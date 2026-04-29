@@ -1,0 +1,25 @@
+{
+  "target_model": "/mnt/eaget-4tb/modelscope_models/Qwen/Qwen3-4B",
+  "draft_model": "/mnt/eaget-4tb/modelscope_models/z-lab/Qwen3-4B-DFlash-b16",
+  "num_spec_tokens": 8,
+  "tests": [
+    {
+      "name": "Thinking mode - short output",
+      "prompt": "Write a Python quicksort function.",
+      "max_tokens": 128,
+      "dflash": null
+    },
+    {
+      "name": "Thinking mode - simple Q&A",
+      "prompt": "What is 2+2?",
+      "max_tokens": 128,
+      "dflash": null
+    },
+    {
+      "name": "No-thinking mode - long output",
+      "prompt": "Explain the difference between TCP and UDP in networking. Include details about handshakes, reliability, and use cases.",
+      "max_tokens": 256,
+      "dflash": null
+    }
+  ]
+}

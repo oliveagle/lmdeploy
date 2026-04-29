@@ -1,0 +1,26 @@
+[
+  {
+    "mode": "unknown",
+    "error": "[W429 01:03:30.728198492 AllocatorConfig.cpp:28] Warning: PYTORCH_CUDA_ALLOC_CONF is deprecated, use PYTORCH_ALLOC_CONF instead (function operator())"
+  },
+  {
+    "mode": "unknown",
+    "error": "[W429 01:03:33.497458827 AllocatorConfig.cpp:28] Warning: PYTORCH_CUDA_ALLOC_CONF is deprecated, use PYTORCH_ALLOC_CONF instead (function operator())"
+  },
+  {
+    "mode": "unknown",
+    "error": "[W429 01:03:36.275032676 AllocatorConfig.cpp:28] Warning: PYTORCH_CUDA_ALLOC_CONF is deprecated, use PYTORCH_ALLOC_CONF instead (function operator())"
+  },
+  {
+    "mode": "unknown",
+    "error": "[W429 01:03:38.016295997 AllocatorConfig.cpp:28] Warning: PYTORCH_CUDA_ALLOC_CONF is deprecated, use PYTORCH_ALLOC_CONF instead (function operator())"
+  },
+  {
+    "mode": "unknown",
+    "error": "[W429 01:03:41.776636985 AllocatorConfig.cpp:28] Warning: PYTORCH_CUDA_ALLOC_CONF is deprecated, use PYTORCH_ALLOC_CONF instead (function operator())"
+  },
+  {
+    "mode": "unknown",
+    "error": "[W429 01:03:44.503433418 AllocatorConfig.cpp:28] Warning: PYTORCH_CUDA_ALLOC_CONF is deprecated, use PYTORCH_ALLOC_CONF instead (function operator())"
+  }
+]

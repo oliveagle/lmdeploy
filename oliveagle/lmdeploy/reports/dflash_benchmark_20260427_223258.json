@@ -1,0 +1,53 @@
+{
+  "timestamp": "20260427_223258",
+  "target_model": "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B",
+  "draft_model": "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B-DFlash",
+  "spec_tokens": 8,
+  "output_tokens": 256,
+  "system_info": {
+    "PyTorch": "2.11.0+cu130",
+    "CUDA": "N/A"
+  },
+  "results": {
+    "1024": {
+      "baseline": {
+        "success": false,
+        "error": "The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver."
+      },
+      "dflash": {
+        "success": false,
+        "error": "The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver."
+      }
+    },
+    "2048": {
+      "baseline": {
+        "success": false,
+        "error": "The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver."
+      },
+      "dflash": {
+        "success": false,
+        "error": "The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver."
+      }
+    },
+    "4096": {
+      "baseline": {
+        "success": false,
+        "error": "The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver."
+      },
+      "dflash": {
+        "success": false,
+        "error": "The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver."
+      }
+    },
+    "8192": {
+      "baseline": {
+        "success": false,
+        "error": "The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver."
+      },
+      "dflash": {
+        "success": false,
+        "error": "The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver."
+      }
+    }
+  }
+}
