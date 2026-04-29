@@ -294,3 +294,6 @@ MODULE_MAP.update({'Eagle3LlamaForCausalLM': f'{LMDEPLOY_PYTORCH_MODEL_PATH}.lla
 
 # deepseek mtp
 MODULE_MAP.update({'DeepseekMTPModel': f'{LMDEPLOY_PYTORCH_MODEL_PATH}.deepseek_mtp.DeepseekMTPModel'})
+
+# dflash draft model
+MODULE_MAP.update({'DFlashDraftModel': f'{LMDEPLOY_PYTORCH_MODEL_PATH}.dflash.DFlashDraftModel'})

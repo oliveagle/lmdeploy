@@ -71,10 +71,28 @@ class Qwen3_5ModelConfigBuilder(AutoModelConfigBuilder):
 
         cfg.use_mrope = True
 
-        # for spec
+        # for spec decoding
         if spec_method is not None:
-            assert spec_method == 'qwen3_5_mtp'
-            cfg.model_paradigm = 'ar_spec'
+            if spec_method == 'dflash':
+                # DFlash uses 5 layers from full_attention layers only
+                # Distribute layers evenly, avoiding linear_attention layers
+                layer_indices = []
+                full_count = 0
+                for idx, layer_type in enumerate(layer_types):
+                    if layer_type == 'full_attention':
+                        full_count += 1
+                        # Select 5 layers evenly distributed: 1st, 25%, 50%, 75%, last
+                        if full_count in [1, full_count // 4 or 1, full_count // 2,
+                                          full_count * 3 // 4, full_count]:
+                            layer_indices.append(idx)
+                # Ensure we have exactly 5 layers
+                while len(layer_indices) < 5 and layer_indices:
+                    # Duplicate some layers if we don't have enough full_attention layers
+                    layer_indices.append(layer_indices[-1])
+                hf_config.aux_hidden_state_layers = tuple(layer_indices[:5])
+            elif spec_method == 'qwen3_5_mtp':
+                assert spec_method == 'qwen3_5_mtp'
+                cfg.model_paradigm = 'ar_spec'
 
         # draft model cfg
         if is_draft_model:
