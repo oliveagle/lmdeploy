@@ -156,8 +156,10 @@ class ARSpecModelAgentStrategy(ModelAgentStrategy):
                            model_outputs: dict[str, torch.Tensor], **kwargs) -> ARSpecExtraInputs:
         """Slice outputs."""
         target_logits = model_outputs['logits'][0]
+        # Use aux_hidden_states for DFlash, fallback to hidden_states
+        target_hidden = model_outputs.get('aux_hidden_states', model_outputs.get('hidden_states'))
         return extra_inputs.clone(
-            target_hidden_states=model_outputs.get('hidden_states'),
+            target_hidden_states=target_hidden,
             target_position_ids=model_outputs.get('position_ids', None),
             target_inputs_embeds=model_outputs.get('target_inputs_embeds', None),
             target_logits=target_logits,
