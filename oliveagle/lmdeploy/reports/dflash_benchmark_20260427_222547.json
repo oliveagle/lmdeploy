@@ -1,0 +1,79 @@
+{
+  "timestamp": "20260427_222547",
+  "target_model": "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B",
+  "draft_model": "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B-DFlash",
+  "spec_tokens": 8,
+  "output_tokens": 256,
+  "system_info": {
+    "PyTorch": "2.5.1+cu124",
+    "CUDA": "12.4",
+    "GPU": "Tesla PG503-216",
+    "GPU Memory": "31.7 GB"
+  },
+  "results": {
+    "1024": {
+      "baseline": {
+        "success": true,
+        "prefill_time": 0.1986255645751953,
+        "decode_time": 5.151953220367432,
+        "prefill_tps": 3025.7937908716403,
+        "decode_tps": 49.68989217292279,
+        "total_time": 5.350578784942627,
+        "prompt_tokens": 601,
+        "output_tokens": 256
+      },
+      "dflash": {
+        "success": false,
+        "error": "Triton Error [CUDA]: an illegal memory access was encountered"
+      }
+    },
+    "2048": {
+      "baseline": {
+        "success": true,
+        "prefill_time": 0.28734922409057617,
+        "decode_time": 5.30038046836853,
+        "prefill_tps": 4179.583236394713,
+        "decode_tps": 48.2984196186953,
+        "total_time": 5.5877296924591064,
+        "prompt_tokens": 1201,
+        "output_tokens": 256
+      },
+      "dflash": {
+        "success": false,
+        "error": "Triton Error [CUDA]: an illegal memory access was encountered"
+      }
+    },
+    "4096": {
+      "baseline": {
+        "success": true,
+        "prefill_time": 0.5273118019104004,
+        "decode_time": 5.741235733032227,
+        "prefill_tps": 4932.565496499083,
+        "decode_tps": 44.58970366381279,
+        "total_time": 6.268547534942627,
+        "prompt_tokens": 2601,
+        "output_tokens": 256
+      },
+      "dflash": {
+        "success": false,
+        "error": "Triton Error [CUDA]: an illegal memory access was encountered"
+      }
+    },
+    "8192": {
+      "baseline": {
+        "success": true,
+        "prefill_time": 1.1367740631103516,
+        "decode_time": 6.373914480209351,
+        "prefill_tps": 4751.163995791925,
+        "decode_tps": 40.1637017244059,
+        "total_time": 7.510688543319702,
+        "prompt_tokens": 5401,
+        "output_tokens": 256
+      },
+      "dflash": {
+        "success": false,
+        "error": "Triton Error [CUDA]: an illegal memory access was encountered"
+      }
+    }
+  }
+}

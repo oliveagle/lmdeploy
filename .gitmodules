@@ -1,0 +1,3 @@
+[submodule "submodules/dflash"]
+	path = submodules/dflash
+	url = git@github.com:z-lab/dflash.git
