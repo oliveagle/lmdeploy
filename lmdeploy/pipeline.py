@@ -69,6 +69,11 @@ class Pipeline:
 
         # Create inference engine
         backend, backend_config = autoget_backend_config(model_path, backend_config)
+
+        # Extract speculative_config from backend_config if not passed directly
+        if speculative_config is None:
+            speculative_config = getattr(backend_config, 'speculative_config', None)
+
         _, pipeline_class = get_task(backend, model_path)
         self.async_engine = pipeline_class(model_path,
                                            backend=backend,

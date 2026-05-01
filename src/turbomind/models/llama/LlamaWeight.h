@@ -23,6 +23,7 @@
 #include <unordered_map>
 
 #include "src/turbomind/core/context.h"
+#include "src/turbomind/models/llama/DFlashDraftWeight.h"
 #include "src/turbomind/models/llama/LlamaDecoderLayerWeight.h"
 #include "src/turbomind/models/llama/LlamaDenseWeight.h"
 #include "src/turbomind/models/llama/llama_params.h"
@@ -54,12 +55,18 @@ struct LlamaWeight: core::Module {
 
     core::ContextGuard context() const;
 
+    // DFlash draft model 支持
+    void LoadDFlashDraftWeight(const std::string& ckpt_path);
+
     std::vector<LlamaDecoderLayerWeight*> decoder_layer_weights;
 
     LlamaDenseWeight pre_decoder_embedding;
     LlamaDenseWeight post_decoder_embedding;
 
     Tensor output_norm_weight;
+
+    // DFlash draft model 权重
+    std::unique_ptr<DFlashDraftWeight> dflash_draft_weight_;
 
 private:
     const ModelParam  model_param_;

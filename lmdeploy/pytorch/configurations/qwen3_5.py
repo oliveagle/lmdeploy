@@ -96,13 +96,19 @@ class Qwen3_5ModelConfigBuilder(AutoModelConfigBuilder):
 
         # draft model cfg
         if is_draft_model:
-            hf_config.architectures[0] = 'Qwen3_5MTPModel'
-            # remove for correct mapping when building the patched model
-            if hasattr(hf_config, 'auto_map'):
-                del hf_config.auto_map
+            original_arch = hf_config.architectures[0]
+            if original_arch == 'DFlashDraftModel':
+                # Keep DFlash architecture, don't remap to MTP
+                cfg.model_paradigm = 'ar_spec'
+                cfg.states_shapes = []
+            else:
+                hf_config.architectures[0] = 'Qwen3_5MTPModel'
+                # remove for correct mapping when building the patched model
+                if hasattr(hf_config, 'auto_map'):
+                    del hf_config.auto_map
 
-            cfg.model_paradigm = 'ar_spec'
-            cfg.num_layers = text_config.mtp_num_hidden_layers
-            cfg.states_shapes = []
+                cfg.model_paradigm = 'ar_spec'
+                cfg.num_layers = text_config.mtp_num_hidden_layers
+                cfg.states_shapes = []
 
         return cfg

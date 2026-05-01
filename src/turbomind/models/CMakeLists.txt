@@ -20,7 +20,11 @@ add_library(models STATIC
         llama/mla_utils.cu
         llama/GatedDeltaNetWeight.cc
         llama/GatedDeltaNetLayer.cc
-        llama/gated_delta_net_kernels.cu)
+        llama/gated_delta_net_kernels.cu
+        llama/unified_decoder_dflash.cc
+        llama/DFlashDraftModel.cu
+        llama/DFlashDraftWeight.cc
+        llama/dflash_kernels.cu)
 set_property(TARGET models PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET models PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 target_link_libraries(models PUBLIC

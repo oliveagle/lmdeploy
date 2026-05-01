@@ -560,5 +560,22 @@ PYBIND11_MODULE(_turbomind, m)
             py::call_guard<py::gil_scoped_release>(),
             "index"_a,
             "tags"_a)
-        .def("is_dummy_node", [](TurboMind* model) { return model->is_dummy_node(); });
+        .def("is_dummy_node", [](TurboMind* model) { return model->is_dummy_node(); })
+        // DFlash speculative decoding support
+        .def("load_dflash_weights",
+            [](TurboMind* model, int index, std::shared_ptr<TensorMap> weight_map) {
+                std::unordered_map<std::string, Tensor> cpu_weights;
+                for (const auto& [k, v] : *weight_map) {
+                    cpu_weights[k] = v;
+                }
+                model->LoadDFlashWeights(index, cpu_weights);
+            },
+            py::call_guard<py::gil_scoped_release>(),
+            "index"_a, "weight_map"_a)
+        .def("enable_dflash",
+            [](TurboMind* model, int index, int num_spec_tokens) {
+                model->EnableDFlash(index, num_spec_tokens);
+            },
+            py::call_guard<py::gil_scoped_release>(),
+            "index"_a, "num_spec_tokens"_a);
 }

@@ -52,25 +52,35 @@ class DFlashProposer(BaseSpecProposer):
         # Set hidden size from draft model config
         self.hidden_size = getattr(hf_config, 'hidden_size', 2048)
 
-        # Share embed_tokens from target model (DFlash draft doesn't have its own)
-        if hasattr(self.model, 'model'):
-            draft_model = self.model.model
+        # Share embed_tokens and lm_head from target model.
+        # DFlash draft model doesn't have its own embedding or lm_head.
+        # The draft model may be wrapped (e.g., graph_runner -> model),
+        # so resolve the inner model first.
+        if target_model is None:
+            logger.warning('DFlashProposer: target_model is None, skipping weight sharing.')
+            return
+
+        inner_model = self.model
+        while hasattr(inner_model, 'model'):
+            inner_model = inner_model.model
+
+        logger.info('DFlash: sharing embed_tokens and lm_head from target model.')
+
+        # embed_tokens: always use target model's embedding layer
+        if hasattr(target_model, 'get_input_embeddings'):
+            inner_model.embed_tokens = target_model.get_input_embeddings()
+        elif hasattr(target_model, 'model') and hasattr(target_model.model, 'get_input_embeddings'):
+            inner_model.embed_tokens = target_model.model.get_input_embeddings()
         else:
-            draft_model = self.model
+            logger.warning('DFlashProposer: cannot find target embed_tokens, keeping draft default.')
 
-        if hasattr(draft_model, 'embed_tokens') and target_model is not None:
-            logger.info('Using embed_tokens from target model for DFlash draft.')
-            del draft_model.embed_tokens
-            draft_model.embed_tokens = target_model.get_input_embeddings()
-
-        # Share lm_head from target model (DFlash draft doesn't have its own)
-        if hasattr(draft_model, 'lm_head') and target_model is not None:
-            logger.info('Using lm_head from target model for DFlash draft.')
-            del draft_model.lm_head
-            if hasattr(target_model, 'lm_head'):
-                draft_model.lm_head = target_model.lm_head
-            else:
-                draft_model.lm_head = target_model.get_logits
+        # lm_head: always use target model's logits projection
+        if hasattr(target_model, 'get_logits'):
+            inner_model.lm_head = target_model
+        elif hasattr(target_model, 'lm_head'):
+            inner_model.lm_head = target_model.lm_head
+        else:
+            logger.warning('DFlashProposer: cannot find target lm_head, keeping draft default.')
 
     def get_outputs(self, model_outputs: dict, model_inputs: ModelInputs, extra_inputs: ExtraInputs = None):
         """Extract draft token predictions from model outputs.

@@ -3,6 +3,12 @@
 cmake_minimum_required(VERSION 3.11)
 project(_turbomind LANGUAGES CXX CUDA)
 
+# Manually add CUDA include directory
+include_directories(SYSTEM /usr/local/cuda/include)
+
+# Manually add CUDA include directory
+include_directories(SYSTEM /usr/local/cuda/include)
+
 find_package(pybind11 CONFIG)
 if(NOT pybind11_FOUND)
     execute_process(COMMAND "pybind11-config" "--cmakedir"
@@ -13,7 +19,7 @@ if(NOT pybind11_FOUND)
 endif()
 
 pybind11_add_module(${PROJECT_NAME} bind.cpp)
-target_link_libraries(${PROJECT_NAME} PRIVATE turbomind xgrammar)
+target_link_libraries(${PROJECT_NAME} PRIVATE turbomind models xgrammar)
 
 pybind11_add_module(_xgrammar xgrammar_bind.cpp)
 target_link_libraries(_xgrammar PRIVATE core xgrammar)

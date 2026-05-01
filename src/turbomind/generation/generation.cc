@@ -19,6 +19,7 @@
 #include "src/turbomind/kernels/sampling_topk_kernels.h"  // InitializeRandomStates
 
 #include "src/turbomind/models/llama/llama_kernels.h"  // invokePadLastTokenIds
+#include "src/turbomind/models/llama/DFlashDraftModel.h"
 
 // #include "dbg.h"
 
@@ -284,7 +285,32 @@ struct Generation::Impl {
             guided_decoding_->FillMask(phase, env);
             guided_decoding_->ApplyMask(phase, env);
 
-            sampling_->Forward(phase, env);
+            // DFlash speculative decoding: check if we have pre-verified tokens
+            if (env.contains("dflash_accepted_tokens")) {
+                // Use DFlash accepted tokens instead of sampling
+                const auto& dflash_accepted = env.at("dflash_accepted_tokens");
+                const auto& dflash_mask = env.at("dflash_accept_mask");
+
+                // Copy accepted tokens to output_ids
+                // TODO: need to handle multiple batches properly
+                int num_accepted = dflash_accepted.shape(0);
+                Copy(dflash_accepted.buffer(), num_accepted, output_ids_);
+
+                TM_LOG_INFO("[DFlash] Using %d accepted tokens from DFlash", num_accepted);
+
+                // Update token_ids_ptrs
+                AppendTokenIds(d.token_ids_ptrs.data(), output_ids_.data(), output_pos.data(), num_accepted, stream);
+
+                // For rejected tokens, still need to sample
+                int num_rejected = dflash_mask.shape(0) - num_accepted;
+                if (num_rejected > 0) {
+                    TM_LOG_INFO("[DFlash] Sampling %d rejected tokens", num_rejected);
+                    sampling_->Forward(phase, env);
+                }
+            } else {
+                // Normal sampling
+                sampling_->Forward(phase, env);
+            }
 
             guided_decoding_->Update(phase, env);
 

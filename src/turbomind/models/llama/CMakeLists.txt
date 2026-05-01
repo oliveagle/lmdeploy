@@ -18,6 +18,7 @@ add_library(Llama STATIC
         LlamaFfnLayer.cc
         moe_ffn_layer.cc
         unified_decoder.cc
+        unified_decoder_dflash.cc
         unified_attention_layer.cc
         llama_kernels.cu
         llama_utils.cu
@@ -25,6 +26,9 @@ add_library(Llama STATIC
         GatedDeltaNetWeight.cc
         GatedDeltaNetLayer.cc
         gated_delta_net_kernels.cu
+        DFlashDraftModel.cc
+        DFlashDraftWeight.cc
+        dflash_kernels.cu
 )
 set_property(TARGET Llama PROPERTY POSITION_INDEPENDENT_CODE  ON)
 set_property(TARGET Llama PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS  ON)

@@ -97,3 +97,32 @@ Layer/norm/head mappings per model family are defined directly in `calibrate.py`
 ## Adding a New PyTorch Model
 
 Use the `/support-new-model` skill for a complete step-by-step guide.
+
+---
+
+## DFlash Speculative Decoding Integration
+
+**当前状态**: 设计完成，C++ 原型 80%，核心集成进行中
+
+**团队协作**: 使用多 Agent 团队 `dflash-turbomind-integration` 进行开发
+
+**关键文档**:
+- `DFLASH_PROJECT_SUMMARY.md` - 项目总结
+- `DFLASH_IMPLEMENTATION_ROADMAP.md` - 实施路线图
+- `DFLASH_TURBOMIND_DESIGN.md` - 架构设计
+- `~/.claude/teams/dflash-turbomind-integration/AGENTS.md` - 团队协作记录
+
+**已创建的 C++ 文件**:
+- `src/turbomind/models/llama/DFlashDraftModel.{h,cc}` - Draft model 实现
+- `src/turbomind/models/llama/DFlashDraftWeight.{h,cc}` - 权重结构
+- `src/turbomind/models/llama/dflash_kernels.{h,cu}` - CUDA kernels
+- `src/turbomind/models/llama/unified_decoder_dflash.{h,cc}` - Decoder 扩展
+
+**待完成的任务**:
+1. 修改 `LlamaWeight.{h,cc}` 添加 DFlashDraftWeight 支持
+2. 修改 `LlamaDecoder.cc` 实现 speculative 解码
+3. 添加 `SpeculativeConfig` 到 `messages.py`
+4. 修改 `CMakeLists.txt` 添加 DFlash 源文件
+5. 修改 `turbomind.py` Python 接口
+
+**预期性能**: 1.7x+ decode speedup, 60-80% accept rate

@@ -39,6 +39,9 @@ public:
 
     std::shared_ptr<ScheduleMetrics> GetScheduleMetrics();
 
+    // DFlash support
+    void EnableDFlash(bool enable);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

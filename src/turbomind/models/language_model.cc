@@ -35,6 +35,7 @@ using std::shared_ptr;
 struct LanguageModel::Impl {
     const DataType       dtype_;
     const ModelParam     param_;
+    const EngineParam    engine_param_;
     const AttentionParam attn_param_;
     const Communicators& comm_;
     const LlamaWeight&   weights_;
@@ -131,6 +132,7 @@ LanguageModel::Impl::Impl(DataType              dtype,
                           int                   phases):
     dtype_{dtype},
     param_{model},
+    engine_param_{engine},
     attn_param_{attn},
     comm_{ctx.comm},
     weights_{weights},
@@ -516,6 +518,65 @@ const ModelParam& LanguageModel::model_param() const noexcept
 const AttentionParam& LanguageModel::attn_param() const noexcept
 {
     return TM_CHECK_NOTNULL(impl_)->attn_param_;
+}
+
+void LanguageModel::SetDFlashContext(Context* ctx)
+{
+    TM_CHECK_NOTNULL(impl_)->unified_decoder_->SetContext(ctx);
+}
+
+void LanguageModel::EnableDFlash(bool enable)
+{
+    auto& impl = TM_CHECK_NOTNULL(impl_);
+    if (!enable) {
+        impl->unified_decoder_->EnableDFlash(false);
+        impl->unified_decoder_->SetDFlashDraftModel(nullptr);
+        TM_LOG_INFO("[DFlash] Disabled DFlash on LanguageModel decoder");
+        return;
+    }
+
+    // Check if draft weights are loaded
+    if (!impl->weights_.dflash_draft_weight_) {
+        TM_LOG_ERROR("[DFlash] Cannot enable DFlash: draft weights not loaded. Call LoadDFlashWeights first.");
+        impl->unified_decoder_->EnableDFlash(false);
+        return;
+    }
+
+    TM_LOG_INFO("[DFlash] Enabling DFlash: num_layers=%d, hidden=%d, num_heads=%d",
+                impl->weights_.dflash_draft_weight_->num_layers,
+                impl->weights_.dflash_draft_weight_->hidden_size,
+                impl->weights_.dflash_draft_weight_->num_attention_heads);
+
+    // Check if we have context
+    auto* ctx = impl->unified_decoder_->GetContext();
+    if (!ctx) {
+        TM_LOG_ERROR("[DFlash] Cannot enable DFlash: context not set. Call SetDFlashContext first.");
+        impl->unified_decoder_->EnableDFlash(false);
+        return;
+    }
+
+    // Create DFlash draft model
+    try {
+        auto dflash_model = std::make_unique<DFlashDraftModel>(
+            impl->param_,
+            impl->engine_param_,
+            *ctx
+        );
+
+        // Set the weight pointer (not copy)
+        dflash_model->SetDraftWeightPointer(impl->weights_.dflash_draft_weight_.get());
+
+        // Attach draft model to decoder
+        impl->unified_decoder_->SetDFlashDraftModel(std::move(dflash_model));
+        impl->unified_decoder_->EnableDFlash(true);
+
+        TM_LOG_INFO("[DFlash] Enabled DFlash on LanguageModel decoder");
+    }
+    catch (const std::exception& e) {
+        TM_LOG_ERROR("[DFlash] Failed to enable DFlash: %s", e.what());
+        impl->unified_decoder_->EnableDFlash(false);
+        impl->unified_decoder_->SetDFlashDraftModel(nullptr);
+    }
 }
 
 }  // namespace turbomind

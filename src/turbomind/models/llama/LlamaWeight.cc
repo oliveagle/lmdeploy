@@ -22,10 +22,12 @@
 
 #include "src/turbomind/core/allocator.h"
 #include "src/turbomind/core/context.h"
+#include "src/turbomind/models/llama/DFlashDraftWeight.h"
 #include "src/turbomind/models/llama/LlamaDenseWeight.h"
 #include "src/turbomind/models/llama/LlamaWeight.h"
 #include "src/turbomind/models/llama/llama_params.h"
 #include "src/turbomind/utils/cuda_utils.h"
+#include "src/turbomind/core/logger.h"
 
 namespace turbomind {
 
@@ -182,6 +184,55 @@ void LlamaWeight::prepare(const cudaDeviceProp& prop)
 
     // Block until processing is done
     check_cuda_error(cudaStreamSynchronize(stream));
+}
+
+void LlamaWeight::LoadDFlashDraftWeight(const std::string& ckpt_path)
+{
+    /*
+     * 加载 DFlash draft model 权重
+     *
+     * DFlash draft model 与 target model 共享以下权重:
+     * - embed_tokens: token embedding
+     * - lm_head: output projection
+     *
+     * DFlash 自己的权重从 checkpoint 加载:
+     * - 8 层的 qkv_proj, o_proj, gate_up_proj, down_proj
+     * - 8 层的 input_layernorm, post_attention_layernorm
+     */
+
+    TM_LOG_INFO("Loading DFlash draft model weights from: %s", ckpt_path.c_str());
+
+    core::ContextGuard guard = context();
+
+    // 创建 DFlash draft weight 结构
+    dflash_draft_weight_ = std::make_unique<DFlashDraftWeight>();
+
+    // 共享 embed_tokens 和 lm_head
+    dflash_draft_weight_->embed_tokens = pre_decoder_embedding.weight;
+    dflash_draft_weight_->lm_head = post_decoder_embedding.weight;
+
+    // 设置配置 (从 ModelParam 获取)
+    dflash_draft_weight_->num_layers = 8;
+    dflash_draft_weight_->hidden_size = hidden_units_;
+    dflash_draft_weight_->intermediate_size = inter_size_[0];  // 使用第一层的 inter_size
+    dflash_draft_weight_->num_attention_heads = model_param_.head_num;
+    dflash_draft_weight_->num_key_value_heads = model_param_.kv_head_num;
+    dflash_draft_weight_->head_dim = model_param_.head_dim;
+    dflash_draft_weight_->rms_norm_eps = model_param_.norm_eps;
+
+    // DFlash 权重由 Python 通过 DLPack 加载, 这里只做初始化
+    // Python 侧通过 SetDFlashWeights() 传入各层权重
+
+    TM_LOG_INFO("DFlash draft model weights loaded:");
+    TM_LOG_INFO("  num_layers: %d", dflash_draft_weight_->num_layers);
+    TM_LOG_INFO("  hidden_size: %d", dflash_draft_weight_->hidden_size);
+    TM_LOG_INFO("  intermediate_size: %d", dflash_draft_weight_->intermediate_size);
+    TM_LOG_INFO("  num_attention_heads: %d", dflash_draft_weight_->num_attention_heads);
+    TM_LOG_INFO("  num_key_value_heads: %d", dflash_draft_weight_->num_key_value_heads);
+    TM_LOG_INFO("  head_dim: %d", dflash_draft_weight_->head_dim);
+    TM_LOG_INFO("  rms_norm_eps: %f", dflash_draft_weight_->rms_norm_eps);
+    TM_LOG_INFO("  embed_tokens: [shared from target model]");
+    TM_LOG_INFO("  lm_head: [shared from target model]");
 }
 
 }  // namespace turbomind

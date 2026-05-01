@@ -20,7 +20,8 @@ import torch
 import yaml
 
 import lmdeploy
-from lmdeploy.messages import EngineOutput, GenerationConfig, ResponseType, ScheduleMetrics, TurbomindEngineConfig
+from lmdeploy.messages import (EngineOutput, GenerationConfig, ResponseType, ScheduleMetrics,
+                                SpeculativeConfig, TurbomindEngineConfig)
 from lmdeploy.serve.openai.protocol import UpdateParamsRequest
 from lmdeploy.tokenizer import Tokenizer
 from lmdeploy.utils import get_logger, get_max_batch_size, get_model
@@ -162,6 +163,9 @@ class TurboMind:
         self.devices = _engine_config.devices
         self._engine_created = False
 
+        # Save speculative_config for DFlash draft model loading
+        self.speculative_config = _engine_config.speculative_config
+
         if not osp.exists(model_path):
             model_path = get_model(model_path, _engine_config.download_dir, _engine_config.revision)
         self.model_comm = self._from_hf(model_path=model_path, engine_config=_engine_config)
@@ -171,6 +175,9 @@ class TurboMind:
             self._load_weights()
             self._process_weights()
             self._create_engine()
+            # Load DFlash draft model if speculative_config is provided (after engine creation)
+            if self.speculative_config is not None:
+                self._load_dflash_model()
 
         self.session_len = self.config.session_len
 
@@ -202,6 +209,161 @@ class TurboMind:
             for _ in e.map(self.model_comm.create_engine, range(self.gpu_count)):
                 pass
         self._engine_created = True
+
+    def _load_dflash_model(self):
+        """Load DFlash draft model for speculative decoding.
+
+        This method loads the draft model specified in speculative_config
+        and prepares it for speculative decoding with the target model.
+        """
+        if self.speculative_config is None:
+            return
+
+        if not isinstance(self.speculative_config, SpeculativeConfig):
+            logger.warning('speculative_config is not a SpeculativeConfig instance, '
+                           'skipping draft model loading')
+            return
+
+        if self.speculative_config.method not in ('dflash', 'eagle'):
+            logger.warning(f'Unknown speculative decoding method: {self.speculative_config.method}, '
+                           'skipping draft model loading')
+            return
+
+        draft_model_path = self.speculative_config.model
+        if not draft_model_path:
+            logger.warning('speculative_config.model is empty, skipping draft model loading')
+            return
+
+        logger.info(f'Loading DFlash draft model from {draft_model_path}')
+
+        # 1. Load draft model weights from safetensors
+        try:
+            from safetensors import safe_open
+            import numpy as np
+        except ImportError:
+            logger.warning('safetensors not installed, cannot load DFlash weights')
+            return
+
+        # Get draft model config
+        try:
+            from transformers import AutoConfig
+            hf_config = AutoConfig.from_pretrained(draft_model_path, trust_remote_code=True)
+        except Exception:
+            from transformers import AutoConfig
+            hf_config = AutoConfig.from_pretrained(draft_model_path)
+
+        num_layers = getattr(hf_config, 'num_hidden_layers', 8)
+        hidden_size = getattr(hf_config, 'hidden_size', 5120)
+        inter_size = getattr(hf_config, 'intermediate_size', 13824)
+
+        logger.info(f'DFlash draft model config: layers={num_layers} hidden={hidden_size} inter={inter_size}')
+
+        # 3. Load weights from safetensors
+        safetensors_path = None
+        for fname in os.listdir(draft_model_path):
+            if fname.endswith('.safetensors'):
+                safetensors_path = osp.join(draft_model_path, fname)
+                break
+
+        if safetensors_path is None:
+            logger.warning(f'No safetensors file found in {draft_model_path}')
+            return
+
+        logger.info(f'Loading DFlash weights from {safetensors_path}')
+
+        # Collect weights per layer to combine QKV
+        layer_weights = {}  # {layer_idx: {weight_type: tensor}}
+
+        # First pass: collect all weights
+        try:
+            from safetensors import safe_open
+            with safe_open(safetensors_path, framework='pt', device='cpu') as f:
+                for key in f.keys():
+                    if not key.startswith('layers.'):
+                        continue
+
+                    parts = key.split('.')
+                    if len(parts) < 4:
+                        continue
+
+                    layer_idx = int(parts[1])
+                    if layer_idx >= num_layers:
+                        continue
+
+                    if layer_idx not in layer_weights:
+                        layer_weights[layer_idx] = {}
+
+                    tensor = f.get_tensor(key)
+
+                    # Map HF key to DFlash weight type
+                    if 'self_attn.q_proj' in key:
+                        layer_weights[layer_idx]['q'] = tensor
+                    elif 'self_attn.k_proj' in key:
+                        layer_weights[layer_idx]['k'] = tensor
+                    elif 'self_attn.v_proj' in key:
+                        layer_weights[layer_idx]['v'] = tensor
+                    elif 'self_attn.o_proj' in key:
+                        layer_weights[layer_idx]['o_proj'] = tensor
+                    elif 'input_layernorm' in key:
+                        layer_weights[layer_idx]['input_layernorm'] = tensor
+                    elif 'mlp.gate_up_proj' in key:
+                        layer_weights[layer_idx]['gate_up_proj'] = tensor
+                    elif 'mlp.down_proj' in key:
+                        layer_weights[layer_idx]['down_proj'] = tensor
+                    elif 'post_attention_layernorm' in key:
+                        layer_weights[layer_idx]['post_layernorm'] = tensor
+        except Exception as e:
+            logger.warning(f'Failed to load safetensors: {e}')
+            return
+
+        # Second pass: combine QKV and load
+        def _load_on_rank(device_id):
+            import torch
+            tm_map = _tm.TensorMap()
+
+            for layer_idx in sorted(layer_weights.keys()):
+                weights = layer_weights[layer_idx]
+
+                # Combine QKV weights
+                if 'q' in weights and 'k' in weights and 'v' in weights:
+                    q = weights['q'].float() if weights['q'].dtype != torch.float32 else weights['q']
+                    k = weights['k'].float() if weights['k'].dtype != torch.float32 else weights['k']
+                    v = weights['v'].float() if weights['v'].dtype != torch.float32 else weights['v']
+
+                    # Concatenate along output dim: [hidden_out, hidden_in] -> [3*hidden_out, hidden_in]
+                    qkv = torch.cat([q, k, v], dim=0)
+                    qkv_np = qkv.numpy().astype(np.float16)
+
+                    dlpack_tensor = torch.from_numpy(qkv_np)
+                    tm_tensor = _tm.from_dlpack(dlpack_tensor)
+                    tm_map[f'dflash.layers.{layer_idx}.qkv_proj'] = tm_tensor
+
+                # Load other weights
+                for wtype, tensor in weights.items():
+                    if wtype in ['q', 'k', 'v']:
+                        continue
+
+                    dflash_key = f'dflash.layers.{layer_idx}.{wtype}'
+                    np_tensor = tensor.float().numpy().astype(np.float16)
+                    dlpack_tensor = torch.from_numpy(np_tensor)
+                    tm_tensor = _tm.from_dlpack(dlpack_tensor)
+                    tm_map[dflash_key] = tm_tensor
+
+            self.model_comm.load_dflash_weights(device_id, tm_map)
+
+        with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
+            list(e.map(_load_on_rank, range(self.gpu_count)))
+
+        # 4. Enable DFlash on all GPUs
+        num_spec = self.speculative_config.num_speculative_tokens or 8
+
+        def _enable_on_rank(device_id):
+            self.model_comm.enable_dflash(device_id, num_spec)
+
+        with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
+            list(e.map(_enable_on_rank, range(self.gpu_count)))
+
+        logger.info(f'DFlash loaded: {num_spec} spec tokens, layers={num_layers}, hidden={hidden_size}')
 
     def _create_weight(self, model_comm):
         """Allocate weight buffer, load params if from_workspace."""
