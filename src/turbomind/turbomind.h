@@ -28,6 +28,11 @@ public:
 
     void CreateEngine(int index);
 
+    // DFlash speculative decoding support
+    void LoadDFlashWeights(int index, const std::unordered_map<std::string, Tensor>& weight_map);
+
+    void EnableDFlash(int index, int num_spec_tokens);
+
     void Sleep(int index, int level);
 
     void WakeUp(int index, const std::vector<std::string>& tags);

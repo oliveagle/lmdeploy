@@ -125,11 +125,12 @@ class AsyncEngine:
         self.session_len = (_get_and_verify_max_len(self.hf_cfg, None)
                             if backend_config.session_len is None else backend_config.session_len)
         backend_config.session_len = self.session_len
-        if speculative_config is not None and backend == 'turbomind':
-            logger.warning('speculative decoding is not supported by turbomind ')
+        # TurboMind now supports DFlash speculative decoding
+        # if speculative_config is not None and backend == 'turbomind':
+        #     logger.warning('speculative decoding is not supported by turbomind ')
         # build backend engine
         if backend == 'turbomind':
-            self.engine = self._build_turbomind(model_path=model_path, backend_config=backend_config, **kwargs)
+            self.engine = self._build_turbomind(model_path=model_path, backend_config=backend_config, speculative_config=speculative_config, **kwargs)
         elif backend == 'pytorch':
             self.engine = self._build_pytorch(model_path=model_path,
                                               backend_config=backend_config,
@@ -169,10 +170,10 @@ class AsyncEngine:
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
 
-    def _build_turbomind(self, model_path: str, backend_config: TurbomindEngineConfig | None = None, **kwargs):
+    def _build_turbomind(self, model_path: str, backend_config: TurbomindEngineConfig | None = None, speculative_config: SpeculativeConfig | None = None, **kwargs):
         """Inner build method for turbomind backend."""
         from lmdeploy import turbomind as tm
-        return tm.TurboMind.from_pretrained(model_path, engine_config=backend_config, **kwargs)
+        return tm.TurboMind.from_pretrained(model_path, engine_config=backend_config, speculative_config=speculative_config, **kwargs)
 
     def _build_pytorch(self,
                        model_path: str,

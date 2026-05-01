@@ -19,6 +19,7 @@
 
 #include "src/turbomind/models/language_model.h"
 #include "src/turbomind/models/llama/LlamaWeight.h"
+#include "src/turbomind/models/llama/DFlashDraftWeight.h"
 #include "src/turbomind/models/llama/context.h"
 #include "src/turbomind/models/llama/llama_params.h"
 #include "src/turbomind/models/llama/llama_utils.h"
@@ -315,6 +316,91 @@ struct TurboMind::Impl {
         if (engine_param_.max_context_token_num <= engine_param_.max_batch_size) {
             engine_param_.max_context_token_num *= engine_param_.session_len;
             TM_LOG_WARN("`max_context_token_num` = {}.", (int)engine_param_.max_context_token_num);
+        }
+    }
+
+    void LoadDFlashWeights(int index, const std::unordered_map<std::string, Tensor>& weight_map)
+    {
+        CudaDeviceGuard dev_guard(engine_param_.devices[index]);
+
+        auto& llama_weight = TM_CHECK_NOTNULL(weights_[index]);
+
+        // Create or reuse DFlash draft weight
+        if (!llama_weight->dflash_draft_weight_) {
+            llama_weight->dflash_draft_weight_ = std::make_unique<DFlashDraftWeight>();
+        }
+
+        auto& dflash_w = llama_weight->dflash_draft_weight_;
+
+        // Parse weight map and populate CPU tensors
+        // Expected keys: "dflash.layers.{i}.{weight_name}" or "layers.{i}.{weight_name}"
+        for (const auto& [name, tensor] : weight_map) {
+            // Support both "dflash.layers.X." and "layers.X." formats
+            std::string prefix = "dflash.layers.";
+            size_t prefix_len = prefix.length();
+
+            // If name doesn't start with "dflash.layers.", try "layers."
+            if (name.find(prefix) != 0) {
+                prefix = "layers.";
+                prefix_len = prefix.length();
+                if (name.find(prefix) != 0) {
+                    continue;  // Skip non-DFlash weights
+                }
+            }
+
+            // Parse layer index and weight type
+            // Example: "dflash.layers.0.qkv_proj" or "layers.0.qkv_proj"
+            std::string rest = name.substr(prefix_len);  // skip prefix
+            size_t dot_pos = rest.find('.');
+            if (dot_pos == std::string::npos) {
+                continue;
+            }
+
+            int layer = std::stoi(rest.substr(0, dot_pos));
+            if (layer >= dflash_w->num_layers) {
+                continue;
+            }
+
+            std::string wtype = rest.substr(dot_pos + 1);
+
+            TM_LOG_INFO("[DFlash] Loading weight: layer {}, type {}", layer, wtype);
+
+            // Copy tensor to appropriate slot (GPU tensors from Python)
+            if (wtype == "qkv_proj") {
+                dflash_w->d_attn_qkv_weight[layer] = tensor;
+            }
+            else if (wtype == "o_proj") {
+                dflash_w->d_attn_o_weight[layer] = tensor;
+            }
+            else if (wtype == "input_layernorm") {
+                dflash_w->d_input_layernorm[layer] = tensor;
+            }
+            else if (wtype == "gate_up_proj") {
+                dflash_w->d_gate_up_proj[layer] = tensor;
+            }
+            else if (wtype == "down_proj") {
+                dflash_w->d_down_proj[layer] = tensor;
+            }
+            else if (wtype == "post_layernorm") {
+                dflash_w->d_post_layernorm[layer] = tensor;
+            }
+        }
+
+        // No need to call ToDevice - weights are already on GPU from Python
+        TM_LOG_INFO("[DFlash] Loaded draft weights for GPU {} ({} layers)",
+                    index, (int)dflash_w->num_layers);
+    }
+
+    void EnableDFlash(int index, int num_spec_tokens)
+    {
+        CudaDeviceGuard dev_guard(engine_param_.devices[index]);
+
+        // Enable DFlash on the engine's LanguageModel
+        if (index < (int)engines_.size() && engines_[index]) {
+            engines_[index].EnableDFlash(true);
+            TM_LOG_INFO("[DFlash] DFlash enabled for GPU {} with {} spec tokens", index, num_spec_tokens);
+        } else {
+            TM_LOG_WARNING("[DFlash] Engine {} not created yet, cannot enable DFlash", index);
         }
     }
 };
@@ -825,6 +911,16 @@ unique_ptr<ModelRequest> TurboMind::CreateRequest()
 bool TurboMind::is_dummy_node() const noexcept
 {
     return impl_->n_queues_ == 0;
+}
+
+void TurboMind::LoadDFlashWeights(int index, const std::unordered_map<std::string, Tensor>& weight_map)
+{
+    return impl_->LoadDFlashWeights(index, weight_map);
+}
+
+void TurboMind::EnableDFlash(int index, int num_spec_tokens)
+{
+    return impl_->EnableDFlash(index, num_spec_tokens);
 }
 
 }  // namespace turbomind

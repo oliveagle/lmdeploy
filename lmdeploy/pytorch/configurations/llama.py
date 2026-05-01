@@ -22,10 +22,13 @@ class LlamaModelConfigBuilder(AutoModelConfigBuilder):
             cfg.vocab_size = getattr(hf_config, 'draft_vocab_size', hf_config.vocab_size)
             cfg.model_paradigm = 'ar_spec'
         elif spec_method is not None:
-            # add aux_hidden_state_layers for eagle3
+            # add aux_hidden_state_layers for spec decoding
             if spec_method == 'eagle3':
                 num_layers = cfg.num_layers
                 hf_config.aux_hidden_state_layers = (2, num_layers // 2, num_layers - 3)
+            elif spec_method == 'dflash':
+                hf_config.aux_hidden_state_layers = (1, 10, 19, 28, 37)
             cfg.model_paradigm = 'ar_spec'
+
         cfg.hf_config = hf_config
         return cfg

@@ -121,6 +121,8 @@ struct Engine::Impl {
 
     int& is_warm_up_;
 
+    Context* ctx_;  // Save context for DFlash
+
     unique_ptr<SequenceManager> seq_mgr_;
 
     Queue<unique_ptr<BatchData>> inbound_;
@@ -192,6 +194,7 @@ Engine::Impl::Impl(DataType      dtype,
     queue_id_{queue_id},
     async_{phases > 1},
     is_warm_up_{*ctx.is_warm_up},
+    ctx_{&ctx},
     model_{std::move(model)}
 {
     states_.emplace_back();
@@ -917,6 +920,12 @@ shared_ptr<ScheduleMetrics> Engine::GetScheduleMetrics()
         return std::atomic_load_explicit(&impl_->metrics_, std::memory_order_acquire);
     }
     return {};
+}
+
+void Engine::EnableDFlash(bool enable)
+{
+    impl_->model_.SetDFlashContext(impl_->ctx_);
+    impl_->model_.EnableDFlash(enable);
 }
 
 }  // namespace turbomind

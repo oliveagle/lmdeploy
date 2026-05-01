@@ -154,6 +154,7 @@ class TurbomindModelConfig:
     model_config: ModelConfig = None
     attention_config: AttentionConfig = None
     lora_config: LoraConfig = None
+    speculative_config: dict | None = None
 
     def update_from_engine_config(self, config: TurbomindEngineConfig):
         """Update the attributes of this instance with the attributes from
@@ -172,6 +173,11 @@ class TurbomindModelConfig:
                 setattr(self.model_config, key, value)
             if hasattr(self.attention_config, key):
                 setattr(self.attention_config, key, value)
+
+        # handle speculative_config separately (asdict would serialize it as dict)
+        if hasattr(config, 'speculative_config') and config.speculative_config is not None:
+            from dataclasses import asdict as dc_asdict
+            self.speculative_config = dc_asdict(config.speculative_config)
 
         # update from hf_overrides
         if hasattr(config, 'hf_overrides') and config.hf_overrides:
@@ -211,16 +217,20 @@ class TurbomindModelConfig:
         if config is None:
             config = {}
         _cfg = {field.name: config.get(field.name, {}) for field in fields(TurbomindModelConfig)}
+        # Handle speculative_config separately: use None when missing
+        speculative_config = config.get('speculative_config')
 
         return TurbomindModelConfig(model_config=config_from_dict(ModelConfig, _cfg['model_config']),
                                     attention_config=config_from_dict(AttentionConfig, _cfg['attention_config']),
-                                    lora_config=config_from_dict(LoraConfig, _cfg['lora_config']))
+                                    lora_config=config_from_dict(LoraConfig, _cfg['lora_config']),
+                                    speculative_config=speculative_config)
 
     def to_dict(self):
         """Export to a dict."""
         return dict(model_config=config_to_dict(self.model_config),
                     attention_config=config_to_dict(self.attention_config),
-                    lora_config=config_to_dict(self.lora_config))
+                    lora_config=config_to_dict(self.lora_config),
+                    speculative_config=self.speculative_config)
 
     @property
     def session_len(self):

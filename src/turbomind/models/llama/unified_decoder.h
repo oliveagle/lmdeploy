@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/turbomind/comm/device_comm.h"
+#include "src/turbomind/models/llama/DFlashDraftModel.h"
 #include "src/turbomind/models/llama/GatedDeltaNetLayer.h"
 #include "src/turbomind/models/llama/LlamaDecoderLayerWeight.h"
 #include "src/turbomind/models/llama/LlamaFfnLayer.h"
@@ -25,6 +26,13 @@ public:
     void Run(BatchOp op, int phase, TensorMap& env);
 
     void Forward(int phase, TensorMap& env, const std::vector<WeightType*>& weights);
+
+    // DFlash 支持
+    void EnableDFlash(bool enable) { enable_dflash_ = enable; }
+    bool IsDFlashEnabled() const { return enable_dflash_; }
+    void SetDFlashDraftModel(std::unique_ptr<DFlashDraftModel> model) { dflash_draft_model_ = std::move(model); }
+    void SetContext(Context* ctx) { ctx_ = ctx; }
+    Context* GetContext() const { return ctx_; }
 
 private:
     const size_t layer_num_;
@@ -58,6 +66,16 @@ private:
                                   int           t0,
                                   int           t1,
                                   const int*    local_token_nums);
+
+    // DFlash 相关成员
+    std::unique_ptr<DFlashDraftModel> dflash_draft_model_;
+    bool enable_dflash_{false};
+    std::vector<Tensor> aux_hidden_states_;
+    const int dflash_aux_layers_[5];
+    Context* ctx_{nullptr};
+
+    // 获取收集的 aux hidden states
+    const std::vector<Tensor>& GetAuxHiddenStates() const { return aux_hidden_states_; }
 };
 
 }  // namespace turbomind

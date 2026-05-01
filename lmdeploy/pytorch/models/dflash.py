@@ -112,46 +112,45 @@ class DFlashAttention(nn.Module):
         bsz, q_len, _ = hidden_states.shape
         ctx_len = target_hidden.shape[1]
 
-        # Q from draft tokens
-        qkv_states = self.qkv_proj(hidden_states)
-        qkv_states = qkv_states.flatten(0, -2)
-        query_states, _, _ = self.qkv_proj.split_qkv(qkv_states)
-
+        # Q from draft tokens - use qkv_proj and split_qkv
+        qkv = self.qkv_proj(hidden_states)
+        qkv_flat = qkv.flatten(0, -2)
+        query_states, _, _ = self.qkv_proj.split_qkv(qkv_flat)
+        query_states = query_states.view(bsz, q_len, self.num_attention_heads,
+                                          self.head_dim).transpose(1, 2)
         query_states = self.q_norm(query_states)
 
-        # K and V from concatenation of target (context) and draft (noise)
-        k_ctx_states = self.qkv_proj.k_proj(target_hidden) if hasattr(self.qkv_proj, 'k_proj') else None
-        k_ctx = k_ctx_states if k_ctx_states is not None else self.qkv_proj(target_hidden)
-
-        k_draft_states = self.qkv_proj(hidden_states)
-        k_draft = k_draft_states
-
-        # Apply q, k norm
-        query_states = query_states.view(bsz, q_len, self.num_attention_heads, self.head_dim)
-        query_states = self.q_norm(query_states)
-
-        # For now use simple projection
-        k = torch.cat([target_hidden, hidden_states], dim=1)
+        # K and V from concatenation of target (context) + draft (noise)
+        # Uses the SAME qkv_proj.k_proj/v_proj for both, then concatenates
+        kv_input = torch.cat([target_hidden, hidden_states], dim=1)
+        kv = self.qkv_proj(kv_input)
+        kv_flat = kv.flatten(0, -2)
+        _, key_states, value_states = self.qkv_proj.split_qkv(kv_flat)
+        key_states = key_states.view(bsz, ctx_len + q_len, self.num_key_value_heads,
+                                      self.head_dim).transpose(1, 2)
+        key_states = self.k_norm(key_states)
+        value_states = value_states.view(bsz, ctx_len + q_len, self.num_key_value_heads,
+                                          self.head_dim).transpose(1, 2)
 
         # Apply rotary embedding
         cos, sin = rotary_pos_emb
         query_states, key_states = self.apply_rotary_pos_emb(
             query_states.flatten(0, -2),
-            k.flatten(0, -2),
+            key_states.flatten(0, -2),
             cos,
             sin,
             inplace=True,
         )
-
-        query_states = query_states.view(bsz, q_len, self.num_attention_heads, self.head_dim).transpose(1, 2)
-        key_states = key_states.view(bsz, ctx_len + q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-        v = k.view(bsz, ctx_len + q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        query_states = query_states.view(bsz, q_len, self.num_attention_heads,
+                                          self.head_dim).transpose(1, 2)
+        key_states = key_states.view(bsz, ctx_len + q_len, self.num_key_value_heads,
+                                      self.head_dim).transpose(1, 2)
 
         # attention
         attn_output = self.attn_fwd(
             query_states,
             key_states,
-            v,
+            value_states,
             past_key_value[0] if past_key_value else None,
             past_key_value[1] if past_key_value else None,
             attn_metadata,
@@ -394,12 +393,8 @@ class DFlashDraftModel(nn.Module, CudaGraphMixin):
 
         hidden_states = inputs_embeds
 
-        # Reshape and project target_hidden_states
+        # Project target_hidden_states from concatenated aux states
         # [batch, 1, num_aux_layers * hidden_size] -> [batch, 1, hidden_size]
-        batch_size = target_hidden_states.shape[0]
-        target_hidden = target_hidden_states.view(batch_size, 1, self.num_aux_layers, -1)
-        target_hidden = target_hidden.mean(dim=2)  # Simple average of aux layers
-
         target_hidden = self.target_hidden_proj(target_hidden_states)
         target_hidden = self.target_hidden_norm(target_hidden)
 

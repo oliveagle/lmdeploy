@@ -38,6 +38,10 @@ public:
     const ModelParam&     model_param() const noexcept;
     const AttentionParam& attn_param() const noexcept;
 
+    // DFlash support
+    void EnableDFlash(bool enable);
+    void SetDFlashContext(Context* ctx);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
