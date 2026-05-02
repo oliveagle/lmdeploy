@@ -1,5 +1,6 @@
 
 
+#include <functional>
 #include <numeric>
 #include <optional>
 
@@ -293,7 +294,7 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
                                     layer, collect_size);
                     } else {
                         // Prefill 阶段：收集全部 token
-                        Copy(global_hidden_states, aux_hidden_states_[i], stream);
+                        Copy(global_hidden_states, std::ref(aux_hidden_states_[i]), stream);
                         TM_LOG_DEBUG("[DFlash] Collected aux hidden state at layer %d for prefill, token_num=%zu",
                                     layer, collect_size);
                     }
