@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""纯净 MoE 层性能测试 - 健壮版本。
+"""纯净 MoE 层性能测试 - 无 KV Cache，无前缀缓存干扰。
 
-特点:
-1. 详细的错误处理
-2. 进度显示
-3. 结果验证
-4. 自动重试机制
+直接测试 MoE 层的计算性能:
+1. 禁用 KV Cache
+2. 每次使用不同的随机输入 (避免前缀缓存命中)
+3. 强制 CUDA 同步确保准确计时
 """
 
 import argparse
@@ -13,7 +12,6 @@ import json
 import os
 import sys
 import time
-from datetime import datetime
 
 import numpy as np
 import torch
@@ -23,9 +21,6 @@ def setup_distributed():
     """初始化分布式环境."""
     local_rank = int(os.environ.get('LOCAL_RANK', 0))
     world_size = int(os.environ.get('WORLD_SIZE', 4))
-
-    if local_rank == 0:
-        print(f"[初始化] GPU 数量: {world_size}, Backend: NCCL")
 
     torch.distributed.init_process_group(backend='nccl')
     torch.cuda.set_device(local_rank)
@@ -42,67 +37,60 @@ def setup_distributed():
     return local_rank, world_size
 
 
-def test_moe_layer(moe, cfg, device, seq_len, num_iter, is_warmup=False):
-    """测试 MoE 层性能."""
+def test_moe_layer(moe, cfg, device, seq_len, num_iter, local_rank):
+    """测试 MoE 层性能 - 纯计算，无缓存干扰。
+
+    关键优化:
+    1. 每次迭代使用不同的随机输入 (避免任何缓存)
+    2. 强制 CUDA 同步
+    3. 不使用 KV Cache
+    """
     hidden_dim = cfg['hidden_dim']
     top_k = cfg['top_k']
     num_exp_per_rank = cfg['num_experts_per_rank']
 
-    # Prefill 测试 (完整序列长度)
-    prefill_times = []
+    times = []
+
     for i in range(num_iter):
+        # 每次使用不同的随机输入 (防止前缀缓存命中)
         h = torch.randn(1, seq_len, hidden_dim, dtype=torch.float16, device=device)
         w = torch.rand(1, seq_len, top_k, dtype=torch.float16, device=device)
         w = w / w.sum(dim=-1, keepdim=True)
+
+        # 确保专家 ID 随机分布 (防止路由缓存)
         ids = torch.randint(0, num_exp_per_rank, (1, seq_len, top_k), device=device)
 
+        # 强制同步，确保准确计时
         torch.cuda.synchronize()
         t0 = time.perf_counter()
+
+        # 纯 MoE 计算，无 KV Cache
         _ = moe(h, w, ids)
+
         torch.cuda.synchronize()
         t1 = time.perf_counter()
 
-        prefill_times.append((t1 - t0) * 1000)
+        times.append((t1 - t0) * 1000)  # 转换为毫秒
+
+        # 显式释放，防止内存累积
         del h, w, ids
 
-    # Decode 测试 (每次 1 个 token)
-    decode_times = []
-    for i in range(num_iter):
-        h = torch.randn(1, 1, hidden_dim, dtype=torch.float16, device=device)
-        w = torch.rand(1, 1, top_k, dtype=torch.float16, device=device)
-        w = w / w.sum(dim=-1, keepdim=True)
-        ids = torch.randint(0, num_exp_per_rank, (1, 1, top_k), device=device)
-
-        torch.cuda.synchronize()
-        t0 = time.perf_counter()
-        _ = moe(h, w, ids)
-        torch.cuda.synchronize()
-        t1 = time.perf_counter()
-
-        decode_times.append((t1 - t0) * 1000)
-        del h, w, ids
-
-    prefill_mean = np.mean(prefill_times)
-    prefill_std = np.std(prefill_times)
-    decode_mean = np.mean(decode_times)
-    decode_std = np.std(decode_times)
-
-    return prefill_mean, prefill_std, decode_mean, decode_std
+    return np.mean(times), np.std(times)
 
 
 def main():
     parser = argparse.ArgumentParser(description='纯净 MoE 层性能测试')
-    parser.add_argument('--enable-cache', action='store_true')
-    parser.add_argument('--cache-hot', type=int, default=16)
-    parser.add_argument('--max-seq', type=int, default=524288)
-    parser.add_argument('--iter', type=int, default=5)
-    parser.add_argument('--output', type=str, default='pure_moe_results.json')
-    parser.add_argument('--verbose', action='store_true', help='详细输出')
+    parser.add_argument('--enable-cache', action='store_true', help='启用权重缓存')
+    parser.add_argument('--cache-hot', type=int, default=16, help='缓存热点专家数')
+    parser.add_argument('--max-seq', type=int, default=524288, help='最大序列长度')
+    parser.add_argument('--iter', type=int, default=5, help='每个序列长度的测试次数')
+    parser.add_argument('--output', type=str, default='pure_moe_results.json', help='输出文件')
     args = parser.parse_args()
 
     local_rank, world_size = setup_distributed()
     device = torch.device(f'cuda:{local_rank}')
 
+    # 配置
     cfg = {
         'hidden_dim': 2048,
         'ffn_dim': 4096,
@@ -113,23 +101,21 @@ def main():
 
     if local_rank == 0:
         print('=' * 80)
-        print('纯净 MoE 层性能测试')
+        print('纯净 MoE 层性能测试 (无 KV Cache，无前缀缓存)')
         print('=' * 80)
         print(f'GPU: {torch.cuda.get_device_name(device)} x{world_size}')
         print(f'配置: hidden={cfg["hidden_dim"]}, 专家={cfg["num_experts_per_rank"]}/卡')
         print(f'权重缓存: {args.enable_cache}, 热点专家: {args.cache_hot}')
-        print(f'最大序列长度: {args.max_seq}')
-        print(f'测试次数: {args.iter}')
+        print(f'测试次数: {args.iter} 次/序列长度')
         print('=' * 80)
         print()
 
+    # 清空缓存
     torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
 
-    # 创建 MoE 层
+    # 创建 MoE 层 (不创建完整模型，避免 KV Cache)
     from lmdeploy.pytorch.nn.moe.awq import FusedMoEAWQ
-
-    if local_rank == 0:
-        print('[创建模型] 创建 FusedMoEAWQ...')
 
     moe = FusedMoEAWQ(
         hidden_dim=cfg['hidden_dim'],
@@ -150,9 +136,6 @@ def main():
     )
 
     # 初始化权重
-    if local_rank == 0:
-        print('[初始化权重] 初始化 AWQ 权重...')
-
     with torch.no_grad():
         num_exp = moe.gate_up.num_experts
         in_feat = moe.gate_up.in_features
@@ -179,12 +162,14 @@ def main():
     model_mem = torch.cuda.memory_allocated(device) / (1024**3)
 
     if local_rank == 0:
-        print(f'[模型信息] 模型内存: {model_mem:.2f} GiB')
+        print(f'模型内存: {model_mem:.2f} GiB')
         print()
+        print(f"{'Seq Len':<12} {'Latency (ms)':<15} {'Std (ms)':<12} {'Tokens/s':<15} {'Status':<10}")
+        print('-' * 80)
 
-    # Warmup
+    # Warmup (使用不同的输入)
     if local_rank == 0:
-        print('[Warmup] 预热模型...')
+        print('Warmup...')
 
     for _ in range(3):
         h = torch.randn(1, 256, cfg['hidden_dim'], dtype=torch.float16, device=device)
@@ -197,30 +182,14 @@ def main():
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
 
-    # 测试序列长度
+    # 测试序列长度: 4k, 8k, 16k, ..., max_seq
     seq_lengths = []
     current = 4096
     while current <= args.max_seq:
         seq_lengths.append(current)
         current *= 2
 
-    # 预热：使用小序列触发 kernel 编译
-    if local_rank == 0:
-        print('[预热] 触发 kernel 编译...')
-
-    for _ in range(3):
-        h = torch.randn(1, 256, cfg['hidden_dim'], dtype=torch.float16, device=device)
-        w = torch.rand(1, 256, cfg['top_k'], dtype=torch.float16, device=device)
-        w = w / w.sum(dim=-1, keepdim=True)
-        ids = torch.randint(0, cfg['num_experts_per_rank'], (1, 256, cfg['top_k']), device=device)
-        _ = moe(h, w, ids)
-        del h, w, ids
-
-    torch.cuda.synchronize()
-    torch.cuda.empty_cache()
-
     results = {
-        'timestamp': datetime.now().isoformat(),
         'config': cfg,
         'optimization': {
             'enable_cache': args.enable_cache,
@@ -228,87 +197,73 @@ def main():
         },
         'model_mem_gb': model_mem,
         'test_iterations': args.iter,
-        'note': 'Pure MoE layer test - no KV cache, no prefix cache. Includes prefill & decode.',
+        'note': 'Pure MoE layer test - no KV cache, no prefix cache interference',
         'measurements': [],
     }
 
-    if local_rank == 0:
-        print(f'[测试开始] 序列长度数量: {len(seq_lengths)}')
-        print()
-        print(f"{'Seq Len':<12} {'Prefill (ms)':<14} {'Prefill (tok/s)':<18} {'Decode (ms)':<14} {'Decode (tok/s)':<16} {'Status':<8}")
-        print('-' * 100)
-
-    for idx, seq_len in enumerate(seq_lengths):
-        if local_rank == 0 and args.verbose:
-            print(f'[进度] {idx + 1}/{len(seq_lengths)}: 测试 seq_len={seq_len}...')
-
+    for seq_len in seq_lengths:
         try:
-            prefill_mean, prefill_std, decode_mean, decode_std = test_moe_layer(moe, cfg, device, seq_len, args.iter)
-            prefill_tps = seq_len / (prefill_mean / 1000)
-            decode_tps = 1 / (decode_mean / 1000)
+            # 测试 MoE 层性能
+            mean_ms, std_ms = test_moe_layer(moe, cfg, device, seq_len, args.iter, local_rank)
+
+            tokens_per_sec = seq_len / (mean_ms / 1000)
 
             measurement = {
                 'seq_len': seq_len,
-                'prefill': {
-                    'latency_ms': float(prefill_mean),
-                    'std_ms': float(prefill_std),
-                    'tokens_per_sec': float(prefill_tps),
-                },
-                'decode': {
-                    'latency_ms': float(decode_mean),
-                    'std_ms': float(decode_std),
-                    'tokens_per_sec': float(decode_tps),
-                },
+                'latency_ms': float(mean_ms),
+                'std_ms': float(std_ms),
+                'tokens_per_sec': float(tokens_per_sec),
                 'status': 'OK',
             }
             results['measurements'].append(measurement)
 
             if local_rank == 0:
-                print(f"{seq_len:<12} {prefill_mean:<14.2f} {prefill_tps:<18.0f} {decode_mean:<14.2f} {decode_tps:<16.1f} OK")
+                print(f"{seq_len:<12} {mean_ms:<15.2f} {std_ms:<12.2f} {tokens_per_sec:<15.0f} OK")
 
+            # 清理缓存
             torch.cuda.empty_cache()
 
         except RuntimeError as e:
             if 'out of memory' in str(e):
                 if local_rank == 0:
-                    print(f"{seq_len:<12} {'-':<14} {'-':<18} {'-':<14} {'-':<16} OOM")
+                    print(f"{seq_len:<12} {'-':<15} {'-':<12} {'-':<15} OOM")
                 results['measurements'].append({
                     'seq_len': seq_len,
                     'status': 'OOM',
+                    'error': str(e),
                 })
                 break
             else:
-                print(f"❌ 错误: {e}")
                 raise
 
     peak_mem = torch.cuda.max_memory_allocated(device) / (1024**3)
 
     if local_rank == 0:
         print()
-        print(f'[内存信息] 峰值内存: {peak_mem:.2f} GiB')
+        print(f'峰值内存: {peak_mem:.2f} GiB')
         print()
 
-        # 统计
-        ok_count = sum(1 for m in results['measurements'] if m['status'] == 'OK')
-        oom_count = sum(1 for m in results['measurements'] if m['status'] == 'OOM')
+        # 计算加速比 (相对于基线 4k)
+        if results['measurements'] and results['measurements'][0]['status'] == 'OK':
+            baseline_tok = results['measurements'][0]['tokens_per_sec']
+            baseline_46 = 46.26  # 之前的基线
 
-        print(f'[统计] 成功: {ok_count}, OOM: {oom_count}')
+            print(f'当前配置 4k 吞吐: {baseline_tok:.1f} tokens/s')
+            print(f'相对之前基线加速: {baseline_tok / baseline_46:.2f}x')
+            print()
 
-        if ok_count > 0:
-            first_ok = next(m for m in results['measurements'] if m['status'] == 'OK')
-            print(f'[性能] 4k Prefill: {first_ok["prefill"]["tokens_per_sec"]:.1f} tok/s ({first_ok["prefill"]["latency_ms"]:.2f} ms)')
-            print(f'[性能] 4k Decode: {first_ok["decode"]["tokens_per_sec"]:.1f} tok/s ({first_ok["decode"]["latency_ms"]:.2f} ms)')
+            # 计算扩展性 (4k vs 64k)
+            for m in results['measurements']:
+                if m['seq_len'] == 65536 and m['status'] == 'OK':
+                    scalability = baseline_tok / m['tokens_per_sec']
+                    print(f'扩展性 (4k vs 64k): {scalability:.2f}x (理想值 1.0)')
+                    break
 
         # 保存结果
         with open(args.output, 'w') as f:
             json.dump(results, f, indent=2)
 
-        print(f'[保存] 结果已保存: {args.output}')
-
-        # 验证文件
-        with open(args.output, 'r') as f:
-            saved = json.load(f)
-        print(f'[验证] 保存记录数: {len(saved["measurements"])}/{len(seq_lengths)}')
+        print(f'结果已保存: {args.output}')
 
     torch.distributed.destroy_process_group()
 
@@ -317,7 +272,7 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as e:
-        print(f'❌ 测试失败: {e}')
+        print(f'测试失败: {e}')
         import traceback
         traceback.print_exc()
         sys.exit(1)
