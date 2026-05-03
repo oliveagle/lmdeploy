@@ -126,3 +126,28 @@ Use the `/support-new-model` skill for a complete step-by-step guide.
 5. 修改 `turbomind.py` Python 接口
 
 **预期性能**: 1.7x+ decode speedup, 60-80% accept rate
+
+## Qwen3.6-35B-A3B-AWQ MoE 模型支持
+
+**当前状态**: ✅ AWQ MoE 量化方法支持已修复
+
+**修复的问题**:
+1. ✅ 添加 AWQ 量化方法到 `lmdeploy/pytorch/nn/moe/__init__.py`
+2. ✅ 修复 `modules_to_not_convert` 层的识别（`lmdeploy/pytorch/config.py`）
+3. ✅ 添加 EP fallback 到 Triton 实现（`lmdeploy/pytorch/backends/cuda/moe/default.py`）
+
+**内存需求分析**:
+- Qwen3.6-35B-A3B-AWQ 有 256 个专家 × 40 层
+- TP4 只分片 FFN 维度，不分片专家
+- MoE 权重每 GPU 需要 ~15 GB
+- 总需求约 18 GB/GPU（超过 16GB V100）
+
+**运行建议**:
+- 使用 A100 40GB 或更大显存的 GPU
+- 或使用 8 张 GPU（TP=8）
+- 或测试更小的 MoE 模型
+
+**已知限制**:
+- 当前 LMDeploy MoE 实现 EP+TP 不能有效减少内存
+- EP 只分片专家，TP 只分片 FFN，不同时分片两者
+- 需要 `deep_gemm` 或 `DeepEP` 库才能使用完整的 EP 功能
