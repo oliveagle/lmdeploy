@@ -22,7 +22,8 @@ class LinearWeights(nn.Module):
                  dtype: torch.dtype,
                  device: torch.device,
                  bias: bool = False,
-                 expert_list: list[int] | None = None):
+                 expert_list: list[int] | None = None,
+                 moe_tp_size: int = 1):
         super().__init__()
         weight = torch.empty((num_experts, out_features, in_features), dtype=dtype, device=device)
         weight = torch.nn.Parameter(weight, requires_grad=False)
@@ -39,6 +40,7 @@ class LinearWeights(nn.Module):
         self.expert_list = expert_list
         self.weight_type = weight_type
         self.half_out = out_features // 2
+        self.moe_tp_size = moe_tp_size
 
         self.setup_weight_loader()
 
@@ -48,9 +50,15 @@ class LinearWeights(nn.Module):
             self.expert_map = defaultdict(list)
             for idx, eid in enumerate(self.expert_list):
                 self.expert_map[eid].append(idx)
-            self.weight.weight_loader = self.weight_loader_ep
-            if self.bias is not None:
-                self.bias.weight_loader = self.weight_loader_ep
+            # Use EP+TP loader if moe_tp_size > 1
+            if self.moe_tp_size > 1:
+                self.weight.weight_loader = self.weight_loader_ep_tp
+                if self.bias is not None:
+                    self.bias.weight_loader = self.weight_loader_ep_tp
+            else:
+                self.weight.weight_loader = self.weight_loader_ep
+                if self.bias is not None:
+                    self.bias.weight_loader = self.weight_loader_ep
         else:
             self.weight.weight_loader = self.weight_loader_tp
             if self.bias is not None:
@@ -86,7 +94,7 @@ class LinearWeights(nn.Module):
         param_data.copy_(weight)
 
     def weight_loader_ep(self, param: torch.nn.Parameter, loaded_weight: torch.Tensor, expert_id: int, shard_id: str):
-        """Weight loader."""
+        """Weight loader for EP only."""
         expert_list = self.expert_list
         if expert_id not in expert_list:
             return
@@ -103,6 +111,37 @@ class LinearWeights(nn.Module):
             else:
                 raise RuntimeError(f'Unknown shard_id: {shard_id}')
             param_data.copy_(loaded_weight)
+
+    def weight_loader_ep_tp(self, param: torch.nn.Parameter, loaded_weight: torch.Tensor, expert_id: int, shard_id: str):
+        """Weight loader for EP + TP combined."""
+        expert_list = self.expert_list
+        if expert_id not in expert_list:
+            return
+
+        expert_map = self.expert_map
+        param_ids = expert_map[expert_id]
+
+        # Get TP rank for MoE
+        world_size = self.moe_tp_size
+        _, tp_rank = get_tp_world_rank('moe')
+
+        for param_id in param_ids:
+            if shard_id == 'gate':
+                param_data = param.data[param_id, :self.half_out]
+                weight = loaded_weight.chunk(world_size, dim=0)[tp_rank]
+            elif shard_id == 'up':
+                param_data = param.data[param_id, self.half_out:]
+                weight = loaded_weight.chunk(world_size, dim=0)[tp_rank]
+            elif shard_id == 'down':
+                param_data = param.data[param_id]
+                weight = loaded_weight.to(param_data.device)
+                if weight.dim() > 1:
+                    weight = weight.chunk(world_size, dim=1)[tp_rank]
+                elif weight.dim() == 1 and tp_rank != 0:
+                    weight = torch.zeros_like(weight)
+            else:
+                raise RuntimeError(f'Unknown shard_id: {shard_id}')
+            param_data.copy_(weight)
 
 
 class FusedMoE(FusedMoEBase):
@@ -147,9 +186,16 @@ class FusedMoE(FusedMoEBase):
         )
 
         # create weights
+        # Get MoE TP size for EP+TP support
+        moe_tp_size, _ = get_tp_world_rank('moe')
+
         if self.ep_size > 1:
             expert_list = self.impl.ep_expert_list(self.ep_size, rank)
             num_experts = len(expert_list)
+            # Apply TP dimension reduction even when EP is enabled
+            # This allows EP and TP to work together
+            if moe_tp_size > 1:
+                ffn_dim = ffn_dim // moe_tp_size
         else:
             hidden_dim, ffn_dim = update_dims(hidden_dim, ffn_dim)
             expert_list = None
@@ -161,7 +207,8 @@ class FusedMoE(FusedMoEBase):
                                      dtype=dtype,
                                      device=device,
                                      bias=bias,
-                                     expert_list=expert_list)
+                                     expert_list=expert_list,
+                                     moe_tp_size=moe_tp_size)
         self.down = LinearWeights(
             num_experts,
             ffn_dim,
@@ -171,6 +218,7 @@ class FusedMoE(FusedMoEBase):
             device=device,
             bias=bias,
             expert_list=expert_list,
+            moe_tp_size=moe_tp_size,
         )
 
         self.hidden_dim = hidden_dim

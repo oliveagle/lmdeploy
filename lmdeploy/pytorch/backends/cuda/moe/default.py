@@ -460,12 +460,19 @@ class TritonFusedMoEBuilder(FusedMoEBuilder):
     ):
         """Build from mlp."""
         if ep_size > 1:
-            return FusedMoEEPImpl(ep_size=ep_size,
-                                  ep_group=ep_group,
-                                  top_k=top_k,
-                                  num_experts=num_experts,
-                                  hidden_dim=hidden_dim,
-                                  renormalize=renormalize,
-                                  layer_idx=layer_idx,
-                                  out_dtype=out_dtype)
+            # Try to use deep_gemm implementation first, fall back to Triton with EP
+            try:
+                import deep_gemm  # noqa: F401
+                return FusedMoEEPImpl(ep_size=ep_size,
+                                      ep_group=ep_group,
+                                      top_k=top_k,
+                                      num_experts=num_experts,
+                                      hidden_dim=hidden_dim,
+                                      renormalize=renormalize,
+                                      layer_idx=layer_idx,
+                                      out_dtype=out_dtype)
+            except ImportError:
+                logger.warning('DeepGEMM not found, using TritonFusedMoEImpl with EP support')
+                # Use TritonFusedMoEImpl which has ep_expert_list method
+                return TritonFusedMoEImpl(top_k=top_k, num_experts=num_experts, renormalize=renormalize)
         return TritonFusedMoEImpl(top_k=top_k, num_experts=num_experts, renormalize=renormalize)

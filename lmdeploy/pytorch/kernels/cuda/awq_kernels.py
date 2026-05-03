@@ -268,3 +268,92 @@ def awq_linear(x, qweight, scales, qzeros):
     )
 
     return out
+
+
+def awq_dequant_weights(qweight, scales, qzeros, w_bit=4, group_size=128):
+    """Dequantize AWQ weights from int4 to float16.
+
+    This is a fallback implementation using PyTorch operations.
+    Not optimal for performance, but works for correctness.
+
+    Args:
+        qweight: Packed quantized weights, shape (in_features, quant_out_features)
+                 or (num_experts, in_features, quant_out_features)
+        scales: Scaling factors, shape (grouped_in_feats, out_features)
+                or (num_experts, grouped_in_feats, out_features)
+        qzeros: Packed zeros, shape (grouped_in_feats, quant_out_features)
+                or (num_experts, grouped_in_feats, quant_out_features)
+        w_bit: Bit width (default 4)
+        group_size: Group size for quantization
+
+    Returns:
+        Dequantized weights in float16, shape (in_features, out_features)
+                or (num_experts, out_features, in_features)
+    """
+    import torch
+
+    assert w_bit == 4, f"Only w_bit=4 is supported, got {w_bit}"
+    elem_per_int = 32 // w_bit
+
+    # Check if we have multiple experts
+    has_experts = qweight.dim() == 3
+    if has_experts:
+        num_experts = qweight.size(0)
+        results = []
+        for e in range(num_experts):
+            expert_qw = qweight[e]
+            expert_s = scales[e]
+            expert_qz = qzeros[e]
+            result = awq_dequant_weights_single_expert(
+                expert_qw, expert_s, expert_qz, w_bit, group_size
+            )
+            results.append(result.t())  # Transpose to (out_features, in_features)
+        return torch.stack(results, dim=0)
+    else:
+        return awq_dequant_weights_single_expert(qweight, scales, qzeros, w_bit, group_size)
+
+
+def awq_dequant_weights_single_expert(qweight, scales, qzeros, w_bit=4, group_size=128):
+    """Dequantize AWQ weights from int4 to float16 for a single expert.
+
+    Args:
+        qweight: Packed quantized weights, shape (in_features, quant_out_features)
+        scales: Scaling factors, shape (grouped_in_feats, out_features)
+        qzeros: Packed zeros, shape (grouped_in_feats, quant_out_features)
+        w_bit: Bit width (default 4)
+        group_size: Group size for quantization
+
+    Returns:
+        Dequantized weights in float16, shape (in_features, out_features)
+    """
+    import torch
+
+    assert w_bit == 4, f"Only w_bit=4 is supported, got {w_bit}"
+    elem_per_int = 32 // w_bit
+
+    in_features, quant_out_features = qweight.shape
+    grouped_in_feats, _ = qzeros.shape
+    out_features = scales.size(1)
+
+    # Unpack qweight: (in_features, quant_out_features) -> (in_features, out_features)
+    qw_unpacked = torch.zeros(in_features, out_features, dtype=torch.int32, device=qweight.device)
+    for i in range(elem_per_int):
+        shift = i * w_bit
+        qw_unpacked[:, i::elem_per_int] = (qweight >> shift) & 0xF
+
+    # Unpack qzeros: (grouped_in_feats, quant_out_features) -> (grouped_in_feats, out_features)
+    qz_unpacked = torch.zeros(grouped_in_feats, out_features, dtype=torch.int32, device=qzeros.device)
+    for i in range(elem_per_int):
+        shift = i * w_bit
+        qz_unpacked[:, i::elem_per_int] = (qzeros >> shift) & 0xF
+
+    # Dequantize: (weight - zeros) * scales
+    # We need to reshape for broadcasting
+    scales_broadcast = scales.reshape(grouped_in_feats, 1, out_features)
+    qz_broadcast = qz_unpacked.reshape(grouped_in_feats, 1, out_features)
+    qw_reshaped = qw_unpacked.reshape(grouped_in_feats, group_size, out_features)
+
+    weights = (qw_reshaped.to(torch.float16) - qz_broadcast.to(torch.float16)) * scales_broadcast.to(torch.float16)
+    weights = weights.reshape(in_features, out_features)
+
+    return weights

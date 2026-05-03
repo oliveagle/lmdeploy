@@ -158,14 +158,27 @@ class DistConfig:
         if dp == 1:
             self.mlp_tp = None
             self.attn_tp = None
-            self.moe_tp = None
+            # For MoE models with EP enabled, preserve moe_tp to allow EP+TP combination
+            # Only force moe_tp to None when EP is not enabled
+            if ep <= 1:
+                self.moe_tp = None
 
         # mlp and moe tp
         self.mlp_tp = self.mlp_tp or tp
-        self.moe_tp = self.moe_tp or (1 if ep > 1 else self.mlp_tp)
+        # When EP is enabled and moe_tp not explicitly set:
+        # - If user wants EP+TP, they should set moe_tp_size explicitly
+        # - Default to moe_tp=1 for backward compatibility
+        if self.moe_tp is None:
+            self.moe_tp = 1 if ep > 1 else self.mlp_tp
 
         # world_size
-        world_size = ep if ep > 1 else max(self.mlp_tp, self.moe_tp)
+        # Support EP + TP combination: world_size = ep * moe_tp when both are enabled
+        if ep > 1:
+            # When EP is enabled, world_size should be ep * moe_tp
+            # to support simultaneous EP and TP for MoE models
+            world_size = ep * self.moe_tp if self.moe_tp > 1 else ep
+        else:
+            world_size = max(self.mlp_tp, self.moe_tp)
         self.world_size = world_size
         assert (world_size >= dp and world_size % dp == 0), (f'world_size {world_size}, dp {dp}')
         assert (world_size >= ep and world_size % ep == 0), (f'world_size {world_size}, ep {ep}')
@@ -679,7 +692,7 @@ class QuantizationConfig:
         if not prefix or not self.ignored_layers:
             return self.quant_method
 
-        is_ignore = any([prefix in layer_name for layer_name in self.ignored_layers])
+        is_ignore = any([prefix in layer_name or layer_name in prefix for layer_name in self.ignored_layers])
         quant_method = None if is_ignore else self.quant_method
         return quant_method
 
