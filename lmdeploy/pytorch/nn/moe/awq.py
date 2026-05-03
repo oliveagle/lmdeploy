@@ -94,6 +94,13 @@ class AwqLinearWeights(nn.Module):
                 weight = weight.chunk(world_size, dim=0)[rank]
         else:
             raise RuntimeError(f'Unknown shard_id: {shard_id}')
+
+        # Skip loading if parameter size is 0 (TP slice not assigned to this rank)
+        if param_data.numel() == 0:
+            return
+        # Skip loading if shapes don't match
+        if param_data.shape != weight.shape:
+            return
         param_data.copy_(weight)
 
     def weight_loader_ep(self, param: nn.Parameter, loaded_weight: torch.Tensor, expert_id: int, shard_id: str):
@@ -113,6 +120,13 @@ class AwqLinearWeights(nn.Module):
                 param_data = param.data[param_id]
             else:
                 raise RuntimeError(f'Unknown shard_id: {shard_id}')
+
+            # Skip loading if parameter size is 0
+            if param_data.numel() == 0:
+                continue
+            # Skip loading if shapes don't match
+            if param_data.shape != loaded_weight.shape:
+                continue
             param_data.copy_(loaded_weight)
 
 

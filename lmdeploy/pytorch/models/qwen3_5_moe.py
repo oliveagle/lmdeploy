@@ -308,15 +308,11 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
         if m:
             expert_id = int(m.group(1))
             param_name, shard_id = proj_map[m.group(2)]
-            # e.g. .experts.42.gate_proj.weight -> .experts.gate_up.weight
+            # e.g. .experts.42.gate_proj.qweight -> .experts.gate_up.qweight
             # For AWQ, we need to handle qweight/scales/qzeros suffix
             suffix = name[m.end():]
-            # Remove language_model prefix
-            if 'language_model' in name:
-                prefix = name[:m.start()].replace('.language_model', '')
-            else:
-                prefix = name[:m.start()]
-            param_key = prefix + param_name + suffix
+            # Keep the language_model prefix in param_key (don't remove it)
+            param_key = name[:m.start()] + param_name + suffix
             param = __get_param(param_key, params_dict)
             load_weight(param, loaded_weight, expert_id=expert_id, shard_id=shard_id)
         else:
@@ -393,12 +389,17 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
         ]
 
         # Special handling for linear_attn weights that should not be split
-        linear_attn_weights = ['.linear_attn.in_proj_qkv', '.linear_attn.in_proj_z',
-                               '.linear_attn.in_proj_ba', '.linear_attn.out_proj']
+        # Note: These patterns are used with 'in name' to check if weight belongs to linear_attn
+        linear_attn_patterns = ['in_proj_qkv', 'in_proj_z', 'in_proj_ba', 'out_proj']
 
         rms_norm_keys = ['model.norm', '.input_layernorm', '.post_attention_layernorm', '.q_norm', '.k_norm']
 
+        # Merge both parameters and buffers (buffers take priority for AWQ weights)
+        # AwqLinearWeights uses register_buffer for qweight/scales/qzeros
         params_dict = dict(self.named_parameters())
+        buffers_dict = dict(self.named_buffers())
+        combined_dict = {**params_dict, **buffers_dict}
+
         for name, loaded_weight in weights:
 
             if __skip_layers(name):
@@ -414,22 +415,26 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
                 continue
 
             if '.experts' in name and '.shared_expert' not in name:
-                self._load_weight_experts(name, loaded_weight, params_dict)
+                self._load_weight_experts(name, loaded_weight, combined_dict)
             else:
                 for (param_name, weight_name, shard_id) in stacked_params_mapping:
                     if weight_name not in name:
                         continue
                     # Skip if this is a linear_attn weight
-                    if any(w in name for w in linear_attn_weights):
+                    if any(w in name for w in linear_attn_patterns):
                         continue
                     name = name.replace(weight_name, param_name)
-                    param = __get_param(name, params_dict)
+                    param = __get_param(name, combined_dict)
                     load_weight(param, loaded_weight, shard_id=shard_id)
                     break
                 else:
-                    if '.qkv.' in name:
+                    # Check for linear_attn weights - load directly without transformation
+                    if any(w in name for w in linear_attn_patterns):
+                        param = __get_param(name, combined_dict)
+                        load_weight(param, loaded_weight)
+                    elif '.qkv.' in name:
                         # vl attention
-                        param = __get_param(name, params_dict)
+                        param = __get_param(name, combined_dict)
                         q, k, v = param.weight_spliter(loaded_weight)
                         load_weight(param, q, shard_id='q')
                         load_weight(param, k, shard_id='k')
@@ -439,5 +444,5 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
                             if rms_norm_key in name and 'weight' in name:
                                 loaded_weight = loaded_weight + 1
                                 break
-                        param = __get_param(name, params_dict)
+                        param = __get_param(name, combined_dict)
                         load_weight(param, loaded_weight)
