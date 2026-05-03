@@ -81,5 +81,21 @@ work_dir*/
 !start_ids.csv
 *.pkl
 
+# Test results and temporary files
+*.json
+!lmdeploy/turbomind/hf_repo/config.json
+performance_*.json
+results*.json
+awq_moe_ep*.json
+*_results*/
+pure_moe_results*/
+large_context_results*/
+
+# Test scripts (keep main ones)
+test_pure_moe_robust.py
+run_pure_moe_test_v2.sh
+!test_*.py
+!run_*.sh
+
 !CMakeLists.txt
 proxy_config.yml

@@ -132,7 +132,9 @@ class FusedMoEAWQ(FusedMoEBase):
                  device: torch.device | None = None,
                  all_reduce: bool = True,
                  layer_idx: int = 0,
-                 act_func: Callable = None):
+                 act_func: Callable = None,
+                 enable_weight_cache: bool = False,
+                 cache_hot_experts: int | None = None):
 
         device = device or torch.device('cpu')
         dtype = dtype or torch.float16
@@ -144,6 +146,14 @@ class FusedMoEAWQ(FusedMoEBase):
             tp_mode=self.tp_mode,
             do_renormalize=renormalize,
         )
+
+        # Store weight cache configuration
+        self.enable_weight_cache = enable_weight_cache
+        self.cache_hot_experts = cache_hot_experts
+        self._cached_gate_up = None
+        self._cached_down = None
+        self._cached_expert_indices = []  # list to support .index()
+        self._cached_expert_map = {}  # dict for O(1) lookup
 
         # create implementation
         dist_ctx = get_dist_manager().current_context()
@@ -200,6 +210,26 @@ class FusedMoEAWQ(FusedMoEBase):
         self.dtype = dtype
         self.device = device
         self.act_func = act_func
+
+        # Initialize weight cache if enabled
+        if self.enable_weight_cache:
+            self._initialize_weight_cache()
+
+    def _initialize_weight_cache(self):
+        """Initialize weight cache for frequently used experts."""
+        if self.cache_hot_experts is not None:
+            # Cache only hot experts
+            num_to_cache = min(self.cache_hot_experts, self.num_experts)
+            expert_indices = list(range(num_to_cache))
+        else:
+            # Cache all experts
+            expert_indices = list(range(self.num_experts))
+
+        self._cached_gate_up = self._pre_dequantize_gate_up_weights(expert_indices)
+        self._cached_down = self._pre_dequantize_down_weights(expert_indices)
+        # Store as list and dict for O(1) lookup
+        self._cached_expert_indices = expert_indices
+        self._cached_expert_map = {e: i for i, e in enumerate(expert_indices)}
 
     def before_dispatch(self, state):
         """Before dispatch."""
@@ -268,8 +298,7 @@ class FusedMoEAWQ(FusedMoEBase):
 
             # Dequantize only the experts that are actually used
             # Shape: (num_experts, in_features, quant_out_feats) -> (active_experts, out_features, in_features)
-            gate_up_weights = self._dequantize_gate_up_weights([global_to_local_expert_id[eid] for eid in unique_experts])
-            down_weights = self._dequantize_down_weights([global_to_local_expert_id[eid] for eid in unique_experts])
+            gate_up_weights, down_weights = self._get_weights([global_to_local_expert_id[eid] for eid in unique_experts])
 
             # Remap topk_ids: first map global expert id to local index in unique_experts
             # Create a mask for experts that are present in this rank
@@ -314,6 +343,21 @@ class FusedMoEAWQ(FusedMoEBase):
             raise NotImplementedError(f'Not supported moe type: {moe_type}')
         return gemm_state
 
+    def _get_weights(self, expert_indices):
+        """Get weights for specified experts, using cache if available."""
+        # Check if all experts are in cache
+        if self._cached_gate_up is not None and all(e in self._cached_expert_map for e in expert_indices):
+            # Build cached weights tensor using O(1) lookup
+            cache_indices = [self._cached_expert_map[e] for e in expert_indices]
+            gate_up_weights = self._cached_gate_up[cache_indices]
+            down_weights = self._cached_down[cache_indices]
+            return gate_up_weights, down_weights
+        else:
+            # Fallback to on-demand dequantization
+            gate_up_weights = self._dequantize_gate_up_weights(expert_indices)
+            down_weights = self._dequantize_down_weights(expert_indices)
+            return gate_up_weights, down_weights
+
     def _dequantize_gate_up_weights(self, expert_indices):
         """Dequantize gate_up weights for specified experts only.
 
@@ -337,6 +381,28 @@ class FusedMoEAWQ(FusedMoEBase):
             results.append(result.t())
 
         return torch.stack(results, dim=0)
+
+    def _pre_dequantize_gate_up_weights(self, expert_indices):
+        """Pre-dequantize gate_up weights for specified experts.
+
+        Args:
+            expert_indices: List of expert indices to dequantize
+
+        Returns:
+            Dequantized weights, shape (len(expert_indices), out_features, in_features)
+        """
+        return self._dequantize_gate_up_weights(expert_indices)
+
+    def _pre_dequantize_down_weights(self, expert_indices):
+        """Pre-dequantize down weights for specified experts.
+
+        Args:
+            expert_indices: List of expert indices to dequantize
+
+        Returns:
+            Dequantized weights, shape (len(expert_indices), out_features, in_features)
+        """
+        return self._dequantize_down_weights(expert_indices)
 
     def _dequantize_down_weights(self, expert_indices):
         """Dequantize down weights for specified experts only.
