@@ -41,21 +41,21 @@ class AwqLinearWeights(nn.Module):
         # Create empty buffers for AWQ quantized weights
         # Shape: (num_experts, in_features, quant_out_feats)
         qweight_shape = (num_experts, in_features, quant_out_feats)
-        self.qweight = nn.Parameter(torch.zeros(qweight_shape, dtype=torch.int32, device=device), requires_grad=False)
+        self.register_buffer('qweight', torch.zeros(qweight_shape, dtype=torch.int32, device=device))
 
         # Shape: (num_experts, grouped_in_feats, out_features)
         scales_shape = (num_experts, grouped_in_feats, out_features)
-        self.scales = nn.Parameter(torch.zeros(scales_shape, dtype=torch.float16, device=device), requires_grad=False)
+        self.register_buffer('scales', torch.zeros(scales_shape, dtype=torch.float16, device=device))
 
         # Shape: (num_experts, grouped_in_feats, quant_out_feats)
         qzeros_shape = (num_experts, grouped_in_feats, quant_out_feats)
-        self.qzeros = nn.Parameter(torch.zeros(qzeros_shape, dtype=torch.int32, device=device), requires_grad=False)
+        self.register_buffer('qzeros', torch.zeros(qzeros_shape, dtype=torch.int32, device=device))
 
         if bias:
             bias_shape = (num_experts, out_features)
-            self.bias = nn.Parameter(torch.zeros(bias_shape, dtype=torch.float16, device=device), requires_grad=False)
+            self.register_buffer('bias', torch.zeros(bias_shape, dtype=torch.float16, device=device))
         else:
-            self.register_parameter('bias', None)
+            self.register_buffer('bias', None)
 
         self.setup_weight_loader()
 
@@ -257,10 +257,13 @@ class FusedMoEAWQ(FusedMoEBase):
 
             # Calculate expert_offset and num_experts for EP
             expert_offset = 0
-            num_experts = None
+            num_experts_for_kernel = None
             if self.expert_list is not None and len(self.expert_list) != self.num_experts:
                 expert_offset = self.expert_list[0]
-                num_experts = self.num_experts
+                num_experts_for_kernel = self.num_experts
+            else:
+                # Use the actual model's num_experts, not the activated count
+                num_experts_for_kernel = self.num_experts
 
             # Use standard fused_moe kernel
             hidden_states = fused_moe(
@@ -273,7 +276,7 @@ class FusedMoEAWQ(FusedMoEBase):
                 w1_bias=self.gate_up.bias,
                 w2_bias=self.down.bias,
                 expert_offset=expert_offset,
-                num_experts=len(unique_experts),
+                num_experts=num_experts_for_kernel,
                 renormalize=self.do_renormalize,
                 act_func=self.act_func,
             )
