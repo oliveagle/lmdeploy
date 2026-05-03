@@ -208,7 +208,7 @@ class FusedMoEAWQ(FusedMoEBase):
     def dispatch(self, state: dict):
         """dispatch."""
         moe_type = state['moe_type']
-        if moe_type == MoeType.Default:
+        if moe_type == MoeType.Default or (isinstance(moe_type, str) and moe_type == 'Default'):
             hidden_states, topk_weights, topk_idx = moe_gather_inputs(state['hidden_states'],
                                                                       state['topk_weights'],
                                                                       state['topk_idx'],
@@ -225,22 +225,35 @@ class FusedMoEAWQ(FusedMoEBase):
 
     def gemm(self, state: dict):
         """gemm."""
-        from lmdeploy.pytorch.kernels.cuda.awq_kernels import awq_dequant_weights
         from lmdeploy.pytorch.kernels.cuda.fused_moe import fused_moe
 
         moe_type = state['moe_type']
-        if moe_type == MoeType.Default:
+        if moe_type == MoeType.Default or (isinstance(moe_type, str) and moe_type == 'Default'):
             hidden_states = state['hidden_states']
             topk_weights = state['topk_weights']
             topk_ids = state['topk_idx']
 
-            # Dequantize gate_up weights expert by expert to save memory
-            # Shape: (num_experts, in_features, quant_out_feats) -> (num_experts, out_features, in_features)
-            gate_up_weights = self._dequantize_gate_up_weights()
+            # Reshape to 2D if 3D (like Qwen3MoeSparseMoeBlock does)
+            was_3d = hidden_states.dim() == 3
+            if was_3d:
+                batch_size, seq_len, hidden_dim = hidden_states.shape
+                hidden_states = hidden_states.view(-1, hidden_dim)
+                topk_weights = topk_weights.view(-1, topk_weights.size(-1))
+                topk_ids = topk_ids.view(-1, topk_ids.size(-1))
 
-            # Dequantize down weights expert by expert to save memory
-            # Shape: (num_experts, in_features, quant_out_feats) -> (num_experts, out_features, in_features)
-            down_weights = self._dequantize_down_weights()
+            # Find which experts are actually used in this batch
+            unique_experts = torch.unique(topk_ids).cpu().tolist()
+
+            # Dequantize only the experts that are actually used
+            # Shape: (num_experts, in_features, quant_out_feats) -> (active_experts, out_features, in_features)
+            gate_up_weights = self._dequantize_gate_up_weights(unique_experts)
+            down_weights = self._dequantize_down_weights(unique_experts)
+
+            # Remap topk_ids to the new expert indices
+            expert_id_map = {old_id: new_id for new_id, old_id in enumerate(unique_experts)}
+            remapped_topk_ids = topk_ids.clone()
+            for old_id, new_id in expert_id_map.items():
+                remapped_topk_ids[topk_ids == old_id] = new_id
 
             # Calculate expert_offset and num_experts for EP
             expert_offset = 0
@@ -255,62 +268,69 @@ class FusedMoEAWQ(FusedMoEBase):
                 gate_up_weights,
                 down_weights,
                 topk_weights=topk_weights,
-                topk_ids=topk_ids,
-                top_k=self.impl.top_k,
+                topk_ids=remapped_topk_ids,
+                topk=self.impl.top_k,
                 w1_bias=self.gate_up.bias,
                 w2_bias=self.down.bias,
                 expert_offset=expert_offset,
-                num_experts=num_experts,
+                num_experts=len(unique_experts),
                 renormalize=self.do_renormalize,
                 act_func=self.act_func,
             )
+
+            # Reshape back to 3D if it was 3D
+            if was_3d:
+                hidden_states = hidden_states.view(batch_size, seq_len, -1)
+
             gemm_state = {'hidden_states': hidden_states, 'moe_type': moe_type}
         else:
             raise NotImplementedError(f'Not supported moe type: {moe_type}')
         return gemm_state
 
-    def _dequantize_gate_up_weights(self):
-        """Dequantize gate_up weights expert by expert to save memory."""
+    def _dequantize_gate_up_weights(self, expert_indices):
+        """Dequantize gate_up weights for specified experts only.
+
+        Args:
+            expert_indices: List of expert indices to dequantize
+
+        Returns:
+            Dequantized weights, shape (len(expert_indices), out_features, in_features)
+        """
         from lmdeploy.pytorch.kernels.cuda.awq_kernels import awq_dequant_weights_single_expert
 
-        num_experts = self.gate_up.num_experts
-        in_features = self.gate_up.in_features
-        out_features = self.gate_up.out_features
-
-        # Allocate output buffer
         results = []
-        for e in range(num_experts):
-            expert_qw = self.gate_up.qweight[e]  # (in_features, quant_out_feats)
-            expert_s = self.gate_up.scales[e]     # (grouped_in_feats, out_features)
-            expert_qz = self.gate_up.qzeros[e]    # (grouped_in_feats, quant_out_feats)
+        for e in expert_indices:
+            expert_qw = self.gate_up.qweight[e]
+            expert_s = self.gate_up.scales[e]
+            expert_qz = self.gate_up.qzeros[e]
 
             result = awq_dequant_weights_single_expert(
                 expert_qw, expert_s, expert_qz, self.w_bit, self.group_size
             )
-            # Transpose to (out_features, in_features) for fused_moe
             results.append(result.t())
 
         return torch.stack(results, dim=0)
 
-    def _dequantize_down_weights(self):
-        """Dequantize down weights expert by expert to save memory."""
+    def _dequantize_down_weights(self, expert_indices):
+        """Dequantize down weights for specified experts only.
+
+        Args:
+            expert_indices: List of expert indices to dequantize
+
+        Returns:
+            Dequantized weights, shape (len(expert_indices), out_features, in_features)
+        """
         from lmdeploy.pytorch.kernels.cuda.awq_kernels import awq_dequant_weights_single_expert
 
-        num_experts = self.down.num_experts
-        in_features = self.down.in_features
-        out_features = self.down.out_features
-
-        # Allocate output buffer
         results = []
-        for e in range(num_experts):
-            expert_qw = self.down.qweight[e]  # (in_features, quant_out_feats)
-            expert_s = self.down.scales[e]     # (grouped_in_feats, out_features)
-            expert_qz = self.down.qzeros[e]    # (grouped_in_feats, quant_out_feats)
+        for e in expert_indices:
+            expert_qw = self.down.qweight[e]
+            expert_s = self.down.scales[e]
+            expert_qz = self.down.qzeros[e]
 
             result = awq_dequant_weights_single_expert(
                 expert_qw, expert_s, expert_qz, self.w_bit, self.group_size
             )
-            # Transpose to (out_features, in_features) for fused_moe
             results.append(result.t())
 
         return torch.stack(results, dim=0)
