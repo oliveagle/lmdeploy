@@ -1269,6 +1269,20 @@ class Qwen3_5ForConditionalGeneration(nn.Module, DeployModelMixinV1, CudaGraphMi
             layer_id = int(matches[0])
             return layer_id >= self.config.text_config.num_hidden_layers
 
+        def __get_param(name, params_dict):
+            """Get parameter from params_dict, handling language_model prefix."""
+            if name in params_dict:
+                return params_dict[name]
+            if 'language_model' in name:
+                name_without = name.replace('language_model.', '')
+                if name_without in params_dict:
+                    return params_dict[name_without]
+            if name.startswith('model.'):
+                name_without = name.replace('model.', '')
+                if name_without in params_dict:
+                    return params_dict[name_without]
+            raise KeyError(name)
+
         # modify from vllm
         stacked_params_mapping = [
             # (param_name, shard_name, shard_id)
@@ -1280,6 +1294,9 @@ class Qwen3_5ForConditionalGeneration(nn.Module, DeployModelMixinV1, CudaGraphMi
             ('.in_proj_ba', '.in_proj_b', 'b'),
             ('.in_proj_ba', '.in_proj_a', 'a'),
         ]
+
+        # Special handling for linear_attn weights that should not be split
+        linear_attn_weights = ['.in_proj_qkv', '.in_proj_z', '.in_proj_ba', '.out_proj']
 
         rms_norm_keys = ['model.norm', '.input_layernorm', '.post_attention_layernorm', '.q_norm', '.k_norm']
 
@@ -1301,14 +1318,17 @@ class Qwen3_5ForConditionalGeneration(nn.Module, DeployModelMixinV1, CudaGraphMi
             for (param_name, weight_name, shard_id) in stacked_params_mapping:
                 if weight_name not in name:
                     continue
+                # Skip if this is a linear_attn weight
+                if any(w in name for w in linear_attn_weights):
+                    continue
                 name = name.replace(weight_name, param_name)
-                param = params_dict[name]
+                param = __get_param(name, params_dict)
                 load_weight(param, loaded_weight, shard_id=shard_id)
                 break
             else:
                 if '.qkv.' in name:
                     # vl attention
-                    param = params_dict[name]
+                    param = __get_param(name, params_dict)
                     q, k, v = param.weight_spliter(loaded_weight)
                     load_weight(param, q, shard_id='q')
                     load_weight(param, k, shard_id='k')
@@ -1318,7 +1338,7 @@ class Qwen3_5ForConditionalGeneration(nn.Module, DeployModelMixinV1, CudaGraphMi
                         if rms_norm_key in name and 'weight' in name:
                             loaded_weight = loaded_weight + 1
                             break
-                    param = params_dict[name]
+                    param = __get_param(name, params_dict)
                     load_weight(param, loaded_weight)
 
     def get_input_processor(self) -> BaseModelInputProcessor:

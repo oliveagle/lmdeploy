@@ -277,6 +277,23 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
     def _load_weight_experts(self, name: str, loaded_weight: torch.Tensor, params_dict: dict[str, nn.Parameter]):
         """Load weight experts."""
         import re
+
+        def __get_param(name, params_dict):
+            """Get parameter from params_dict, handling language_model prefix."""
+            if name in params_dict:
+                return params_dict[name]
+            # Try removing language_model prefix if not found
+            if 'language_model' in name:
+                name_without = name.replace('language_model.', '')
+                if name_without in params_dict:
+                    return params_dict[name_without]
+            # Try removing model.language_model prefix
+            if name.startswith('model.'):
+                name_without = name.replace('model.', '')
+                if name_without in params_dict:
+                    return params_dict[name_without]
+            raise KeyError(name)
+
         # fused weights (bf16): experts.gate_up_proj / experts.down_proj
         if any(k in name for k in ['experts.gate_up_proj', 'experts.down_proj']):
             return self._load_weight_fused_experts(name, loaded_weight, params_dict)
@@ -292,12 +309,18 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
             expert_id = int(m.group(1))
             param_name, shard_id = proj_map[m.group(2)]
             # e.g. .experts.42.gate_proj.weight -> .experts.gate_up.weight
+            # For AWQ, we need to handle qweight/scales/qzeros suffix
             suffix = name[m.end():]
-            param_key = name[:m.start()] + param_name + suffix
-            param = params_dict[param_key]
+            # Remove language_model prefix
+            if 'language_model' in name:
+                prefix = name[:m.start()].replace('.language_model', '')
+            else:
+                prefix = name[:m.start()]
+            param_key = prefix + param_name + suffix
+            param = __get_param(param_key, params_dict)
             load_weight(param, loaded_weight, expert_id=expert_id, shard_id=shard_id)
         else:
-            param = params_dict[name]
+            param = __get_param(name, params_dict)
             load_weight(param, loaded_weight)
 
     def _load_weight_fused_experts(self, name: str, loaded_weight: torch.Tensor, params_dict: dict[str, nn.Parameter]):
@@ -309,6 +332,9 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
 
             for expert_id in range(num_experts):
                 param_name = name.replace(f'experts.{fused_gateup_name}', 'experts.gate_up.weight')
+                # If param_name not found, try removing language_model prefix
+                if param_name not in params_dict and 'language_model' in param_name:
+                    param_name = param_name.replace('.language_model', '')
                 param = params_dict[param_name]
                 weight = loaded_weight[expert_id]
                 w1, w3 = weight.chunk(2, 0)
@@ -316,9 +342,11 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
                 load_weight(param, w3, expert_id=expert_id, shard_id='up')
 
         elif fused_down_name in name:
-
             for expert_id in range(num_experts):
                 param_name = name.replace(f'experts.{fused_down_name}', 'experts.down.weight')
+                # If param_name not found, try removing language_model prefix
+                if param_name not in params_dict and 'language_model' in param_name:
+                    param_name = param_name.replace('.language_model', '')
                 param = params_dict[param_name]
                 w2 = loaded_weight[expert_id]
                 load_weight(param, w2, expert_id=expert_id, shard_id='down')
@@ -336,6 +364,22 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
             layer_id = int(matches[0])
             return layer_id >= self.config.text_config.num_hidden_layers
 
+        def __get_param(name, params_dict):
+            """Get parameter from params_dict, handling language_model prefix."""
+            if name in params_dict:
+                return params_dict[name]
+            # Try removing language_model prefix if not found
+            if 'language_model' in name:
+                name_without = name.replace('language_model.', '')
+                if name_without in params_dict:
+                    return params_dict[name_without]
+            # Try removing model.language_model prefix
+            if name.startswith('model.'):
+                name_without = name.replace('model.', '')
+                if name_without in params_dict:
+                    return params_dict[name_without]
+            raise KeyError(name)
+
         # modify from vllm
         stacked_params_mapping = [
             # (param_name, shard_name, shard_id)
@@ -347,6 +391,10 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
             ('.in_proj_ba', '.in_proj_b', 'b'),
             ('.in_proj_ba', '.in_proj_a', 'a'),
         ]
+
+        # Special handling for linear_attn weights that should not be split
+        linear_attn_weights = ['.linear_attn.in_proj_qkv', '.linear_attn.in_proj_z',
+                               '.linear_attn.in_proj_ba', '.linear_attn.out_proj']
 
         rms_norm_keys = ['model.norm', '.input_layernorm', '.post_attention_layernorm', '.q_norm', '.k_norm']
 
@@ -371,14 +419,17 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
                 for (param_name, weight_name, shard_id) in stacked_params_mapping:
                     if weight_name not in name:
                         continue
+                    # Skip if this is a linear_attn weight
+                    if any(w in name for w in linear_attn_weights):
+                        continue
                     name = name.replace(weight_name, param_name)
-                    param = params_dict[name]
+                    param = __get_param(name, params_dict)
                     load_weight(param, loaded_weight, shard_id=shard_id)
                     break
                 else:
                     if '.qkv.' in name:
                         # vl attention
-                        param = params_dict[name]
+                        param = __get_param(name, params_dict)
                         q, k, v = param.weight_spliter(loaded_weight)
                         load_weight(param, q, shard_id='q')
                         load_weight(param, k, shard_id='k')
@@ -388,5 +439,5 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
                             if rms_norm_key in name and 'weight' in name:
                                 loaded_weight = loaded_weight + 1
                                 break
-                        param = params_dict[name]
+                        param = __get_param(name, params_dict)
                         load_weight(param, loaded_weight)
