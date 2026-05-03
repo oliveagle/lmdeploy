@@ -280,16 +280,22 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
 
         def __get_param(name, params_dict):
             """Get parameter from params_dict, handling language_model prefix."""
+            # Direct match first
             if name in params_dict:
                 return params_dict[name]
-            # Try removing language_model prefix if not found
+            # Try removing model. prefix
+            if name.startswith('model.'):
+                name_without = name.replace('model.', '', 1)
+                if name_without in params_dict:
+                    return params_dict[name_without]
+            # Try removing language_model. prefix
             if 'language_model' in name:
                 name_without = name.replace('language_model.', '')
                 if name_without in params_dict:
                     return params_dict[name_without]
-            # Try removing model.language_model prefix
-            if name.startswith('model.'):
-                name_without = name.replace('model.', '')
+            # Try removing both prefixes
+            if name.startswith('model.') and 'language_model' in name:
+                name_without = name.replace('model.', '', 1).replace('language_model.', '')
                 if name_without in params_dict:
                     return params_dict[name_without]
             raise KeyError(name)
@@ -362,16 +368,22 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
 
         def __get_param(name, params_dict):
             """Get parameter from params_dict, handling language_model prefix."""
+            # Direct match first
             if name in params_dict:
                 return params_dict[name]
-            # Try removing language_model prefix if not found
+            # Try removing model. prefix
+            if name.startswith('model.'):
+                name_without = name.replace('model.', '', 1)
+                if name_without in params_dict:
+                    return params_dict[name_without]
+            # Try removing language_model. prefix
             if 'language_model' in name:
                 name_without = name.replace('language_model.', '')
                 if name_without in params_dict:
                     return params_dict[name_without]
-            # Try removing model.language_model prefix
-            if name.startswith('model.'):
-                name_without = name.replace('model.', '')
+            # Try removing both prefixes
+            if name.startswith('model.') and 'language_model' in name:
+                name_without = name.replace('model.', '', 1).replace('language_model.', '')
                 if name_without in params_dict:
                     return params_dict[name_without]
             raise KeyError(name)
