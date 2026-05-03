@@ -469,6 +469,7 @@ class DFlashDraftModel(nn.Module, CudaGraphMixin):
         ]
 
         params_dict = dict(self.named_parameters())
+        params_dict.update(dict(self.named_buffers()))
         for name, loaded_weight in weights:
             if 'rotary_emb.inv_freq' in name:
                 continue
@@ -479,9 +480,10 @@ class DFlashDraftModel(nn.Module, CudaGraphMixin):
                 if weight_name not in name:
                     continue
                 name = name.replace(weight_name, param_name)
-                param = params_dict[name]
-                load_weight(param, loaded_weight, shard_id=shard_id)
-                break
+                param = params_dict.get(name)
+                if param is not None:
+                    load_weight(param, loaded_weight, shard_id=shard_id)
+                    break
             else:
                 if name in params_dict:
                     param = params_dict[name]

@@ -409,7 +409,7 @@ class SpecModelAgent(BaseSpecModelAgent):
 
                 for loop_idx in range(loop_count):
                     outputs = self._forward_impl(inputs)
-                    draft_token_ids, model_metas, target_hidden_states = self.proposer.get_outputs(outputs, inputs)
+                    draft_token_ids, model_metas, target_hidden_states = self.proposer.get_outputs(outputs, inputs, extra_inputs)
                     draft_tokens_li.append(draft_token_ids)
                     if loop_idx < loop_count - 1:
                         step_seqlens = inputs.seq_length.new_ones(inputs.seq_length.size(0))
