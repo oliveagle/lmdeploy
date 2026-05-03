@@ -291,6 +291,14 @@ def main():
     # 用小 batch 测试
     for seq_len in args.context_lengths:
         print(f"\nTesting seq_len={seq_len}...")
+
+        # Warmup for this seq_len to trigger kernel compilation
+        print("  Warmup for seq_len={}...".format(seq_len))
+        for _ in range(2):
+            h, w, ids = create_test_inputs(1, seq_len, hidden_dim, num_experts_per_rank, top_k, device)
+            _ = moe(h, w, ids)
+        torch.cuda.synchronize()
+
         try:
             # Prefill
             print("  Prefill...")
@@ -339,6 +347,26 @@ def main():
             json.dump(results, f, indent=2)
         print(f"\n✓ Results saved to {args.output}")
         print(f"Peak memory: {results['peak_mem_gb']:.2f} GiB")
+
+        # 漂亮的表格输出
+        print("\n" + "=" * 80)
+        print("性能测试结果".center(80))
+        print("=" * 80)
+        print(f"{'Context Length':<16} {'Prefill (ms)':<16} {'Prefill (tok/s)':<20} {'Decode (ms)':<14} {'Decode (tok/s)':<16}")
+        print("-" * 80)
+
+        for seq_len in args.context_lengths:
+            key = str(seq_len)
+            if key in results and 'error' not in results[key]:
+                prefill_ms = results[key]['prefill']['mean_ms']
+                prefill_tps = results[key]['prefill']['tok_per_sec']
+                decode_ms = results[key]['decode']['mean_ms']
+                decode_tps = results[key]['decode']['tok_per_sec']
+                print(f"{seq_len:<16} {prefill_ms:<16.2f} {prefill_tps:<20.0f} {decode_ms:<14.2f} {decode_tps:<16.1f}")
+            else:
+                err = results.get(key, {}).get('error', 'unknown error')
+                print(f"{seq_len:<16} {'ERROR':<16} {'-':<20} {'ERROR':<14} {'-':<16}")
+        print("=" * 80)
 
     if is_dist:
         torch.distributed.destroy_process_group()
