@@ -241,19 +241,43 @@ class FusedMoEAWQ(FusedMoEBase):
                 topk_weights = topk_weights.view(-1, topk_weights.size(-1))
                 topk_ids = topk_ids.view(-1, topk_ids.size(-1))
 
-            # Find which experts are actually used in this batch
-            unique_experts = torch.unique(topk_ids).cpu().tolist()
+            # Handle expert parallelism: global -> local expert id mapping
+            # Find which experts are actually present in this rank
+            if self.expert_list is not None:
+                local_expert_set = set(self.expert_list)
+                # Filter unique_experts to only those present in this rank
+                unique_global_experts = torch.unique(topk_ids).cpu().tolist()
+                unique_experts = [eid for eid in unique_global_experts if eid in local_expert_set]
+
+                if len(unique_experts) == 0:
+                    # No experts assigned to this rank in this batch
+                    hidden_states = torch.zeros_like(hidden_states)
+                    if was_3d:
+                        hidden_states = hidden_states.view(batch_size, seq_len, -1)
+                    return {'hidden_states': hidden_states, 'moe_type': moe_type}
+
+                # Create global -> local index mapping
+                global_to_local_idx = {eid: i for i, eid in enumerate(unique_experts)}
+                # Create global -> local expert id mapping
+                global_to_local_expert_id = {eid: self.expert_list.index(eid) for eid in unique_experts}
+            else:
+                # No EP, all experts are local
+                unique_experts = torch.unique(topk_ids).cpu().tolist()
+                global_to_local_idx = {eid: i for i, eid in enumerate(unique_experts)}
+                global_to_local_expert_id = global_to_local_idx
 
             # Dequantize only the experts that are actually used
             # Shape: (num_experts, in_features, quant_out_feats) -> (active_experts, out_features, in_features)
-            gate_up_weights = self._dequantize_gate_up_weights(unique_experts)
-            down_weights = self._dequantize_down_weights(unique_experts)
+            gate_up_weights = self._dequantize_gate_up_weights([global_to_local_expert_id[eid] for eid in unique_experts])
+            down_weights = self._dequantize_down_weights([global_to_local_expert_id[eid] for eid in unique_experts])
 
-            # Remap topk_ids to the new expert indices
-            expert_id_map = {old_id: new_id for new_id, old_id in enumerate(unique_experts)}
-            remapped_topk_ids = topk_ids.clone()
-            for old_id, new_id in expert_id_map.items():
-                remapped_topk_ids[topk_ids == old_id] = new_id
+            # Remap topk_ids: first map global expert id to local index in unique_experts
+            # Create a mask for experts that are present in this rank
+            mask = torch.isin(topk_ids, torch.tensor(unique_experts, device=topk_ids.device))
+            remapped_topk_ids = torch.zeros_like(topk_ids)
+            for old_id in unique_experts:
+                new_idx = global_to_local_idx[old_id]
+                remapped_topk_ids[topk_ids == old_id] = new_idx
 
             # Calculate expert_offset and num_experts for EP
             expert_offset = 0
