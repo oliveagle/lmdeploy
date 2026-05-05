@@ -167,7 +167,7 @@ class DistConfig:
         self.mlp_tp = self.mlp_tp or tp
         # When EP is enabled and moe_tp not explicitly set:
         # - If user wants EP+TP, they should set moe_tp_size explicitly
-        # - Default to moe_tp=1 for backward compatibility
+        # - Default to moe_tp=1 for backward compatibility when EP alone
         if self.moe_tp is None:
             self.moe_tp = 1 if ep > 1 else self.mlp_tp
 
@@ -188,7 +188,12 @@ class DistConfig:
                 and world_size % self.moe_tp == 0), (f'world_size {world_size}, moe_tp {self.moe_tp}')
 
         # attn tp
-        self.attn_tp = self.attn_tp or self.world_size // dp
+        # 关键修复：当 ep>1 时，attn_tp 默认应该是 1，而不是 world_size
+        # 这样可以避免 attn_tp > moe_tp 的问题
+        if self.ep > 1:
+            self.attn_tp = self.attn_tp or 1
+        else:
+            self.attn_tp = self.attn_tp or self.world_size // dp
         self.tp = self.attn_tp
         if self.mlp_tp > 1:
             assert (self.mlp_tp >= self.attn_tp
