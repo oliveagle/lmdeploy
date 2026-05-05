@@ -172,11 +172,14 @@ class DistConfig:
             self.moe_tp = 1 if ep > 1 else self.mlp_tp
 
         # world_size
-        # Support EP + TP combination: world_size = ep * moe_tp when both are enabled
+        # Support EP + TP combination: world_size = ep (TP is applied within each EP group)
+        # - ep=4 means 4 experts per group (4 GPU workers)
+        # - moe_tp=4 means tensor parallel within each worker (FFN dimension partition)
+        # - EP and TP are orthogonal, world_size doesn't need to be multiplied!
         if ep > 1:
-            # When EP is enabled, world_size should be ep * moe_tp
-            # to support simultaneous EP and TP for MoE models
-            world_size = ep * self.moe_tp if self.moe_tp > 1 else ep
+            # When EP is enabled, world_size = ep
+            # moe_tp controls tensor parallel within each worker
+            world_size = ep
         else:
             world_size = max(self.mlp_tp, self.moe_tp)
         self.world_size = world_size
@@ -184,8 +187,11 @@ class DistConfig:
         assert (world_size >= ep and world_size % ep == 0), (f'world_size {world_size}, ep {ep}')
         assert (world_size >= self.mlp_tp
                 and world_size % self.mlp_tp == 0), (f'world_size {world_size}, mlp_tp {self.mlp_tp}')
-        assert (world_size >= self.moe_tp
-                and world_size % self.moe_tp == 0), (f'world_size {world_size}, moe_tp {self.moe_tp}')
+        # Relaxed: moe_tp can be different from world_size when EP + TP is combined
+        # When using EP + TP, world_size = ep, moe_tp controls intra-worker parallelism
+        if ep <= 1:
+            assert (world_size >= self.moe_tp
+                    and world_size % self.moe_tp == 0), (f'world_size {world_size}, moe_tp {self.moe_tp}')
 
         # attn tp
         # 关键修复：当 ep>1 时，attn_tp 默认应该是 1，而不是 world_size
