@@ -1,6 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 
 from collections.abc import Iterable
+from typing import Any
 
 import torch
 import torch.nn.functional as F
@@ -68,41 +69,59 @@ class Qwen3_5MoeSparseMoeBlock(nn.Module):
 
         self.gate = Qwen3_5MoeTopKRouter(config, dtype=dtype, device=device)
 
-        self.experts = build_fused_moe(
-            self.hidden_dim,
-            self.ffn_dim,
-            self.num_experts,
-            top_k=self.top_k,
-            renormalize=False,
-            dtype=dtype,
-            device=device,
-            quant_config=quantization_config,
-            all_reduce=False,
-            layer_idx=layer_idx,
-            prefix=add_prefix('experts', prefix),
-        )
+        # For AWQ MoE, explicitly use FusedMoEAWQ to ensure int4 quantization
+        # This is critical for EP=4 to work correctly with ~7GB/GPU instead of ~30GB
+        if quantization_config is not None and quantization_config.get('quant_method') == 'awq':
+            from lmdeploy.pytorch.nn.moe.awq import FusedMoEAWQ
+            self.experts = FusedMoEAWQ(
+                hidden_dim=self.hidden_dim,
+                ffn_dim=self.ffn_dim,
+                num_experts=self.num_experts,
+                top_k=self.top_k,
+                w_bit=quantization_config.get('bits', 4),
+                group_size=quantization_config.get('group_size', 128),
+                bias=False,
+                renormalize=False,
+                dtype=dtype,
+                device=device,
+                all_reduce=False,
+                layer_idx=layer_idx,
+                act_func=None,
+            )
+        else:
+            self.experts = build_fused_moe(
+                self.hidden_dim,
+                self.ffn_dim,
+                self.num_experts,
+                top_k=self.top_k,
+                renormalize=False,
+                dtype=dtype,
+                device=device,
+                quant_config=quantization_config,
+                all_reduce=False,
+                layer_idx=layer_idx,
+                prefix=add_prefix('experts', prefix),
+            )
 
         self.moe_all_reduce = self.experts.build_moe_all_reduce()
+
+        # For EP+TP combination, enable TP for shared_expert just like
+        # we do for MoE experts. This ensures both have the same shape.
+        dist_ctx = get_dist_manager().current_context()
+        moe_tp = dist_ctx.dist_config.moe_tp
+        enable_tp_for_shared = (moe_tp > 1)
 
         self.shared_expert = Qwen3_5MLP(
             config=config,
             intermediate_size=config.shared_expert_intermediate_size,
             dtype=dtype,
             device=device,
-            is_tp=self.moe_all_reduce.enable_shared_tp(),
+            is_tp=enable_tp_for_shared,
             all_reduce=False,
             prefix=add_prefix('shared_expert', prefix),
+            layer_type='moe',
         )
         self.shared_expert_gate = torch.nn.Linear(config.hidden_size, 1, bias=False, device=device, dtype=dtype)
-
-        # get all reduce
-        dist_ctx = get_dist_manager().current_context()
-        dp = dist_ctx.dist_config.dp
-        world_size = dist_ctx.dist_config.moe_tp
-        if dp == 1 and world_size > 1:
-            self._all_reduce = True
-        else:
-            self._all_reduce = False
 
     def forward(self, hidden_states: torch.Tensor, all_routed_experts: torch.Tensor | None = None):
         """forward."""
@@ -120,9 +139,35 @@ class Qwen3_5MoeSparseMoeBlock(nn.Module):
         shared_states = self.shared_expert(hidden_states)
         shared_states = self.shared_expert_gate(hidden_states).sigmoid() * shared_states
 
+        # Ensure both tensors are 2D before adding
+        # This handles cases where experts might return 3D tensors (e.g., DP_TP mode)
+        if out_states.dim() == 3:
+            out_states = out_states.reshape(-1, out_states.size(-1))
+        if shared_states.dim() == 3:
+            shared_states = shared_states.reshape(-1, shared_states.size(-1))
+
+        # Handle case where AWQ MoE shards output dimension but shared expert doesn't
+        # This can happen when using different TP strategies between MoE and shared expert
+        if out_states.size(-1) != shared_states.size(-1):
+            from lmdeploy.pytorch.distributed import get_tp_world_rank
+            try:
+                moe_tp_size, moe_tp_rank = get_tp_world_rank('moe')
+                if moe_tp_size > 1:
+                    # Slice shared expert's output to match MoE's output shape
+                    hidden_dim = shared_states.size(-1)
+                    slice_size = hidden_dim // moe_tp_size
+                    start_idx = moe_tp_rank * slice_size
+                    end_idx = start_idx + slice_size
+                    shared_states = shared_states[:, start_idx:end_idx]
+            except Exception:
+                pass  # If get_tp_world_rank fails, do nothing
+
+        # Both out_states and shared_states are TP-sharded (same shape)
+        # so we can add them together before the final all-reduce
         out_states += shared_states
         out_states = out_states.reshape(batch_size, sequence_length, -1)
 
+        # Apply the final all-reduce to combine the TP-sharded outputs
         out_states = self.moe_all_reduce(out_states)
         return out_states
 
@@ -213,6 +258,9 @@ class Qwen3_5MoeTextModel(Qwen3_5TextModel):
         # build rotary embedding
         self.rotary_emb = Qwen3_5TextRotaryEmbedding(config, device=device)
 
+        # for spec decoding - aux hidden states (same as parent class)
+        self.aux_hidden_state_layers = getattr(config, 'aux_hidden_state_layers', tuple())
+
 
 class Qwen3_5MoeModel(Qwen3_5Model):
 
@@ -235,6 +283,18 @@ class Qwen3_5MoeModel(Qwen3_5Model):
 
 class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
     """ModelForCausalLM."""
+
+    def support_cuda_graph(
+        self,
+        input_ids: torch.Tensor,
+        position_ids: torch.Tensor,
+        past_key_values: list[list[torch.Tensor]],
+        attn_metadata: Any = None,
+        inputs_embeds: torch.Tensor = None,
+        **kwargs,
+    ):
+        """Disable CUDA Graph for AWQ quantized MoE models to avoid OOM during dequantization."""
+        return False
 
     packed_modules_mapping = {
         'qkv_proj': [
@@ -329,34 +389,57 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5ForConditionalGeneration):
                 load_weight(param, loaded_weight)
 
     def _load_weight_fused_experts(self, name: str, loaded_weight: torch.Tensor, params_dict: dict[str, nn.Parameter]):
-        """Load weight of fused expert weights."""
+        """Load weight of fused expert weights.
+
+        For AWQ quantized models, the parameter names are:
+        - experts.gate_up.{qweight|scales|qzeros}
+        - experts.down.{qweight|scales|qzeros}
+
+        For non-quantized models, the parameter names are:
+        - experts.gate_up.weight
+        - experts.down.weight
+        """
         num_experts = self.config.text_config.num_experts
         fused_gateup_name = 'gate_up_proj'
         fused_down_name = 'down_proj'
-        if fused_gateup_name in name:
 
-            for expert_id in range(num_experts):
-                param_name = name.replace(f'experts.{fused_gateup_name}', 'experts.gate_up.weight')
+        # Check if this is an AWQ quantized model
+        quantization_config = getattr(self.config, 'quantization_config', None)
+        is_awq = quantization_config is not None and quantization_config.get('quant_method') == 'awq'
+
+        if fused_gateup_name in name:
+            # For AWQ: try qweight, scales, qzeros suffixes
+            # For non-AWQ: use .weight suffix
+            weight_suffixes = ['qweight', 'scales', 'qzeros'] if is_awq else ['weight']
+            for suffix in weight_suffixes:
+                param_name = name.replace(f'experts.{fused_gateup_name}', f'experts.gate_up.{suffix}')
                 # If param_name not found, try removing language_model prefix
                 if param_name not in params_dict and 'language_model' in param_name:
                     param_name = param_name.replace('.language_model', '')
                 if param_name in params_dict:
                     param = params_dict[param_name]
-                    weight = loaded_weight[expert_id]
-                    w1, w3 = weight.chunk(2, 0)
-                    load_weight(param, w1, expert_id=expert_id, shard_id='gate')
-                    load_weight(param, w3, expert_id=expert_id, shard_id='up')
+                    # Load each expert
+                    for expert_id in range(num_experts):
+                        weight = loaded_weight[expert_id]
+                        w1, w3 = weight.chunk(2, 0)
+                        load_weight(param, w1, expert_id=expert_id, shard_id='gate')
+                        load_weight(param, w3, expert_id=expert_id, shard_id='up')
+                    break  # Found the parameter, don't try other suffixes
 
         elif fused_down_name in name:
-            for expert_id in range(num_experts):
-                param_name = name.replace(f'experts.{fused_down_name}', 'experts.down.weight')
+            weight_suffixes = ['qweight', 'scales', 'qzeros'] if is_awq else ['weight']
+            for suffix in weight_suffixes:
+                param_name = name.replace(f'experts.{fused_down_name}', f'experts.down.{suffix}')
                 # If param_name not found, try removing language_model prefix
                 if param_name not in params_dict and 'language_model' in param_name:
                     param_name = param_name.replace('.language_model', '')
                 if param_name in params_dict:
                     param = params_dict[param_name]
-                    w2 = loaded_weight[expert_id]
-                    load_weight(param, w2, expert_id=expert_id, shard_id='down')
+                    # Load each expert
+                    for expert_id in range(num_experts):
+                        w2 = loaded_weight[expert_id]
+                        load_weight(param, w2, expert_id=expert_id, shard_id='down')
+                    break  # Found the parameter, don't try other suffixes
 
     def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]):
         """Load weights."""

@@ -151,10 +151,12 @@ class WorkerWrapperBase:
 
     def stop(self):
         """Stop engine loop."""
-        self.model_agent.stop()
+        if hasattr(self, 'model_agent'):
+            self.model_agent.stop()
 
     async def stop_async(self):
-        await self.model_agent.stop_async()
+        if hasattr(self, 'model_agent'):
+            await self.model_agent.stop_async()
 
     async def forward_async(self, inputs):
         """Start forward."""
@@ -168,7 +170,8 @@ class WorkerWrapperBase:
 
     def release(self):
         """Stop engine loop."""
-        self.model_agent.release()
+        if hasattr(self, 'model_agent'):
+            self.model_agent.release()
 
     """ PD Disaggregation API Begin """
 

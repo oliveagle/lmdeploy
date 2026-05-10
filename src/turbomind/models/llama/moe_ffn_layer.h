@@ -37,6 +37,10 @@ private:
 
     const MoeParam param_;
 
+    // EP (Expert Parallelism) support
+    const int ep_size_;
+    const int ep_rank_;
+
     int& is_warm_up_;
 
     LlamaLinear& linear_;

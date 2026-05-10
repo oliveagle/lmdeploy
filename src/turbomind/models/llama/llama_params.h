@@ -111,6 +111,10 @@ struct MoeParam {
     int         router_n_groups;
 
     std::vector<int> expert_num;
+
+    // EP (Expert Parallelism) support
+    int ep_size = 1;   // Expert parallelism size (number of GPUs sharding experts)
+    int ep_rank = 0;   // Expert parallelism rank (0 to ep_size-1)
 };
 
 struct AttentionParam {
@@ -152,6 +156,10 @@ struct EngineParam {
     int attn_cp_rank;
     int mlp_tp_size;
     int mlp_tp_rank;
+
+    // EP (Expert Parallelism) for MoE
+    int mlp_ep_size = 1;   // Expert parallelism size
+    int mlp_ep_rank = 0;   // Expert parallelism rank
 
     // multi-node
     int nnodes;

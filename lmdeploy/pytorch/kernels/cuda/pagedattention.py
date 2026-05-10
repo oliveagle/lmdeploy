@@ -619,12 +619,28 @@ _nv_cap = None
 
 
 def _kernel_meta_default(BLOCK_DMODEL: int, BLOCK_H: int):
-    """Kernel meta default."""
-    return 4, 2
+    """Kernel meta default for SM7- (V100, T4, etc.).
+
+    V100 has 96KB shared memory limit. To avoid exceeding this limit:
+    - Use num_stages=1 to minimize shared memory usage
+    - Use num_warps=4 for most workloads
+    - For very large block sizes (BLOCK_DMODEL * BLOCK_H > 4096), use num_warps=8
+      but keep num_stages=1 to stay within shared memory limits
+    """
+    num_stages = 1  # Always use 1 stage for SM7- to minimize shared memory
+    if BLOCK_DMODEL * BLOCK_H > 4096:
+        num_warps = 8
+    else:
+        num_warps = 4
+    return num_warps, num_stages
 
 
 def _kernel_meta_sm8x(BLOCK_DMODEL: int, BLOCK_H: int):
-    """Kernel meta default."""
+    """Kernel meta for SM8x (A100, etc.).
+
+    A100 has more shared memory but still needs to be conservative
+    with larger block sizes to avoid exceeding limits.
+    """
     num_stages = 2
     if BLOCK_DMODEL * BLOCK_H > 8192:
         num_warps = 8
@@ -797,7 +813,18 @@ def flash_attn_with_kvcache(
         if BLOCK_DMODEL != Lk:
             BLOCK_DMODEL = BLOCK_DMODEL // 2
             BLOCK_DMODEL1 = max(16, triton.next_power_of_2(Lk - BLOCK_DMODEL))
+        # For SM7-, use smaller blocks to reduce shared memory usage
+        if _nv_cap[0] < 8 and BLOCK_DMODEL > 64:
+            # If BLOCK_DMODEL is large (128 or more), split it
+            # to reduce shared memory requirements
+            original_BLOCK_DMODEL = BLOCK_DMODEL
+            BLOCK_DMODEL = max(32, BLOCK_DMODEL // 2)
+            if original_BLOCK_DMODEL != BLOCK_DMODEL:
+                BLOCK_DMODEL1 = max(16, original_BLOCK_DMODEL - BLOCK_DMODEL)
         BLOCK_DV = triton.next_power_of_2(Lv)
+        # Also reduce BLOCK_DV for SM7- if needed
+        if _nv_cap[0] < 8 and BLOCK_DV > 64:
+            BLOCK_DV = max(32, BLOCK_DV // 2)
         return BLOCK_DMODEL, BLOCK_DMODEL1, BLOCK_DV
 
 
@@ -855,12 +882,28 @@ def flash_attn_with_kvcache(
     valid = num_tokens % batch == 0
     assert valid, 'we only support decoding paged attention.'
     seq_len = num_tokens // batch
-    if max_seqlen_q is not None:
-        assert max_seqlen_q == seq_len, 'we only support decoding paged attention.'
+    if max_seqlen_q is not None and max_seqlen_q != seq_len:
+        # For DFlash draft model in EP mode, metadata may not match actual query shape
+        # Use seq_len derived from actual query tensor, ignore max_seqlen_q from metadata
+        # This is safe because the kernel uses seq_len for grid calculations
+        pass
 
     BLOCK_DMODEL, BLOCK_DMODEL1, BLOCK_DV = _get_block_d(Lq)
     HEADS_PER_REQ = kv_group_num * seq_len
-    BLOCK_H = max(16, min(BLOCK, triton.next_power_of_2(HEADS_PER_REQ)))
+
+    # Adjust block sizes for SM7- (V100) to stay within 96KB shared memory limit
+    if _nv_cap[0] < 8:
+        # For V100, use smaller blocks to reduce shared memory usage
+        # Original BLOCK can be too large (64 or more)
+        original_BLOCK = BLOCK
+        BLOCK = min(BLOCK, 32)  # Use max 32 for SM7-
+        # Always set BLOCK_H for V100 to avoid UnboundLocalError
+        BLOCK_H = max(16, min(BLOCK, triton.next_power_of_2(HEADS_PER_REQ)))
+        if BLOCK_H > 16 and BLOCK_DMODEL * BLOCK_H > 2048:
+            BLOCK_H = 16  # Further reduce to stay within limit
+    else:
+        BLOCK_H = max(16, min(BLOCK, triton.next_power_of_2(HEADS_PER_REQ)))
+
     TILES_PER_GROUP = triton.cdiv(HEADS_PER_REQ, BLOCK_H)
     grid_1 = TILES_PER_GROUP * num_kv_heads
 

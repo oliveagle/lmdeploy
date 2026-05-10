@@ -8,7 +8,11 @@ def build_strategy_factory(model_config: ModelConfig,
     """Build strategy factory."""
     model_paradigm = model_config.model_paradigm
 
-    if model_paradigm == 'ar':
+    # If specdecode_config is provided, use ar_spec strategy regardless of model_paradigm
+    if specdecode_config is not None:
+        from .ar_spec import ARSpecStrategyFactory
+        return ARSpecStrategyFactory(model_config=model_config, specdecode_config=specdecode_config)
+    elif model_paradigm == 'ar':
         from .ar import ARStrategyFactory
         return ARStrategyFactory(model_config=model_config)
     elif model_paradigm == 'dllm':

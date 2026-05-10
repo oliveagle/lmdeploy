@@ -223,6 +223,15 @@ class DistContext:
         context.ep_gpu_group = ep_gpu_group
         context.ep_gpu_groups = ep_gpu_groups
 
+        # 关键：当 EP>1 时，确保 attn_tp 设置为 1
+        # 这样可以避免 attn_tp 被默认设置为 world_size
+        # 注意：moe_tp 在 EP 模式下默认等于 tp 值（不是 1）
+        if dist_config.ep > 1:
+            if dist_config.attn_tp is None:
+                dist_config.attn_tp = 1
+            if dist_config.tp is None:
+                dist_config.tp = 1
+
     @classmethod
     def build(cls, rank: int = 0, dist_config: DistConfig = None, ccl_backend: str = 'nccl'):
         """Build dist context."""

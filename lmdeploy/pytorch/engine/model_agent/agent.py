@@ -992,6 +992,13 @@ class BaseModelAgent:
                                         self.patched_model,
                                         build_model_ctx=self.build_model_ctx)
 
+            # Synchronize all ranks after model building.
+            # In EP mode, only rank 0 loads the draft model, which takes extra time.
+            # Without this barrier, other ranks would finish earlier while rank 0
+            # is still loading, causing the parent process to hang.
+            if self.world_size > 1:
+                dist.barrier()
+
     def build_graph_runner(self):
         """Build graph runner."""
         with self.all_context():

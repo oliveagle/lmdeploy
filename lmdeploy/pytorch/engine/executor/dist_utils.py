@@ -37,10 +37,40 @@ def init_dist_environ(rank: int, world_size: int):
 
 def init_process_group(rank: int, world_size: int):
     """Init process group."""
+    import torch
     DIST_TIMEOUT = timedelta(days=35600)
     init_dist_environ(rank, world_size)
     os.environ.pop('TORCHELASTIC_USE_AGENT_STORE', None)
 
     ccl_backend = get_backend().ccl_backend()
-    dist.init_process_group(backend=ccl_backend, rank=rank, world_size=world_size, timeout=DIST_TIMEOUT)
+    # 明确指定 device_id 以避免 NCCL 猜测导致的挂起
+    # 这在多 GPU 环境（如 EP+TP）中尤为重要
+    device_id = None
+    if torch.cuda.is_available():
+        device_count = torch.cuda.device_count()
+        if device_count > 0:
+            device_id = rank % device_count
+            os.environ['LOCAL_RANK'] = str(device_id)
+
+    # PyTorch 2.0+ 支持 device_id 参数
+    # 这会消除 "Guessing device ID" 警告并避免潜在的挂起
+    kwargs = {
+        'backend': ccl_backend,
+        'rank': rank,
+        'world_size': world_size,
+        'timeout': DIST_TIMEOUT,
+    }
+    if device_id is not None:
+        kwargs['device_id'] = device_id
+
+    dist.init_process_group(**kwargs)
+    assert dist.is_initialized()
+
+    # set default CUDA device for subsequent tensor allocations
+    if device_id is not None:
+        torch.cuda.set_device(device_id)
+
+    # set default CUDA device
+    if device_id is not None:
+        torch.cuda.set_device(device_id)
     assert dist.is_initialized()

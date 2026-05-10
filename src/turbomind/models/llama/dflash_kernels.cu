@@ -35,7 +35,7 @@ __global__ void DFlashAttnKernelFP16(
     if (s >= num_draft) return;
 
     const int tid     = threadIdx.x;
-    const int total   = num_ctx + (s + 1);
+    const int total   = num_ctx + num_draft;  // Non-causal: all context + all draft tokens
 
     // Offset into per-head data (row-major layout)
     const half* q     = query + s * blockDim.y * head_dim + h * head_dim;
@@ -70,9 +70,10 @@ __global__ void DFlashAttnKernelFP16(
         lmax = fmaxf(lmax, dot);
     }
 
-    // draft keys (causal: only up to current spec_pos)
+    // draft keys (NON-CAUSAL: all draft tokens can see all draft tokens)
+    // This matches lucebox-hub/dflash behavior for better draft quality
     const int ds = num_ctx;
-    for (int i = tid; i < s + 1; i += THREADS) {
+    for (int i = tid; i < num_draft; i += THREADS) {
         float dot = 0.f;
 #pragma unroll
         for (int d = 0; d < 128; ++d) {
@@ -116,7 +117,7 @@ __global__ void DFlashAttnKernelFP16(
             float acc = 0.f;
             for (int i = 0; i < num_ctx; ++i)
                 acc += logits[i] * __half2float(vc[i * head_dim + d]);
-            for (int i = 0; i < s + 1; ++i)
+            for (int i = 0; i < num_draft; ++i)
                 acc += logits[ds + i] * __half2float(vd[i * head_dim + d]);
             out[d] = __float2half(acc / gsum);
         }

@@ -70,6 +70,10 @@ private:
     int  attn_tp_rank_;
     int  mlp_tp_size_;
     int  mlp_tp_rank_;
+
+    // EP (Expert Parallelism) for MoE
+    int mlp_ep_size_ = 1;
+    int mlp_ep_rank_ = 0;
 };
 
 }  // namespace turbomind

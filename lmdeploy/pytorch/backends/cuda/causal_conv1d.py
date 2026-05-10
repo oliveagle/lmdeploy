@@ -82,12 +82,35 @@ class CausalConv1dDaoImpl(CausalConv1dTilelangImpl):
                                      activation=activation)
 
 
+class CausalConv1dTritonImpl(CausalConv1dImpl):
+    """Triton fallback for GPUs where TileLang fails (e.g., sm_70 with CUDA 12.8)."""
+
+    def __init__(self):
+        from .causal_conv1d_triton import CausalConv1dTritonImpl as TritonImpl
+        self._impl = TritonImpl()
+
+    def conv1d_fn(self, *args, **kwargs):
+        return self._impl.conv1d_fn(*args, **kwargs)
+
+    def update_fn(self, *args, **kwargs):
+        return self._impl.update_fn(*args, **kwargs)
+
+
 @lru_cache
 def has_dao():
     try:
         import causal_conv1d  # noqa: F401
         causal_conv1d_fn = causal_conv1d.causal_conv1d_fn  # noqa: F841
         causal_conv1d_update = causal_conv1d.causal_conv1d_update  # noqa: F841
+        return True
+    except Exception:
+        return False
+
+
+@lru_cache
+def has_triton():
+    try:
+        import triton  # noqa: F401
         return True
     except Exception:
         return False
@@ -103,6 +126,8 @@ class CausalConv1dCudaBuilder(CausalConv1dBuilder):
             return CausalConv1dTilelangImpl()
         elif has_dao():
             return CausalConv1dDaoImpl()
+        elif has_triton():
+            return CausalConv1dTritonImpl()
         else:
             raise RuntimeError('No available implementation for CausalConv1d, '
                                'please install https://tilelang.com/ or https://github.com/Dao-AILab/causal-conv1d')

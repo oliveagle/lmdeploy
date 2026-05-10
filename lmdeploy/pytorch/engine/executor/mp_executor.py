@@ -510,6 +510,7 @@ class ExecutorProc:
     ):
         """Main loop."""
         init_backend(device_type)
+        # 在 init_process_group 之前不设置设备，让 init_process_group 处理
         torch.cuda.set_device(proc_id)
 
         # catch signal

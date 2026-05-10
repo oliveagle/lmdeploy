@@ -27,11 +27,14 @@ def build_fused_moe(
     """Fused moe builder."""
     quant_method = None
     if quant_config is not None:
-        # Only override quant_config if it's a dict (comes from model config)
-        # If it's already a QuantizationConfig object, use it directly
         if isinstance(quant_config, dict):
-            quant_config = get_build_model_context().quant_config
-        quant_method = quant_config.get_quant_method(prefix)
+            ctx_quant_config = get_build_model_context().quant_config
+            if ctx_quant_config is not None:
+                quant_config = ctx_quant_config
+        if hasattr(quant_config, 'get_quant_method'):
+            quant_method = quant_config.get_quant_method(prefix)
+        elif isinstance(quant_config, dict):
+            quant_method = quant_config.get('quant_method', None)
 
     if quant_method is None:
         from .default import FusedMoE

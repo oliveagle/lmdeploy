@@ -52,22 +52,22 @@ def get_cuda_autotune_config():
         },
                       num_stages=4,
                       num_warps=4),
-        # SM7-
+        # SM7- (V100, T4, etc.) - reduced shared memory configs
         triton.Config({
             'BLOCK_SIZE_M': 64,
             'BLOCK_SIZE_N': 128,
             'BLOCK_SIZE_K': 32,
             'GROUP_SIZE_M': 1,
         },
-                      num_stages=4,
+                      num_stages=3,
                       num_warps=4),
         triton.Config({
-            'BLOCK_SIZE_M': 128,
-            'BLOCK_SIZE_N': 32,
+            'BLOCK_SIZE_M': 64,
+            'BLOCK_SIZE_N': 64,
             'BLOCK_SIZE_K': 32,
             'GROUP_SIZE_M': 1,
         },
-                      num_stages=4,
+                      num_stages=3,
                       num_warps=4),
         triton.Config({
             'BLOCK_SIZE_M': 64,
@@ -75,7 +75,15 @@ def get_cuda_autotune_config():
             'BLOCK_SIZE_K': 32,
             'GROUP_SIZE_M': 1,
         },
-                      num_stages=5,
+                      num_stages=3,
+                      num_warps=2),
+        triton.Config({
+            'BLOCK_SIZE_M': 64,
+            'BLOCK_SIZE_N': 32,
+            'BLOCK_SIZE_K': 32,
+            'GROUP_SIZE_M': 1,
+        },
+                      num_stages=2,
                       num_warps=2),
     ]
 

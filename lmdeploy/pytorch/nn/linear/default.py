@@ -74,20 +74,26 @@ class BaseLinear(LinearBase):
     def _weight_loader_tp_colwise(self, param: torch.nn.Parameter, loaded_weight: torch.Tensor, rank: int,
                                   world_size: int):
         """Weight loader for colwise linear."""
+        # CRITICAL: Split on CPU first to avoid OOM when loading large weights
+        # First split, then move to GPU
         weight = chunk_aligned(loaded_weight, world_size, 0, self.tp_align_size)[rank]
+        weight = weight.to(param.device)
         return default_weight_loader(param, weight)
 
     def _weight_loader_tp_rowwise(self, param: torch.nn.Parameter, loaded_weight: torch.Tensor, rank: int,
                                   world_size: int):
         """Weight loader for rowwise linear."""
         if loaded_weight.dim() == 2:
-            loaded_weight = loaded_weight.to(param.device)
+            # CRITICAL: Split on CPU first to avoid OOM when loading large weights
+            # Split first, then move to GPU
             weight = chunk_aligned(loaded_weight, world_size, 1, self.tp_align_size)[rank]
+            weight = weight.to(param.device)
             return default_weight_loader(param, weight)
         else:
             # bias
             if rank != 0:
                 loaded_weight = torch.zeros_like(loaded_weight)
+            loaded_weight = loaded_weight.to(param.device)
             return default_weight_loader(param, loaded_weight)
 
     def weight_loader(self, param: torch.nn.Parameter, loaded_weight: torch.Tensor):

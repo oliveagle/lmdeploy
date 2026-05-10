@@ -66,7 +66,9 @@ LlamaDecoderLayerWeight::LlamaDecoderLayerWeight(
     attn_tp_size_(engine.attn_tp_size),
     attn_tp_rank_(engine.attn_tp_rank),
     mlp_tp_size_(engine.mlp_tp_size),
-    mlp_tp_rank_(engine.mlp_tp_rank)
+    mlp_tp_rank_(engine.mlp_tp_rank),
+    mlp_ep_size_(engine.mlp_ep_size),
+    mlp_ep_rank_(engine.mlp_ep_rank)
 {
     bool is_linear_attention = false;
     if (layer_id < (int)model.layer_types.size() && model.layer_types[layer_id] == 1) {

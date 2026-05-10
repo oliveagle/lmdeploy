@@ -100,11 +100,13 @@ static void GemmFP16ComputeFP32(cublasHandle_t cublas,
 
 DFlashDraftModel::DFlashDraftModel(const ModelParam& model,
                                    const EngineParam& engine,
-                                   const Context& ctx)
+                                   const Context& ctx,
+                                   int num_spec_tokens,
+                                   int num_draft_layers)
     : hidden_size_(model.hidden_units)
-    , num_draft_layers_(8)
+    , num_draft_layers_(num_draft_layers)
     , num_aux_layers_(5)
-    , num_spec_tokens_(8)
+    , num_spec_tokens_(num_spec_tokens)
     , target_layer_ids_{1, 10, 19, 28, 37}
     , vocab_size_(model.vocab_size)
 {

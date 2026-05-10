@@ -1,3 +1,6 @@
 [submodule "submodules/dflash"]
 	path = submodules/dflash
 	url = git@github.com:z-lab/dflash.git
+[submodule "submodules/tilelang"]
+	path = submodules/tilelang
+	url = https://github.com/tile-ai/tilelang.git

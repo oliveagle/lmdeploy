@@ -569,6 +569,23 @@ MoeFfnWeight::MoeFfnWeight(int             layer_id,
         return;
     }
 
+    // EP (Expert Parallelism) support
+    const int ep_size = param.ep_size;
+    const int ep_rank = param.ep_rank;
+    ep_total_experts_ = expert_num;
+
+    int local_expert_num = expert_num;
+    if (ep_size > 1) {
+        const int expert_per_rank = (expert_num + ep_size - 1) / ep_size;
+        ep_first_expert_ = ep_rank * expert_per_rank;
+        ep_num_experts_ = std::min(expert_per_rank, expert_num - ep_first_expert_);
+        local_expert_num = ep_num_experts_;
+    }
+    else {
+        ep_first_expert_ = 0;
+        ep_num_experts_ = expert_num;
+    }
+
     gate.emplace(hidden_dim, expert_num, data_type, param.router_bias, data_type, 1);
     register_module("gate", gate);
 
@@ -587,8 +604,9 @@ MoeFfnWeight::MoeFfnWeight(int             layer_id,
         fuse_silu_act = false;
     }
 
-    experts.reserve(expert_num);
-    for (int i = 0; i < expert_num; ++i) {
+    // Create only local experts for this EP rank
+    experts.reserve(local_expert_num);
+    for (int i = 0; i < local_expert_num; ++i) {
         experts.emplace_back(new LlamaFfnWeight{hidden_dim,
                                                 param.inter_size,
                                                 mlp_bias,

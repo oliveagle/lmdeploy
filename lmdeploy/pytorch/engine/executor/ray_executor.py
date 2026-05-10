@@ -189,7 +189,14 @@ class RayWorkerWrapper(WorkerWrapperBase):
 
     def set_device(self, local_rank):
         """Set worker local rank."""
-        torch.cuda.set_device(local_rank)
+        # For Ray workers, CUDA_VISIBLE_DEVICES is set to a single GPU
+        # so we should always use device 0
+        # Check if we're in a Ray worker
+        if ray.is_initialized():
+            # Ray sets CUDA_VISIBLE_DEVICES to a single GPU for each worker
+            torch.cuda.set_device(0)
+        else:
+            torch.cuda.set_device(local_rank)
 
     def set_env(self, envs: dict[str, str]):
         for key, value in envs.items():
@@ -260,8 +267,11 @@ class RayExecutor(ExecutorBase):
         device_ctx = DeviceContext(device_type)
         with get_device_manager().context(device_ctx):
             logger.info('Init ray cluster.')
-            attn_tp = dist_config.attn_tp
-            self.ray_ctx = RayContext(attn_tp, dp=dist_config.dp, device_type=device_type)
+            # 关键修复：使用 world_size 而不是 attn_tp 来创建 Ray workers
+            # 当 EP > 1 时，需要在每张 GPU 上创建一个 worker 来实现 EP 分片
+            # attn_tp 只用于注意力层的分片，不影响 worker 数量
+            num_workers = dist_config.world_size
+            self.ray_ctx = RayContext(num_workers, dp=dist_config.dp, device_type=device_type)
             placement_group = self.ray_ctx.get_placement_group()
             self.placement_group = placement_group
 
@@ -296,7 +306,9 @@ class RayExecutor(ExecutorBase):
             self.remote_outs: asyncio.Queue = None
 
             logger.info('Init distributed environment by device.')
-            self.rank_offset = dist_config.dp_rank * attn_tp
+            # rank_offset 用于 DP 场景下的 rank 偏移
+            # world_size / dp 就是每个 dp rank 的 worker 数量
+            self.rank_offset = dist_config.dp_rank * (dist_config.world_size // dist_config.dp)
             self._init_distributed_environment_by_device(device_type)
 
             logger.info('Init distributed process group.')
@@ -614,12 +626,12 @@ class RayExecutor(ExecutorBase):
                     raise ValueError(
                         f'External bundle index {bundle_id} does not have required resource: {device_str}. '
                         f'Available resources in this bundle: {dict(bundle)}')
-        attn_tp = self.dist_config.attn_tp
-        if len(bundle_indices) < attn_tp:
-            raise ValueError(f'Not enough bundle indices for attention tensor parallelism. '
-                             f'Required: {attn_tp}, Provided: {len(bundle_indices)} '
+        world_size = self.dist_config.world_size
+        if len(bundle_indices) < world_size:
+            raise ValueError(f'Not enough bundle indices for distributed training. '
+                             f'Required: {world_size}, Provided: {len(bundle_indices)} '
                              f'(bundle_indices: {bundle_indices}).')
-        bundle_indices = bundle_indices[:attn_tp]
+        bundle_indices = bundle_indices[:world_size]
 
         workers = list()
         for _, bundle_id in enumerate(bundle_indices):
@@ -635,8 +647,8 @@ class RayExecutor(ExecutorBase):
                 if _envs.ray_nsys_enable:
                     runtime_env = _update_runtime_env_nsys(runtime_env)
                 worker = ray.remote(
-                    num_cpus=0,
-                    num_gpus=0.01,
+                    num_cpus=1,
+                    num_gpus=1,
                     scheduling_strategy=scheduling_strategy,
                     runtime_env=runtime_env,
                 )(RayWorkerWrapper).remote(**worker_kwargs)
@@ -655,6 +667,8 @@ class RayExecutor(ExecutorBase):
         driver_ip = _get_master_addr()
         if device_str == 'cuda':
             self.workers = self._sort_workers(driver_ip, self.workers)
+            # Set device for each worker
+            ray.get([worker.set_device.remote(idx + self.rank_offset) for idx, worker in enumerate(self.workers)])
 
         elif device_str == 'ascend':
             self._init_ascend_distributed_environment(driver_ip)

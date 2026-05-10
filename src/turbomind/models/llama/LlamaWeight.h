@@ -87,6 +87,10 @@ private:
     int tp_size_;  // this will follow attn tp param
     int tp_rank_;
 
+    // EP (Expert Parallelism) for MoE
+    int mlp_ep_size_ = 1;
+    int mlp_ep_rank_ = 0;
+
     std::vector<int> inter_size_;
 
     core::Stream    stream_;

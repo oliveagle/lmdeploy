@@ -183,6 +183,11 @@ struct MoeFfnWeight: core::Module {
     LlamaFfnWeight block;
 
     MoeParam::Method method{};
+
+    // EP (Expert Parallelism) support
+    int ep_first_expert_ = 0;  // First expert index for this rank
+    int ep_num_experts_ = 0;   // Number of experts for this rank
+    int ep_total_experts_ = 0; // Total number of experts
 };
 
 void LinkExperts(std::function<LlamaDenseWeight*(int)> experts, int n, LlamaDenseWeight& d);

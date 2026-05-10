@@ -81,6 +81,7 @@ class ModelInputsStrategy(ABC):
                    device: str = 'cpu',
                    dummy_block_id: int = 0,
                    vocab_size: int = 1,
-                   meta: MakeDummyMeta | None = None) -> ModelInputs:
+                   meta: MakeDummyMeta | None = None,
+                   **kwargs) -> ModelInputs:
         """Create dummy model inputs."""
         pass

@@ -109,7 +109,12 @@ class ARSpecStoppingCriteria(ARStoppingCriteria):
              inputs: ModelInputs | None = None,
              extra_inputs: ARSpecExtraInputs | None = None):
         """Check whether to stop generation."""
-        token_ids = extra_inputs.output_token_ids
+        # Handle case where output_token_ids is None (e.g., first prefill step)
+        # Fall back to next_token_ids for stopping check
+        if extra_inputs.output_token_ids is None:
+            token_ids = next_token_ids.unsqueeze(-1) if next_token_ids.ndim == 1 else next_token_ids
+        else:
+            token_ids = extra_inputs.output_token_ids
 
         if token_ids.ndim == 1:
             token_ids = token_ids.unsqueeze(-1)

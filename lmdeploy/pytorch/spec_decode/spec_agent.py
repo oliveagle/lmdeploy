@@ -152,6 +152,38 @@ class SpecModelAgent(BaseSpecModelAgent):
                                                          backend_config=self.backend_config,
                                                          device=self.device)
 
+        # After GraphRunner is built, we need to re-apply lm_head sharing
+        # because the serialization process may have broken the reference
+        if hasattr(self.proposer, '_target_get_logits') and self.proposer._target_get_logits is not None:
+            from lmdeploy.utils import get_logger
+            logger = get_logger('lmdeploy')
+
+            # Get the inner DFlashDraftModel
+            inner_model = self.proposer.model
+            while hasattr(inner_model, 'model'):
+                inner_model = inner_model.model
+
+            # We need to get lm_head from target_model
+            # The target_model should be accessible in the driver process
+            if hasattr(self.proposer, 'target_model') and self.proposer.target_model is not None:
+                target_model = self.proposer.target_model
+                if hasattr(target_model, 'lm_head'):
+                    lm_head = target_model.lm_head
+                elif hasattr(target_model, 'model') and hasattr(target_model.model, 'lm_head'):
+                    lm_head = target_model.model.lm_head
+                else:
+                    logger.warning('SpecModelAgent: cannot find target lm_head after GraphRunner build')
+                    lm_head = None
+
+                if lm_head is not None and hasattr(inner_model, 'set_lm_head'):
+                    inner_model.set_lm_head(lm_head)
+                    logger.info('SpecModelAgent: Re-shared lm_head to draft model after GraphRunner build')
+                elif lm_head is not None:
+                    inner_model.lm_head = lm_head
+                    logger.info('SpecModelAgent: Set lm_head directly on inner_model')
+                else:
+                    logger.warning('SpecModelAgent: lm_head is None, cannot re-share')
+
     def build_cache_engine(self, cache_stream: torch.cuda.Stream):
         """Build cache engine."""
         if self.cache_config is not None:
@@ -478,7 +510,7 @@ class SpecModelAgent(BaseSpecModelAgent):
                                                      device='cuda',
                                                      vocab_size=self.model_config.vocab_size,
                                                      max_q_seqlen=1,
-                                                     target_hidden_size=self.model_config.hidden_size,
+                                                     target_hidden_size=target_hidden_size,
                                                      target_dtype=self.model_config.dtype,
                                                      meta=self.make_dummy_meta)
             self._forward_impl(inputs)

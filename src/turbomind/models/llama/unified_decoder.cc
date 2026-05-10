@@ -7,6 +7,7 @@
 #include <cuda_runtime.h>
 
 #include "src/turbomind/core/allocator.h"
+#include "src/turbomind/core/tensor.h"
 #include "src/turbomind/kernels/core/math.h"
 #include "src/turbomind/kernels/norm/rms_norm.h"
 #include "src/turbomind/models/llama/DFlashDraftModel.h"
@@ -294,7 +295,7 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
                                     layer, collect_size);
                     } else {
                         // Prefill 阶段：收集全部 token
-                        Copy(global_hidden_states, std::ref(aux_hidden_states_[i]), stream);
+                        Copy(global_hidden_states, aux_hidden_states_[i]);
                         TM_LOG_DEBUG("[DFlash] Collected aux hidden state at layer %d for prefill, token_num=%zu",
                                     layer, collect_size);
                     }
