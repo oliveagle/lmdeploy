@@ -276,6 +276,10 @@ def get_tm_model(model_path,
         tm_cfg.model_config.attn_cp_size = engine_config.attn_cp_size
     if engine_config.mlp_tp_size is not None:
         tm_cfg.model_config.mlp_tp_size = engine_config.mlp_tp_size
+    # EP (Expert Parallelism) support
+    if engine_config.ep is not None and engine_config.ep > 1:
+        tm_cfg.model_config.mlp_ep_size = engine_config.ep
+        tm_cfg.model_config.mlp_ep_rank = engine_config.ep_rank
 
     output_model = OUTPUT_MODELS.get(output_model_name)(input_model=input_model,
                                                         cfg=tm_cfg,

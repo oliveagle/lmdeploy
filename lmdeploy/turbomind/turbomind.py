@@ -107,6 +107,16 @@ def update_parallel_config(cfg: TurbomindEngineConfig):
         cfg.mlp_tp_size = mlp_tp_size * inner_tp_size
     assert cfg.attn_dp_size * cfg.attn_tp_size * cfg.attn_cp_size == cfg.mlp_dp_size * cfg.mlp_tp_size
     assert cfg.attn_dp_size * cfg.attn_tp_size * cfg.attn_cp_size * cfg.outer_dp_size == cfg.device_num
+    # EP (Expert Parallelism) support: calculate ep_rank if not set
+    if cfg.ep > 1:
+        if cfg.ep_rank is None or cfg.ep_rank == 0:
+            # When using multiple GPUs for EP, assign rank based on device id
+            # This is a simplified approach; may need refinement for multi-node
+            if cfg.devices and len(cfg.devices) > 1:
+                # Map device index to EP rank
+                cfg.ep_rank = cfg.devices[0] % cfg.ep
+            else:
+                cfg.ep_rank = 0
     # update devices
     cfg.devices = cfg.devices or list(range(cfg.device_num // cfg.nnodes))
     cfg.devices = cfg.devices[:cfg.device_num // cfg.nnodes]

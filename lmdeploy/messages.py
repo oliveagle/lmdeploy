@@ -288,6 +288,7 @@ class TurbomindEngineConfig:
     tp: int = 1
     dp: int = 1
     ep: int = 1  # Expert Parallelism size for MoE
+    ep_rank: int = 0  # Expert Parallelism rank (0 to ep-1)
     cp: int = 1
     device_num: int = None
     attn_tp_size: int = None
