@@ -38,8 +38,85 @@ __global__ void DFlashSiluMulKernel(half* gate, const half* up, int n)
     }
 }
 
+// Optimized SiLU multiply kernel with half2 vectorized loads
+__global__ void DFlashSiluMulKernelV2(half* gate, const half* up, int n)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int idx2 = idx * 2;  // Process 2 elements per iteration
+    if (idx2 >= n) return;
+
+    if (idx2 + 1 < n) {
+        // Vectorized load
+        half2 g2 = reinterpret_cast<half2*>(gate)[idx];
+        half2 u2 = reinterpret_cast<const half2*>(up)[idx];
+
+        float g0 = __low2float(g2);
+        float g1 = __high2float(g2);
+        float u0 = __low2float(u2);
+        float u1 = __high2float(u2);
+
+        float sig0 = 1.f / (1.f + expf(-g0));
+        float sig1 = 1.f / (1.f + expf(-g1));
+
+        half2 out;
+        reinterpret_cast<half*>(&out)[0] = __float2half(sig0 * g0 * u0);
+        reinterpret_cast<half*>(&out)[1] = __float2half(sig1 * g1 * u1);
+
+        reinterpret_cast<half2*>(gate)[idx] = out;
+    } else {
+        // Handle odd element
+        float g = __half2float(gate[idx2]);
+        float sig = 1.f / (1.f + expf(-g));
+        gate[idx2] = __float2half(sig * g * __half2float(up[idx2]));
+    }
+}
+
+// Fused residual + RMSNorm kernel (STORY-009 performance optimization)
+// Combines residual addition and RMSNorm into a single kernel launch
+__global__ void DFlashResidualRMSNormKernel(
+    half* __restrict__ output,        // [num_tokens, hidden]
+    const half* __restrict__ input,   // [num_tokens, hidden]
+    const half* __restrict__ residual,// [num_tokens, hidden]
+    const half* __restrict__ weight,  // [hidden]
+    float eps,
+    int num_tokens,
+    int hidden)
+{
+    const int t = blockIdx.x * blockDim.y + threadIdx.y;
+    const int h = threadIdx.x;
+    const int idx = t * hidden + h;
+
+    if (t >= num_tokens || h >= hidden) return;
+
+    // 1) Residual connection: output = input + residual
+    float x = __half2float(input[idx]) + __half2float(residual[idx]);
+
+    // 2) RMSNorm: compute variance across hidden dimension
+    extern __shared__ char smem_char[];
+    float* s_variance = reinterpret_cast<float*>(smem_char);
+
+    float local_sum = x * x;
+    s_variance[h] = local_sum;
+    __syncthreads();
+
+    // Tree reduction for sum of squares
+    for (int stride = hidden / 2; stride > 0; stride >>= 1) {
+        if (h < stride) {
+            s_variance[h] += s_variance[h + stride];
+        }
+        __syncthreads();
+    }
+
+    float variance = s_variance[0] / static_cast<float>(hidden) + eps;
+    float rms = rsqrtf(variance);
+
+    // 3) Normalize and scale by weight
+    output[idx] = __float2half(x * rms * __half2float(weight[h]));
+}
+
 // Split QKV kernel: extracts Q, K, V from QKV tensor
 // QKV: [num_rows, 3*hidden] → Q: [num_rows, hidden], K: [num_rows, hidden], V: [num_rows, hidden]
+// Optimized with half2 vectorized loads for better memory bandwidth.
 __global__ void DFlashSplitQKVKernel(
     const half* __restrict__ qkv,   // [num_rows, 3*hidden]
     half* __restrict__ q,           // [num_rows, hidden]
@@ -56,11 +133,32 @@ __global__ void DFlashSplitQKVKernel(
     half* k_row = k + row * hidden;
     half* v_row = v + row * hidden;
 
-    // Each thread processes multiple elements
-    for (int i = threadIdx.x; i < hidden; i += blockDim.x) {
-        q_row[i] = qkv_row[i];                // Q starts at offset 0
-        k_row[i] = qkv_row[hidden + i];      // K starts at offset hidden
-        v_row[i] = qkv_row[2 * hidden + i];  // V starts at offset 2*hidden
+    // Process 2 elements at a time using half2 vectorized loads/stores
+    const int hidden_aligned = (hidden / 2) * 2;
+    const half2* qkv_row2 = reinterpret_cast<const half2*>(qkv_row);
+    half2* q_row2 = reinterpret_cast<half2*>(q_row);
+    half2* k_row2 = reinterpret_cast<half2*>(k_row);
+    half2* v_row2 = reinterpret_cast<half2*>(v_row);
+
+    for (int i = threadIdx.x; i < hidden_aligned; i += 2 * blockDim.x) {
+        const int idx = i / 2;
+        half2 qkv_vec = qkv_row2[idx];
+        half2 k_vec = qkv_row2[idx + hidden / 2];
+        half2 v_vec = qkv_row2[idx + hidden];
+
+        q_row2[idx] = qkv_vec;
+        k_row2[idx] = k_vec;
+        v_row2[idx] = v_vec;
+    }
+
+    // Handle odd dimension
+    if (hidden % 2 != 0) {
+        const int odd_idx = hidden - 1 - threadIdx.x;
+        if (odd_idx >= 0 && threadIdx.x == 0) {
+            q_row[odd_idx] = qkv_row[odd_idx];
+            k_row[odd_idx] = qkv_row[hidden + odd_idx];
+            v_row[odd_idx] = qkv_row[2 * hidden + odd_idx];
+        }
     }
 }
 
@@ -333,9 +431,9 @@ void DFlashDraftModel::GenerateDraft(
                                 static_cast<half*>(up_out.raw_data()),
                                 num_spec_tokens_, inter_size, h);
 
-            // silu(gate) * up
+            // silu(gate) * up (STORY-009: use V2 vectorized kernel for better memory bandwidth)
             int threads_m = 256 < (num_spec_tokens_ * inter_size) ? 256 : (num_spec_tokens_ * inter_size);
-            DFlashSiluMulKernel<<<(num_spec_tokens_ * inter_size + threads_m - 1) / threads_m, threads_m, 0, stream>>>(
+            DFlashSiluMulKernelV2<<<(num_spec_tokens_ * inter_size + threads_m - 1) / threads_m, threads_m, 0, stream>>>(
                 static_cast<half*>(gate_out.raw_data()),
                 static_cast<const half*>(up_out.raw_data()),
                 num_spec_tokens_ * inter_size);
