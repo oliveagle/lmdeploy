@@ -289,6 +289,13 @@ class FusedMoEAWQ(FusedMoEBase):
             # Find which experts are actually present in this rank
             if self.expert_list is not None:
                 local_expert_set = set(self.expert_list)
+                # Validate topk_ids to prevent illegal memory access
+                # Filter out invalid expert IDs (negative or >= num_experts)
+                valid_mask = (topk_ids >= 0) & (topk_ids < self.num_experts)
+                if not valid_mask.all():
+                    # Clamp to valid range if invalid IDs found
+                    topk_ids = torch.clamp(topk_ids, 0, self.num_experts - 1)
+
                 # Filter unique_experts to only those present in this rank
                 unique_global_experts = torch.unique(topk_ids).cpu().tolist()
                 unique_experts = [eid for eid in unique_global_experts if eid in local_expert_set]
@@ -306,6 +313,13 @@ class FusedMoEAWQ(FusedMoEBase):
                 global_to_local_expert_id = {eid: self.expert_list.index(eid) for eid in unique_experts}
             else:
                 # No EP, all experts are local
+                # Validate topk_ids to prevent illegal memory access
+                # Filter out invalid expert IDs (negative or >= num_experts)
+                valid_mask = (topk_ids >= 0) & (topk_ids < self.num_experts)
+                if not valid_mask.all():
+                    # Clamp to valid range if invalid IDs found
+                    topk_ids = torch.clamp(topk_ids, 0, self.num_experts - 1)
+
                 unique_experts = torch.unique(topk_ids).cpu().tolist()
                 global_to_local_idx = {eid: i for i, eid in enumerate(unique_experts)}
                 global_to_local_expert_id = global_to_local_idx

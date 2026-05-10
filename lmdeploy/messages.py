@@ -287,6 +287,7 @@ class TurbomindEngineConfig:
     model_format: str | None = None
     tp: int = 1
     dp: int = 1
+    ep: int = 1  # Expert Parallelism size for MoE
     cp: int = 1
     device_num: int = None
     attn_tp_size: int = None

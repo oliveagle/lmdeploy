@@ -29,8 +29,11 @@ bool SetupDFlash(const std::string&     model_dir,
         TM_LOG_INFO("[DFlash] Setting up DFlash draft model from: %s",
                     dflash_param.draft_model_path.c_str());
 
-        // 1. Create DFlash draft model
-        auto dflash_model = std::make_unique<DFlashDraftModel>(model_param, engine_param, ctx);
+        // 1. Create DFlash draft model (with configurable num_spec_tokens)
+        auto dflash_model = std::make_unique<DFlashDraftModel>(model_param,
+                                                               engine_param,
+                                                               ctx,
+                                                               dflash_param.num_spec_tokens);
 
         // 2. Enable DFlash on decoder
         decoder->EnableDFlash(true);

@@ -329,7 +329,8 @@ class Qwen3_5MLP(nn.Module):
                  device: torch.device | None = None,
                  is_tp: bool = True,
                  all_reduce: bool = True,
-                 prefix: str = ''):
+                 prefix: str = '',
+                 layer_type: str = 'attn'):
         super().__init__()
         quantization_config = getattr(config, 'quantization_config', None)
         if intermediate_size is None:
@@ -344,6 +345,7 @@ class Qwen3_5MLP(nn.Module):
             quant_config=quantization_config,
             is_tp=is_tp,
             prefix=add_prefix('gate_up_proj', prefix),
+            layer_type=layer_type,
         )
 
         # silu and mul
@@ -360,6 +362,7 @@ class Qwen3_5MLP(nn.Module):
             is_tp=is_tp,
             all_reduce=all_reduce,
             prefix=add_prefix('down_proj', prefix),
+            layer_type=layer_type,
         )
 
     def forward(self, x, all_routed_experts: torch.Tensor | None = None):

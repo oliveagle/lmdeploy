@@ -148,6 +148,7 @@ class DeployModelMixinV1(DeployModelMixin):
             bias,
             dtype=head_dtype,
             device=device,
+            layer_type='moe',  # 使用 moe_tp 而不是 attn_tp，在 EP 模式下也能正确分片
             **kwargs,
         )
         return lm_head

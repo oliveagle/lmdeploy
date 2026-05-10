@@ -26,7 +26,9 @@ class DFlashDraftModel {
 public:
     DFlashDraftModel(const ModelParam& model,
                      const EngineParam& engine,
-                     const Context& ctx);
+                     const Context& ctx,
+                     int num_spec_tokens = 8,
+                     int num_draft_layers = 8);
 
     ~DFlashDraftModel();
 

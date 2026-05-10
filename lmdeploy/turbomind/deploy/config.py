@@ -71,6 +71,8 @@ class ModelConfig:
     attn_tp_size: int = 1
     attn_cp_size: int = 1
     mlp_tp_size: int = 1
+    mlp_ep_size: int = 1  # Expert Parallelism size for MoE
+    mlp_ep_rank: int = 0
     model_format: str = 'hf'
     expert_num: list[int] = field(default_factory=list)
     expert_router_bias: bool = False

@@ -125,7 +125,8 @@ def init_ray_cluster(world_size: int, ray_address: str = None, dp: int = 1, devi
                 'The number of required %ss exceeds the total '
                 'number of available %ss in the placement group.', device_str, device_str)
         # Create a new placement group
-        placement_group_specs: list[dict[str, float]] = ([{device_str: 1.0} for _ in range(world_size)])
+        # Add CPU resource to each bundle for worker creation
+        placement_group_specs: list[dict[str, float]] = ([{device_str: 1.0, 'CPU': 1.0} for _ in range(world_size)])
 
         # Pin at least one bundle to the local node.
         # This helps multi-node DP keep each dp_rank process's workers co-located with

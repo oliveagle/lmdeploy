@@ -52,6 +52,8 @@ class DFlashAttention(nn.Module):
         quantization_config = getattr(config, 'quantization_config', None)
 
         # qkv projections - using LMDeploy primitives
+        # Note: DFlash draft model should NOT use TP for attention heads,
+        # even when EP is enabled for the target model
         self.qkv_proj = build_qkv_proj(
             self.hidden_size,
             num_q_heads=self.num_attention_heads,
@@ -61,6 +63,7 @@ class DFlashAttention(nn.Module):
             quant_config=quantization_config,
             dtype=dtype,
             device=device,
+            is_tp=False,  # DFlash draft model should not shard attention heads
             prefix=add_prefix('qkv_proj', prefix),
         )
 
@@ -71,6 +74,7 @@ class DFlashAttention(nn.Module):
             quant_config=quantization_config,
             dtype=dtype,
             device=device,
+            is_tp=False,  # DFlash draft model should not shard attention heads
             prefix=add_prefix('o_proj', prefix),
         )
 
@@ -116,8 +120,7 @@ class DFlashAttention(nn.Module):
         qkv = self.qkv_proj(hidden_states)
         qkv_flat = qkv.flatten(0, -2)
         query_states, _, _ = self.qkv_proj.split_qkv(qkv_flat)
-        query_states = query_states.view(bsz, q_len, self.num_attention_heads,
-                                          self.head_dim).transpose(1, 2)
+        # query_states: [bsz * q_len, num_q_heads, head_dim] (3D)
         query_states = self.q_norm(query_states)
 
         # K and V from concatenation of target (context) + draft (noise)
@@ -126,27 +129,21 @@ class DFlashAttention(nn.Module):
         kv = self.qkv_proj(kv_input)
         kv_flat = kv.flatten(0, -2)
         _, key_states, value_states = self.qkv_proj.split_qkv(kv_flat)
-        key_states = key_states.view(bsz, ctx_len + q_len, self.num_key_value_heads,
-                                      self.head_dim).transpose(1, 2)
+        # key_states/value_states: [bsz * (ctx_len + q_len), num_kv_heads, head_dim] (3D)
         key_states = self.k_norm(key_states)
-        value_states = value_states.view(bsz, ctx_len + q_len, self.num_key_value_heads,
-                                          self.head_dim).transpose(1, 2)
+        # value_states doesn't need norm
 
         # Apply rotary embedding
         cos, sin = rotary_pos_emb
         query_states, key_states = self.apply_rotary_pos_emb(
-            query_states.flatten(0, -2),
-            key_states.flatten(0, -2),
+            query_states,
+            key_states,
             cos,
             sin,
             inplace=True,
         )
-        query_states = query_states.view(bsz, q_len, self.num_attention_heads,
-                                          self.head_dim).transpose(1, 2)
-        key_states = key_states.view(bsz, ctx_len + q_len, self.num_key_value_heads,
-                                      self.head_dim).transpose(1, 2)
 
-        # attention
+        # attention - pass through metadata as is
         attn_output = self.attn_fwd(
             query_states,
             key_states,
@@ -183,6 +180,7 @@ class DFlashDecoderLayer(nn.Module):
         self.self_attn = DFlashAttention(config, layer_idx, dtype=dtype, device=device, prefix=add_prefix('self_attn', prefix))
 
         # build MLP using LMDeploy primitives
+        # Note: DFlash draft model should NOT use TP for MLP, even when EP is enabled
         self.gate_up_proj = build_gateup_linear(
             self.hidden_size,
             [self.intermediate_size, self.intermediate_size],
@@ -190,6 +188,7 @@ class DFlashDecoderLayer(nn.Module):
             dtype=dtype,
             device=device,
             quant_config=quantization_config,
+            is_tp=False,  # DFlash draft model should not shard MLP
             prefix=add_prefix('gate_up_proj', prefix),
         )
         self.act_fn = SiluAndMul(inplace=True)
@@ -200,6 +199,7 @@ class DFlashDecoderLayer(nn.Module):
             quant_config=quantization_config,
             dtype=dtype,
             device=device,
+            is_tp=False,  # DFlash draft model should not shard MLP
             prefix=add_prefix('down_proj', prefix),
         )
 
@@ -285,6 +285,18 @@ class DFlashDraftModel(nn.Module, CudaGraphMixin):
     has_own_embed_tokens = False
     has_own_lm_head = False
 
+    def support_cuda_graph(
+        self,
+        input_ids: torch.Tensor,
+        position_ids: torch.Tensor,
+        past_key_values: list[list[torch.Tensor]],
+        attn_metadata: Any = None,
+        inputs_embeds: torch.Tensor = None,
+        **kwargs,
+    ):
+        """Disable CUDA Graph for DFlash due to shape mismatch in speculative decoding."""
+        return False
+
     def __init__(self,
                  config: PretrainedConfig,
                  ctx_mgr: StepContextManager,
@@ -338,6 +350,7 @@ class DFlashDraftModel(nn.Module, CudaGraphMixin):
             dtype=dtype,
             device=device,
             quant_config=quantization_config,
+            is_tp=False,  # DFlash draft model should not shard projection
             prefix=add_prefix('target_hidden_proj', prefix),
         )
 
@@ -362,6 +375,56 @@ class DFlashDraftModel(nn.Module, CudaGraphMixin):
     def set_lm_head(self, lm_head: nn.Linear):
         """Set lm head."""
         self.lm_head = lm_head
+
+    def get_logits(self, hidden_states: torch.Tensor):
+        """Get logits from hidden states using the shared lm_head.
+
+        Args:
+            hidden_states: Hidden states [batch, seq_len, hidden_size]
+
+        Returns:
+            logits: [batch, seq_len, vocab_size] or tuple of (logits, hidden_states)
+        """
+        if self.lm_head is not None:
+            return self.lm_head(hidden_states)
+        else:
+            # Try to find lm_head from target model (if available in distributed env)
+            from lmdeploy.utils import get_logger
+            logger = get_logger('lmdeploy')
+
+            # Check if parent model has access to target_model
+            # This is a fallback for distributed environments where lm_head was lost
+            # First, check if there's a parent proposer that has target_model
+            lm_head_found = None
+            # Look for a nearby model that has lm_head
+            # Start from the hidden_states device and try to find a target_model reference
+            try:
+                import inspect
+                # Walk up the call stack to find the proposer
+                for frame in inspect.stack():
+                    frame_locals = frame[0].f_locals
+                    if 'self' in frame_locals:
+                        caller_self = frame_locals['self']
+                        if hasattr(caller_self, 'target_model') and caller_self.target_model is not None:
+                            target_model = caller_self.target_model
+                            if hasattr(target_model, 'lm_head'):
+                                lm_head_found = target_model.lm_head
+                                logger.warning(f'DFlashDraftModel.get_logits: Found lm_head on caller_self.target_model')
+                            elif hasattr(target_model, 'model') and hasattr(target_model.model, 'lm_head'):
+                                lm_head_found = target_model.model.lm_head
+                                logger.warning(f'DFlashDraftModel.get_logits: Found lm_head on caller_self.target_model.model')
+                            if lm_head_found is not None:
+                                # Save it to avoid future lookups
+                                self.lm_head = lm_head_found
+                                logger.warning(f'DFlashDraftModel.get_logits: Saved found lm_head')
+                                return lm_head_found(hidden_states)
+            except Exception as e:
+                logger.warning(f'DFlashDraftModel.get_logits: Error looking for lm_head: {e}')
+
+            logger.warning('DFlashDraftModel.lm_head is None! This will cause invalid outputs.')
+            logger.warning(f'Self: {self}')
+            # Fall back to returning hidden_states for now
+            return hidden_states
 
     def forward(
         self,
@@ -427,7 +490,12 @@ class DFlashDraftModel(nn.Module, CudaGraphMixin):
     ):
         """Prepare input."""
         input_ids = context.input_ids
+        # Ensure input_ids is 2D: [batch, seq_len]
+        if input_ids.dim() == 1:
+            input_ids = input_ids.unsqueeze(0)
         position_ids = context.position_ids
+        if position_ids.dim() == 1:
+            position_ids = position_ids.unsqueeze(0)
         attn_metadata = context.attn_metadata
         target_hidden_states = context.target_hidden_states
 
@@ -452,12 +520,29 @@ class DFlashDraftModel(nn.Module, CudaGraphMixin):
 
     def fill_buffers_cudagraph(self, graph_meta: CudaGraphMeta, input_ids: torch.Tensor, **kwargs):
         """Fill cudagraph buffers from forward inputs."""
+        # Ensure input_ids is 2D: [batch, seq_len]
+        if input_ids.dim() == 1:
+            # Handle both [seq_len] and [batch * seq_len]
+            input_ids = input_ids.unsqueeze(0)
+        elif input_ids.dim() > 2:
+            # Flatten extra dimensions if needed
+            input_ids = input_ids.view(1, -1)
         new_inputs = super().fill_buffers_cudagraph(graph_meta=graph_meta, input_ids=input_ids, **kwargs)
 
         input_buffers = graph_meta.input_buffers
         target_hidden_states = kwargs.get('target_hidden_states')
-        assert target_hidden_states is not None
-        input_buffers['target_hidden_states'][:, :, :] = target_hidden_states
+        if target_hidden_states is not None:
+            # 确保 target_hidden_states 形状正确
+            # input_buffers['target_hidden_states'] shape: [1, 1, num_aux_layers * hidden_size]
+            if target_hidden_states.dim() == 3:
+                # [batch, num_aux_layers, hidden_size] -> [batch, 1, num_aux_layers * hidden_size]
+                batch_size, num_aux, hidden_size = target_hidden_states.shape
+                target_hidden_states = target_hidden_states.view(batch_size, 1, num_aux * hidden_size)
+            elif target_hidden_states.dim() == 2:
+                # [batch, num_aux_layers * hidden_size] -> [batch, 1, num_aux_layers * hidden_size]
+                batch_size, features = target_hidden_states.shape
+                target_hidden_states = target_hidden_states.unsqueeze(1)
+            input_buffers['target_hidden_states'][:, :, :] = target_hidden_states
         new_inputs['target_hidden_states'] = input_buffers['target_hidden_states']
         return new_inputs
 
@@ -468,9 +553,21 @@ class DFlashDraftModel(nn.Module, CudaGraphMixin):
             ('.gate_up_proj', '.up_proj', 1),
         ]
 
+        # Map checkpoint names to model parameter names
+        weight_name_mapping = {
+            'fc.': 'target_hidden_proj.',
+            'hidden_norm.': 'target_hidden_norm.',
+        }
+
         params_dict = dict(self.named_parameters())
         params_dict.update(dict(self.named_buffers()))
         for name, loaded_weight in weights:
+            # Map checkpoint weight names to model parameter names
+            for ckpt_prefix, model_prefix in weight_name_mapping.items():
+                if name.startswith(ckpt_prefix):
+                    name = name.replace(ckpt_prefix, model_prefix, 1)
+                    break
+
             if 'rotary_emb.inv_freq' in name:
                 continue
             if ('rotary_emb.cos_cached' in name or 'rotary_emb.sin_cached' in name):

@@ -24,6 +24,8 @@ MoeFfnLayer::MoeFfnLayer(const ModelParam& model, const MoeParam& param, const E
     hidden_dim_(model.hidden_units),
     tp_size_(engine.mlp_tp_size),
     param_(param),
+    ep_size_(engine.mlp_ep_size),
+    ep_rank_(engine.mlp_ep_rank),
     is_warm_up_{*ctx.is_warm_up},
     linear_(*ctx.linear)
 {

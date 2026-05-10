@@ -59,17 +59,24 @@ class Qwen3_5ModelConfigBuilder(AutoModelConfigBuilder):
         else:
             recurrent_state_shape = (num_delta_layers, num_v_heads, head_k_dim, head_v_dim)
 
-        device_type = kwargs.get('device_type', 'auto')
-        if is_bf16_supported(device_type):
-            dtype = torch.bfloat16
-        else:
-            dtype = torch.float16
+        # 强制使用 float16 以避免 TileLang kernel 类型不匹配问题
+        dtype = torch.float16
         ssm_dtype = dtype if not _envs.fp32_mamba_ssm_dtype else torch.float32
         cfg.states_shapes = [(conv_state_shape, dtype), (recurrent_state_shape, ssm_dtype)]
         cfg.is_gated_delta = True
         cfg.check_env_func = _check_env_qwen3_next
 
         cfg.use_mrope = True
+
+        # 修复 Qwen3.5 EOS token 问题: 使用 tokenizer 的 eos_token_id 而非 config 中的
+        # config.text_config.eos_token_id = 248044 (PAD), tokenizer.eos_token_id = 248046 (<|im_end|>)
+        if model_path is not None:
+            from transformers import AutoTokenizer
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+                cfg.eos_token_id = tokenizer.eos_token_id
+            except:
+                pass  # 使用默认值
 
         # for spec decoding
         if spec_method is not None:

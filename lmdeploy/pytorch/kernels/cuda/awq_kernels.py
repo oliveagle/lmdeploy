@@ -1,8 +1,12 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import os
 import torch
 import triton
 from triton import language as tl
 
+# 设置 Triton benchmark 缓存大小以避免 OOM
+# 默认值是总显存大小，在 16GB V100 上会分配 4GB 作为 cache
+os.environ['TRITON_BENCHMARK_CACHE_SIZE_KB'] = '262144'  # 256MB instead of 4GB
 
 def get_cuda_autotune_config():
     return [
@@ -82,11 +86,6 @@ def _unpack_weight(weight):
     return weight.reshape(BLOCK_SIZE_K, BLOCK_SIZE_N)
 
 
-@triton.autotune(
-    configs=get_cuda_autotune_config(),
-    key=['N', 'K'],
-    reset_to_zero=['c_ptr'],
-)
 @triton.jit
 def awq_linear_kernel(
         a_ptr,
@@ -239,32 +238,45 @@ def awq_linear(x, qweight, scales, qzeros):
 
     BLOCK_SIZE_M = triton.next_power_of_2(M)
     BLOCK_SIZE_M = max(16, min(128, BLOCK_SIZE_M))
+
+    # 直接调用 kernel，不使用 autotuner
+    # 使用 BLOCK_SIZE_N = 64，这在 V100 上应该能工作
+    # 不使用 triton.autotune 来避免 OOM
+    BLOCK_SIZE_N = 64
+    GROUP_SIZE_M = 8
+
+    # 构造 grid 和调用
+    grid = (
+        triton.cdiv(M, BLOCK_SIZE_M) * triton.cdiv(N, BLOCK_SIZE_N),
+        SPLIT_K,
+    )
+
+    # 调用 kernel 而不是 autotuner
     awq_linear_kernel[grid](
-        # Pointers to matrices
         x,
         qweight,
         scales,
         qzeros,
         out,
-        # Matrix dimensions
         M,
         N,
         K,
         stride_am=x.stride(0),
-        stride_ak=x.stride(1),  #
+        stride_ak=x.stride(1),
         stride_wk=qweight.stride(0),
-        stride_wn=qweight.stride(1),  #
+        stride_wn=qweight.stride(1),
         stride_sk=scales.stride(0),
-        stride_sn=scales.stride(1),  #
+        stride_sn=scales.stride(1),
         stride_zk=qzeros.stride(0),
-        stride_zn=qzeros.stride(1),  #
+        stride_zn=qzeros.stride(1),
         stride_cm=out.stride(0),
         stride_cn=out.stride(1),
-        # Meta-parameters
-        BLOCK_SIZE_M=BLOCK_SIZE_M,
-        BLOCK_SIZE_K=group_size,
         SPLIT_K=SPLIT_K,
         NUM_STAGES=num_stages,
+        BLOCK_SIZE_M=BLOCK_SIZE_M,
+        BLOCK_SIZE_N=BLOCK_SIZE_N,
+        BLOCK_SIZE_K=group_size,
+        GROUP_SIZE_M=GROUP_SIZE_M,
     )
 
     return out

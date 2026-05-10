@@ -2,6 +2,7 @@
 """DFlash proposer for speculative decoding."""
 
 import torch
+from torch.profiler import record_function
 
 from lmdeploy.pytorch.config import ModelConfig
 from lmdeploy.pytorch.model_inputs import ModelInputs
@@ -54,8 +55,6 @@ class DFlashProposer(BaseSpecProposer):
 
         # Share embed_tokens and lm_head from target model.
         # DFlash draft model doesn't have its own embedding or lm_head.
-        # The draft model may be wrapped (e.g., graph_runner -> model),
-        # so resolve the inner model first.
         if target_model is None:
             logger.warning('DFlashProposer: target_model is None, skipping weight sharing.')
             return
@@ -75,12 +74,43 @@ class DFlashProposer(BaseSpecProposer):
             logger.warning('DFlashProposer: cannot find target embed_tokens, keeping draft default.')
 
         # lm_head: always use target model's logits projection
-        if hasattr(target_model, 'get_logits'):
-            inner_model.lm_head = target_model
-        elif hasattr(target_model, 'lm_head'):
-            inner_model.lm_head = target_model.lm_head
+        # We need to find the actual lm_head layer
+        if hasattr(target_model, 'lm_head'):
+            lm_head = target_model.lm_head
+        elif hasattr(target_model, 'model') and hasattr(target_model.model, 'lm_head'):
+            lm_head = target_model.model.lm_head
         else:
             logger.warning('DFlashProposer: cannot find target lm_head, keeping draft default.')
+            lm_head = None
+
+        # Use set_lm_head method if available (DFlashDraftModel has this method)
+        if lm_head is not None and hasattr(inner_model, 'set_lm_head'):
+            inner_model.set_lm_head(lm_head)
+        elif lm_head is not None:
+            inner_model.lm_head = lm_head
+
+        # Save reference to target_model's get_logits for use in distributed environments
+        if hasattr(target_model, 'get_logits'):
+            self._target_get_logits = target_model.get_logits
+        elif hasattr(target_model, 'model') and hasattr(target_model.model, 'get_logits'):
+            self._target_get_logits = target_model.model.get_logits
+        else:
+            self._target_get_logits = None
+
+        logger.info('DFlashProposer: shared embed_tokens and lm_head from target model')
+
+    @record_function('draft_get_logits')
+    def get_logits(self, hidden_states: torch.Tensor):
+        """Get logits of model output.
+
+        Overrides BaseSpecProposer.get_logits to ensure we always use
+        the correct lm_head from target model.
+        """
+        # Use saved reference to target_model's get_logits
+        if hasattr(self, '_target_get_logits') and self._target_get_logits is not None:
+            return self._target_get_logits(hidden_states)
+        # Fall back to base class implementation
+        return super().get_logits(hidden_states)
 
     def get_outputs(self, model_outputs: dict, model_inputs: ModelInputs, extra_inputs: ExtraInputs = None):
         """Extract draft token predictions from model outputs.
@@ -103,12 +133,14 @@ class DFlashProposer(BaseSpecProposer):
         if hidden_states is None:
             return None, model_metas, None
 
-        # Get logits from shared lm_head
-        logits = self.get_logits(hidden_states)[0]
+        # Get logits using our overridden get_logits method
+        logits = self.get_logits(hidden_states)
+
+        if isinstance(logits, tuple):
+            logits = logits[0]
         draft_token_ids = logits.argmax(dim=-1, keepdim=True)
 
         # For DFlash, we use the same aux_hidden_states for all spec steps
-        # The next iteration will use the same target_hidden_states
         target_hidden_states = None
         if extra_inputs is not None and hasattr(extra_inputs, 'target_hidden_states'):
             target_hidden_states = extra_inputs.target_hidden_states

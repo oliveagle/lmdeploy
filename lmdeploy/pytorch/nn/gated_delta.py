@@ -109,6 +109,10 @@ class CausalConv1dFunc:
         # Save conv state (last kernel_size input tokens per sequence).
         final_state = x[0, conv_idx].transpose(-2, -1)
 
+        # Ensure final_state has the same dtype as conv_state
+        if final_state.dtype != conv_state.dtype:
+            final_state = final_state.to(conv_state.dtype)
+
         # for prefill with spec tokens
         if spec_conv_offsets is not None:
             read_offsets, write_offsets = spec_conv_offsets

@@ -246,13 +246,24 @@ class FusedMoEBase(nn.Module):
         dist_cfg = dist_ctx.dist_config
         _, tp_mode = dist_cfg.get_tp_by_layer('moe')
         tp, tp_rank = get_tp_world_rank('moe')
-        all_reduce = all_reduce if tp > 1 else False
+        ep_size = dist_cfg.ep
+
+        # Enable all_reduce for TP mode or EP mode
+        if tp > 1:
+            # TP mode: respect the caller's all_reduce flag
+            self.all_reduce = all_reduce
+        elif ep_size > 1:
+            # EP mode: always enable all_reduce to sum partial results from different ranks
+            self.all_reduce = True
+        else:
+            # No parallelism: no all_reduce needed
+            self.all_reduce = False
 
         self.ep = dist_cfg.ep
+        self.ep_size = ep_size
         self.tp = tp
         self.tp_rank = tp_rank
         self.tp_mode = tp_mode
-        self.all_reduce = all_reduce
         self.tp_group = dist_ctx.moe_tp_group.gpu_group
         self.gather_group = dist_ctx.moe_tp_group.gpu_gather_group
 
@@ -323,24 +334,34 @@ class FusedMoEBase(nn.Module):
     def build_moe_all_reduce(self):
         """Build moe all reduce.
 
-        This is only used when dp==1 and tp>1, and fused moe module does not perform all_reduce
+        This is used when dp==1 and (tp>1 or ep>1), and fused moe module does not perform all_reduce
         """
         dist_ctx = get_dist_manager().current_context()
         dp = dist_ctx.dist_config.dp
-        enable = (dp == 1) and (not self.all_reduce)
-        return MoEAllReduce(enable, self.tp, self.tp_mode)
+        ep_size = dist_ctx.dist_config.ep
+        # In EP mode, always enable MoEAllReduce to sum partial results from different ranks
+        # In TP mode, enable if FusedMoE itself doesn't perform all_reduce
+        if ep_size > 1:
+            enable = True
+        else:
+            enable = (dp == 1) and (not self.all_reduce)
+        return MoEAllReduce(enable, self.tp, self.tp_mode, ep_size)
 
 
 class MoEAllReduce(nn.Module):
 
-    def __init__(self, enable: bool, moe_tp: int, tp_mode: TPMode):
+    def __init__(self, enable: bool, moe_tp: int, tp_mode: TPMode, ep_size: int = 1):
         super().__init__()
+        self.ep_size = ep_size
         enable_moe_tp = moe_tp > 1
-        if tp_mode == TPMode.DEFAULT and enable_moe_tp:
-            # else, shared expert should has same tp as moe layer
-            #
+        enable_ep = ep_size > 1
+
+        # Enable all_reduce for either TP mode or EP mode
+        if tp_mode == TPMode.DEFAULT and (enable_moe_tp or enable_ep):
+            # EP mode: all_reduce across EP group to sum partial results
+            # TP mode: all_reduce across TP group for standard tensor parallelism
             self._enable_shared_tp = enable_moe_tp
-            self._all_reduce = enable and enable_moe_tp
+            self._all_reduce = enable and (enable_moe_tp or enable_ep)
         else:
             # do not support shared layer to perform tp
             # do not perform all reduce here
@@ -349,7 +370,12 @@ class MoEAllReduce(nn.Module):
 
         if self._all_reduce:
             dist_ctx = get_dist_manager().current_context()
-            self.group = dist_ctx.moe_tp_group.gpu_group
+            if enable_ep:
+                # Use EP group for expert parallelism
+                self.group = dist_ctx.ep_gpu_group
+            else:
+                # Use TP group for tensor parallelism
+                self.group = dist_ctx.moe_tp_group.gpu_group
         else:
             self.group = None
 
@@ -360,5 +386,6 @@ class MoEAllReduce(nn.Module):
     def forward(self, x: torch.Tensor):
         """forward."""
         if self._all_reduce:
-            dist.all_reduce(x, group=self.group)
+            import torch.distributed
+            torch.distributed.all_reduce(x, group=self.group)
         return x

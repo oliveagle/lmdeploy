@@ -63,8 +63,8 @@ class BaseSpecModelAgent:
         if not model_inputs.is_decoding:
             logits_indices = model_inputs.seq_length.cumsum(0) - 1
             hidden_states = hidden_states[:, logits_indices]
-        if 'aux_hidden_states' in output:
-            # replace with aux
+        if 'aux_hidden_states' in output and output['aux_hidden_states'] is not None:
+            # replace with aux only when it's not None
             output['hidden_states'] = output.pop('aux_hidden_states')
         return hidden_states, output
 

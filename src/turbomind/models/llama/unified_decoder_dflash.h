@@ -23,8 +23,8 @@ class UnifiedDecoder;
  */
 struct DFlashParam {
     std::string draft_model_path;
-    int num_spec_tokens = 8;
-    std::vector<int> aux_layer_ids = {1, 10, 19, 28, 37};
+    int num_spec_tokens = 16;  // lucebox-hub/dflash uses 16 for better performance
+    std::vector<int> aux_layer_ids = {1, 10, 19, 28, 37};  // Will be optimized to {1,16,31,46,61}
 };
 
 /**
