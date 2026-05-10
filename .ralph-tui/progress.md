@@ -283,3 +283,59 @@ All STORY-004 acceptance criteria were already implemented in STORY-003:
 5. Verify output quality (no garbled text like PyTorch EP issue)
 
 ---
+
+## [2026-05-10] - STORY-006: 文档更新
+
+### What was implemented
+- ✅ Created comprehensive EP user documentation (`expert_parallelism.md`)
+- ✅ Updated Turbomind config documentation with EP parameters
+- ✅ Updated Turbomind inference documentation with EP examples
+- ✅ Documented EP configuration parameters and usage
+- ✅ Documented expected performance metrics (memory, throughput, latency)
+- ✅ Provided English and Chinese versions of all documentation
+
+### Key Changes Made
+
+#### 1. New Documentation Files
+- **`docs/en/advance/expert_parallelism.md`** (191 lines): Comprehensive EP guide in English
+- **`docs/zh_cn/advance/expert_parallelism.md`** (205 lines): Comprehensive EP guide in Chinese
+
+#### 2. Updated Documentation Files
+- **`docs/en/inference/turbomind_config.md`**: Added EP configuration section
+- **`docs/zh_cn/inference/turbomind_config.md`**: Added EP configuration section
+- **`docs/en/inference/turbomind.md`**: Added EP usage example
+- **`docs/zh_cn/inference/turbomind.md`**: Added EP usage example
+
+### Documentation Content
+
+**EP User Guide** (`expert_parallelism.md`):
+- Overview of EP vs TP
+- Basic usage examples
+- Configuration parameters table
+- Expert distribution formulas
+- Performance characteristics (memory, throughput, latency)
+- Hardware requirements
+- Troubleshooting guide
+- Advanced topics (EP+TP combinations, multi-node EP)
+
+**Updated Files**:
+- Added EP parameter documentation to `turbomind_config.md`
+- Added EP usage examples to `turbomind.md`
+
+### Learnings:
+- Documentation should be bilingual (English and Chinese)
+- Parameter tables should include Type, Default, and Description columns
+- Code examples should be complete and runnable
+- Performance metrics should be quantitative (GB, tokens/sec)
+- Troubleshooting section should address common issues (OOM, garbled output, config errors)
+- Cross-references to related documentation improve discoverability
+
+### Files Changed
+- `docs/en/advance/expert_parallelism.md` - New EP user guide (English)
+- `docs/zh_cn/advance/expert_parallelism.md` - New EP user guide (Chinese)
+- `docs/en/inference/turbomind_config.md` - Added EP configuration section
+- `docs/zh_cn/inference/turbomind_config.md` - Added EP configuration section
+- `docs/en/inference/turbomind.md` - Added EP usage example
+- `docs/zh_cn/inference/turbomind.md` - Added EP usage example
+
+---
