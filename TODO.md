@@ -120,7 +120,7 @@ Max Batch Size: 1
 
 #### 1.2 内存优化
 - [x] KV cache 内存使用 (已有 TurboQuant, INT4, INT8 支持)
-- [ ] Draft 模型使用 Q4 量化
+- [x] Draft 模型使用 Q4 量化 (STORY-008 已完成)
 - [ ] 考虑 CPU embedding (不占用 GPU)
 
 #### 1.3 测试验证

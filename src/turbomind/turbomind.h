@@ -31,6 +31,12 @@ public:
     // DFlash speculative decoding support
     void LoadDFlashWeights(int index, const std::unordered_map<std::string, Tensor>& weight_map);
 
+    void LoadDFlashWeightsQuantized(int index,
+                                    const std::unordered_map<std::string, Tensor>& weight_map,
+                                    const std::unordered_map<std::string, Tensor>& scale_map,
+                                    int quant_policy,
+                                    int group_size);
+
     void EnableDFlash(int index, int num_spec_tokens);
 
     void Sleep(int index, int level);

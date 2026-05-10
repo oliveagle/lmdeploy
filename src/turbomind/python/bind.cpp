@@ -572,6 +572,21 @@ PYBIND11_MODULE(_turbomind, m)
             },
             py::call_guard<py::gil_scoped_release>(),
             "index"_a, "weight_map"_a)
+        .def("load_dflash_weights_quantized",
+            [](TurboMind* model, int index, std::shared_ptr<TensorMap> weight_map,
+               std::shared_ptr<TensorMap> scale_map, int quant_policy, int group_size) {
+                std::unordered_map<std::string, Tensor> cpu_weights;
+                std::unordered_map<std::string, Tensor> cpu_scales;
+                for (const auto& [k, v] : *weight_map) {
+                    cpu_weights[k] = v;
+                }
+                for (const auto& [k, v] : *scale_map) {
+                    cpu_scales[k] = v;
+                }
+                model->LoadDFlashWeightsQuantized(index, cpu_weights, cpu_scales, quant_policy, group_size);
+            },
+            py::call_guard<py::gil_scoped_release>(),
+            "index"_a, "weight_map"_a, "scale_map"_a, "quant_policy"_a, "group_size"_a)
         .def("enable_dflash",
             [](TurboMind* model, int index, int num_spec_tokens) {
                 model->EnableDFlash(index, num_spec_tokens);

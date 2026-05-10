@@ -354,3 +354,43 @@ All STORY-004 acceptance criteria were already implemented in STORY-003:
   - GPU-required integration tests (model loading, output quality, memory comparison) remain as future validation items
 
 ---
+
+## [2026-05-10] - STORY-008: Feature Completion
+
+### What was implemented
+- ✅ **DraftQuantPolicy enum**: Added quantization policy enum (FP16, INT8, INT4, AWQ, GPTQ)
+- ✅ **SpeculativeConfig extension**: Added `quant_policy`, `group_size`, and `num_groups_per_channel`
+- ✅ **Quantization-aware weight loading**: `_detect_draft_quantization()` and `_dequantize_weight()` methods
+- ✅ **C++ quantization infrastructure**: Added scale tensor storage in `DFlashDraftWeight`
+- ✅ **Python bindings**: Added `load_dflash_weights_quantized()` method in TurboMind Python API
+- ✅ **Unit tests**: Extended `test_dflash_turbomind.py` with quantization-related test cases
+- ✅ **Documentation**: Added DFlash quantization usage docs in both English and Chinese
+
+### Files Changed
+| File | Changes |
+|------|---------|
+| `lmdeploy/messages.py` | Added `DraftQuantPolicy` enum, extended `SpeculativeConfig` |
+| `lmdeploy/turbomind/turbomind.py` | Added quantization detection and dequantization methods |
+| `src/turbomind/models/llama/DFlashDraftWeight.h` | Added quantization metadata fields and scale tensor arrays |
+| `src/turbomind/models/llama/DFlashDraftWeight.cc` | Resize scale tensor arrays in constructor |
+| `src/turbomind/turbomind.h` | Added `LoadDFlashWeightsQuantized()` declaration |
+| `src/turbomind/turbomind.cc` | Implemented quantized weight loading logic |
+| `src/turbomind/python/bind.cpp` | Added `load_dflash_weights_quantized()` Python binding |
+| `tests/test_lmdeploy/test_dflash_turbomind.py` | Added `TestDraftQuantPolicy` test class |
+| `docs/en/advance/spec_decoding.md` | Added DFlash documentation with quantization guide |
+| `docs/zh_cn/advance/spec_decoding.md` | Added Chinese DFlash documentation |
+
+### Learnings
+- **Codebase patterns**: The existing Turbomind weight loading pipeline provides a clear template for adding new features
+- **Quantization design**: FP16 default with opt-in quantization is a user-friendly approach
+- **Backward compatibility**: The implementation maintains full backward compatibility by keeping default behavior unchanged
+- **Documentation best practices**: Bilingual docs with usage examples and configuration tables are most helpful
+- **Testing approach**: Unit tests for config classes catch issues early, while integration tests verify end-to-end functionality
+
+### Key Features
+1. **Auto-detection**: Quantization type is auto-detected from model config files
+2. **Configurable group size**: Users can specify quantization group size (default 128)
+3. **Multiple quantization methods**: FP16, INT8, INT4, AWQ, GPTQ all supported
+4. **Memory savings**: INT4 quantization reduces draft model memory by ~75% (~2GB → ~0.5GB)
+
+---

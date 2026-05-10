@@ -7,6 +7,15 @@
 
 namespace turbomind {
 
+// Quantization policy for draft model weights
+enum DraftQuantPolicy {
+    DRAFT_QUANT_FP16 = 0,  // No quantization
+    DRAFT_QUANT_INT8 = 1,  // 8-bit weight-only quantization
+    DRAFT_QUANT_INT4 = 2,  // 4-bit weight-only quantization
+    DRAFT_QUANT_AWQ  = 3,  // Activation-aware weight quantization
+    DRAFT_QUANT_GPTQ = 4,  // Gradient-based post-training quantization
+};
+
 /**
  * DFlash draft model 权重结构
  *
@@ -17,6 +26,11 @@ namespace turbomind {
  * DFlash 自己的权重:
  * - 8 层 decoder 的 qkv_proj, o_proj, gate_up_proj, down_proj
  * - 8 层的 input_layernorm, post_attention_layernorm
+ *
+ * 量化支持 (STORY-008):
+ * - quant_policy_: 量化策略 (FP16/INT8/INT4/AWQ/GPTQ)
+ * - group_size_: 量化组大小
+ * - d_*_scale: 每层权重对应的 scale 张量 (用于反量化)
  */
 struct DFlashDraftWeight {
     // 共享的权重 (从 target model)
@@ -43,6 +57,12 @@ struct DFlashDraftWeight {
     std::vector<Tensor> d_down_proj;
     std::vector<Tensor> d_post_layernorm;
 
+    // 量化 scale 张量 (STORY-008)
+    std::vector<Tensor> d_qkv_scale;
+    std::vector<Tensor> d_o_scale;
+    std::vector<Tensor> d_gate_up_scale;
+    std::vector<Tensor> d_down_scale;
+
     // 配置
     int num_layers = 8;
     int hidden_size = 5120;
@@ -51,6 +71,10 @@ struct DFlashDraftWeight {
     int num_key_value_heads = 40;
     int head_dim = 128;
     float rms_norm_eps = 1e-5;
+
+    // 量化配置 (STORY-008)
+    int quant_policy = DRAFT_QUANT_FP16;
+    int group_size = 128;
 
     DFlashDraftWeight();
 
