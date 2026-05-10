@@ -57,6 +57,30 @@ Our implementation of the LLaMa family models is modified from Gpt-NeoX model in
 
 TurboMind supports a Python API that enables streaming output and tensor parallel mode.
 
+### Expert Parallelism for MoE Models
+
+TurboMind supports Expert Parallelism (EP) for Mixture of Experts (MoE) models like Qwen3.6-35B-A3B-AWQ. EP distributes different experts across different GPUs, reducing memory usage per GPU.
+
+```python
+from lmdeploy import TurbomindEngineConfig, pipeline
+
+# EP=4 configuration for MoE models
+engine_config = TurbomindEngineConfig(
+    ep=4,              # Expert Parallelism size
+    tp=1,              # Tensor Parallelism size
+    device_num=4,      # Total GPUs
+    quant_policy=8,    # KV cache quantization (4+8 bit)
+)
+
+pipe = pipeline(
+    model_path='/path/to/moe-model',
+    backend='turbomind',
+    engine_config=engine_config,
+)
+```
+
+For detailed information about EP, see [Expert Parallelism](./advance/expert_parallelism.md).
+
 ## Difference between FasterTransformer and TurboMind
 
 Apart of the features described above, there are still many minor differences that we don't cover in this document. Notably, many capabilities of FT are dropped in TurboMind because of the difference in objectives (e.g. prefix prompt, beam search, context embedding, sparse GEMM, GPT/T5/other model families, etc)

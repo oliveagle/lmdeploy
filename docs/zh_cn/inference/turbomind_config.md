@@ -127,6 +127,39 @@ cache_block_seq_len * num_layer * kv_head_num * size_per_head * 2 * sizeof(kv_da
 
 设置 `use_logn_attn = 1`，可以开启 [LogN attention scaling](https://kexue.fm/archives/8823)。
 
+### 专家并行 (EP)
+
+对于混合专家 (MoE) 模型，可以使用专家并行将专家分布到多个 GPU 上。
+
+关键配置参数：
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `mlp_ep_size` | int | 1 | 专家并行的 GPU 数量。将专家分布到 `mlp_ep_size` 个 GPU 上。 |
+| `mlp_ep_rank` | int | 0 | 当前 GPU 在 EP 组中的 rank (0 到 `mlp_ep_size`-1)。自动计算。 |
+| `tensor_para_size` | int | 1 | 张量并行的 GPU 数量。 |
+| `expert_num` | int | 模型相关 | MoE 模型中的专家总数。 |
+
+**Qwen3.6-35B-A3B-AWQ 示例 (256 专家, EP=4):**
+
+```toml
+[llama]
+model_name = "qwen3.6-35b-a3b-awq"
+tensor_para_size = 1
+mlp_ep_size = 4
+mlp_ep_rank = 0
+expert_num = 256
+# ... 其他参数
+```
+
+**EP=4 时的专家分布：**
+- Rank 0: 专家 [0, 63] (64 个专家)
+- Rank 1: 专家 [64, 127] (64 个专家)
+- Rank 2: 专家 [128, 191] (64 个专家)
+- Rank 3: 专家 [192, 255] (64 个专家)
+
+详细用法请参考 [专家并行](../advance/expert_parallelism.md)。
+
 ## TurboMind 1.0 配置
 
 以 `llama-2-7b-chat` 模型为例，在 TurboMind 1.0 中，它的`config.ini`内容如下：

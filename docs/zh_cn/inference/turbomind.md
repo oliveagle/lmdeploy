@@ -57,6 +57,30 @@ TurboMind 的 [KV 缓存管理器](https://github.com/InternLM/lmdeploy/blob/mai
 
 TurboMind 的 Python API 支持流式结果返回和张量并行模式。
 
+### MoE 模型的专家并行
+
+TurboMind 支持混合专家 (MoE) 模型的专家并行 (EP)，如 Qwen3.6-35B-A3B-AWQ。EP 将不同的专家分布到不同的 GPU 上，降低每 GPU 的内存使用。
+
+```python
+from lmdeploy import TurbomindEngineConfig, pipeline
+
+# MoE 模型的 EP=4 配置
+engine_config = TurbomindEngineConfig(
+    ep=4,              # 专家并行大小
+    tp=1,              # 张量并行大小
+    device_num=4,      # GPU 总数
+    quant_policy=8,    # KV 缓存量化 (4+8 bit)
+)
+
+pipe = pipeline(
+    model_path='/path/to/moe-model',
+    backend='turbomind',
+    engine_config=engine_config,
+)
+```
+
+关于 EP 的详细信息，请参考 [专家并行](./advance/expert_parallelism.md)。
+
 ## TurboMind 和 FasterTransformer 的区别
 
 除了上文中提到的功能外，TurboMind 相较于 FasterTransformer 还有不少差别。譬如不少 FasterTransformer 的功能在 TurboMind 中都被去掉了，这其中包括前缀提示词、 beam search 、上下文 embedding、稀疏化 GEMM 操作和对应 GPT 或 T5 等结构的模型的支持等等。
