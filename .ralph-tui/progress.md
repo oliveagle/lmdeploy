@@ -339,3 +339,18 @@ All STORY-004 acceptance criteria were already implemented in STORY-003:
 - `docs/zh_cn/inference/turbomind.md` - Added EP usage example
 
 ---
+
+## [2026-05-10] - STORY-007: Turbomind EP=4 支持 (综合验证)
+- Verified all EP=4 implementation is already complete from STORY-002 through STORY-006
+- Ran full test suite: 22 passed, 3 skipped (GPU-required integration tests)
+- Verified parameter chain end-to-end: `TurbomindEngineConfig.ep` → `converter.py` → `ModelConfig.mlp_ep_size/mlp_ep_rank` → `turbomind.cc` → `MoeParam`
+- All Python files compile cleanly
+- Files changed: None (all implementation already complete)
+- **Learnings:**
+  - STORY-007 was a meta-story encompassing all EP=4 work already implemented across STORY-002 to STORY-006
+  - The complete EP=4 implementation consists of 5 Python files modified + 1 C++ file + 2 doc files created + 4 doc files updated + 6 test files created
+  - Expert range formula is correct: 256 experts / EP=4 = 64 experts per rank
+  - EP rank calculation: `cfg.ep_rank = cfg.devices[0] % cfg.ep` for single-node multi-GPU
+  - GPU-required integration tests (model loading, output quality, memory comparison) remain as future validation items
+
+---
