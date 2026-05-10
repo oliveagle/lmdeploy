@@ -55,15 +55,31 @@ __global__ void DFlashAttnKernelFP16(
     float* rsum          = rmax + THREADS;
 
     // ── 1) Q·K dot products ──────────────────
+    // Use vectorized loads (half2) for better memory bandwidth utilization.
+    // head_dim is typically a multiple of 64 or 128.
     float lmax = -1e20f;
+
+    const int head_dim_aligned = (head_dim / 2) * 2;  // Ensure even for half2 loads
+    const half2* q2 = reinterpret_cast<const half2*>(q);
 
     // context keys
     for (int i = tid; i < num_ctx; i += THREADS) {
         float dot = 0.f;
-#pragma unroll
-        for (int d = 0; d < 128; ++d) {
-            if (d < head_dim)
-                dot += __half2float(q[d]) * __half2float(kc[i * head_dim + d]);
+        const half2* kc2 = reinterpret_cast<const half2*>(kc + i * head_dim);
+        // Process 2 elements at a time using half2 vector loads
+        for (int d = 0; d < head_dim_aligned; d += 2) {
+            half2 q_vec = q2[d / 2];
+            half2 k_vec = kc2[d / 2];
+            // Extract and multiply individual elements
+            float q0 = __low2float(q_vec);
+            float q1 = __high2float(q_vec);
+            float k0 = __low2float(k_vec);
+            float k1 = __high2float(k_vec);
+            dot += q0 * k0 + q1 * k1;
+        }
+        // Handle odd dimension
+        if (head_dim % 2 != 0) {
+            dot += __half2float(q[head_dim - 1]) * __half2float(kc[i * head_dim + head_dim - 1]);
         }
         dot *= scale;
         logits[i] = dot;
@@ -75,10 +91,19 @@ __global__ void DFlashAttnKernelFP16(
     const int ds = num_ctx;
     for (int i = tid; i < num_draft; i += THREADS) {
         float dot = 0.f;
-#pragma unroll
-        for (int d = 0; d < 128; ++d) {
-            if (d < head_dim)
-                dot += __half2float(q[d]) * __half2float(kd[i * head_dim + d]);
+        const half2* kd2 = reinterpret_cast<const half2*>(kd + i * head_dim);
+        // Process 2 elements at a time using half2 vector loads
+        for (int d = 0; d < head_dim_aligned; d += 2) {
+            half2 q_vec = q2[d / 2];
+            half2 k_vec = kd2[d / 2];
+            float q0 = __low2float(q_vec);
+            float q1 = __high2float(q_vec);
+            float k0 = __low2float(k_vec);
+            float k1 = __high2float(k_vec);
+            dot += q0 * k0 + q1 * k1;
+        }
+        if (head_dim % 2 != 0) {
+            dot += __half2float(q[head_dim - 1]) * __half2float(kd[i * head_dim + head_dim - 1]);
         }
         dot *= scale;
         logits[ds + i] = dot;
@@ -111,17 +136,30 @@ __global__ void DFlashAttnKernelFP16(
     float gsum = rsum[0] + 1e-8f;
     __syncthreads();
 
-    // ── 4) weighted value sum (master thread) ─
-    if (tid == 0) {
-        for (int d = 0; d < head_dim; ++d) {
-            float acc = 0.f;
-            for (int i = 0; i < num_ctx; ++i)
-                acc += logits[i] * __half2float(vc[i * head_dim + d]);
-            for (int i = 0; i < num_draft; ++i)
-                acc += logits[ds + i] * __half2float(vd[i * head_dim + d]);
-            out[d] = __float2half(acc / gsum);
-        }
+    // ── 4) weighted value sum (ALL THREADS in block) ────────────
+    // Each thread accumulates one slice of head_dim for all KV pairs.
+    // Parallel reduction over KV positions stored in rmax/rsum arrays.
+    // rmax and rsum are reused: after softmax normalization (step 3),
+    // they hold softmax weights for each KV position.
+    // We repurpose them here as accumulators for each thread's head_dim slice.
+    //
+    // Layout: logits[total] (softmax weights for context + draft)
+    //         rmax[THREADS] -> per-thread accumulation buffer for value sum
+    //         rsum[THREADS] -> parallel scratch (reused for value accumulation)
+    //         logits[total + THREADS] onwards -> softmax weights (now read-only)
+
+    const int head_dim_reg = head_dim;
+    const int h = tid;
+    float acc = 0.f;
+
+    // Accumulate over all KV positions (context + draft)
+    for (int i = 0; i < num_ctx; ++i) {
+        acc += logits[i] * __half2float(vc[i * head_dim_reg + h]);
     }
+    for (int i = 0; i < num_draft; ++i) {
+        acc += logits[ds + i] * __half2float(vd[i * head_dim_reg + h]);
+    }
+    out[h] = __float2half(acc / gsum);
 }
 
 // Host wrapper
