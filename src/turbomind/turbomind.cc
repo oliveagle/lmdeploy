@@ -547,6 +547,10 @@ TurboMind::Impl::Impl(string model_dir, string config, FFICtxFactory ffi_ctx_fac
 
     engine_param_.mlp_tp_size = engine["mlp_tp_size"].as<int>();
 
+    // EP (Expert Parallelism) support
+    engine_param_.mlp_ep_size = model["mlp_ep_size"].as<int>(1);
+    engine_param_.mlp_ep_rank = model["mlp_ep_rank"].as<int>(0);
+
     engine_param_.devices = engine["devices"].as<std::vector<int>>();
 
     // multi-node information
@@ -574,6 +578,9 @@ TurboMind::Impl::Impl(string model_dir, string config, FFICtxFactory ffi_ctx_fac
     moe_param_.scoring_func      = model["scoring_func"].as<std::string>("softmax");
     moe_param_.router_n_groups   = model["router_n_groups"].as<int>(-1);
     moe_param_.router_bias       = model["expert_router_bias"].as<bool>();
+    // EP (Expert Parallelism) support
+    moe_param_.ep_size = engine_param_.mlp_ep_size;
+    moe_param_.ep_rank = engine_param_.mlp_ep_rank;
     YAML::Node expert_num        = model["expert_num"];
     for (auto it = expert_num.begin(); it != expert_num.end(); ++it) {
         moe_param_.expert_num.push_back(it->as<int>());

@@ -192,14 +192,27 @@ class MoeFfn(Ffn):
         self.expert_num = model.model_config.expert_num
         self.inter_size = model.model_config.expert_inter_size
         self.shared_gate = model.model_config.moe_shared_gate
+        # EP (Expert Parallelism) support
+        self.ep_size = model.model_config.mlp_ep_size
+        self.ep_rank = model.model_config.mlp_ep_rank
 
     def apply(self, i: int, r: BaseReader):
         if i >= len(self.expert_num) or self.expert_num[i] == 0:
             return
 
+        # EP (Expert Parallelism) support: determine expert range for this rank
+        if self.ep_size > 1:
+            total_experts = self.expert_num[i]
+            experts_per_rank = (total_experts + self.ep_size - 1) // self.ep_size
+            ep_first_expert = self.ep_rank * experts_per_rank
+            ep_num_experts = min(experts_per_rank, total_experts - ep_first_expert)
+            expert_range = range(ep_first_expert, ep_first_expert + ep_num_experts)
+        else:
+            expert_range = range(self.expert_num[i])
+
         # Export expert weights with outer loop over experts (not params)
         # to ensure each expert's full weight set is grouped together
-        for e in range(self.expert_num[i]):
+        for e in expert_range:
             for p in get_params(r.moe_ffn_expert(), 1):
                 fmt = self._moe_ffn_expert.replace('E', str(e))
                 p(partial(self._export, self.inter_size, fmt), partial(r.moe_ffn_expert, e, i), i)
