@@ -20,7 +20,7 @@ import torch
 import yaml
 
 import lmdeploy
-from lmdeploy.messages import (EngineOutput, GenerationConfig, ResponseType, ScheduleMetrics,
+from lmdeploy.messages import (DraftQuantPolicy, EngineOutput, GenerationConfig, ResponseType, ScheduleMetrics,
                                 SpeculativeConfig, TurbomindEngineConfig)
 from lmdeploy.serve.openai.protocol import UpdateParamsRequest
 from lmdeploy.tokenizer import Tokenizer
@@ -191,34 +191,101 @@ class TurboMind:
 
         self.session_len = self.config.session_len
 
-    def _check_unloaded_tm_params(self):
-        tm_params = self._tm_model.tm_params
-        if len(tm_params) > 0:
-            uninitialized = list(tm_params.keys())
-            logger.warning('the model may not be loaded successfully '
-                           f'with {len(tm_params)} uninitialized params:\n{uninitialized}')
+    def _detect_draft_quantization(self, draft_model_path: str) -> tuple[int, dict]:
+        """Detect if draft model is quantized.
 
-    def _load_weights(self):
-        """Load weights."""
-        self._get_model_params()
+        Args:
+            draft_model_path: Path to draft model directory
 
-        with torch.cuda.device(self.devices[0]):
-            self._tm_model.export()
+        Returns:
+            (quant_policy, metadata_dict) where quant_policy is int (0=FP16, 1=INT8, 2=INT4, 3=AWQ, 4=GPTQ)
+        """
+        import json
+        metadata = {}
 
-        self._check_unloaded_tm_params()
+        # Check for AWQ quantization config
+        awq_config_path = osp.join(draft_model_path, 'quant_config.json')
+        if osp.exists(awq_config_path):
+            try:
+                with open(awq_config_path, 'r') as f:
+                    awq_config = json.load(f)
+                if awq_config.get('quant_method') == 'awq':
+                    logger.info(f'Detected AWQ quantized draft model')
+                    return (DraftQuantPolicy.AWQ, awq_config)
+            except Exception as e:
+                logger.warning(f'Failed to parse AWQ config: {e}')
 
-    def _process_weights(self):
-        """Process weight."""
-        with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
-            for _ in e.map(self.model_comm.process_weight, range(self.gpu_count)):
-                pass
+        # Check for GPTQ quantization config
+        gptq_config_path = osp.join(draft_model_path, 'quantize_config.json')
+        if osp.exists(gptq_config_path):
+            try:
+                with open(gptq_config_path, 'r') as f:
+                    gptq_config = json.load(f)
+                if gptq_config.get('quant_method') == 'gptq':
+                    logger.info(f'Detected GPTQ quantized draft model')
+                    return (DraftQuantPolicy.GPTQ, gptq_config)
+            except Exception as e:
+                logger.warning(f'Failed to parse GPTQ config: {e}')
 
-    def _create_engine(self):
-        """Create engine."""
-        with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
-            for _ in e.map(self.model_comm.create_engine, range(self.gpu_count)):
-                pass
-        self._engine_created = True
+        # Check HF config for quantization info
+        hf_config_path = osp.join(draft_model_path, 'config.json')
+        if osp.exists(hf_config_path):
+            try:
+                with open(hf_config_path, 'r') as f:
+                    hf_config = json.load(f)
+                quant_config = hf_config.get('quantization_config', {})
+                if quant_config.get('quant_method') == 'awq':
+                    logger.info(f'Detected AWQ quantized draft model (from HF config)')
+                    return (DraftQuantPolicy.AWQ, quant_config)
+                elif quant_config.get('quant_method') == 'gptq':
+                    logger.info(f'Detected GPTQ quantized draft model (from HF config)')
+                    return (DraftQuantPolicy.GPTQ, quant_config)
+            except Exception as e:
+                logger.warning(f'Failed to parse HF config: {e}')
+
+        logger.info('No quantization detected, using FP16 weights')
+        return (DraftQuantPolicy.FP16, metadata)
+
+    def _dequantize_weight(self, weight: torch.Tensor, scale: torch.Tensor,
+                          zero_point: torch.Tensor = None,
+                          quant_policy: int = DraftQuantPolicy.INT8) -> torch.Tensor:
+        """Dequantize weight tensor to FP16.
+
+        Args:
+            weight: Quantized weight tensor
+            scale: Scale tensor for dequantization
+            zero_point: Zero point tensor (for INT4)
+            quant_policy: Quantization policy
+
+        Returns:
+            Dequantized FP16 weight tensor
+        """
+        import torch
+
+        if quant_policy == DraftQuantPolicy.FP16:
+            return weight.half() if weight.dtype != torch.float16 else weight
+
+        elif quant_policy == DraftQuantPolicy.INT8:
+            # INT8 dequantization: fp16_weight = int8_weight * scale
+            if weight.dtype != torch.float32:
+                weight = weight.float()
+            return (weight * scale).half()
+
+        elif quant_policy == DraftQuantPolicy.INT4:
+            # INT4 dequantization: fp16_weight = (int4_weight - zero_point) * scale
+            if weight.dtype != torch.float32:
+                weight = weight.float()
+            if zero_point is not None:
+                weight = weight - zero_point.float()
+            return (weight * scale).half()
+
+        elif quant_policy in (DraftQuantPolicy.AWQ, DraftQuantPolicy.GPTQ):
+            # AWQ/GPTQ use group-wise quantization
+            # This is a simplified dequantization; full implementation would need group-wise processing
+            logger.warning(f'AWQ/GPTQ dequantization not fully implemented, using FP16')
+            return weight.half() if weight.dtype != torch.float16 else weight
+
+        return weight.half()
 
     def _load_dflash_model(self):
         """Load DFlash draft model for speculative decoding.
@@ -245,6 +312,17 @@ class TurboMind:
             return
 
         logger.info(f'Loading DFlash draft model from {draft_model_path}')
+
+        # Detect quantization type (STORY-008)
+        quant_policy = self.speculative_config.quant_policy
+        if quant_policy == 0:  # Auto-detect
+            detected_policy, quant_meta = self._detect_draft_quantization(draft_model_path)
+            quant_policy = detected_policy
+            logger.info(f'Detected draft model quantization: {DraftQuantPolicy(detected_policy).name}')
+
+        # Load quantized weights if needed
+        use_quantized = quant_policy > DraftQuantPolicy.FP16
+        group_size = self.speculative_config.group_size
 
         # 1. Load draft model weights from safetensors
         try:

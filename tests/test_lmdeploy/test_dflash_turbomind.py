@@ -5,12 +5,13 @@ Tests cover:
 - SpeculativeConfig dataclass initialization and defaults
 - TurbomindEngineConfig with speculative_config integration
 - TurbomindModelConfig speculative_config serialization
+- DFlash draft model quantization support (STORY-008)
 - Edge cases and invalid configurations
 """
 
 import pytest
 
-from lmdeploy.messages import SpeculativeConfig, TurbomindEngineConfig
+from lmdeploy.messages import (DraftQuantPolicy, SpeculativeConfig, TurbomindEngineConfig)
 
 
 class TestSpeculativeConfig:
@@ -22,6 +23,8 @@ class TestSpeculativeConfig:
         assert config.method == 'dflash'
         assert config.model == ''
         assert config.num_speculative_tokens == 8
+        assert config.quant_policy == DraftQuantPolicy.FP16
+        assert config.group_size == 128
 
     def test_custom_values(self):
         """Test custom field values."""
@@ -29,10 +32,14 @@ class TestSpeculativeConfig:
             method='dflash',
             model='/path/to/draft/model',
             num_speculative_tokens=4,
+            quant_policy=DraftQuantPolicy.INT4,
+            group_size=64,
         )
         assert config.method == 'dflash'
         assert config.model == '/path/to/draft/model'
         assert config.num_speculative_tokens == 4
+        assert config.quant_policy == DraftQuantPolicy.INT4
+        assert config.group_size == 64
 
     def test_num_speculative_tokens_boundary(self):
         """Test edge values for num_speculative_tokens."""
@@ -43,6 +50,46 @@ class TestSpeculativeConfig:
         # Large value
         config_large = SpeculativeConfig(num_speculative_tokens=64)
         assert config_large.num_speculative_tokens == 64
+
+
+class TestDraftQuantPolicy:
+    """Test DraftQuantPolicy enum (STORY-008)."""
+
+    def test_quant_policy_values(self):
+        """Test DraftQuantPolicy enum values."""
+        assert DraftQuantPolicy.FP16 == 0
+        assert DraftQuantPolicy.INT8 == 1
+        assert DraftQuantPolicy.INT4 == 2
+        assert DraftQuantPolicy.AWQ == 3
+        assert DraftQuantPolicy.GPTQ == 4
+
+    def test_quant_policy_names(self):
+        """Test DraftQuantPolicy enum names."""
+        assert DraftQuantPolicy.FP16.name == 'FP16'
+        assert DraftQuantPolicy.INT8.name == 'INT8'
+        assert DraftQuantPolicy.INT4.name == 'INT4'
+        assert DraftQuantPolicy.AWQ.name == 'AWQ'
+        assert DraftQuantPolicy.GPTQ.name == 'GPTQ'
+
+    def test_speculative_config_with_quantization(self):
+        """Test SpeculativeConfig with quantization parameters."""
+        config = SpeculativeConfig(
+            quant_policy=DraftQuantPolicy.INT4,
+            group_size=128,
+        )
+        assert config.quant_policy == DraftQuantPolicy.INT4
+        assert config.group_size == 128
+
+    def test_speculative_config_awq_quantization(self):
+        """Test SpeculativeConfig with AWQ quantization."""
+        config = SpeculativeConfig(
+            quant_policy=DraftQuantPolicy.AWQ,
+            group_size=128,
+            num_groups_per_channel=1,
+        )
+        assert config.quant_policy == DraftQuantPolicy.AWQ
+        assert config.group_size == 128
+        assert config.num_groups_per_channel == 1
 
 
 class TestTurbomindEngineConfigWithSpeculative:

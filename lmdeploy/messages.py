@@ -24,6 +24,16 @@ class QuantPolicy(enum.IntEnum):
     INT8 = 8  # 8-bit KV cache
     TURBO_QUANT = 42  # TurboQuant: K=4bit QJL4 + V=2bit MSE
 
+
+class DraftQuantPolicy(enum.IntEnum):
+    """Quantization policy constants for draft model weights."""
+    FP16 = 0  # No quantization, use FP16 weights
+    INT8 = 1  # 8-bit weight-only quantization
+    INT4 = 2  # 4-bit weight-only quantization
+    AWQ = 3  # AWQ (Activation-aware Weight Quantization)
+    GPTQ = 4  # GPTQ (Gradient-based Post-Training Quantization)
+
+
 LogitsProcessor = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 """LogitsProcessor is a function that takes a tensor of input_ids, the logits
 tensor for the next token, and returns a modified tensor of logits to sample
@@ -208,10 +218,17 @@ class SpeculativeConfig:
         method: the speculative decoding method.
         model: the path of speculative model.
         num_speculative_tokens: number of generated token of draft model per step
+        quant_policy: quantization policy for draft model weights.
+            0 = FP16 (no quantization), 1 = INT8, 2 = INT4, 3 = AWQ
+        group_size: quantization group size for INT4/AWQ quantization (default 128)
+        num_groups_per_channel: number of quantization groups per channel (for AWQ)
     """
     method: str = 'dflash'
     model: str = ''
     num_speculative_tokens: int = 8
+    quant_policy: int = 0  # 0=FP16, 1=INT8, 2=INT4, 3=AWQ
+    group_size: int = 128
+    num_groups_per_channel: int = 1
 
 
 @pydantic_dataclass

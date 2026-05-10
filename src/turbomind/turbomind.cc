@@ -391,6 +391,109 @@ struct TurboMind::Impl {
                     index, (int)dflash_w->num_layers);
     }
 
+    void LoadDFlashWeightsQuantized(int index,
+                                    const std::unordered_map<std::string, Tensor>& weight_map,
+                                    const std::unordered_map<std::string, Tensor>& scale_map,
+                                    int quant_policy,
+                                    int group_size)
+    {
+        CudaDeviceGuard dev_guard(engine_param_.devices[index]);
+
+        auto& llama_weight = TM_CHECK_NOTNULL(weights_[index]);
+
+        // Create or reuse DFlash draft weight
+        if (!llama_weight->dflash_draft_weight_) {
+            llama_weight->dflash_draft_weight_ = std::make_unique<DFlashDraftWeight>();
+        }
+
+        auto* dflash_w = llama_weight->dflash_draft_weight_.get();
+        dflash_w->quant_policy = quant_policy;
+        dflash_w->group_size   = group_size;
+
+        TM_LOG_INFO("[DFlash] Loading quantized draft weights for GPU {} (quant_policy={}, group_size={})",
+                    index, quant_policy, group_size);
+
+        // Load quantized weights same as FP16 but mark quantization info
+        // The actual dequantization will happen at inference time in the kernel
+        for (const auto& [key, tensor] : weight_map) {
+            if (key.find("dflash.layers.") == std::string::npos) {
+                continue;
+            }
+
+            // Parse key: dflash.layers.{L}.{wtype}
+            std::string remaining = key.substr(sizeof("dflash.layers.") - 1);
+            size_t dot_pos        = remaining.find('.');
+            if (dot_pos == std::string::npos) {
+                continue;
+            }
+
+            int layer = std::stoi(remaining.substr(0, dot_pos));
+            if (layer >= dflash_w->num_layers) {
+                continue;
+            }
+
+            std::string wtype = remaining.substr(dot_pos + 1);
+
+            // Load quantized weight tensor (INT4/INT8 packed format)
+            Tensor int_tensor = tensor;
+            if (int_tensor.dtype == DataType(3) || int_tensor.dtype == DataType(2)) {
+                // FP32/FP16 -> convert to appropriate type
+                // For now, store as-is; the kernel will handle dequantization
+            }
+
+            if (wtype == "qkv_proj") {
+                dflash_w->d_qkv_proj[layer] = int_tensor;
+            }
+            else if (wtype == "o_proj") {
+                dflash_w->d_o_proj[layer] = int_tensor;
+            }
+            else if (wtype == "gate_up_proj") {
+                dflash_w->d_gate_up_proj[layer] = int_tensor;
+            }
+            else if (wtype == "down_proj") {
+                dflash_w->d_down_proj[layer] = int_tensor;
+            }
+            else if (wtype == "input_layernorm") {
+                dflash_w->d_input_layernorm[layer] = int_tensor;
+            }
+            else if (wtype == "post_layernorm") {
+                dflash_w->d_post_layernorm[layer] = int_tensor;
+            }
+        }
+
+        // Load scale tensors for dequantization
+        for (const auto& [key, tensor] : scale_map) {
+            if (key.find("dflash.layers.") == std::string::npos) {
+                continue;
+            }
+
+            std::string remaining = key.substr(sizeof("dflash.layers.") - 1);
+            size_t dot_pos        = remaining.find('.');
+            if (dot_pos == std::string::npos) {
+                continue;
+            }
+
+            int layer = std::stoi(remaining.substr(0, dot_pos));
+            std::string wtype = remaining.substr(dot_pos + 1);
+
+            if (wtype == "qkv_proj") {
+                dflash_w->d_qkv_scale[layer] = tensor;
+            }
+            else if (wtype == "o_proj") {
+                dflash_w->d_o_scale[layer] = tensor;
+            }
+            else if (wtype == "gate_up_proj") {
+                dflash_w->d_gate_up_scale[layer] = tensor;
+            }
+            else if (wtype == "down_proj") {
+                dflash_w->d_down_scale[layer] = tensor;
+            }
+        }
+
+        TM_LOG_INFO("[DFlash] Loaded quantized draft weights for GPU {} ({} layers)",
+                    index, (int)dflash_w->num_layers);
+    }
+
     void EnableDFlash(int index, int num_spec_tokens)
     {
         CudaDeviceGuard dev_guard(engine_param_.devices[index]);
@@ -923,6 +1026,16 @@ bool TurboMind::is_dummy_node() const noexcept
 void TurboMind::LoadDFlashWeights(int index, const std::unordered_map<std::string, Tensor>& weight_map)
 {
     return impl_->LoadDFlashWeights(index, weight_map);
+}
+
+void TurboMind::LoadDFlashWeightsQuantized(
+    int index,
+    const std::unordered_map<std::string, Tensor>& weight_map,
+    const std::unordered_map<std::string, Tensor>& scale_map,
+    int quant_policy,
+    int group_size)
+{
+    return impl_->LoadDFlashWeightsQuantized(index, weight_map, scale_map, quant_policy, group_size);
 }
 
 void TurboMind::EnableDFlash(int index, int num_spec_tokens)

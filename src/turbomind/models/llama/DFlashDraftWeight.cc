@@ -41,6 +41,12 @@ DFlashDraftWeight::DFlashDraftWeight()
     d_gate_up_proj.resize(n);
     d_down_proj.resize(n);
     d_post_layernorm.resize(n);
+
+    // Quantization scale vectors (STORY-008)
+    d_qkv_scale.resize(n);
+    d_o_scale.resize(n);
+    d_gate_up_scale.resize(n);
+    d_down_scale.resize(n);
 }
 
 DFlashDraftWeight::~DFlashDraftWeight() = default;
