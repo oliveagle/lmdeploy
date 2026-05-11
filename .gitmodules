@@ -4,3 +4,6 @@
 [submodule "submodules/tilelang"]
 	path = submodules/tilelang
 	url = https://github.com/tile-ai/tilelang.git
+[submodule "submodules/lucebox-hub"]
+	path = submodules/lucebox-hub
+	url = https://github.com/Luce-Org/lucebox-hub.git
