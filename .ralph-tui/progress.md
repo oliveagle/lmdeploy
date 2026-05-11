@@ -17,7 +17,47 @@
 
 ---
 
-## 2026-05-12: STORY-004 - Performance Benchmarking
+## 2026-05-12: STORY-005 - Cleanup & Optimization
+
+### ✅ What was implemented
+1. **Removed verbose debug logging**:
+   - Replaced `dflash_log::` namespace wrapper with standard logging
+   - Converted `dflash_log::Info/Debug` to `TM_LOG_DEBUG`
+   - Converted `dflash_log::Error` to `TM_LOG_ERROR`
+   - Converted `dflash_log::Warning` to `TM_LOG_WARNING`
+
+2. **Cleaned up Chinese comments**:
+   - Translated all Chinese comments to English in `DFlashDraftModel.cu`
+   - Translated all Chinese comments to English in `DFlashDraftWeight.cc`
+   - Translated all Chinese comments to English in `DFlashDraftWeight.h`
+
+3. **Improved code documentation**:
+   - English comments now consistently document DFlash implementation
+   - Preserved STORY-* references for feature tracking
+
+### ✅ Files changed
+- Modified: `src/turbomind/models/llama/DFlashDraftModel.cu`
+  - Replaced ~63 `dflash_log::` calls with standard logging
+  - Removed Chinese comments
+- Modified: `src/turbomind/models/llama/DFlashDraftWeight.cc`
+  - Translated Chinese comments to English
+- Modified: `src/turbomind/models/llama/DFlashDraftWeight.h`
+  - Translated Chinese comments to English
+
+### 💡 Learnings
+1. **Standard logging pattern**: Use `TM_LOG_DEBUG/WARNING/ERROR` instead of custom namespaces
+2. **Comment consistency**: English comments ensure broader code maintainability
+3. **Cleanup scope**: Focused on main DFlash implementation files, left other files (unified_decoder, LlamaWeight) for future cleanup
+
+### ⚠️ Remaining work
+- Prefix cache code (STORY-010) remains in codebase but unused - can be removed in future cleanup
+- Some Chinese comments remain in `unified_decoder.cc` and `LlamaWeight.cc` - not critical for DFlash functionality
+
+---
+
+## Previous Work (from git history)
+
+### 2026-05-12 (earlier): STORY-004 - Performance Benchmarking
 
 ### ✅ What was implemented
 1. **Baseline benchmark script**: `tests/dflash/benchmark_baseline.py`
