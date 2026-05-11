@@ -79,12 +79,7 @@ public:
     int GetNumAuxLayers() const { return num_aux_layers_; }
 
     // Set draft weight pointer - use the weights from LlamaWeight directly
-    void SetDraftWeightPointer(DFlashDraftWeight* weight) {
-        if (weight) {
-            weight_.reset();  // Release our own weight
-            external_weight_ = weight;  // Use external weight
-        }
-    }
+    void SetDraftWeightPointer(DFlashDraftWeight* weight);
 
     // Get the current weight (external or internal)
     DFlashDraftWeight* GetDraftWeight() const {

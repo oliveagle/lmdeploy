@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 DFlash 推理 Benchmark
-运行约 2 分钟，测试 DFlash speculative decoding 性能
+运行约 30 秒，测试 DFlash speculative decoding 性能
 """
 
 import os
@@ -16,7 +16,7 @@ from lmdeploy import pipeline, TurbomindEngineConfig, SpeculativeConfig, Generat
 target_model = "/home/oliveagle/.cache/modelscope/hub/models/tclf90/Qwen3.5-9B-AWQ"
 draft_model = "/home/oliveagle/.cache/huggingface/hub/models--z-lab--Qwen3.5-9B-DFlash/snapshots/492f4b532a957a50561e1418e5a3f31690f127f4"
 
-DURATION = 120  # 运行 2 分钟
+DURATION = 30  # 运行 30 秒
 
 gen_config = GenerationConfig(max_new_tokens=128, do_sample=False)
 

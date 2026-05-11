@@ -40,6 +40,7 @@ private:
     // EP (Expert Parallelism) support
     const int ep_size_;
     const int ep_rank_;
+    const Context& ctx_;  // Reference to context (for communicator access)
 
     int& is_warm_up_;
 

@@ -20,6 +20,7 @@
 #include "src/turbomind/models/llama/llama_params.h"
 #include "src/turbomind/models/llama/llama_utils.h"
 #include "src/turbomind/models/llama/unified_decoder.h"
+#include "src/turbomind/models/llama/DFlashDraftModel.h"
 #include "src/turbomind/models/output_processor.h"
 #include "src/turbomind/utils/anomaly_handler.h"
 #include "src/turbomind/utils/cuda_utils.h"
@@ -536,19 +537,22 @@ void LanguageModel::EnableDFlash(bool enable)
     }
 
     // Check if draft weights are loaded
+    TM_LOG_INFO("[DFlash] EnableDFlash: checking weights, dflash_draft_weight_={}",
+                (void*)impl->weights_.dflash_draft_weight_.get());
     if (!impl->weights_.dflash_draft_weight_) {
         TM_LOG_ERROR("[DFlash] Cannot enable DFlash: draft weights not loaded. Call LoadDFlashWeights first.");
         impl->unified_decoder_->EnableDFlash(false);
         return;
     }
 
-    TM_LOG_INFO("[DFlash] Enabling DFlash: num_layers=%d, hidden=%d, num_heads=%d",
+    TM_LOG_INFO("[DFlash] Enabling DFlash: num_layers={}, hidden={}, num_heads={}",
                 impl->weights_.dflash_draft_weight_->num_layers,
                 impl->weights_.dflash_draft_weight_->hidden_size,
                 impl->weights_.dflash_draft_weight_->num_attention_heads);
 
     // Check if we have context
     auto* ctx = impl->unified_decoder_->GetContext();
+    TM_LOG_INFO("[DFlash] EnableDFlash: got ctx={}, decoder={}", (void*)ctx, (void*)impl->unified_decoder_.get());
     if (!ctx) {
         TM_LOG_ERROR("[DFlash] Cannot enable DFlash: context not set. Call SetDFlashContext first.");
         impl->unified_decoder_->EnableDFlash(false);
@@ -557,6 +561,7 @@ void LanguageModel::EnableDFlash(bool enable)
 
     // Create DFlash draft model
     try {
+        TM_LOG_INFO("[DFlash] Creating DFlashDraftModel instance...");
         auto dflash_model = std::make_unique<DFlashDraftModel>(
             impl->param_,
             impl->engine_param_,
@@ -564,16 +569,23 @@ void LanguageModel::EnableDFlash(bool enable)
         );
 
         // Set the weight pointer (not copy)
+        TM_LOG_INFO("[DFlash] Setting draft weight pointer...");
         dflash_model->SetDraftWeightPointer(impl->weights_.dflash_draft_weight_.get());
 
+        // Verify weight pointer was set correctly
+        TM_LOG_INFO("[DFlash] Verifying weight pointer: GetDraftWeight()=%p",
+                   dflash_model->GetDraftWeight());
+
         // Attach draft model to decoder
-        impl->unified_decoder_->SetDFlashDraftModel(std::move(dflash_model));
+        impl->unified_decoder_->SetDFlashDraftModel(dflash_model.release());
         impl->unified_decoder_->EnableDFlash(true);
 
-        TM_LOG_INFO("[DFlash] Enabled DFlash on LanguageModel decoder");
+        TM_LOG_INFO("[DFlash] Enabled DFlash on LanguageModel decoder: enable={}, model={}",
+                    impl->unified_decoder_->IsDFlashEnabled(),
+                    (void*)impl->unified_decoder_->GetDFlashDraftModel());
     }
     catch (const std::exception& e) {
-        TM_LOG_ERROR("[DFlash] Failed to enable DFlash: %s", e.what());
+        TM_LOG_ERROR("[DFlash] Failed to enable DFlash: {}", e.what());
         impl->unified_decoder_->EnableDFlash(false);
         impl->unified_decoder_->SetDFlashDraftModel(nullptr);
     }

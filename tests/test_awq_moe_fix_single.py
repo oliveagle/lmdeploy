@@ -8,8 +8,6 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-
 # 使用 32GB GPU 测试 (避免 NCCL P2P 问题)
 os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 

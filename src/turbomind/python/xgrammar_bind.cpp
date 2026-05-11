@@ -1,4 +1,4 @@
-// Modified from xgrammar/nanobind/nanobind.cc from xgrammar project.
+// Modified from xgrammar/nanobind/nanobind.cc from xgrammar project!
 /*!
  *  Copyright (c) 2024 by Contributors
  * \file xgrammar/nanobind/nanobind.cc
@@ -25,7 +25,7 @@ using namespace pybind11::literals;
 namespace {
 
 static const std::vector<std::string>
-CommonEncodedVocabType(const py::typing::List<std::variant<std::string, py::bytes>>& lst)
+CommonEncodedVocabType(py::list lst)
 {
     std::vector<std::string> out;
     out.reserve(lst.size());
@@ -75,11 +75,11 @@ std::vector<py::bytes> TokenizerInfo_GetDecodedVocab(const TokenizerInfo& tokeni
 PYBIND11_MODULE(_xgrammar, m)
 {
     py::class_<TokenizerInfo, std::shared_ptr<TokenizerInfo>>(m, "TokenizerInfo")
-        .def(py::init([](const py::typing::List<std::variant<std::string, py::bytes>>& encoded_vocab,
-                         int                                                           vocab_type,
-                         std::optional<int>                                            vocab_size,
-                         std::optional<std::vector<int32_t>>                           stop_token_ids,
-                         bool                                                          add_prefix_space) {
+        .def(py::init([](py::list encoded_vocab,
+                         int    vocab_type,
+                         std::optional<int>                  vocab_size,
+                         std::optional<std::vector<int32_t>> stop_token_ids,
+                         bool                                add_prefix_space) {
                  return TokenizerInfo{TokenizerInfo_Init(CommonEncodedVocabType(encoded_vocab),
                                                          vocab_type,
                                                          vocab_size,
@@ -102,10 +102,11 @@ PYBIND11_MODULE(_xgrammar, m)
         .def("dump_metadata", &TokenizerInfo::DumpMetadata)
 
         .def_static("from_vocab_and_metadata",
-                    [](const py::typing::List<std::variant<std::string, py::bytes>>& encoded_vocab,
-                       const std::string&                                            metadata) {
+                    [](py::list encoded_vocab, const std::string& metadata) {
                         return TokenizerInfo::FromVocabAndMetadata(CommonEncodedVocabType(encoded_vocab), metadata);
-                    })
+                    },
+                    py::arg("encoded_vocab"),
+                    py::arg("metadata"))
 
         .def_static("_detect_metadata_from_hf", &TokenizerInfo::DetectMetadataFromHF);
 

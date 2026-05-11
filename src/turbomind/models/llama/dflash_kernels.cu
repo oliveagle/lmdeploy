@@ -149,17 +149,17 @@ __global__ void DFlashAttnKernelFP16(
     //         logits[total + THREADS] onwards -> softmax weights (now read-only)
 
     const int head_dim_reg = head_dim;
-    const int h = tid;
+    const int dim_offset = tid;
     float acc = 0.f;
 
     // Accumulate over all KV positions (context + draft)
     for (int i = 0; i < num_ctx; ++i) {
-        acc += logits[i] * __half2float(vc[i * head_dim_reg + h]);
+        acc += logits[i] * __half2float(vc[i * head_dim_reg + dim_offset]);
     }
     for (int i = 0; i < num_draft; ++i) {
-        acc += logits[ds + i] * __half2float(vd[i * head_dim_reg + h]);
+        acc += logits[ds + i] * __half2float(vd[i * head_dim_reg + dim_offset]);
     }
-    out[h] = __float2half(acc / gsum);
+    out[dim_offset] = __float2half(acc / gsum);
 }
 
 // Host wrapper

@@ -9,8 +9,6 @@ import time
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
-sys.path.insert(0, str(Path(__file__).parent))
-
 from lmdeploy import pipeline, PytorchEngineConfig, GenerationConfig
 from lmdeploy.messages import SpeculativeConfig, QuantPolicy
 
