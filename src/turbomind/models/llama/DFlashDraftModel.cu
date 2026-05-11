@@ -247,10 +247,123 @@ void DFlashDraftModel::ExtractAuxHidden(
     TM_LOG_DEBUG("[DFlash] Extracted %d aux hidden states", (int)aux_states.size());
 }
 
+// ──────────────────────────────────────────
+// Prefix Cache Implementation (STORY-010)
+// ──────────────────────────────────────────
+
+#include <functional>
+#include <chrono>
+
+namespace turbomind {
+
+// Simple hash function for token vectors
+size_t DFlashDraftModel::ComputeTokensHash(const std::vector<int>& tokens) const {
+    size_t seed = tokens.size();
+    for (const auto& token : tokens) {
+        seed ^= std::hash<int>{}(token) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+    return seed;
+}
+
+const DFlashCacheEntry* DFlashDraftModel::FindPrefixMatch(const std::vector<int>& tokens) const {
+    if (tokens.empty()) return nullptr;
+
+    size_t hash = ComputeTokensHash(tokens);
+    auto it = prefix_cache_.find(hash);
+    if (it != prefix_cache_.end() && it->second.tokens == tokens) {
+        return &it->second;
+    }
+    return nullptr;
+}
+
+void DFlashDraftModel::EvictLRUEntry() {
+    if (cache_order_.empty()) return;
+
+    // Find and remove the LRU entry
+    size_t lru_hash = cache_order_.front();
+    prefix_cache_.erase(lru_hash);
+    cache_order_.erase(cache_order_.begin());
+
+    TM_LOG_DEBUG("[DFlash PrefixCache] Evicted LRU entry, cache size: %zu",
+                prefix_cache_.size());
+}
+
+void DFlashDraftModel::StoreInPrefixCache(
+    const std::vector<int>& tokens,
+    const Tensor& ctx_k,
+    const Tensor& ctx_v,
+    const std::vector<Tensor>& aux_states) {
+
+    if (tokens.empty()) return;
+
+    size_t hash = ComputeTokensHash(tokens);
+
+    // Check if we need to evict
+    if (prefix_cache_.size() >= max_prefix_cache_entries_) {
+        // If this entry already exists, just update access time
+        auto it = prefix_cache_.find(hash);
+        if (it != prefix_cache_.end()) {
+            // Update LRU order
+            auto order_it = std::find(cache_order_.begin(), cache_order_.end(), hash);
+            if (order_it != cache_order_.end()) {
+                cache_order_.erase(order_it);
+            }
+            cache_order_.push_back(hash);
+            it->second.last_accessed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+            return;
+        }
+        EvictLRUEntry();
+    }
+
+    // Create new cache entry
+    DFlashCacheEntry entry;
+    entry.tokens = tokens;
+    entry.hash = hash;
+    entry.last_accessed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+
+    // Deep copy tensors (this is expensive, but necessary for caching)
+    const auto stream = core::Context::stream().handle();
+
+    // Copy ctx_k and ctx_v
+    entry.cached_ctx_k = Tensor{ctx_k.shape(), ctx_k.dtype(), kDEVICE};
+    entry.cached_ctx_v = Tensor{ctx_v.shape(), ctx_v.dtype(), kDEVICE};
+    cudaMemcpyAsync(entry.cached_ctx_k.raw_data(), ctx_k.raw_data(),
+                   ctx_k.size_bytes(), cudaMemcpyDeviceToDevice, stream);
+    cudaMemcpyAsync(entry.cached_ctx_v.raw_data(), ctx_v.raw_data(),
+                   ctx_v.size_bytes(), cudaMemcpyDeviceToDevice, stream);
+
+    // Copy aux states
+    entry.cached_aux_states.reserve(aux_states.size());
+    for (const auto& aux : aux_states) {
+        Tensor aux_copy{aux.shape(), aux.dtype(), kDEVICE};
+        cudaMemcpyAsync(aux_copy.raw_data(), aux.raw_data(),
+                       aux.size_bytes(), cudaMemcpyDeviceToDevice, stream);
+        entry.cached_aux_states.push_back(std::move(aux_copy));
+    }
+
+    // Add to cache
+    prefix_cache_[hash] = std::move(entry);
+    cache_order_.push_back(hash);
+
+    TM_LOG_DEBUG("[DFlash PrefixCache] Stored new entry, cache size: %zu",
+                prefix_cache_.size());
+}
+
+}  // namespace turbomind
+
+// ──────────────────────────────────────────
+// DFlashDraftModel implementation
+// ──────────────────────────────────────────
+
+namespace turbomind {
+
 void DFlashDraftModel::GenerateDraft(
     const std::vector<Tensor>& aux_states,
     Tensor& draft_tokens,
-    Tensor& draft_logits)
+    Tensor& draft_logits,
+    const std::vector<int>* input_tokens)
 {
     if (aux_states.empty()) {
         TM_LOG_WARNING("[DFlash] No aux hidden states available");
@@ -263,66 +376,108 @@ void DFlashDraftModel::GenerateDraft(
     const int num_heads = GetDraftWeight()->num_attention_heads;
     const int inter_size = GetDraftWeight()->intermediate_size;
 
+    // Prefix cache lookup (STORY-010)
+    bool cache_hit = false;
+    Tensor ctx_k, ctx_v;  // Declare at the beginning
+    if (enable_prefix_cache_ && input_tokens != nullptr && !input_tokens->empty()) {
+        const auto* entry = FindPrefixMatch(*input_tokens);
+        if (entry != nullptr) {
+            // Cache hit - use cached ctx_k, ctx_v, and aux_states
+            TM_LOG_DEBUG("[DFlash PrefixCache] Cache hit! Using cached K/V");
+            cache_hit = true;
+
+            // Copy cached tensors
+            Tensor ctx_k_copy{entry->cached_ctx_k.shape(), entry->cached_ctx_k.dtype(), kDEVICE};
+            Tensor ctx_v_copy{entry->cached_ctx_v.shape(), entry->cached_ctx_v.dtype(), kDEVICE};
+            cudaMemcpyAsync(ctx_k_copy.raw_data(), entry->cached_ctx_k.raw_data(),
+                           entry->cached_ctx_k.size_bytes(), cudaMemcpyDeviceToDevice, stream);
+            cudaMemcpyAsync(ctx_v_copy.raw_data(), entry->cached_ctx_v.raw_data(),
+                           entry->cached_ctx_v.size_bytes(), cudaMemcpyDeviceToDevice, stream);
+            ctx_k = std::move(ctx_k_copy);
+            ctx_v = std::move(ctx_v_copy);
+
+            // Update access time
+            auto it = prefix_cache_.find(entry->hash);
+            if (it != prefix_cache_.end()) {
+                auto order_it = std::find(cache_order_.begin(), cache_order_.end(), entry->hash);
+                if (order_it != cache_order_.end()) {
+                    cache_order_.erase(order_it);
+                }
+                cache_order_.push_back(entry->hash);
+                it->second.last_accessed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch()).count();
+            }
+        }
+    }
+
     // Context length: use the token count from first aux state
     const int num_ctx = aux_states[0].shape(0);
     const auto dtype  = aux_states[0].dtype();  // Should be FP16
 
-    // ── 1) Build context hidden from aux states ──
-    // Average the 5 aux states: [num_ctx, hidden]
-    Tensor ctx_hidden = Tensor{{num_ctx, hidden}, dtype, kDEVICE};
-    {
-        // Simple average: sum all aux states, then multiply by 1/num_aux
-        // For now, use the first aux state as context (can be improved)
-        cudaMemcpyAsync(ctx_hidden.raw_data(),
-                        const_cast<void*>(aux_states[0].raw_data()),
-                        num_ctx * hidden * 2,  // FP16: 2 bytes per element
-                        cudaMemcpyDeviceToDevice,
-                        stream);
-    }
+    // Skip context hidden and K/V computation if we have cache hit
+    if (!cache_hit) {
+        // ── 1) Build context hidden from aux states ──
+        // Average the 5 aux states: [num_ctx, hidden]
+        Tensor ctx_hidden = Tensor{{num_ctx, hidden}, dtype, kDEVICE};
+        {
+            // Simple average: sum all aux states, then multiply by 1/num_aux
+            // For now, use the first aux state as context (can be improved)
+            cudaMemcpyAsync(ctx_hidden.raw_data(),
+                            const_cast<void*>(aux_states[0].raw_data()),
+                            num_ctx * hidden * 2,  // FP16: 2 bytes per element
+                            cudaMemcpyDeviceToDevice,
+                            stream);
+        }
 
-    // ── 2) Compute context K and V ──
-    // context_K = ctx_hidden @ W_ctx_k  → [num_ctx, hidden]
-    // context_V = ctx_hidden @ W_ctx_v  → [num_ctx, hidden]
-    // For simplicity, use draft model's own K/V projection weights
-    // but we need separate context K/V projections.
-    //
-    // For now: derive context K/V from context hidden directly
-    // by using the draft model's QKV split weights.
-    Tensor ctx_k = Tensor{{num_ctx, hidden}, dtype, kDEVICE};
-    Tensor ctx_v = Tensor{{num_ctx, hidden}, dtype, kDEVICE};
+        // ── 2) Compute context K and V ──
+        // context_K = ctx_hidden @ W_ctx_k  → [num_ctx, hidden]
+        // context_V = ctx_hidden @ W_ctx_v  → [num_ctx, hidden]
+        // For simplicity, use draft model's own K/V projection weights
+        // but we need separate context K/V projections.
+        //
+        // For now: derive context K/V from context hidden directly
+        // by using the draft model's QKV split weights.
+        ctx_k = Tensor{{num_ctx, hidden}, dtype, kDEVICE};
+        ctx_v = Tensor{{num_ctx, hidden}, dtype, kDEVICE};
 
-    // Split QKV weight into Q, K, V components
-    // QKV weight is [hidden, 3*hidden] row-major
-    // Q = cols [0, hidden), K = cols [hidden, 2*hidden), V = cols [2*hidden, 3*hidden)
-    if (GetDraftWeight()->d_attn_qkv_weight[0]) {
-        const int qkv_total = 3 * hidden;
-        const half* qkv_w = static_cast<const half*>(GetDraftWeight()->d_attn_qkv_weight[0].raw_data());
+        // Split QKV weight into Q, K, V components
+        // QKV weight is [hidden, 3*hidden] row-major
+        // Q = cols [0, hidden), K = cols [hidden, 2*hidden), V = cols [2*hidden, 3*hidden)
+        if (GetDraftWeight()->d_attn_qkv_weight[0]) {
+            const int qkv_total = 3 * hidden;
+            const half* qkv_w = static_cast<const half*>(GetDraftWeight()->d_attn_qkv_weight[0].raw_data());
 
-        // Extract K weight: rows [0:hidden], cols [hidden:2*hidden]
-        // Extract V weight: rows [0:hidden], cols [2*hidden:3*hidden]
-        // For efficiency, create strided views or copy the relevant columns
+            // Extract K weight: rows [0:hidden], cols [hidden:2*hidden]
+            // Extract V weight: rows [0:hidden], cols [2*hidden:3*hidden]
+            // For efficiency, create strided views or copy the relevant columns
 
-        // Simplified: compute full QKV for context, then split
-        Tensor ctx_qkv = Tensor{{num_ctx, qkv_total}, dtype, kDEVICE};
-        GemmFP16ComputeFP32(cublas_,
-                            static_cast<const half*>(ctx_hidden.raw_data()),
-                            qkv_w,
-                            static_cast<half*>(ctx_qkv.raw_data()),
-                            num_ctx, qkv_total, hidden);
+            // Simplified: compute full QKV for context, then split
+            Tensor ctx_qkv = Tensor{{num_ctx, qkv_total}, dtype, kDEVICE};
+            GemmFP16ComputeFP32(cublas_,
+                                static_cast<const half*>(ctx_hidden.raw_data()),
+                                qkv_w,
+                                static_cast<half*>(ctx_qkv.raw_data()),
+                                num_ctx, qkv_total, hidden);
 
-        // Split: Q, K, V each [num_ctx, hidden]
-        const half* qkv_data = static_cast<const half*>(ctx_qkv.raw_data());
-        half* k_data = static_cast<half*>(ctx_k.raw_data());
-        half* v_data = static_cast<half*>(ctx_v.raw_data());
+            // Split: Q, K, V each [num_ctx, hidden]
+            const half* qkv_data = static_cast<const half*>(ctx_qkv.raw_data());
+            half* k_data = static_cast<half*>(ctx_k.raw_data());
+            half* v_data = static_cast<half*>(ctx_v.raw_data());
 
-        // 使用 kernel 替代循环 cudaMemcpyAsync
-        const int threads = 256;
-        DFlashSplitQKVKernel<<<num_ctx, threads, 0, stream>>>(qkv_data, nullptr, k_data, v_data, num_ctx, hidden);
-    }
-    else {
-        // Fallback: zero K/V if no weights loaded
-        cudaMemsetAsync(ctx_k.raw_data(), 0, num_ctx * hidden * 2, stream);
-        cudaMemsetAsync(ctx_v.raw_data(), 0, num_ctx * hidden * 2, stream);
+            // 使用 kernel 替代循环 cudaMemcpyAsync
+            const int threads = 256;
+            DFlashSplitQKVKernel<<<num_ctx, threads, 0, stream>>>(qkv_data, nullptr, k_data, v_data, num_ctx, hidden);
+        }
+        else {
+            // Fallback: zero K/V if no weights loaded
+            cudaMemsetAsync(ctx_k.raw_data(), 0, num_ctx * hidden * 2, stream);
+            cudaMemsetAsync(ctx_v.raw_data(), 0, num_ctx * hidden * 2, stream);
+        }
+
+        // Store to cache if enabled and we have input tokens
+        if (enable_prefix_cache_ && input_tokens != nullptr && !input_tokens->empty()) {
+            StoreInPrefixCache(*input_tokens, ctx_k, ctx_v, aux_states);
+        }
     }
 
     // ── 3) Initialize draft hidden states ──
