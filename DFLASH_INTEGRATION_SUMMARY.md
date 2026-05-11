@@ -1,7 +1,7 @@
 # LMDeploy + DFlash 集成总结
 
 **日期**: 2026-05-10
-**状态**: ✅ Turbomind 编译成功，DFlash C++ 集成完成
+**状态**: ✅ Turbomind 编译成功，DFlash C++ 集成完成，Demo 运行成功！
 
 ## 已完成的工作
 
@@ -11,6 +11,17 @@
 - dflash_kernels (CUDA kernels)
 - unified_decoder (DFlash 逻辑集成)
 - 编译成功 (`import lmdeploy.lib._turbomind` OK)
+
+### 2. Python Demo 实现 ✅
+- `test_dflash_simple.py` - 简单测试 (中文问答)
+- `test_dflash_v2.py` - 多个英文问题测试
+- `demo_dflash_nlr.py` - 自然语言推理测试 (5个问题)
+- `demo_dflash_qa.py` - 纯问答测试 (5个问题)
+
+### 3. Demo 运行成功 ✅
+- Qwen3.5-9B-AWQ (target) + Qwen3.5-9B-DFlash (draft)
+- Speculative decoding 正常工作
+- 自然语言推理任务完成良好
 
 ### 2. lucebox-hub/dflash 参考分析 ✅
 - 基于 ggml 的完整 DFlash 实现
