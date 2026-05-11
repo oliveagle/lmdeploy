@@ -9,7 +9,7 @@
 namespace turbomind {
 
 // ──────────────────────────────────────────
-// 从 CPU tensor 拷贝到 GPU
+// Copy CPU tensor to GPU
 // ──────────────────────────────────────────
 static Tensor _ToDevice(const Tensor& src)
 {
