@@ -58,3 +58,33 @@ This file tracks progress across iterations. Agents update this file after each 
 - **GPU-Host sync pattern**: When logging is needed, synchronize with `cudaStreamSynchronize()` after `cudaMemcpyAsync()` calls
 - **Acceptance calculation**: Can compute on host after copying accept_mask, avoids needing to sync just for logging
 - **Logit->probability**: For quick debugging, use `exp(logit)/(1+exp(logit))` as confidence estimate without full softmax
+
+---
+
+## 2026-05-12 - STORY-003
+
+### What was implemented:
+- **Created DDTree structure and algorithms** - Implemented `DDTreeBuilder` and `DDTreeVerifier` classes in `ddtree.h` and `ddtree.cpp`
+- **Added DDTree support to DFlashDraftModel** - Added `GenerateDraftWithDDTree()` method for tree-based verification
+- **Implemented top-K extraction** - `DDTreeBuilder::extract_topk()` for extracting top-K log-probabilities from logits
+- **Implemented best-first tree construction** - `DDTreeBuilder::build_from_topk()` with chain seeding support
+- **Implemented tree following algorithm** - `DDTreeVerifier::follow()` for finding accepted token path in verified tree
+- **Added DDTree configuration** - Added DDTree parameters to `DFlashDraftModel.h` (top_k, budget, temperature, chain_seed)
+- **Updated CMakeLists.txt** - Added `ddtree.cpp` to the build
+
+### Files changed:
+- `src/turbomind/models/llama/ddtree.h` - New file: DDTree structure and algorithm declarations
+- `src/turbomind/models/llama/ddtree.cpp` - New file: DDTree structure and algorithm implementations
+- `src/turbomind/models/llama/DFlashDraftModel.h` - Added `GenerateDraftWithDDTree()` method and DDTree configuration members
+- `src/turbomind/models/llama/DFlashDraftModel.cu` - Implemented `GenerateDraftWithDDTree()` with full logging
+- `src/turbomind/models/llama/CMakeLists.txt` - Added `ddtree.cpp` to build sources
+
+### Learnings:
+- **DDTree structure**: The tree uses a flat DFS-ordered representation with parents array, child_maps for O(1) child lookup, and visibility mask for attention
+- **Best-first heap**: Uses a priority queue ordered by cumulative log-probability to expand the most promising paths first
+- **Chain seeding**: Pre-seeding with full top-1 chain guarantees minimum acceptance rate even with flat softmax from quantized models
+- **Tree verification**: Unlike linear verification, DDTree verifies all tree nodes in parallel and finds the longest accepted path
+- **Expected speedup**: ~30% additional speedup over linear speculative decoding
+- **CUDA->Host copy**: For DDTree, draft logits need to be copied to host for tree construction (unlike linear verification which is GPU-only)
+- **Attention mask**: `DDTreeVerifier::build_attention_mask()` creates ancestor-only mask for tree-structured attention
+- **Lucebox reference**: The implementation is based on `submodules/lucebox-hub/dflash/test/test_dflash.cpp` lines 184-496

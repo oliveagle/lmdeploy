@@ -29,6 +29,7 @@ add_library(Llama STATIC
         DFlashDraftModel.cc
         DFlashDraftWeight.cc
         dflash_kernels.cu
+        ddtree.cpp
 )
 set_property(TARGET Llama PROPERTY POSITION_INDEPENDENT_CODE  ON)
 set_property(TARGET Llama PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS  ON)

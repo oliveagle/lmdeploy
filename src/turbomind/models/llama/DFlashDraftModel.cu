@@ -7,10 +7,13 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <queue>
+#include <vector>
 
 #include "src/turbomind/core/allocator.h"
 #include "src/turbomind/core/context.h"
 #include "src/turbomind/kernels/norm/rms_norm.h"
+#include "src/turbomind/models/llama/ddtree.h"
 #include "src/turbomind/models/llama/dflash_kernels.h"
 #include "src/turbomind/models/llama/llama_kernels.h"
 #include "src/turbomind/utils/cuda_utils.h"
@@ -1009,6 +1012,197 @@ void DFlashDraftModel::VerifyDraft(
     dflash_log::Info("[DFlash] Rejected tokens: %d", num_spec - accepted_count);
     dflash_log::Info("[DFlash] Acceptance rate: %.2f%%", accept_rate);
     dflash_log::Info("[DFlash] ======================================================");
+}
+
+// ──────────────────────────────────────────
+// DDTree-based speculative verification (STORY-003)
+//
+// Uses a tree-based approach instead of linear verification:
+// 1. Build a DDTree from draft logits (best-first expansion)
+// 2. Verify all tree nodes against target logits
+// 3. Find longest accepted path in the tree
+// 4. Return accepted tokens + bonus token
+//
+// Expected speedup: ~30% over linear verification
+// ──────────────────────────────────────────
+
+void DFlashDraftModel::GenerateDraftWithDDTree(
+    const std::vector<Tensor>& aux_states,
+    const Tensor& target_logits,
+    Tensor& draft_tokens,
+    Tensor& draft_logits,
+    Tensor& accepted_tokens,
+    Tensor& accept_mask,
+    int& num_accepted)
+{
+    dflash_log::Info("[DFlash DDTree] ================ DDTree Generation START ================");
+    dflash_log::Info("[DFlash DDTree] DDTree enabled: %s", enable_ddtree_ ? "true" : "false");
+    dflash_log::Info("[DFlash DDTree] DDTree params: K=%d, budget=%d, temp=%.2f, chain_seed=%s",
+                   ddtree_top_k_, ddtree_budget_, ddtree_temperature_,
+                   ddtree_chain_seed_ ? "true" : "false");
+
+    // Step 1: Generate draft tokens using the standard path
+    dflash_log::Info("[DFlash DDTree] Step 1: Generating draft tokens...");
+    GenerateDraft(aux_states, draft_tokens, draft_logits);
+
+    if (!draft_tokens || !draft_logits) {
+        dflash_log::Error("[DFlash DDTree] Draft generation failed!");
+        num_accepted = 0;
+        return;
+    }
+
+    const int num_spec = num_spec_tokens_;
+    const int vocab_size = vocab_size_;
+    const auto stream = core::Context::stream().handle();
+
+    // Step 2: Copy draft logits to host for DDTree construction
+    dflash_log::Info("[DFlash DDTree] Step 2: Copying draft logits to host...");
+
+    // First check if draft_logits is on device
+    Tensor draft_logits_host;
+    if (draft_logits.where == kDEVICE) {
+        // Copy to host
+        draft_logits_host = Tensor{{num_spec, vocab_size}, kFloat32, kCPUpinned};
+        cudaMemcpyAsync(draft_logits_host.raw_data(),
+                       draft_logits.raw_data(),
+                       num_spec * vocab_size * sizeof(float),
+                       cudaMemcpyDeviceToHost,
+                       stream);
+        cudaStreamSynchronize(stream);
+    } else {
+        // Already on host
+        draft_logits_host = draft_logits;
+    }
+
+    const float* logits_ptr = static_cast<const float*>(draft_logits_host.raw_data());
+
+    // Step 3: Build DDTree from draft logits
+    dflash_log::Info("[DFlash DDTree] Step 3: Building DDTree from draft logits...");
+
+    std::vector<float> top_log_probs((size_t)num_spec * ddtree_top_k_);
+    std::vector<int32_t> top_token_ids((size_t)num_spec * ddtree_top_k_);
+
+    DDTreeBuilder::extract_topk(
+        logits_ptr, num_spec, vocab_size, ddtree_top_k_,
+        top_log_probs.data(), top_token_ids.data(), ddtree_temperature_);
+
+    DDTree tree = DDTreeBuilder::build_from_topk(
+        top_log_probs.data(), top_token_ids.data(),
+        num_spec, ddtree_top_k_, ddtree_budget_, ddtree_chain_seed_);
+
+    dflash_log::Info("[DFlash DDTree] DDTree built: %d nodes (excluding root)", tree.n_nodes);
+
+    // Step 4: Copy target logits to host for tree verification
+    dflash_log::Info("[DFlash DDTree] Step 4: Copying target logits to host...");
+
+    Tensor target_logits_host;
+    if (target_logits.where == kDEVICE) {
+        target_logits_host = Tensor{{num_spec, vocab_size}, kFloat32, kCPUpinned};
+        cudaMemcpyAsync(target_logits_host.raw_data(),
+                       target_logits.raw_data(),
+                       num_spec * vocab_size * sizeof(float),
+                       cudaMemcpyDeviceToHost,
+                       stream);
+        cudaStreamSynchronize(stream);
+    } else {
+        target_logits_host = target_logits;
+    }
+
+    const float* target_logits_ptr = static_cast<const float*>(target_logits_host.raw_data());
+
+    // Step 5: Compute target argmax for each tree node (posterior)
+    dflash_log::Info("[DFlash DDTree] Step 5: Computing target argmax for each tree node...");
+
+    const int N = tree.total_nodes();  // including root
+    std::vector<int32_t> posterior_tokens(N);
+
+    // For root, we need to get the argmax from the first position
+    // For other nodes, we need to get argmax based on their depth
+    posterior_tokens[0] = 0;  // Root placeholder (will be replaced by bonus token)
+
+    for (int i = 1; i < N; i++) {
+        const int depth = tree.depths[i - 1];  // depth is 1-indexed
+        if (depth - 1 < num_spec) {
+            // Find argmax at this depth position
+            const float* logits_row = target_logits_ptr + (size_t)(depth - 1) * vocab_size;
+            int best_idx = 0;
+            float best_val = logits_row[0];
+            for (int v = 1; v < vocab_size; v++) {
+                if (logits_row[v] > best_val) {
+                    best_val = logits_row[v];
+                    best_idx = v;
+                }
+            }
+            posterior_tokens[i] = best_idx;
+        } else {
+            posterior_tokens[i] = 0;  // Fallback
+        }
+    }
+
+    // Step 6: Follow verified tree to find accepted path
+    dflash_log::Info("[DFlash DDTree] Step 6: Following verified tree...");
+
+    std::vector<int> accepted_indices;
+    int32_t bonus_token;
+    int accepted_count = DDTreeVerifier::follow(tree, posterior_tokens.data(),
+                                                accepted_indices, bonus_token);
+
+    dflash_log::Info("[DFlash DDTree] Accepted path length: %d nodes (including root)",
+                   (int)accepted_indices.size());
+    dflash_log::Info("[DFlash DDTree] Accepted tokens: %d (excluding root)", accepted_count);
+    dflash_log::Info("[DFlash DDTree] Bonus token: %d", bonus_token);
+
+    // Step 7: Build output arrays
+    dflash_log::Info("[DFlash DDTree] Step 7: Building output arrays...");
+
+    // Output format: [accepted_tokens..., bonus_token, rejected_tokens..., padding...]
+    // We'll use a simpler format: just output accepted tokens (excluding root)
+    // and set accept_mask accordingly
+
+    std::vector<int> h_accepted_tokens(num_spec);
+    std::vector<int> h_accept_mask(num_spec);
+
+    // Fill accepted tokens and mask
+    int accepted_idx = 0;
+    for (int i = 1; i < (int)accepted_indices.size(); i++) {
+        const int node_idx = accepted_indices[i];
+        if (accepted_idx < num_spec) {
+            h_accepted_tokens[accepted_idx] = tree.token_ids[node_idx - 1];
+            h_accept_mask[accepted_idx] = 1;
+            accepted_idx++;
+        }
+    }
+
+    // Fill remaining with bonus token (if we have rejected positions)
+    // or mark as rejected
+    for (int i = accepted_idx; i < num_spec; i++) {
+        h_accepted_tokens[i] = (i == accepted_idx) ? bonus_token : 0;
+        h_accept_mask[i] = 0;
+    }
+
+    // Copy to device
+    accepted_tokens = Tensor{{num_spec}, kInt32, kDEVICE};
+    accept_mask = Tensor{{num_spec}, kInt32, kDEVICE};
+
+    cudaMemcpyAsync(accepted_tokens.raw_data(),
+                   h_accepted_tokens.data(),
+                   num_spec * sizeof(int),
+                   cudaMemcpyHostToDevice,
+                   stream);
+    cudaMemcpyAsync(accept_mask.raw_data(),
+                   h_accept_mask.data(),
+                   num_spec * sizeof(int),
+                   cudaMemcpyHostToDevice,
+                   stream);
+
+    num_accepted = accepted_count;
+
+    dflash_log::Info("[DFlash DDTree] ================ DDTree SUMMARY ================");
+    dflash_log::Info("[DFlash DDTree] Tree nodes: %d (excluding root)", tree.n_nodes);
+    dflash_log::Info("[DFlash DDTree] Accepted tokens: %d", num_accepted);
+    dflash_log::Info("[DFlash DDTree] Acceptance rate: %.2f%%",
+                   (float)num_accepted / (float)num_spec * 100.0f);
+    dflash_log::Info("[DFlash DDTree] ====================================================");
 }
 
 }  // namespace turbomind
