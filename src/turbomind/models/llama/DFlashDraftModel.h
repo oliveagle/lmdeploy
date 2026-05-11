@@ -10,6 +10,7 @@
 #include "src/turbomind/core/tensor.h"
 #include "src/turbomind/models/llama/DFlashDraftWeight.h"
 #include "src/turbomind/models/llama/llama_params.h"
+#include "src/turbomind/models/llama/ddtree.h"
 
 namespace turbomind {
 
@@ -73,6 +74,26 @@ public:
                 const Tensor& target_logits,
                 Tensor& accepted_tokens,
                 Tensor& accept_mask);
+
+    /**
+     * Generate draft tokens and build a DDTree for tree-based verification.
+     * This is an alternative to GenerateDraft + VerifyDraft.
+     *
+     * @param aux_states       5 layer hidden states from target model
+     * @param target_logits    Target model logits for verification
+     * @param draft_tokens     Output: draft token IDs [num_spec]
+     * @param draft_logits     Output: draft logits [num_spec, vocab]
+     * @param accepted_tokens  Output: accepted token IDs (DDTree verified)
+     * @param accept_mask      Output: [num_spec] accept mask
+     * @param num_accepted     Output: number of accepted tokens
+     */
+    void GenerateDraftWithDDTree(const std::vector<Tensor>& aux_states,
+                               const Tensor& target_logits,
+                               Tensor& draft_tokens,
+                               Tensor& draft_logits,
+                               Tensor& accepted_tokens,
+                               Tensor& accept_mask,
+                               int& num_accepted);
 
     // Getters
     int GetNumSpecTokens() const { return num_spec_tokens_; }
@@ -165,6 +186,37 @@ private:
      * Evict least recently used entry
      */
     void EvictLRUEntry();
+
+    // ========== DDTree Verification (STORY-003) ==========
+    bool enable_ddtree_ = false;           // Enable DDTree verification
+    int ddtree_top_k_ = 4;                // Top-K per position for DDTree
+    int ddtree_budget_ = 22;              // Maximum DDTree nodes
+    float ddtree_temperature_ = 1.0f;     // Temperature for DDTree top-K
+    bool ddtree_chain_seed_ = true;       // Use chain seeding for DDTree
+
+    /**
+     * Enable/disable DDTree verification
+     */
+    void SetDDTreeEnabled(bool enabled) {
+        enable_ddtree_ = enabled;
+    }
+
+    /**
+     * Check if DDTree verification is enabled
+     */
+    bool IsDDTreeEnabled() const {
+        return enable_ddtree_;
+    }
+
+    /**
+     * Set DDTree parameters
+     */
+    void SetDDTreeParams(int top_k, int budget, float temperature, bool chain_seed) {
+        ddtree_top_k_ = top_k;
+        ddtree_budget_ = budget;
+        ddtree_temperature_ = temperature;
+        ddtree_chain_seed_ = chain_seed;
+    }
 };
 
 }  // namespace turbomind
