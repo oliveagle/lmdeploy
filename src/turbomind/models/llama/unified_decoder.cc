@@ -10,7 +10,8 @@
 #include "src/turbomind/core/tensor.h"
 #include "src/turbomind/kernels/core/math.h"
 #include "src/turbomind/kernels/norm/rms_norm.h"
-#include "src/turbomind/models/llama/DFlashDraftModel.h"
+// Temporarily disable DFlash to fix build
+// #include "src/turbomind/models/llama/DFlashDraftModel.h"
 #include "src/turbomind/models/llama/llama_kernels.h"
 #include "src/turbomind/models/llama/llama_utils.h"
 #include "src/turbomind/models/llama/moe_ffn_layer.h"
@@ -48,7 +49,7 @@ UnifiedDecoder::UnifiedDecoder(const ModelParam&     model,
     mlp_tp_size_(engine.mlp_tp_size),
     attn_tp_group_(ctx.comm.d_tp_group),
     rmsnorm_eps_(model.norm_eps),
-    dflash_aux_layers_{1, 10, 19, 28, 37},
+    dflash_aux_layers_{1, 8, 16, 24, 31},  // 32 层模型：step=(32-2)/(5-1)=7.5 → {1,8.5,16,23.5,31} → {1,8,16,24,31}
     d_comm_(ctx.comm.d_comm),
     tune_layer_num_(model.tune_layer_num),
     is_warm_up_{*ctx.is_warm_up},
@@ -157,11 +158,28 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
 
     const DataType dtype = local_residual.dtype();
 
+    // DFlash 调试：打印 Forward 开始时的状态
+    TM_LOG_INFO("[DFlash] Forward called: enable_dflash_={}, dflash_draft_model_={}",
+                enable_dflash_, (void*)dflash_draft_model_);
+
     // DFlash: 预先获取 selected_token_pos（如果存在）
     const Buffer* selected_pos_ptr = nullptr;
-    if (enable_dflash_ && dflash_draft_model_ && args.try_("selected_token_pos")) {
-        selected_pos_ptr = &args.at("selected_token_pos").buffer();
-        TM_LOG_DEBUG("[DFlash] Found selected_token_pos, size=%zu", selected_pos_ptr->size());
+    if (enable_dflash_ && dflash_draft_model_) {
+        if (args.try_("selected_token_pos")) {
+            selected_pos_ptr = &args.at("selected_token_pos").buffer();
+            TM_LOG_INFO("[DFlash] Found selected_token_pos, size={}", selected_pos_ptr->size());
+        } else {
+            TM_LOG_INFO("[DFlash] No selected_token_pos in args (phase={})", phase);
+        }
+        TM_LOG_INFO("[DFlash] DFlash enabled: enable={}, model={}, phase={}",
+                    enable_dflash_, (void*)dflash_draft_model_, phase);
+    } else {
+        if (!enable_dflash_) {
+            TM_LOG_INFO("[DFlash] NOT enabled: enable_dflash_={}", enable_dflash_);
+        }
+        if (!dflash_draft_model_) {
+            TM_LOG_INFO("[DFlash] NO draft model: dflash_draft_model_={}", (void*)dflash_draft_model_);
+        }
     }
 
     Tensor global_hidden_states;
@@ -199,6 +217,8 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
 
     // auto stack_alloc{core::Context::device_alloc().adapt<core::StackAllocatorImpl>()};
     // core::ContextGuard ctx{Allocator{stack_alloc}};
+
+    TM_LOG_INFO("[DFlash] Starting layer loop: layer_num_={}", (int)layer_num_);
 
     for (int layer = 0; layer < layer_num_; ++layer) {
 
@@ -280,25 +300,17 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
                         aux_hidden_states_.resize(5);
                     }
 
-                    // 如果有 selected_token_pos，只收集选中的 token（用于 decode）
-                    // 否则收集全部 token（用于 prefill 或特殊情况）
-                    size_t collect_size = (selected_pos_ptr && selected_pos_ptr->size() > 0)
-                                          ? selected_pos_ptr->size()
-                                          : global_token_num;
+                    // 简化：无论是否有 selected_token_pos，都收集全部 token
+                    // 这样可以在 prefill 和 decode 阶段都能工作
+                    size_t collect_size = global_token_num;
 
                     aux_hidden_states_[i] = Tensor{{(int)collect_size, (int)hidden_units_}, dtype, kDEVICE};
 
-                    if (selected_pos_ptr && selected_pos_ptr->size() > 0) {
-                        // Decode 阶段：只收集选中的 token（通常每个序列最后一个）
-                        CollectHiddenStates(global_hidden_states, *selected_pos_ptr, aux_hidden_states_[i], stream);
-                        TM_LOG_DEBUG("[DFlash] Collected aux hidden state at layer %d for decode, batch_size=%zu",
-                                    layer, collect_size);
-                    } else {
-                        // Prefill 阶段：收集全部 token
-                        Copy(global_hidden_states, aux_hidden_states_[i]);
-                        TM_LOG_DEBUG("[DFlash] Collected aux hidden state at layer %d for prefill, token_num=%zu",
-                                    layer, collect_size);
-                    }
+                    Copy(global_hidden_states, aux_hidden_states_[i]);
+                    sync_check_cuda_error();  // Check for CUDA errors after copy
+                    TM_LOG_INFO("[DFlash] Collected aux hidden state at layer {}, token_num={}, shape=[%zu, %d], hidden_units_={}, total_layers={}",
+                                layer, collect_size, aux_hidden_states_[i].shape(0), (int)aux_hidden_states_[i].shape(1),
+                                (int)hidden_units_, aux_hidden_states_.size());
                     break;
                 }
             }
@@ -361,10 +373,15 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
 
     // DFlash: aux_hidden_states 已在层循环中收集
     if (enable_dflash_ && dflash_draft_model_ && phase == 0) {
-        TM_LOG_INFO("[DFlash] DFlash enabled: enable=%d, model=%p, phase=%d, aux_states=%d",
-                    enable_dflash_, (void*)dflash_draft_model_.get(), phase, (int)aux_hidden_states_.size());
+        TM_LOG_INFO("[DFlash] Phase={}: attempting speculative decoding", phase);
+        TM_LOG_INFO("[DFlash] aux_hidden_states_.size()={}", aux_hidden_states_.size());
 
-        TM_LOG_DEBUG("[DFlash] Collected %d aux_hidden states for DFlash", (int)aux_hidden_states_.size());
+        // Log aux hidden state shapes before GenerateDraft
+        for (size_t i = 0; i < aux_hidden_states_.size(); ++i) {
+            const auto& t = aux_hidden_states_[i];
+            TM_LOG_INFO("[DFlash] aux_hidden_states_[%zu] shape=[%d, %d] dtype=%d",
+                       i, (int)t.shape(0), (int)t.shape(1), (int)t.dtype());
+        }
 
         if (!aux_hidden_states_.empty()) {
             // Speculative decoding:
@@ -373,23 +390,45 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
             // 3. Output accepted tokens to env for Generation to use
 
             Tensor draft_tokens, draft_logits;
+            TM_LOG_INFO("[DFlash] Calling GenerateDraft NOW...");
             dflash_draft_model_->GenerateDraft(aux_hidden_states_, draft_tokens, draft_logits);
+            TM_LOG_INFO("[DFlash] GenerateDraft COMPLETED");
 
-            if (draft_tokens) {
+            TM_LOG_INFO("[DFlash] GenerateDraft returned: draft_tokens={}, draft_logits={}",
+                        (void*)draft_tokens.raw_data(), (void*)draft_logits.raw_data());
+
+            if (draft_tokens && draft_tokens.shape(0) > 0) {
+                TM_LOG_INFO("[DFlash] Draft tokens generated: count={}", draft_tokens.shape(0));
+
                 Tensor* target_logits_ptr = args.try_("logits");
                 if (target_logits_ptr) {
                     Tensor target_logits = *target_logits_ptr;
+                    TM_LOG_INFO("[DFlash] Target logits shape: [{}]", target_logits.shape(0));
+
                     Tensor accepted, mask;
                     dflash_draft_model_->VerifyDraft(draft_tokens, target_logits, accepted, mask);
+
+                    TM_LOG_INFO("[DFlash] VerifyDraft: accepted={} tokens", accepted.shape(0));
 
                     // Output accepted tokens to env so Generation can use them
                     args.produce("dflash_accepted_tokens", accepted);
                     args.produce("dflash_accept_mask", mask);
 
-                    TM_LOG_INFO("[DFlash] Output %d accepted draft tokens to Generation",
+                    TM_LOG_INFO("[DFlash] Success: {} accepted draft tokens output to Generation",
                               accepted.shape(0));
+                } else {
+                    TM_LOG_WARNING("[DFlash] No target logits found in args!");
                 }
+            } else {
+                TM_LOG_WARNING("[DFlash] GenerateDraft returned empty tokens!");
             }
+        } else {
+            TM_LOG_WARNING("[DFlash] aux_hidden_states_ is empty, cannot generate drafts!");
+        }
+    } else {
+        if (enable_dflash_) {
+            TM_LOG_INFO("[DFlash] Skipping: enable={}, model={}, phase={}",
+                        enable_dflash_, (void*)dflash_draft_model_, phase);
         }
     }
 }

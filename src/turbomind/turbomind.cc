@@ -436,16 +436,16 @@ struct TurboMind::Impl {
 
             // Load quantized weight tensor (INT4/INT8 packed format)
             Tensor int_tensor = tensor;
-            if (int_tensor.dtype == DataType(3) || int_tensor.dtype == DataType(2)) {
+            if (int_tensor.dtype() == DataType(3) || int_tensor.dtype() == DataType(2)) {
                 // FP32/FP16 -> convert to appropriate type
                 // For now, store as-is; the kernel will handle dequantization
             }
 
             if (wtype == "qkv_proj") {
-                dflash_w->d_qkv_proj[layer] = int_tensor;
+                dflash_w->d_attn_qkv_weight[layer] = int_tensor;
             }
             else if (wtype == "o_proj") {
-                dflash_w->d_o_proj[layer] = int_tensor;
+                dflash_w->d_attn_o_weight[layer] = int_tensor;
             }
             else if (wtype == "gate_up_proj") {
                 dflash_w->d_gate_up_proj[layer] = int_tensor;

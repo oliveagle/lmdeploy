@@ -4,6 +4,9 @@
 
 #include <cublas_v2.h>
 #include <cuda_fp16.h>
+#include <algorithm>
+#include <chrono>
+#include <cstring>
 
 #include "src/turbomind/core/allocator.h"
 #include "src/turbomind/core/context.h"
@@ -13,10 +16,27 @@
 #include "src/turbomind/utils/cuda_utils.h"
 #include "src/turbomind/core/logger.h"
 
-#include <algorithm>
-#include <cstring>
-
 namespace turbomind {
+
+// CUDA-safe logging wrappers (avoid :: in macro expansions)
+namespace dflash_log {
+    template <typename... Args>
+    inline void Debug(const char* fmt, Args... args) {
+        TM_LOG_DEBUG(fmt, args...);
+    }
+    template <typename... Args>
+    inline void Info(const char* fmt, Args... args) {
+        TM_LOG_INFO(fmt, args...);
+    }
+    template <typename... Args>
+    inline void Warning(const char* fmt, Args... args) {
+        TM_LOG_WARNING(fmt, args...);
+    }
+    template <typename... Args>
+    inline void Error(const char* fmt, Args... args) {
+        TM_LOG_ERROR(fmt, args...);
+    }
+}
 
 // ──────────────────────────────────────────
 // CUDA kernel helpers
@@ -214,10 +234,18 @@ DFlashDraftModel::DFlashDraftModel(const ModelParam& model,
     weight_ = std::make_unique<DFlashDraftWeight>();
 
     // Create cuBLAS handle
-    cublasCreate(&cublas_);
+    cublasStatus_t cublas_status = cublasCreate(&cublas_);
+    if (cublas_status != CUBLAS_STATUS_SUCCESS) {
+        dflash_log::Error("[DFlash] Failed to create cuBLAS handle: status=%d", (int)cublas_status);
+        cublas_ = nullptr;
+    } else {
+        dflash_log::Info("[DFlash] cuBLAS handle created successfully");
+    }
 
-    TM_LOG_INFO("[DFlash] Draft model created: hidden=%d layers=%d spec=%d vocab=%d",
+    dflash_log::Info("[DFlash] Draft model created: hidden=%d layers=%d spec=%d vocab=%d",
                 hidden_size_, num_draft_layers_, num_spec_tokens_, vocab_size_);
+    dflash_log::Info("[DFlash] Constructor: external_weight_=%lx, weight_.get()=%lx",
+                (uintptr_t)external_weight_, (uintptr_t)weight_.get());
 }
 
 DFlashDraftModel::~DFlashDraftModel()
@@ -225,6 +253,21 @@ DFlashDraftModel::~DFlashDraftModel()
     if (cublas_) {
         cublasDestroy(cublas_);
     }
+}
+
+void DFlashDraftModel::SetDraftWeightPointer(DFlashDraftWeight* weight) {
+    dflash_log::Info("[DFlash] SetDraftWeightPointer CALLED with weight=%lx", (uintptr_t)weight);
+    dflash_log::Info("[DFlash] Before: external_weight_=%lx, weight_.get()=%lx",
+                   (uintptr_t)external_weight_, (uintptr_t)weight_.get());
+    if (weight) {
+        weight_.reset();  // Release our own weight
+        external_weight_ = weight;  // Use external weight
+        dflash_log::Info("[DFlash] SetDraftWeightPointer: using EXTERNAL weight");
+    } else {
+        dflash_log::Warning("[DFlash] SetDraftWeightPointer: NULL weight passed!");
+    }
+    dflash_log::Info("[DFlash] After: external_weight_=%lx, weight_.get()=%lx",
+                   (uintptr_t)external_weight_, (uintptr_t)weight_.get());
 }
 
 void DFlashDraftModel::ExtractAuxHidden(
@@ -240,11 +283,11 @@ void DFlashDraftModel::ExtractAuxHidden(
             aux_states[i] = layer_outputs[layer_id];
         }
         else {
-            TM_LOG_WARNING("[DFlash] Layer %d not available in layer_outputs", layer_id);
+            dflash_log::Warning("[DFlash] Layer %d not available in layer_outputs", layer_id);
         }
     }
 
-    TM_LOG_DEBUG("[DFlash] Extracted %d aux hidden states", (int)aux_states.size());
+    dflash_log::Debug("[DFlash] Extracted %d aux hidden states", (int)aux_states.size());
 }
 
 // ──────────────────────────────────────────
@@ -252,9 +295,6 @@ void DFlashDraftModel::ExtractAuxHidden(
 // ──────────────────────────────────────────
 
 #include <functional>
-#include <chrono>
-
-namespace turbomind {
 
 // Simple hash function for token vectors
 size_t DFlashDraftModel::ComputeTokensHash(const std::vector<int>& tokens) const {
@@ -284,7 +324,7 @@ void DFlashDraftModel::EvictLRUEntry() {
     prefix_cache_.erase(lru_hash);
     cache_order_.erase(cache_order_.begin());
 
-    TM_LOG_DEBUG("[DFlash PrefixCache] Evicted LRU entry, cache size: %zu",
+    dflash_log::Debug("[DFlash PrefixCache] Evicted LRU entry, cache size: %zu",
                 prefix_cache_.size());
 }
 
@@ -330,16 +370,16 @@ void DFlashDraftModel::StoreInPrefixCache(
     entry.cached_ctx_k = Tensor{ctx_k.shape(), ctx_k.dtype(), kDEVICE};
     entry.cached_ctx_v = Tensor{ctx_v.shape(), ctx_v.dtype(), kDEVICE};
     cudaMemcpyAsync(entry.cached_ctx_k.raw_data(), ctx_k.raw_data(),
-                   ctx_k.size_bytes(), cudaMemcpyDeviceToDevice, stream);
+                   ctx_k.byte_size(), cudaMemcpyDeviceToDevice, stream);
     cudaMemcpyAsync(entry.cached_ctx_v.raw_data(), ctx_v.raw_data(),
-                   ctx_v.size_bytes(), cudaMemcpyDeviceToDevice, stream);
+                   ctx_v.byte_size(), cudaMemcpyDeviceToDevice, stream);
 
     // Copy aux states
     entry.cached_aux_states.reserve(aux_states.size());
     for (const auto& aux : aux_states) {
         Tensor aux_copy{aux.shape(), aux.dtype(), kDEVICE};
         cudaMemcpyAsync(aux_copy.raw_data(), aux.raw_data(),
-                       aux.size_bytes(), cudaMemcpyDeviceToDevice, stream);
+                       aux.byte_size(), cudaMemcpyDeviceToDevice, stream);
         entry.cached_aux_states.push_back(std::move(aux_copy));
     }
 
@@ -347,17 +387,13 @@ void DFlashDraftModel::StoreInPrefixCache(
     prefix_cache_[hash] = std::move(entry);
     cache_order_.push_back(hash);
 
-    TM_LOG_DEBUG("[DFlash PrefixCache] Stored new entry, cache size: %zu",
+    dflash_log::Debug("[DFlash PrefixCache] Stored new entry, cache size: %zu",
                 prefix_cache_.size());
 }
-
-}  // namespace turbomind
 
 // ──────────────────────────────────────────
 // DFlashDraftModel implementation
 // ──────────────────────────────────────────
-
-namespace turbomind {
 
 void DFlashDraftModel::GenerateDraft(
     const std::vector<Tensor>& aux_states,
@@ -365,8 +401,10 @@ void DFlashDraftModel::GenerateDraft(
     Tensor& draft_logits,
     const std::vector<int>* input_tokens)
 {
+    dflash_log::Info("[DFlash] GenerateDraft: ENTRY - num_aux_states=%zu", aux_states.size());
+
     if (aux_states.empty()) {
-        TM_LOG_WARNING("[DFlash] No aux hidden states available");
+        dflash_log::Warning("[DFlash] GenerateDraft: No aux hidden states available");
         return;
     }
 
@@ -376,6 +414,27 @@ void DFlashDraftModel::GenerateDraft(
     const int num_heads = GetDraftWeight()->num_attention_heads;
     const int inter_size = GetDraftWeight()->intermediate_size;
 
+    // Log aux state shapes
+    for (size_t i = 0; i < aux_states.size(); ++i) {
+        const auto& t = aux_states[i];
+        dflash_log::Info("[DFlash] GenerateDraft: aux_state[%zu] shape=[%d, %d] dtype=%d",
+                       i, (int)t.shape(0), (int)t.shape(1), (int)t.dtype());
+    }
+
+    // Verify draft weight pointer is set
+    if (GetDraftWeight() == nullptr) {
+        dflash_log::Error("[DFlash] GenerateDraft: GetDraftWeight() returns NULL!");
+        return;
+    }
+    dflash_log::Info("[DFlash] GenerateDraft: Draft weight pointer OK - hidden_size=%d", hidden_size_);
+
+    // Verify cuBLAS handle
+    if (cublas_ == nullptr) {
+        dflash_log::Error("[DFlash] GenerateDraft: cuBLAS handle is NULL!");
+        return;
+    }
+    dflash_log::Info("[DFlash] GenerateDraft: cuBLAS handle OK");
+
     // Prefix cache lookup (STORY-010)
     bool cache_hit = false;
     Tensor ctx_k, ctx_v;  // Declare at the beginning
@@ -383,16 +442,16 @@ void DFlashDraftModel::GenerateDraft(
         const auto* entry = FindPrefixMatch(*input_tokens);
         if (entry != nullptr) {
             // Cache hit - use cached ctx_k, ctx_v, and aux_states
-            TM_LOG_DEBUG("[DFlash PrefixCache] Cache hit! Using cached K/V");
+            dflash_log::Debug("[DFlash PrefixCache] Cache hit! Using cached K/V");
             cache_hit = true;
 
             // Copy cached tensors
             Tensor ctx_k_copy{entry->cached_ctx_k.shape(), entry->cached_ctx_k.dtype(), kDEVICE};
             Tensor ctx_v_copy{entry->cached_ctx_v.shape(), entry->cached_ctx_v.dtype(), kDEVICE};
             cudaMemcpyAsync(ctx_k_copy.raw_data(), entry->cached_ctx_k.raw_data(),
-                           entry->cached_ctx_k.size_bytes(), cudaMemcpyDeviceToDevice, stream);
+                           entry->cached_ctx_k.byte_size(), cudaMemcpyDeviceToDevice, stream);
             cudaMemcpyAsync(ctx_v_copy.raw_data(), entry->cached_ctx_v.raw_data(),
-                           entry->cached_ctx_v.size_bytes(), cudaMemcpyDeviceToDevice, stream);
+                           entry->cached_ctx_v.byte_size(), cudaMemcpyDeviceToDevice, stream);
             ctx_k = std::move(ctx_k_copy);
             ctx_v = std::move(ctx_v_copy);
 
@@ -414,20 +473,28 @@ void DFlashDraftModel::GenerateDraft(
     const int num_ctx = aux_states[0].shape(0);
     const auto dtype  = aux_states[0].dtype();  // Should be FP16
 
+    dflash_log::Info("[DFlash] GenerateDraft: num_ctx=%d, hidden_size=%d, num_draft_layers=%d, num_spec_tokens=%d",
+                   num_ctx, hidden, num_draft_layers_, num_spec_tokens_);
+
     // Skip context hidden and K/V computation if we have cache hit
     if (!cache_hit) {
+        dflash_log::Info("[DFlash] GenerateDraft: No cache hit, computing context K/V from scratch");
         // ── 1) Build context hidden from aux states ──
         // Average the 5 aux states: [num_ctx, hidden]
         Tensor ctx_hidden = Tensor{{num_ctx, hidden}, dtype, kDEVICE};
         {
             // Simple average: sum all aux states, then multiply by 1/num_aux
             // For now, use the first aux state as context (can be improved)
+            dflash_log::Info("[DFlash] GenerateDraft: Copying aux_states[0] to ctx_hidden");
             cudaMemcpyAsync(ctx_hidden.raw_data(),
                             const_cast<void*>(aux_states[0].raw_data()),
                             num_ctx * hidden * 2,  // FP16: 2 bytes per element
                             cudaMemcpyDeviceToDevice,
                             stream);
+            // Check for CUDA errors after async copy
+            sync_check_cuda_error();
         }
+        dflash_log::Info("[DFlash] GenerateDraft: ctx_hidden shape=[%d, %d] created", num_ctx, hidden);
 
         // ── 2) Compute context K and V ──
         // context_K = ctx_hidden @ W_ctx_k  → [num_ctx, hidden]
@@ -484,8 +551,12 @@ void DFlashDraftModel::GenerateDraft(
     Tensor draft_hidden = Tensor{{num_spec_tokens_, hidden}, dtype, kDEVICE};
     cudaMemsetAsync(draft_hidden.raw_data(), 0, num_spec_tokens_ * hidden * 2, stream);
 
+    dflash_log::Info("[DFlash] GenerateDraft: Starting %d decoder layers...", num_draft_layers_);
+
     // ── 4) 8 decoder layers ──
     for (int layer = 0; layer < num_draft_layers_; ++layer) {
+        dflash_log::Debug("[DFlash] GenerateDraft: Layer %d/%d starting", layer, num_draft_layers_);
+
         const int h = hidden;
 
         // ── 4a. Input RMSNorm ──
@@ -609,7 +680,10 @@ void DFlashDraftModel::GenerateDraft(
         }
     }
 
+    dflash_log::Info("[DFlash] GenerateDraft: All %d decoder layers completed", num_draft_layers_);
+
     // ── 5) Final norm ──
+    dflash_log::Info("[DFlash] GenerateDraft: Computing final norm...");
     Tensor final_norm = Tensor{{num_spec_tokens_, hidden}, dtype, kDEVICE};
     invokeRMSNorm(final_norm, draft_hidden, GetDraftWeight()->d_input_layernorm[0],  // Use first layer norm as fallback
                   GetDraftWeight()->rms_norm_eps, stream);
@@ -617,27 +691,35 @@ void DFlashDraftModel::GenerateDraft(
 
     // ── 6) LM head projection → logits ──
     // [num_spec, hidden] @ [hidden, vocab] → [num_spec, vocab]
+    dflash_log::Info("[DFlash] GenerateDraft: Computing LM head projection...");
     const half* lm_w = static_cast<const half*>(GetDraftWeight()->lm_head.raw_data());
     if (lm_w && GetDraftWeight()->lm_head) {
         draft_logits = Tensor{{num_spec_tokens_, vocab_size_}, dtype, kDEVICE};
+        dflash_log::Info("[DFlash] GenerateDraft: draft_logits shape=[%d, %d]", num_spec_tokens_, vocab_size_);
         GemmFP16ComputeFP32(cublas_,
                             static_cast<const half*>(final_norm.raw_data()),
                             lm_w,
                             static_cast<half*>(draft_logits.raw_data()),
                             num_spec_tokens_, vocab_size_, hidden);
+    } else {
+        dflash_log::Error("[DFlash] GenerateDraft: LM head weight is NULL!");
     }
 
     // ── 7) Argmax → draft tokens ──
     if (draft_logits) {
+        dflash_log::Info("[DFlash] GenerateDraft: Computing argmax for draft tokens...");
         draft_tokens = Tensor{{num_spec_tokens_}, kInt32, kDEVICE};
         DFlashArgmaxKernel(static_cast<const void*>(draft_logits.raw_data()),
                            draft_tokens.raw_data(),
                            num_spec_tokens_,
                            vocab_size_,
                            stream);
+    } else {
+        dflash_log::Error("[DFlash] GenerateDraft: draft_logits tensor is empty!");
     }
 
-    TM_LOG_DEBUG("[DFlash] Generated %d draft tokens", num_spec_tokens_);
+    sync_check_cuda_error();
+    dflash_log::Info("[DFlash] GenerateDraft: SUCCESS - generated %d draft tokens, returning", num_spec_tokens_);
 }
 
 // ──────────────────────────────────────────
@@ -656,6 +738,7 @@ __global__ void DFlashVerifyDraftKernel(
     const half* __restrict__ target_logits,   // [num_spec, vocab_size]
     int* __restrict__ accepted_tokens,        // [num_spec]
     int* __restrict__ accept_mask,            // [num_spec]
+    float* __restrict__ max_logits,           // [num_spec] max logit value for each position
     int num_spec,
     int vocab_size)
 {
@@ -664,8 +747,6 @@ __global__ void DFlashVerifyDraftKernel(
 
     // ── 1) Argmax of target logits ──
     const half* logits_row = target_logits + i * vocab_size;
-    float max_val = -1e20f;
-    int max_idx = 0;
 
     // Use shared memory for block-level reduction
     extern __shared__ char smem_char[];
@@ -699,6 +780,7 @@ __global__ void DFlashVerifyDraftKernel(
     }
 
     int target_token = s_idx[0];
+    float target_max_logit = s_max[0];
 
     // ── 2) Compare with draft token ──
     int draft = draft_tokens[i];
@@ -708,6 +790,11 @@ __global__ void DFlashVerifyDraftKernel(
     } else {
         accepted_tokens[i] = target_token;
         accept_mask[i] = 0;
+    }
+
+    // ── 3) Output max logit for probability calculation ──
+    if (threadIdx.x == 0) {
+        max_logits[i] = target_max_logit;
     }
 }
 
@@ -750,20 +837,31 @@ void DFlashVerifyDraftGPU(
     const Tensor& target_logits,
     Tensor& accepted_tokens,
     Tensor& accept_mask,
+    Tensor& max_logits,  // Output: max logit for each position
     int num_spec_tokens)
 {
     const int num_spec = num_spec_tokens;
     const int vocab_size = target_logits.shape(1);
     const auto stream = core::Context::stream().handle();
 
+    dflash_log::Debug("[DFlash] DFlashVerifyDraftGPU starting:");
+    dflash_log::Debug("[DFlash]   num_spec: %d", num_spec);
+    dflash_log::Debug("[DFlash]   vocab_size: %d", vocab_size);
+
     accepted_tokens = Tensor{{num_spec}, kInt32, kDEVICE};
     accept_mask = Tensor{{num_spec}, kInt32, kDEVICE};
+    max_logits = Tensor{{num_spec}, kFloat32, kDEVICE};
 
     // Launch verification kernel
     // One block per spec position (8 blocks for 8 spec tokens)
     // Each block handles vocab_size with threads
     int threads = std::min(256, vocab_size);
     int smem = threads * (sizeof(float) + sizeof(int));
+
+    dflash_log::Debug("[DFlash] Launching DFlashVerifyDraftKernel:");
+    dflash_log::Debug("[DFlash]   blocks: %d", num_spec);
+    dflash_log::Debug("[DFlash]   threads/block: %d", threads);
+    dflash_log::Debug("[DFlash]   smem/block: %d bytes", smem);
 
     const half* logits_data = static_cast<const half*>(target_logits.raw_data());
 
@@ -772,29 +870,34 @@ void DFlashVerifyDraftGPU(
         logits_data,
         static_cast<int*>(accepted_tokens.raw_data()),
         static_cast<int*>(accept_mask.raw_data()),
+        static_cast<float*>(max_logits.raw_data()),
         num_spec,
         vocab_size);
+
+    sync_check_cuda_error();
+    dflash_log::Debug("[DFlash] DFlashVerifyDraftKernel launched successfully");
 
     // Count accepted tokens for logging
     Tensor d_count = Tensor{{1}, kInt32, kDEVICE};
     Tensor h_count = Tensor{{1}, kInt32, kCPUpinned};
 
+    dflash_log::Debug("[DFlash] Launching DFlashCountAcceptedKernel...");
     DFlashCountAcceptedKernel<<<1, std::min(256, num_spec), 256 * sizeof(int), stream>>>(
         static_cast<const int*>(accept_mask.raw_data()),
         static_cast<int*>(d_count.raw_data()),
         num_spec);
 
-    // Copy count asynchronously (no sync - let it complete in background)
+    sync_check_cuda_error();
+    dflash_log::Debug("[DFlash] DFlashCountAcceptedKernel launched successfully");
+
+    // Copy count to host (FIX: was DeviceToDevice, now DeviceToHost)
+    dflash_log::Debug("[DFlash] Copying accepted count from device to host...");
     cudaMemcpyAsync(static_cast<int*>(h_count.raw_data()),
                     static_cast<const int*>(d_count.raw_data()),
-                    sizeof(int), cudaMemcpyDeviceToDevice,
+                    sizeof(int), cudaMemcpyDeviceToHost,
                     stream);
-
-    // Note: We intentionally do NOT sync here.
-    // The count is only for logging and can be read later.
-    // If we need the count immediately, we can sync after the log.
-    // For now, use a rough estimate.
-    TM_LOG_DEBUG("[DFlash] Verification launched on GPU for %d spec tokens", num_spec);
+    sync_check_cuda_error();
+    dflash_log::Debug("[DFlash] DFlashVerifyDraftGPU complete");
 }
 
 void DFlashDraftModel::VerifyDraft(
@@ -805,24 +908,107 @@ void DFlashDraftModel::VerifyDraft(
 {
     const int num_spec = num_spec_tokens_;
     int vocab_size = target_logits.shape(1);
+    const auto stream = core::Context::stream().handle();
+
+    dflash_log::Info("[DFlash] ================ VERIFY DRAFT START ================");
+    dflash_log::Info("[DFlash] VerifyDraft called with:");
+    dflash_log::Info("[DFlash]   num_spec_tokens: %d", num_spec);
+    dflash_log::Info("[DFlash]   vocab_size: %d", vocab_size);
+    dflash_log::Info("[DFlash]   target_logits shape: [%zu, %zu]", target_logits.shape(0), target_logits.shape(1));
+    dflash_log::Info("[DFlash]   target_logits dtype: %d", (int)target_logits.dtype());
+    dflash_log::Info("[DFlash]   draft_tokens shape: [%zu]", draft_tokens.shape(0));
+    dflash_log::Info("[DFlash]   draft_tokens dtype: %d", (int)draft_tokens.dtype());
 
     accepted_tokens = Tensor{{num_spec}, kInt32, kDEVICE};
     accept_mask = Tensor{{num_spec}, kInt32, kDEVICE};
 
-    // Check dtype of target_logits
-    if (target_logits.dtype() == kFloat) {
-        // Convert to FP16 first
-        const auto stream = core::Context::stream().handle();
-        Tensor logits_fp16 = Tensor{{num_spec, vocab_size}, kFloat16, kDEVICE};
-        invokeCastFloat2D(target_logits, logits_fp16, stream);
-        DFlashVerifyDraftGPU(draft_tokens, logits_fp16, accepted_tokens, accept_mask, num_spec);
-    }
-    else {
-        DFlashVerifyDraftGPU(draft_tokens, target_logits, accepted_tokens, accept_mask, num_spec);
+    // First, copy draft tokens to host for logging
+    dflash_log::Info("[DFlash] Step 1: Copy draft tokens to host for verification logging...");
+    std::vector<int> h_draft_tokens(num_spec);
+    cudaMemcpyAsync(h_draft_tokens.data(),
+                   static_cast<const int*>(draft_tokens.raw_data()),
+                   num_spec * sizeof(int),
+                   cudaMemcpyDeviceToHost,
+                   stream);
+    sync_check_cuda_error();
+
+    // Wait for copy to complete so we can log draft tokens
+    cudaStreamSynchronize(stream);
+
+    dflash_log::Info("[DFlash] Draft tokens:");
+    for (int i = 0; i < num_spec; ++i) {
+        dflash_log::Info("[DFlash]   [%d] = %d", i, h_draft_tokens[i]);
     }
 
-    // Note: No sync here. The verification is fully asynchronous.
-    // The caller will sync when it needs the results.
+    dflash_log::Info("[DFlash] Step 2: Launching GPU verification kernel...");
+
+    // Check dtype of target_logits
+    Tensor logits_to_use = target_logits;
+    if (target_logits.dtype() == kFloat) {
+        dflash_log::Info("[DFlash] Converting target logits from FP32 to FP16...");
+        Tensor logits_fp16 = Tensor{{num_spec, vocab_size}, kFloat16, kDEVICE};
+        invokeCastFloat2D(target_logits, logits_fp16, stream);
+        logits_to_use = logits_fp16;
+        dflash_log::Info("[DFlash] Conversion complete");
+    }
+
+    dflash_log::Info("[DFlash] Step 3: Calling DFlashVerifyDraftGPU...");
+    Tensor max_logits;  // Will be allocated by DFlashVerifyDraftGPU
+    DFlashVerifyDraftGPU(draft_tokens, logits_to_use, accepted_tokens, accept_mask, max_logits, num_spec);
+    dflash_log::Info("[DFlash] DFlashVerifyDraftGPU returned");
+
+    dflash_log::Info("[DFlash] Step 4: Copying accept_mask, accepted_tokens, and max_logits to host...");
+    std::vector<int> h_accept_mask(num_spec);
+    std::vector<int> h_accepted_tokens(num_spec);
+    std::vector<float> h_max_logits(num_spec);
+
+    cudaMemcpyAsync(h_accept_mask.data(),
+                   static_cast<const int*>(accept_mask.raw_data()),
+                   num_spec * sizeof(int),
+                   cudaMemcpyDeviceToHost,
+                   stream);
+    cudaMemcpyAsync(h_accepted_tokens.data(),
+                   static_cast<const int*>(accepted_tokens.raw_data()),
+                   num_spec * sizeof(int),
+                   cudaMemcpyDeviceToHost,
+                   stream);
+    cudaMemcpyAsync(h_max_logits.data(),
+                   static_cast<const float*>(max_logits.raw_data()),
+                   num_spec * sizeof(float),
+                   cudaMemcpyDeviceToHost,
+                   stream);
+    sync_check_cuda_error();
+
+    // Wait for copies to complete
+    cudaStreamSynchronize(stream);
+
+    dflash_log::Info("[DFlash] Step 5: Calculating acceptance rate and token probabilities...");
+    int accepted_count = 0;
+    dflash_log::Info("[DFlash] Verification results:");
+    for (int i = 0; i < num_spec; ++i) {
+        // Calculate probability using softmax: exp(max_logit) / sum(exp(logits))
+        // For simplicity, we use exp(max_logit) as a relative confidence score
+        float confidence = expf(h_max_logits[i]);
+        // Normalize to [0, 1] for readability (very rough approximation)
+        float prob = confidence / (1.0f + confidence);
+
+        if (h_accept_mask[i]) {
+            accepted_count++;
+            dflash_log::Info("[DFlash]   [%d] ACCEPTED: draft=%d, accepted=%d, max_logit=%.4f, conf=%.4f",
+                           i, h_draft_tokens[i], h_accepted_tokens[i], h_max_logits[i], prob);
+        } else {
+            dflash_log::Info("[DFlash]   [%d] REJECTED: draft=%d, accepted=%d, max_logit=%.4f, conf=%.4f",
+                           i, h_draft_tokens[i], h_accepted_tokens[i], h_max_logits[i], prob);
+        }
+    }
+
+    float accept_rate = (float)accepted_count / (float)num_spec * 100.0f;
+    dflash_log::Info("[DFlash] ================ VERIFICATION SUMMARY ================");
+    dflash_log::Info("[DFlash] Total draft tokens: %d", num_spec);
+    dflash_log::Info("[DFlash] Accepted tokens: %d", accepted_count);
+    dflash_log::Info("[DFlash] Rejected tokens: %d", num_spec - accepted_count);
+    dflash_log::Info("[DFlash] Acceptance rate: %.2f%%", accept_rate);
+    dflash_log::Info("[DFlash] ======================================================");
 }
 
 }  // namespace turbomind

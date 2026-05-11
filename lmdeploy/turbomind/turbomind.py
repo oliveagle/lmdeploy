@@ -191,6 +191,36 @@ class TurboMind:
 
         self.session_len = self.config.session_len
 
+    def _check_unloaded_tm_params(self):
+        """Check unloaded turbomind parameters."""
+        tm_params = self._tm_model.tm_params
+        if len(tm_params) > 0:
+            uninitialized = list(tm_params.keys())
+            logger.warning('the model may not be loaded successfully '
+                           f'with {len(tm_params)} uninitialized params:\n{uninitialized}')
+
+    def _load_weights(self):
+        """Load weights."""
+        self._get_model_params()
+
+        with torch.cuda.device(self.devices[0]):
+            self._tm_model.export()
+
+        self._check_unloaded_tm_params()
+
+    def _process_weights(self):
+        """Process weight."""
+        with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
+            for _ in e.map(self.model_comm.process_weight, range(self.gpu_count)):
+                pass
+
+    def _create_engine(self):
+        """Create engine."""
+        with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
+            for _ in e.map(self.model_comm.create_engine, range(self.gpu_count)):
+                pass
+        self._engine_created = True
+
     def _detect_draft_quantization(self, draft_model_path: str) -> tuple[int, dict]:
         """Detect if draft model is quantized.
 

@@ -12,8 +12,6 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-
 # V100 分组 (GPU 0-3), 不包含 PG199
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
 

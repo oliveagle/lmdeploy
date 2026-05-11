@@ -8,8 +8,6 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-
 # 使用前 4 块 V100 GPU (避免 P2P 问题)
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'

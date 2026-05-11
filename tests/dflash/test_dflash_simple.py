@@ -4,9 +4,6 @@
 import os
 import sys
 
-# Set LD_LIBRARY_PATH for the build
-os.environ['LD_LIBRARY_PATH'] = f'/home/oliveagle/opt/lmdeploy/lmdeploy/build/lib:{os.environ.get("LD_LIBRARY_PATH", "")}'
-
 from lmdeploy import pipeline, TurbomindEngineConfig, SpeculativeConfig, GenerationConfig
 
 # Model paths
@@ -28,6 +25,8 @@ speculative_config = SpeculativeConfig(
 tm_config = TurbomindEngineConfig(
     model_format='awq',
     tensor_parallel=1,
+    cache_max_entry_count=0.5,  # 使用更小的 KV cache，0.5 表示空闲显存的 50%
+    quant_policy=8,  # 启用 KV cache 8bit 量化，减少内存占用
 )
 
 print("\n=== Creating pipeline with DFlash ===")
@@ -35,29 +34,30 @@ pipe = pipeline(
     target_model,
     backend_config=tm_config,
     speculative_config=speculative_config,
-    log_level='INFO',
+    log_level='WARNING',
 )
 print("Pipeline created successfully!")
 
 # Test inference
 print("\n=== Testing inference ===")
-prompts = [
-    "Hello, how are you?",
-    "What is the capital of France?",
-    "Explain the concept of machine learning in simple terms.",
-]
+prompt = "什么是人工智能？请用一句话解释。"
 
 gen_config = GenerationConfig(
-    max_new_tokens=128,
-    do_sample=True,
+    max_new_tokens=256,
+    do_sample=False,  # Greedy for better DFlash acceptance
     temperature=0.7,
     top_p=0.9,
 )
 
-for i, prompt in enumerate(prompts):
-    print(f"\n--- Test {i+1} ---")
-    print(f"Prompt: {prompt}")
-    response = pipe(prompt, gen_config=gen_config)
-    print(f"Response: {response.text}")
+print(f"Prompt: {prompt}")
+messages = [{"role": "user", "content": prompt}]
+response = pipe(
+    messages,
+    gen_config=gen_config,
+    sequence_start=True,  # 标记为独立请求的开始
+    sequence_end=True,    # 标记为独立请求的结束
+    chat_template_kwargs={'enable_thinking': False}
+)
+print(f"Response: {response.text}")
 
 print("\n=== Test completed successfully! ===")

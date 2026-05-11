@@ -30,7 +30,8 @@ public:
     // DFlash 支持
     void EnableDFlash(bool enable) { enable_dflash_ = enable; }
     bool IsDFlashEnabled() const { return enable_dflash_; }
-    void SetDFlashDraftModel(std::unique_ptr<DFlashDraftModel> model) { dflash_draft_model_ = std::move(model); }
+    void SetDFlashDraftModel(DFlashDraftModel* model) { dflash_draft_model_ = model; }
+    DFlashDraftModel* GetDFlashDraftModel() const { return dflash_draft_model_; }
     void SetContext(Context* ctx) { ctx_ = ctx; }
     Context* GetContext() const { return ctx_; }
 
@@ -68,7 +69,7 @@ private:
                                   const int*    local_token_nums);
 
     // DFlash 相关成员
-    std::unique_ptr<DFlashDraftModel> dflash_draft_model_;
+    DFlashDraftModel* dflash_draft_model_{nullptr};
     bool enable_dflash_{false};
     std::vector<Tensor> aux_hidden_states_;
     const int dflash_aux_layers_[5];

@@ -173,7 +173,10 @@ class AsyncEngine:
     def _build_turbomind(self, model_path: str, backend_config: TurbomindEngineConfig | None = None, speculative_config: SpeculativeConfig | None = None, **kwargs):
         """Inner build method for turbomind backend."""
         from lmdeploy import turbomind as tm
-        return tm.TurboMind.from_pretrained(model_path, engine_config=backend_config, speculative_config=speculative_config, **kwargs)
+        # Attach speculative_config to backend_config if provided
+        if speculative_config is not None and backend_config is not None:
+            backend_config.speculative_config = speculative_config
+        return tm.TurboMind.from_pretrained(model_path, engine_config=backend_config, **kwargs)
 
     def _build_pytorch(self,
                        model_path: str,

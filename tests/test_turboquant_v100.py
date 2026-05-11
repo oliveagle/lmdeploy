@@ -7,9 +7,6 @@ import sys
 import time
 from pathlib import Path
 
-# 使用当前源码
-sys.path.insert(0, str(Path(__file__).parent))
-
 from lmdeploy import pipeline, PytorchEngineConfig
 from lmdeploy.messages import QuantPolicy
 

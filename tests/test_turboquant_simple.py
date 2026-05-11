@@ -5,9 +5,6 @@ import os
 import sys
 from pathlib import Path
 
-LMDEPLOY_PATH = Path(__file__).parent
-sys.path.insert(0, str(LMDEPLOY_PATH))
-
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import torch

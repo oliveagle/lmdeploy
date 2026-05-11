@@ -39,7 +39,7 @@ bool SetupDFlash(const std::string&     model_dir,
         decoder->EnableDFlash(true);
 
         // 3. Attach draft model to decoder
-        decoder->SetDFlashDraftModel(std::move(dflash_model));
+        decoder->SetDFlashDraftModel(dflash_model.release());
 
         TM_LOG_INFO("[DFlash] DFlash setup successful:");
         TM_LOG_INFO("[DFlash]   num_spec_tokens: %d", dflash_param.num_spec_tokens);

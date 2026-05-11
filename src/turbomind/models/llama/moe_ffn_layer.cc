@@ -2,6 +2,7 @@
 
 #include <cuda_runtime.h>
 
+#include "src/turbomind/comm/device_comm.h"
 #include "src/turbomind/core/context.h"
 #include "src/turbomind/kernels/activation.h"
 #include "src/turbomind/kernels/norm/rms_norm.h"
@@ -26,6 +27,7 @@ MoeFfnLayer::MoeFfnLayer(const ModelParam& model, const MoeParam& param, const E
     param_(param),
     ep_size_(engine.mlp_ep_size),
     ep_rank_(engine.mlp_ep_rank),
+    ctx_(ctx),
     is_warm_up_{*ctx.is_warm_up},
     linear_(*ctx.linear)
 {
@@ -226,6 +228,32 @@ void MoeFfnLayer::Combine(ForwardParam& p)
                      p.scale,
                      core::Context::stream().handle());
     sync_check_cuda_error();
+
+    // EP (Expert Parallelism) AllReduce: if there are multiple EP ranks,
+    // we need to sum the outputs across all ranks since each rank only
+    // computed a subset of experts that were selected by the router
+    if (ep_size_ > 1 && ctx_.comm.d_comm) {
+        // Determine dtype for AllReduce
+        DataType dtype = kFloat16;  // default
+        if (p.output.dtype() == kBfloat16) {
+            dtype = kBfloat16;
+        } else if (p.output.dtype() == kFloat32) {
+            dtype = kFloat32;
+        }
+
+        // AllReduce sum across EP group (using default group 0 for now)
+        // In the future, we might want a dedicated EP group
+        const size_t num_elements = p.output.shape(0) * p.output.shape(1);
+        ctx_.comm.d_comm->AllReduceSum(
+            p.output.data<void>(),
+            p.output.data<void>(),
+            num_elements,
+            dtype,
+            0,  // group ID (using default group for now)
+            core::Context::stream().handle()
+        );
+        sync_check_cuda_error();
+    }
 
     temp_          = {};
     shared_scales_ = {};

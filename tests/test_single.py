@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """
-LMDeploy 测试 - 使用合理的 cache_max_entry_count
-cache_max_entry_count 控制空闲显存中多少比例用于 KV 缓存
+分别测试 LMDeploy 和 LMDeploy + DFlash
+每次只运行一个测试以避免内存不足
 """
 import os
 import sys
 import time
+import argparse
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
-
-sys.path.insert(0, str(Path(__file__).parent))
 
 from lmdeploy import pipeline, PytorchEngineConfig, GenerationConfig
 from lmdeploy.messages import SpeculativeConfig, QuantPolicy
@@ -19,30 +18,34 @@ MODEL_PATH = "/home/oliveagle/.cache/modelscope/hub/models/tclf90/Qwen3___6-35B-
 DRAFT_MODEL = "/home/oliveagle/.cache/modelscope/hub/models/z-lab/Qwen3___6-35B-A3B-DFlash"
 
 PROMPT = "Hello, how are you?"
-MAX_NEW_TOKENS = 128
+MAX_NEW_TOKENS = 64
 
 
-def run_test(name, use_turboquant=False, use_dflash=False):
-    print(f"\n{'=' * 70}")
-    print(f"测试: {name}")
-    print(f"{'=' * 70}")
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--test", choices=["basic", "turboquant", "dflash", "dflash_turboquant"], default="basic")
+    args = parser.parse_args()
 
-    quant_policy = QuantPolicy.TURBO_QUANT if use_turboquant else QuantPolicy.NONE
+    print(f"=" * 70)
+    print(f"测试: {args.test}")
+    print(f"=" * 70)
+
+    quant_policy = QuantPolicy.NONE
+    if "turboquant" in args.test:
+        quant_policy = QuantPolicy.TURBO_QUANT
 
     spec_config = None
-    if use_dflash:
+    if "dflash" in args.test:
         spec_config = SpeculativeConfig(
             method="dflash",
             model=DRAFT_MODEL,
             num_speculative_tokens=8,
         )
 
-    # 关键：cache_max_entry_count=0.9 表示 90% 空闲显存用于缓存
-    # 如果模型占用 20GB，空闲 12GB，那么 0.9 * 12GB = 10.8GB 用于缓存
     engine_config = PytorchEngineConfig(
         tp=1,
-        session_len=4096,  # 支持更长上下文
-        cache_max_entry_count=0.9,  # 90% 空闲显存用于 KV 缓存
+        session_len=512,
+        cache_max_entry_count=0.2,
         max_batch_size=1,
         block_size=64,
         eager_mode=True,
@@ -84,44 +87,13 @@ def run_test(name, use_turboquant=False, use_dflash=False):
                 print(f"  Speculative steps: {spec_info.get('num_spec_steps', 'N/A')}")
 
         print("✓ 测试成功")
-        return True
+        return 0
     except Exception as e:
         import traceback
         print(f"✗ 测试失败: {e}")
-        print(f"Stacktrace:\n{traceback.format_exc()[:1000]}")
-        return False
-
-
-def main():
-    print("=" * 70)
-    print("LMDeploy + DFlash + TurboQuant 测试")
-    print(f"目标模型: {MODEL_PATH}")
-    print(f"草稿模型: {DRAFT_MODEL}")
-    print("=" * 70)
-
-    results = {}
-
-    # 测试 1: 基础 LMDeploy
-    results['basic'] = run_test("基础 LMDeploy", use_turboquant=False, use_dflash=False)
-
-    # 测试 2: LMDeploy + TurboQuant
-    results['turboquant'] = run_test("LMDeploy + TurboQuant", use_turboquant=True, use_dflash=False)
-
-    # 测试 3: LMDeploy + DFlash
-    results['dflash'] = run_test("LMDeploy + DFlash", use_turboquant=False, use_dflash=True)
-
-    # 测试 4: LMDeploy + DFlash + TurboQuant
-    results['dflash_turboquant'] = run_test(
-        "LMDeploy + DFlash + TurboQuant", use_turboquant=True, use_dflash=True
-    )
-
-    print(f"\n\n{'=' * 70}")
-    print("测试总结")
-    print(f"{'=' * 70}")
-    for name, success in results.items():
-        status = "✓ 通过" if success else "✗ 失败"
-        print(f"{name}: {status}")
+        print(f"Stacktrace:\n{traceback.format_exc()}")
+        return 1
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

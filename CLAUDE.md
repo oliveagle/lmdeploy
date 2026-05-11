@@ -151,3 +151,61 @@ Use the `/support-new-model` skill for a complete step-by-step guide.
 - 当前 LMDeploy MoE 实现 EP+TP 不能有效减少内存
 - EP 只分片专家，TP 只分片 FFN，不同时分片两者
 - 需要 `deep_gemm` 或 `DeepEP` 库才能使用完整的 EP 功能
+
+## Test 文件存放规范
+
+**测试文件位置**: `tests/` 目录下按功能分类组织
+
+### 目录结构
+
+```
+tests/
+├── dflash/              # DFlash speculative decoding 测试
+│   ├── test_dflash.py
+│   ├── test_dflash_debug.py
+│   └── ...
+├── test_awq_moe_fix.py  # AWQ MoE 相关测试
+├── test_correct_cache.py
+├── test_ep_config.py
+└── ...
+```
+
+### 测试文件命名规范
+
+- **文件名**: 必须以 `test_` 开头，使用下划线命名
+- **位置**: 必须放在 `tests/` 目录下，按功能分子目录（如 `dflash/`）
+- **禁止**: 根目录（`lmdeploy/`）下禁止放置 `test*.py` 文件
+
+### 测试文件编写规范
+
+1. **禁止硬编码路径**
+   - ❌ 禁止: `sys.path.insert(0, '/home/oliveagle/opt/lmdeploy/lmdeploy')`
+   - ✅ 正确: 假设从 repo 根目录运行，lmdeploy 已在 PYTHONPATH 中
+
+2. **禁止硬编码 LD_LIBRARY_PATH**
+   - ❌ 禁止: `os.environ['LD_LIBRARY_PATH'] = '.../build/lib'`
+   - ✅ 正确: 使用 `pip install -e .` 安装后，库路径自动配置
+
+3. **模型路径配置**
+   - 使用环境变量或配置文件
+   - 提供默认值示例，但允许用户覆盖
+
+4. **GPU 配置**
+   - 使用 `CUDA_VISIBLE_DEVICES` 环境变量
+   - 提供清晰的注释说明 GPU 需求
+
+### 运行测试
+
+从 repo 根目录运行：
+
+```bash
+# 运行单个测试
+python tests/dflash/test_dflash.py
+
+# 运行所有单元测试
+pytest tests/test_lmdeploy/
+
+# 运行特定模块测试
+pytest tests/test_lmdeploy/test_model.py
+```
+
