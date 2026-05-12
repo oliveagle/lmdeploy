@@ -25,6 +25,7 @@ add_library(models STATIC
         llama/DFlashDraftModel.cu
         llama/DFlashDraftWeight.cc
         llama/dflash_kernels.cu
+        llama/ddtree.cpp
 )
 set_property(TARGET models PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET models PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)

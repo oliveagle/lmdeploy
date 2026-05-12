@@ -10,6 +10,8 @@
 
 #include "src/turbomind/core/tensor.h"
 
+using Tensor = turbomind::core::Tensor;
+
 namespace turbomind {
 
 /**

@@ -36,6 +36,7 @@ def main():
     print(f"草稿: {draft_model}")
     print(f"运行时长: {DURATION} 秒\n")
 
+    # Enable DFlash speculative decoding
     speculative_config = SpeculativeConfig(
         method='dflash',
         model=draft_model,

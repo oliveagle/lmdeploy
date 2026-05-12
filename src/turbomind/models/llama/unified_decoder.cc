@@ -159,8 +159,8 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
     const DataType dtype = local_residual.dtype();
 
     // DFlash 调试：打印 Forward 开始时的状态
-    TM_LOG_INFO("[DFlash] Forward called: enable_dflash_={}, dflash_draft_model_={}",
-                enable_dflash_, (void*)dflash_draft_model_);
+    TM_LOG_INFO("[DFlash] Forward called: decoder=%p, enable_dflash_={}, dflash_draft_model_={}",
+                (void*)this, enable_dflash_, (void*)dflash_draft_model_);
 
     // DFlash: 预先获取 selected_token_pos（如果存在）
     const Buffer* selected_pos_ptr = nullptr;
@@ -372,6 +372,8 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
     }
 
     // DFlash: aux_hidden_states 已在层循环中收集
+    TM_LOG_INFO("[DFlash] Checking DFlash conditions: enable_dflash_={}, dflash_draft_model_={}, phase={}",
+                enable_dflash_, (void*)dflash_draft_model_, phase);
     if (enable_dflash_ && dflash_draft_model_ && phase == 0) {
         TM_LOG_INFO("[DFlash] Phase={}: attempting speculative decoding", phase);
         TM_LOG_INFO("[DFlash] aux_hidden_states_.size()={}", aux_hidden_states_.size());
@@ -384,43 +386,53 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
         }
 
         if (!aux_hidden_states_.empty()) {
-            // Speculative decoding:
-            // 1. Generate draft tokens from aux hidden states
-            // 2. Verify against target logits
-            // 3. Output accepted tokens to env for Generation to use
-
-            Tensor draft_tokens, draft_logits;
-            TM_LOG_INFO("[DFlash] Calling GenerateDraft NOW...");
-            dflash_draft_model_->GenerateDraft(aux_hidden_states_, draft_tokens, draft_logits);
-            TM_LOG_INFO("[DFlash] GenerateDraft COMPLETED");
-
-            TM_LOG_INFO("[DFlash] GenerateDraft returned: draft_tokens={}, draft_logits={}",
-                        (void*)draft_tokens.raw_data(), (void*)draft_logits.raw_data());
-
-            if (draft_tokens && draft_tokens.shape(0) > 0) {
-                TM_LOG_INFO("[DFlash] Draft tokens generated: count={}", draft_tokens.shape(0));
-
-                Tensor* target_logits_ptr = args.try_("logits");
-                if (target_logits_ptr) {
-                    Tensor target_logits = *target_logits_ptr;
-                    TM_LOG_INFO("[DFlash] Target logits shape: [{}]", target_logits.shape(0));
-
-                    Tensor accepted, mask;
-                    dflash_draft_model_->VerifyDraft(draft_tokens, target_logits, accepted, mask);
-
-                    TM_LOG_INFO("[DFlash] VerifyDraft: accepted={} tokens", accepted.shape(0));
-
-                    // Output accepted tokens to env so Generation can use them
-                    args.produce("dflash_accepted_tokens", accepted);
-                    args.produce("dflash_accept_mask", mask);
-
-                    TM_LOG_INFO("[DFlash] Success: {} accepted draft tokens output to Generation",
-                              accepted.shape(0));
-                } else {
-                    TM_LOG_WARNING("[DFlash] No target logits found in args!");
-                }
+            // Check draft model weights before running
+            auto* draft_weight = dflash_draft_model_->GetDraftWeight();
+            if (!draft_weight || !draft_weight->lm_head || !draft_weight->embed_tokens) {
+                TM_LOG_WARNING("[DFlash] Draft weights not properly loaded, skipping DFlash");
+                TM_LOG_WARNING("[DFlash]   draft_weight=%p, lm_head=%p, embed_tokens=%p",
+                            (void*)draft_weight,
+                            draft_weight ? (void*)draft_weight->lm_head.raw_data() : nullptr,
+                            draft_weight ? (void*)draft_weight->embed_tokens.raw_data() : nullptr);
             } else {
-                TM_LOG_WARNING("[DFlash] GenerateDraft returned empty tokens!");
+                // Speculative decoding:
+                // 1. Generate draft tokens from aux hidden states
+                // 2. Verify against target logits
+                // 3. Output accepted tokens to env for Generation to use
+
+                Tensor draft_tokens, draft_logits;
+                TM_LOG_INFO("[DFlash] Calling GenerateDraft NOW...");
+                dflash_draft_model_->GenerateDraft(aux_hidden_states_, draft_tokens, draft_logits);
+                TM_LOG_INFO("[DFlash] GenerateDraft COMPLETED");
+
+                TM_LOG_INFO("[DFlash] GenerateDraft returned: draft_tokens={}, draft_logits={}",
+                            (void*)draft_tokens.raw_data(), (void*)draft_logits.raw_data());
+
+                if (draft_tokens && draft_tokens.shape(0) > 0) {
+                    TM_LOG_INFO("[DFlash] Draft tokens generated: count={}", draft_tokens.shape(0));
+
+                    Tensor* target_logits_ptr = args.try_("logits");
+                    if (target_logits_ptr) {
+                        Tensor target_logits = *target_logits_ptr;
+                        TM_LOG_INFO("[DFlash] Target logits shape: [{}]", target_logits.shape(0));
+
+                        Tensor accepted, mask;
+                        dflash_draft_model_->VerifyDraft(draft_tokens, target_logits, accepted, mask);
+
+                        TM_LOG_INFO("[DFlash] VerifyDraft: accepted={} tokens", accepted.shape(0));
+
+                        // Output accepted tokens to env so Generation can use them
+                        args.produce("dflash_accepted_tokens", accepted);
+                        args.produce("dflash_accept_mask", mask);
+
+                        TM_LOG_INFO("[DFlash] Success: {} accepted draft tokens output to Generation",
+                                  accepted.shape(0));
+                    } else {
+                        TM_LOG_WARNING("[DFlash] No target logits found in args!");
+                    }
+                } else {
+                    TM_LOG_WARNING("[DFlash] GenerateDraft returned empty tokens!");
+                }
             }
         } else {
             TM_LOG_WARNING("[DFlash] aux_hidden_states_ is empty, cannot generate drafts!");

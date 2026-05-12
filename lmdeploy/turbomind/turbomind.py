@@ -434,50 +434,57 @@ class TurboMind:
             logger.warning(f'Failed to load safetensors: {e}')
             return
 
+        logger.info(f'DFlash weights prepared: {len(layer_weights)} layers')
+
         # Second pass: combine QKV and load
         def _load_on_rank(device_id):
             import torch
             tm_map = _tm.TensorMap()
 
-            for layer_idx in sorted(layer_weights.keys()):
-                weights = layer_weights[layer_idx]
+            # Set CUDA device context for this rank
+            with torch.cuda.device(f'cuda:{device_id}'):
+                for layer_idx in sorted(layer_weights.keys()):
+                    weights = layer_weights[layer_idx]
 
-                # Combine QKV weights
-                if 'q' in weights and 'k' in weights and 'v' in weights:
-                    q = weights['q'].float() if weights['q'].dtype != torch.float32 else weights['q']
-                    k = weights['k'].float() if weights['k'].dtype != torch.float32 else weights['k']
-                    v = weights['v'].float() if weights['v'].dtype != torch.float32 else weights['v']
+                    # Combine QKV weights
+                    if 'q' in weights and 'k' in weights and 'v' in weights:
+                        q = weights['q'].float() if weights['q'].dtype != torch.float32 else weights['q']
+                        k = weights['k'].float() if weights['k'].dtype != torch.float32 else weights['k']
+                        v = weights['v'].float() if weights['v'].dtype != torch.float32 else weights['v']
 
-                    # Concatenate along output dim: [hidden_out, hidden_in] -> [3*hidden_out, hidden_in]
-                    qkv = torch.cat([q, k, v], dim=0)
-                    qkv_np = qkv.numpy().astype(np.float16)
+                        # Concatenate along output dim: [hidden_out, hidden_in] -> [3*hidden_out, hidden_in]
+                        qkv = torch.cat([q, k, v], dim=0)
+                        qkv_np = qkv.numpy().astype(np.float16)
 
-                    dlpack_tensor = torch.from_numpy(qkv_np)
-                    tm_tensor = _tm.from_dlpack(dlpack_tensor)
-                    tm_map[f'dflash.layers.{layer_idx}.qkv_proj'] = tm_tensor
+                        dlpack_tensor = torch.from_numpy(qkv_np)
+                        tm_tensor = _tm.from_dlpack(dlpack_tensor)
+                        tm_map[f'dflash.layers.{layer_idx}.qkv_proj'] = tm_tensor
 
-                # Load other weights
-                for wtype, tensor in weights.items():
-                    if wtype in ['q', 'k', 'v']:
-                        continue
+                    # Load other weights
+                    for wtype, tensor in weights.items():
+                        if wtype in ['q', 'k', 'v']:
+                            continue
 
-                    dflash_key = f'dflash.layers.{layer_idx}.{wtype}'
-                    np_tensor = tensor.float().numpy().astype(np.float16)
-                    dlpack_tensor = torch.from_numpy(np_tensor)
-                    tm_tensor = _tm.from_dlpack(dlpack_tensor)
-                    tm_map[dflash_key] = tm_tensor
+                        dflash_key = f'dflash.layers.{layer_idx}.{wtype}'
+                        np_tensor = tensor.float().numpy().astype(np.float16)
+                        dlpack_tensor = torch.from_numpy(np_tensor)
+                        tm_tensor = _tm.from_dlpack(dlpack_tensor)
+                        tm_map[dflash_key] = tm_tensor
 
-            self.model_comm.load_dflash_weights(device_id, tm_map)
+                logger.info(f'DFlash: loading {len(dict(tm_map))} tensors on device {device_id}')
+                self.model_comm.load_dflash_weights(device_id, tm_map)
+                logger.info(f'DFlash: load complete on device {device_id}')
 
         with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
             list(e.map(_load_on_rank, range(self.gpu_count)))
 
         # 4. Enable DFlash on all GPUs
         num_spec = self.speculative_config.num_speculative_tokens or 8
-
+        logger.info(f'DFlash: enabling with num_spec={num_spec}')
         def _enable_on_rank(device_id):
+            logger.info(f'DFlash: enabling on device {device_id}')
             self.model_comm.enable_dflash(device_id, num_spec)
-
+            logger.info(f'DFlash: enabled on device {device_id}')
         with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
             list(e.map(_enable_on_rank, range(self.gpu_count)))
 
