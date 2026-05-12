@@ -1,4 +1,19 @@
 
+/**
+ * @file DFlashDraftWeight.h
+ *
+ * DFlash Speculative Decoder Weight Structure
+ *
+ * @license Apache-2.0 WITH LLVM-exception
+ *
+ * Derived from and inspired by:
+ * - lucebox-hub/dflash (https://github.com/lucebox-hub/dflash)
+ *   Original authors: lucebox-hub contributors
+ *   License: Apache-2.0
+ *
+ * @see DFlashDraftModel.h for full attribution
+ */
+
 #pragma once
 
 #include "src/turbomind/core/tensor.h"
@@ -65,8 +80,8 @@ struct DFlashDraftWeight {
 
     // Configuration
     int num_layers = 8;
-    int hidden_size = 5120;
-    int intermediate_size = 13824;
+    int hidden_size = 4096;  // Will be overridden by target model config
+    int intermediate_size = 12288;  // Will be overridden by target model config
     int num_attention_heads = 40;
     int num_key_value_heads = 40;
     int head_dim = 128;

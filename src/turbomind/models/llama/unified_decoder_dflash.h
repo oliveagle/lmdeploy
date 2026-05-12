@@ -1,4 +1,17 @@
-
+/**
+ * @file unified_decoder_dflash.h
+ *
+ * DFlash Speculative Decoder - Unified Decoder Integration
+ *
+ * @license Apache-2.0 WITH LLVM-exception
+ *
+ * Derived from and inspired by:
+ * - lucebox-hub/dflash (https://github.com/lucebox-hub/dflash)
+ *   Original authors: lucebox-hub contributors
+ *   License: Apache-2.0
+ *
+ * @see DFlashDraftModel.h for full attribution
+ */
 
 #pragma once
 

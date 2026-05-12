@@ -1,4 +1,19 @@
-
+/**
+ * @file dflash_kernels.cu
+ *
+ * DFlash Speculative Decoder - CUDA Kernels
+ *
+ * @license Apache-2.0 WITH LLVM-exception
+ *
+ * Derived from and inspired by:
+ * - lucebox-hub/dflash (https://github.com/lucebox-hub/dflash)
+ *   Original authors: lucebox-hub contributors
+ *   License: Apache-2.0
+ *
+ * This matches lucebox-hub/dflash behavior for better draft quality
+ *
+ * @see DFlashDraftModel.h for full attribution
+ */
 
 #include <cuda_fp16.h>
 
@@ -19,31 +34,35 @@ namespace turbomind {
 
 template <int THREADS>
 __global__ void DFlashAttnKernelFP16(
-    const half* __restrict__ query,       // [num_draft, num_heads, head_dim]
-    const half* __restrict__ key_ctx,     // [num_ctx, num_heads, head_dim]
-    const half* __restrict__ key_draft,   // [num_draft, num_heads, head_dim]
-    const half* __restrict__ val_ctx,     // [num_ctx, num_heads, head_dim]
-    const half* __restrict__ val_draft,   // [num_draft, num_heads, head_dim]
-    half* __restrict__ output,            // [num_draft, num_heads, head_dim]
+    const half* __restrict__ query,       // [num_draft, hidden_size] (row-major)
+    const half* __restrict__ key_ctx,     // [num_ctx, hidden_size] (row-major)
+    const half* __restrict__ key_draft,   // [num_draft, hidden_size] (row-major)
+    const half* __restrict__ val_ctx,     // [num_ctx, hidden_size] (row-major)
+    const half* __restrict__ val_draft,   // [num_draft, hidden_size] (row-major)
+    half* __restrict__ output,            // [num_draft, hidden_size] (row-major)
     int num_ctx,
     int num_draft,
+    int hidden_size,
     int head_dim,
     float scale)
 {
     const int s = blockIdx.x;   // draft position index
     const int h = blockIdx.y;   // head index
-    if (s >= num_draft) return;
+    const int num_heads = hidden_size / head_dim;
+    if (s >= num_draft || h >= num_heads) return;
 
     const int tid     = threadIdx.x;
     const int total   = num_ctx + num_draft;  // Non-causal: all context + all draft tokens
 
-    // Offset into per-head data (row-major layout)
-    const half* q     = query + s * blockDim.y * head_dim + h * head_dim;
+    // Offset into data for this (s, h):
+    // query/key/val are 2D: [num_draft/num_ctx, hidden_size],
+    // where hidden_size = num_heads * head_dim
+    const half* q     = query + s * hidden_size + h * head_dim;
     const half* kc    = key_ctx + h * head_dim;
-    const half* kd    = key_draft + s * blockDim.y * head_dim + h * head_dim;
+    const half* kd    = key_draft + h * head_dim;
     const half* vc    = val_ctx + h * head_dim;
-    const half* vd    = val_draft + s * blockDim.y * head_dim + h * head_dim;
-    half* out         = output + s * blockDim.y * head_dim + h * head_dim;
+    const half* vd    = val_draft + h * head_dim;
+    half* out         = output + s * hidden_size + h * head_dim;
 
     // Shared memory layout:
     //   logits[total]     – attention scores (FP32 for numerical stability)
@@ -55,8 +74,6 @@ __global__ void DFlashAttnKernelFP16(
     float* rsum          = rmax + THREADS;
 
     // ── 1) Q·K dot products ──────────────────
-    // Use vectorized loads (half2) for better memory bandwidth utilization.
-    // head_dim is typically a multiple of 64 or 128.
     float lmax = -1e20f;
 
     const int head_dim_aligned = (head_dim / 2) * 2;  // Ensure even for half2 loads
@@ -65,21 +82,19 @@ __global__ void DFlashAttnKernelFP16(
     // context keys
     for (int i = tid; i < num_ctx; i += THREADS) {
         float dot = 0.f;
-        const half2* kc2 = reinterpret_cast<const half2*>(kc + i * head_dim);
+        const half2* kc2 = reinterpret_cast<const half2*>(kc + i * hidden_size);
         // Process 2 elements at a time using half2 vector loads
         for (int d = 0; d < head_dim_aligned; d += 2) {
             half2 q_vec = q2[d / 2];
             half2 k_vec = kc2[d / 2];
-            // Extract and multiply individual elements
             float q0 = __low2float(q_vec);
             float q1 = __high2float(q_vec);
             float k0 = __low2float(k_vec);
             float k1 = __high2float(k_vec);
             dot += q0 * k0 + q1 * k1;
         }
-        // Handle odd dimension
         if (head_dim % 2 != 0) {
-            dot += __half2float(q[head_dim - 1]) * __half2float(kc[i * head_dim + head_dim - 1]);
+            dot += __half2float(q[head_dim - 1]) * __half2float(kc[i * hidden_size + head_dim - 1]);
         }
         dot *= scale;
         logits[i] = dot;
@@ -87,11 +102,10 @@ __global__ void DFlashAttnKernelFP16(
     }
 
     // draft keys (NON-CAUSAL: all draft tokens can see all draft tokens)
-    // This matches lucebox-hub/dflash behavior for better draft quality
     const int ds = num_ctx;
     for (int i = tid; i < num_draft; i += THREADS) {
         float dot = 0.f;
-        const half2* kd2 = reinterpret_cast<const half2*>(kd + i * head_dim);
+        const half2* kd2 = reinterpret_cast<const half2*>(kd + i * hidden_size);
         // Process 2 elements at a time using half2 vector loads
         for (int d = 0; d < head_dim_aligned; d += 2) {
             half2 q_vec = q2[d / 2];
@@ -103,7 +117,7 @@ __global__ void DFlashAttnKernelFP16(
             dot += q0 * k0 + q1 * k1;
         }
         if (head_dim % 2 != 0) {
-            dot += __half2float(q[head_dim - 1]) * __half2float(kd[i * head_dim + head_dim - 1]);
+            dot += __half2float(q[head_dim - 1]) * __half2float(kd[i * hidden_size + head_dim - 1]);
         }
         dot *= scale;
         logits[ds + i] = dot;
@@ -137,27 +151,15 @@ __global__ void DFlashAttnKernelFP16(
     __syncthreads();
 
     // ── 4) weighted value sum (ALL THREADS in block) ────────────
-    // Each thread accumulates one slice of head_dim for all KV pairs.
-    // Parallel reduction over KV positions stored in rmax/rsum arrays.
-    // rmax and rsum are reused: after softmax normalization (step 3),
-    // they hold softmax weights for each KV position.
-    // We repurpose them here as accumulators for each thread's head_dim slice.
-    //
-    // Layout: logits[total] (softmax weights for context + draft)
-    //         rmax[THREADS] -> per-thread accumulation buffer for value sum
-    //         rsum[THREADS] -> parallel scratch (reused for value accumulation)
-    //         logits[total + THREADS] onwards -> softmax weights (now read-only)
-
-    const int head_dim_reg = head_dim;
     const int dim_offset = tid;
     float acc = 0.f;
 
     // Accumulate over all KV positions (context + draft)
     for (int i = 0; i < num_ctx; ++i) {
-        acc += logits[i] * __half2float(vc[i * head_dim_reg + dim_offset]);
+        acc += logits[i] * __half2float(vc[i * hidden_size + dim_offset]);
     }
     for (int i = 0; i < num_draft; ++i) {
-        acc += logits[ds + i] * __half2float(vd[i * head_dim_reg + dim_offset]);
+        acc += logits[ds + i] * __half2float(vd[i * hidden_size + dim_offset]);
     }
     out[dim_offset] = __float2half(acc / gsum);
 }
@@ -186,7 +188,7 @@ void DFlashAttentionKernel(const void* query,
         static_cast<const half*>(value_ctx),
         static_cast<const half*>(value_draft),
         static_cast<half*>(output),
-        num_ctx, num_draft, head_dim, scale);
+        num_ctx, num_draft, hidden_size, head_dim, scale);
 }
 
 
