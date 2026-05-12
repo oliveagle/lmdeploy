@@ -1,3 +1,26 @@
+/**
+ * @file DFlashDraftModel.h
+ *
+ * DFlash Speculative Decoder for LMDeploy TurboMind
+ *
+ * @license Apache-2.0 WITH LLVM-exception
+ *
+ * This implementation is derived from and inspired by:
+ * - lucebox-hub/dflash (https://github.com/lucebox-hub/dflash)
+ *   Original authors: lucebox-hub contributors
+ *   License: Apache-2.0
+ *
+ * TurboMind Integration Changes:
+ * - Adapted to LMDeploy TurboMind architecture
+ * - Uses TurboMind tensor/memory management
+ * - Integrated with UnifiedDecoder for speculative decoding
+ * - Added DDTree verification algorithm
+ * - Prefix caching for improved performance
+ *
+ * @author LMDeploy contributors
+ * @see https://github.com/lucebox-hub/dflash
+ */
+
 #pragma once
 
 #include <memory>
@@ -15,7 +38,8 @@
 namespace turbomind {
 
 struct EngineParam;
-class Context;
+// Forward declaration - Context is defined in models/llama/context.h
+struct Context;
 
 /**
  * Cache entry for DFlash prefix caching (STORY-010: Advanced Features)
@@ -148,6 +172,8 @@ private:
     DFlashDraftWeight* external_weight_ = nullptr;  // External weight (from LlamaWeight)
     std::unique_ptr<DFlashDraftWeight> weight_;     // Internal weight
     cublasHandle_t cublas_ = nullptr;
+    // 移除 allocator_ 成员 - 改为动态获取
+    // core::Allocator allocator_;  // Saved allocator for tensor creation
 
     // Config
     const int hidden_size_;

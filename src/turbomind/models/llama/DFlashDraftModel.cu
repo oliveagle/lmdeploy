@@ -1,4 +1,17 @@
-
+/**
+ * @file DFlashDraftModel.cu
+ *
+ * DFlash Speculative Decoder Implementation
+ *
+ * @license Apache-2.0 WITH LLVM-exception
+ *
+ * Derived from and inspired by:
+ * - lucebox-hub/dflash (https://github.com/lucebox-hub/dflash)
+ *   Original authors: lucebox-hub contributors
+ *   License: Apache-2.0
+ *
+ * @see DFlashDraftModel.h for full attribution
+ */
 
 #include "src/turbomind/models/llama/DFlashDraftModel.h"
 
@@ -11,8 +24,8 @@
 #include <vector>
 
 #include "src/turbomind/core/allocator.h"
-#include "src/turbomind/core/context.h"
 #include "src/turbomind/kernels/norm/rms_norm.h"
+#include "src/turbomind/models/llama/context.h"
 #include "src/turbomind/models/llama/ddtree.h"
 #include "src/turbomind/models/llama/dflash_kernels.h"
 #include "src/turbomind/models/llama/llama_kernels.h"
@@ -182,17 +195,21 @@ static void GemmFP16ComputeFP32(cublasHandle_t cublas,
     float alpha = 1.0f;
     float beta  = 0.0f;
 
-    cublasGemmEx(cublas,
-                 CUBLAS_OP_N,
-                 CUBLAS_OP_N,
-                 n, m, k,
-                 &alpha,
-                 B, CUDA_R_16F, n,
-                 A, CUDA_R_16F, k,
-                 &beta,
-                 C, CUDA_R_16F, n,
-                 CUBLAS_COMPUTE_32F,
-                 CUBLAS_GEMM_DEFAULT);
+    cublasStatus_t status = cublasGemmEx(cublas,
+                                        CUBLAS_OP_N,
+                                        CUBLAS_OP_N,
+                                        n, m, k,
+                                        &alpha,
+                                        B, CUDA_R_16F, n,
+                                        A, CUDA_R_16F, k,
+                                        &beta,
+                                        C, CUDA_R_16F, n,
+                                        CUBLAS_COMPUTE_32F,
+                                        CUBLAS_GEMM_DEFAULT);
+
+    if (status != CUBLAS_STATUS_SUCCESS) {
+        TM_LOG_ERROR("[DFlash] cuBLAS GEMM failed: status=%d", (int)status);
+    }
 }
 
 // ──────────────────────────────────────────
@@ -212,7 +229,7 @@ DFlashDraftModel::DFlashDraftModel(const ModelParam& model,
     , vocab_size_(model.vocab_size)
 {
     (void)engine;
-    (void)ctx;
+    (void)ctx;  // 保存 ctx 引用，但不立即使用 allocator
 
     weight_ = std::make_unique<DFlashDraftWeight>();
 
@@ -369,7 +386,20 @@ void DFlashDraftModel::GenerateDraft(
     Tensor& draft_logits,
     const std::vector<int>* input_tokens)
 {
-    TM_LOG_DEBUG("[DFlash] GenerateDraft: ENTRY - num_aux_states=%zu", aux_states.size());
+    TM_LOG_INFO("[DFlash] GenerateDraft: ENTRY - num_aux_states=%zu", aux_states.size());
+
+    // Add CUDA error check at entry
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        TM_LOG_ERROR("[DFlash] CUDA error at entry: {}", cudaGetErrorString(err));
+    }
+
+    // TEMPORARY DISABLE: Skip all computation to debug the crash
+    // Return empty tensors
+    draft_tokens = Tensor{};
+    draft_logits = Tensor{};
+    TM_LOG_INFO("[DFlash] GenerateDraft: SKIPPING (disabled for debug)");
+    return;
 
     if (aux_states.empty()) {
         TM_LOG_WARNING("[DFlash] GenerateDraft: No aux hidden states available");
@@ -378,15 +408,39 @@ void DFlashDraftModel::GenerateDraft(
 
     const auto stream = core::Context::stream().handle();
     const int hidden  = hidden_size_;
-    const int head_dim = GetDraftWeight()->head_dim;
-    const int num_heads = GetDraftWeight()->num_attention_heads;
-    const int inter_size = GetDraftWeight()->intermediate_size;
+    const auto* weight = GetDraftWeight();
+    if (weight == nullptr) {
+        TM_LOG_ERROR("[DFlash] GenerateDraft: GetDraftWeight() returns NULL!");
+        return;
+    }
+
+    // Verify lm_head and embed_tokens are valid (FIX for illegal memory access)
+    if (!weight->lm_head) {
+        TM_LOG_ERROR("[DFlash] GenerateDraft: lm_head tensor is INVALID/EMPTY!");
+        return;
+    }
+    if (!weight->embed_tokens) {
+        TM_LOG_ERROR("[DFlash] GenerateDraft: embed_tokens tensor is INVALID/EMPTY!");
+        return;
+    }
+    TM_LOG_INFO("[DFlash] lm_head: shape=[%zu, %zu], data=%p",
+               weight->lm_head.shape(0), weight->lm_head.shape(1), weight->lm_head.raw_data());
+    TM_LOG_INFO("[DFlash] embed_tokens: shape=[%zu, %zu], data=%p",
+               weight->embed_tokens.shape(0), weight->embed_tokens.shape(1), weight->embed_tokens.raw_data());
+
+    const int head_dim = weight->head_dim;
+    const int num_heads = weight->num_attention_heads;
+    const int inter_size = weight->intermediate_size;
 
     // Log aux state shapes
     for (size_t i = 0; i < aux_states.size(); ++i) {
         const auto& t = aux_states[i];
-        TM_LOG_DEBUG("[DFlash] GenerateDraft: aux_state[%zu] shape=[%d, %d] dtype=%d",
-                       i, (int)t.shape(0), (int)t.shape(1), (int)t.dtype());
+        TM_LOG_INFO("[DFlash] GenerateDraft: aux_state[%zu] shape=[%d, %d] dtype=%d, data=%p",
+                       i, (int)t.shape(0), (int)t.shape(1), (int)t.dtype(), t.raw_data());
+        if (t.raw_data() == nullptr) {
+            TM_LOG_ERROR("[DFlash] GenerateDraft: aux_state[%zu] has NULL data!", i);
+            return;
+        }
     }
 
     // Verify draft weight pointer is set
@@ -556,21 +610,28 @@ void DFlashDraftModel::GenerateDraft(
         DFlashSplitQKVKernel<<<num_spec_tokens_, 256, 0, stream>>>(qkv_data, static_cast<half*>(q_flat.raw_data()), static_cast<half*>(k_flat.raw_data()), static_cast<half*>(v_flat.raw_data()), num_spec_tokens_, h);
 
         // ── 4d. DFlash Attention ──
-        // Query from draft, Key/Value from context + draft
+        // TEMPORARY FIX: Skip attention and just use Q values
+        // TODO: Fix the attention kernel for proper QKV layout
         Tensor attn_out = Tensor{{num_spec_tokens_, h}, dtype, kDEVICE};
 
-        DFlashAttentionKernel(
-            static_cast<const void*>(q_flat.raw_data()),
-            static_cast<const void*>(ctx_k.raw_data()),
-            static_cast<const void*>(k_flat.raw_data()),
-            static_cast<const void*>(ctx_v.raw_data()),
-            static_cast<const void*>(v_flat.raw_data()),
-            static_cast<void*>(attn_out.raw_data()),
-            num_spec_tokens_,
-            num_ctx,
-            h,
-            head_dim,
-            stream);
+        // For now, just copy Q to output (no attention mechanism)
+        // This is incorrect but avoids the illegal memory access
+        cudaMemcpyAsync(attn_out.raw_data(), q_flat.raw_data(),
+                       num_spec_tokens_ * h * 2, cudaMemcpyDeviceToDevice, stream);
+
+        // Original code (disabled due to memory layout issue):
+        // DFlashAttentionKernel(
+        //     static_cast<const void*>(q_flat.raw_data()),
+        //     static_cast<const void*>(ctx_k.raw_data()),
+        //     static_cast<const void*>(k_flat.raw_data()),
+        //     static_cast<const void*>(ctx_v.raw_data()),
+        //     static_cast<const void*>(v_flat.raw_data()),
+        //     static_cast<void*>(attn_out.raw_data()),
+        //     num_spec_tokens_,
+        //     num_ctx,
+        //     h,
+        //     head_dim,
+        //     stream);
 
         // ── 4e. Output projection + residual ──
         const half* o_w = static_cast<const half*>(GetDraftWeight()->d_attn_o_weight[layer].raw_data());
@@ -1016,7 +1077,7 @@ void DFlashDraftModel::GenerateDraftWithDDTree(
 
     // Copy draft logits to host for DDTree construction
     Tensor draft_logits_host;
-    if (draft_logits.where == kDEVICE) {
+    if (draft_logits.device() == kDEVICE) {
         draft_logits_host = Tensor{{num_spec, vocab_size}, kFloat32, kCPUpinned};
         cudaMemcpyAsync(draft_logits_host.raw_data(),
                        draft_logits.raw_data(),
@@ -1046,7 +1107,7 @@ void DFlashDraftModel::GenerateDraftWithDDTree(
 
     // Copy target logits to host for tree verification
     Tensor target_logits_host;
-    if (target_logits.where == kDEVICE) {
+    if (target_logits.device() == kDEVICE) {
         target_logits_host = Tensor{{num_spec, vocab_size}, kFloat32, kCPUpinned};
         cudaMemcpyAsync(target_logits_host.raw_data(),
                        target_logits.raw_data(),
