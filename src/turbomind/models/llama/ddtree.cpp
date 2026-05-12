@@ -3,6 +3,8 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <vector>
+#include "src/turbomind/core/tensor.h"
 
 namespace turbomind {
 

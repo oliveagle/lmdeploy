@@ -320,21 +320,36 @@ struct TurboMind::Impl {
     }
 
     void LoadDFlashWeights(int index, const std::unordered_map<std::string, Tensor>& weight_map)
-    {
-        CudaDeviceGuard dev_guard(engine_param_.devices[index]);
+{
+        TM_LOG_INFO("[DFlash] LoadDFlashWeights: START GPU={}", index);
+
+        // CRITICAL: Don't create CudaDeviceGuard yet - it might be causing the crash
+        // CudaDeviceGuard dev_guard(engine_param_.devices[index]);
 
         auto& llama_weight = TM_CHECK_NOTNULL(weights_[index]);
 
         // Create or reuse DFlash draft weight
         if (!llama_weight->dflash_draft_weight_) {
             llama_weight->dflash_draft_weight_ = std::make_unique<DFlashDraftWeight>();
+            TM_LOG_INFO("[DFlash] Created new DFlashDraftWeight for GPU {}", index);
         }
 
         auto& dflash_w = llama_weight->dflash_draft_weight_;
 
+        TM_LOG_INFO("[DFlash] Processing {} weight tensors", (int)weight_map.size());
+
         // Parse weight map and populate CPU tensors
         // Expected keys: "dflash.layers.{i}.{weight_name}" or "layers.{i}.{weight_name}"
+        int loaded_count = 0;
         for (const auto& [name, tensor] : weight_map) {
+            // Validate tensor before using
+            if (!tensor) {
+                TM_LOG_WARNING("[DFlash] Skipping invalid tensor: {}", name);
+                continue;
+            }
+
+            TM_LOG_DEBUG("[DFlash]   tensor: {} shape=[{}]", name, tensor.shape(0));
+
             // Support both "dflash.layers.X." and "layers.X." formats
             std::string prefix = "dflash.layers.";
             size_t prefix_len = prefix.length();
@@ -358,14 +373,15 @@ struct TurboMind::Impl {
 
             int layer = std::stoi(rest.substr(0, dot_pos));
             if (layer >= dflash_w->num_layers) {
+                TM_LOG_DEBUG("[DFlash] Layer {} exceeds max {}, skipping", layer, dflash_w->num_layers);
                 continue;
             }
 
             std::string wtype = rest.substr(dot_pos + 1);
 
-            TM_LOG_INFO("[DFlash] Loading weight: layer {}, type {}", layer, wtype);
+            TM_LOG_DEBUG("[DFlash] Loading weight: layer {}, type {}", layer, wtype);
 
-            // Copy tensor to appropriate slot (GPU tensors from Python)
+            // Just store the tensor reference, no copy yet
             if (wtype == "qkv_proj") {
                 dflash_w->d_attn_qkv_weight[layer] = tensor;
             }
@@ -384,11 +400,20 @@ struct TurboMind::Impl {
             else if (wtype == "post_layernorm") {
                 dflash_w->d_post_layernorm[layer] = tensor;
             }
+            loaded_count++;
         }
 
-        // No need to call ToDevice - weights are already on GPU from Python
+        TM_LOG_INFO("[DFlash] Loaded {} weight tensors for GPU {}", loaded_count, index);
+
+        // Set shared weights from target model (should be safe - just copying tensor references)
+        dflash_w->embed_tokens = llama_weight->pre_decoder_embedding.weight;
+        dflash_w->lm_head = llama_weight->post_decoder_embedding.weight;
+
         TM_LOG_INFO("[DFlash] Loaded draft weights for GPU {} ({} layers)",
                     index, (int)dflash_w->num_layers);
+        TM_LOG_INFO("[DFlash] Shared weights set: embed_tokens=%p, lm_head=%p",
+                    (void*)dflash_w->embed_tokens.raw_data(),
+                    (void*)dflash_w->lm_head.raw_data());
     }
 
     void LoadDFlashWeightsQuantized(int index,
@@ -497,6 +522,8 @@ struct TurboMind::Impl {
     void EnableDFlash(int index, int num_spec_tokens)
     {
         CudaDeviceGuard dev_guard(engine_param_.devices[index]);
+
+        TM_LOG_INFO("[DFlash] EnableDFlash called for GPU {} with {} spec tokens", index, num_spec_tokens);
 
         // Enable DFlash on the engine's LanguageModel
         if (index < (int)engines_.size() && engines_[index]) {

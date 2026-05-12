@@ -573,8 +573,9 @@ void LanguageModel::EnableDFlash(bool enable)
         dflash_model->SetDraftWeightPointer(impl->weights_.dflash_draft_weight_.get());
 
         // Verify weight pointer was set correctly
+        DFlashDraftWeight* weight = dflash_model->GetDraftWeight();
         TM_LOG_INFO("[DFlash] Verifying weight pointer: GetDraftWeight()=%p",
-                   dflash_model->GetDraftWeight());
+                   (void*)weight);
 
         // Attach draft model to decoder
         impl->unified_decoder_->SetDFlashDraftModel(dflash_model.release());

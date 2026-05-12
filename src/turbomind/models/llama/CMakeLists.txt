@@ -26,10 +26,9 @@ add_library(Llama STATIC
         GatedDeltaNetWeight.cc
         GatedDeltaNetLayer.cc
         gated_delta_net_kernels.cu
-        DFlashDraftModel.cc
+        DFlashDraftModel.cu
         DFlashDraftWeight.cc
         dflash_kernels.cu
-        ddtree.cpp
 )
 set_property(TARGET Llama PROPERTY POSITION_INDEPENDENT_CODE  ON)
 set_property(TARGET Llama PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS  ON)

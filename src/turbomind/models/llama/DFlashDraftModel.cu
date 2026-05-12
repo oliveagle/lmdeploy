@@ -225,7 +225,7 @@ DFlashDraftModel::DFlashDraftModel(const ModelParam& model,
     , num_draft_layers_(num_draft_layers)
     , num_aux_layers_(5)
     , num_spec_tokens_(num_spec_tokens)
-    , target_layer_ids_{1, 10, 19, 28, 37}
+    , target_layer_ids_{1, 10, 19, 28, 37}  // Draft model layers (for internal use only)
     , vocab_size_(model.vocab_size)
 {
     (void)engine;
@@ -388,18 +388,11 @@ void DFlashDraftModel::GenerateDraft(
 {
     TM_LOG_INFO("[DFlash] GenerateDraft: ENTRY - num_aux_states=%zu", aux_states.size());
 
-    // Add CUDA error check at entry
+    // Check CUDA error at entry
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         TM_LOG_ERROR("[DFlash] CUDA error at entry: {}", cudaGetErrorString(err));
     }
-
-    // TEMPORARY DISABLE: Skip all computation to debug the crash
-    // Return empty tensors
-    draft_tokens = Tensor{};
-    draft_logits = Tensor{};
-    TM_LOG_INFO("[DFlash] GenerateDraft: SKIPPING (disabled for debug)");
-    return;
 
     if (aux_states.empty()) {
         TM_LOG_WARNING("[DFlash] GenerateDraft: No aux hidden states available");
@@ -427,6 +420,29 @@ void DFlashDraftModel::GenerateDraft(
                weight->lm_head.shape(0), weight->lm_head.shape(1), weight->lm_head.raw_data());
     TM_LOG_INFO("[DFlash] embed_tokens: shape=[%zu, %zu], data=%p",
                weight->embed_tokens.shape(0), weight->embed_tokens.shape(1), weight->embed_tokens.raw_data());
+
+    // Check draft layer weights before running
+    bool all_weights_valid = true;
+    for (int layer = 0; layer < num_draft_layers_; ++layer) {
+        bool has_qkv = weight->d_attn_qkv_weight[layer] && weight->d_attn_qkv_weight[layer].raw_data() != nullptr;
+        bool has_o = weight->d_attn_o_weight[layer] && weight->d_attn_o_weight[layer].raw_data() != nullptr;
+        bool has_ln1 = weight->d_input_layernorm[layer] && weight->d_input_layernorm[layer].raw_data() != nullptr;
+        bool has_ln2 = weight->d_post_layernorm[layer] && weight->d_post_layernorm[layer].raw_data() != nullptr;
+        bool has_ffn = weight->d_gate_up_proj[layer] && weight->d_gate_up_proj[layer].raw_data() != nullptr &&
+                       weight->d_down_proj[layer] && weight->d_down_proj[layer].raw_data() != nullptr;
+        TM_LOG_INFO("[DFlash] Layer %d weights: qkv=%d, o=%d, ln1=%d, ln2=%d, ffn=%d",
+                   layer, has_qkv?1:0, has_o?1:0, has_ln1?1:0, has_ln2?1:0, has_ffn?1:0);
+        if (!has_qkv || !has_o || !has_ln1 || !has_ln2 || !has_ffn) {
+            all_weights_valid = false;
+        }
+    }
+
+    // If any weights are missing, skip DFlash generation
+    if (!all_weights_valid) {
+        TM_LOG_WARNING("[DFlash] Some draft weights are missing, skipping DFlash generation");
+        TM_LOG_WARNING("[DFlash] This is expected for prefill phase - DFlash only works during decode");
+        return;
+    }
 
     const int head_dim = weight->head_dim;
     const int num_heads = weight->num_attention_heads;
