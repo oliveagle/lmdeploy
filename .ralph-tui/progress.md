@@ -201,6 +201,31 @@ if stats:
 
 ---
 
+## 2026-05-14 - FR-1: DFlash 正确性
+
+**Status**: ✅ Already implemented
+
+All functional requirements for FR-1 are already present in the codebase:
+
+| FR Criterion | Implementation | Location |
+|-------------|----------------|----------|
+| FR-1.1: `global_token_num == 1` → DECODE MODE | `const bool is_decode = global_token_num == 1;` | unified_decoder.cc:386 |
+| FR-1.2: 获取 `dflash_stored_draft_tokens` | `args.try_("dflash_stored_draft_tokens")` | unified_decoder.cc:415 |
+| FR-1.3: 调用 `VerifyDraft()` | `dflash_draft_model_->VerifyDraft(...)` | unified_decoder.cc:428 |
+| FR-1.4: 输出 `dflash_accepted_tokens` | `args.produce("dflash_accepted_tokens", accepted)` | unified_decoder.cc:433 |
+| FR-1.5: Generation 检查并使用 | `env.contains("dflash_accepted_tokens")` | generation.cc:295 |
+
+**Files**: None (already implemented)
+- `src/turbomind/models/llama/unified_decoder.cc` - DECODE/PREFILL mode and VerifyDraft
+- `src/turbomind/generation/generation.cc` - Accepted tokens usage
+
+**Learnings:**
+- `args` and `env` are the same `TensorMap` object passed through the pipeline
+- `args.produce()` is equivalent to outputting to `env`
+- The `is_decode` flag is set based on `global_token_num == 1`, NOT `phase`
+
+---
+
 ## 2026-05-14 - US-004: Optimize DFlash Accept Rate
 
 **Status**: ✅ Completed
