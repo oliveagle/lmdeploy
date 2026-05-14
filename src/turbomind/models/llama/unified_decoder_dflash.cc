@@ -42,13 +42,13 @@ bool SetupDFlash(const std::string&     model_dir,
         decoder->SetDFlashDraftModel(dflash_model.release());
 
         TM_LOG_INFO("[DFlash] DFlash setup successful:");
-        TM_LOG_INFO("[DFlash]   num_spec_tokens: %d", dflash_param.num_spec_tokens);
-        TM_LOG_INFO("[DFlash]   draft_model_path: %s", dflash_param.draft_model_path.c_str());
+        TM_LOG_INFO("[DFlash]   num_spec_tokens: {}", dflash_param.num_spec_tokens);
+        TM_LOG_INFO("[DFlash]   draft_model_path: {}", dflash_param.draft_model_path);
 
         return true;
 
     } catch (const std::exception& e) {
-        TM_LOG_WARNING("[DFlash] Failed to setup DFlash: %s", e.what());
+        TM_LOG_WARNING("[DFlash] Failed to setup DFlash: {}", e.what());
         TM_LOG_WARNING("[DFlash] Falling back to normal decoder");
         return false;
     }

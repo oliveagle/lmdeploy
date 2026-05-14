@@ -6,11 +6,10 @@ DFlash 推理 Benchmark
 
 import os
 import time
-import sys
 
-os.environ['LD_LIBRARY_PATH'] = f'/home/oliveagle/opt/lmdeploy/lmdeploy/build/lib:{os.environ.get("LD_LIBRARY_PATH", "")}'
+os.environ['LD_LIBRARY_PATH'] = f'/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy/lib:{os.environ.get("LD_LIBRARY_PATH", "")}'
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True,max_split_size_mb:512'
-os.environ['LMDEPLOY_LOG_LEVEL'] = 'DEBUG'  # Enable DEBUG logging for DFlash
+os.environ['LMDEPLOY_LOG_LEVEL'] = 'WARNING'
 
 from lmdeploy import pipeline, TurbomindEngineConfig, SpeculativeConfig, GenerationConfig
 
@@ -28,6 +27,7 @@ prompts = [
     "什么是深度学习？",
     "Docker 有什么优势？",
 ]
+
 
 def main():
     print("=" * 60)
@@ -48,9 +48,9 @@ def main():
     tm_config = TurbomindEngineConfig(
         model_format='awq',
         tp=1,
-        cache_max_entry_count=0.2,
+        cache_max_entry_count=0.8,  # 80% 的可用显存
         quant_policy=8,
-        session_len=16384,
+        session_len=16384,  # 支持较长上下文
     )
 
     print("创建 Pipeline...")
@@ -58,7 +58,7 @@ def main():
         target_model,
         backend_config=tm_config,
         speculative_config=speculative_config,
-        log_level='DEBUG'  # DEBUG to see DFlash logs
+        log_level='WARNING'
     )
     print("✓ 创建成功！\n")
 
@@ -92,13 +92,27 @@ def main():
 
         print(f"{total_requests:<6} {elapsed:<10.3f} {output_tokens:<12} {tokens_per_sec:<15.2f}")
 
-        # 每 10 次请求打印一次统计
         if total_requests % 10 == 0:
             elapsed_total = time.time() - start_time
             avg_time = elapsed_total / total_requests
             print(f"  -> 当前平均: {avg_time:.3f}s/请求, {total_tokens/elapsed_total:.2f} tokens/s")
 
     total_time = time.time() - start_time
+
+    # 获取 DFlash 统计信息
+    try:
+        dflash_stats = pipe.async_engine.engine.get_dflash_stats()
+        if dflash_stats and dflash_stats.get('total_draft_tokens', 0) > 0:
+            accept_rate = dflash_stats['total_accepted_tokens'] / dflash_stats['total_draft_tokens'] * 100.0
+            mal = 1 + dflash_stats['total_accepted_tokens'] / dflash_stats['total_draft_steps'] if dflash_stats.get('total_draft_steps', 0) > 0 else 0
+        else:
+            accept_rate = 0.0
+            mal = 0.0
+    except Exception as e:
+        print(f"\n无法获取 DFlash 统计: {e}")
+        dflash_stats = {}
+        accept_rate = 0.0
+        mal = 0.0
 
     print("\n" + "=" * 60)
     print("Benchmark 结果")
@@ -108,9 +122,18 @@ def main():
     print(f"总耗时:     {total_time:.2f}s")
     print(f"平均耗时:   {total_time/total_requests:.3f}s/请求")
     print(f"平均速度:   {total_tokens/total_time:.2f} tokens/s")
+    print("\n" + "-" * 60)
+    print("DFlash Speculative Decoding 统计")
+    print("-" * 60)
+    print(f"总 draft 步数:       {dflash_stats.get('total_draft_steps', 0)}")
+    print(f"总 draft tokens:     {dflash_stats.get('total_draft_tokens', 0)}")
+    print(f"总 accepted tokens: {dflash_stats.get('total_accepted_tokens', 0)}")
+    print(f"Draft 接受率:        {accept_rate:.2f}%")
+    print(f"平均接受长度:        {mal:.2f}")
     print("=" * 60)
 
     del pipe
+
 
 if __name__ == "__main__":
     main()

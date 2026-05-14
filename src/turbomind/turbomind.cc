@@ -1137,6 +1137,16 @@ void TurboMind::GetDFlashStats(int index,
                                 int& total_accepted_tokens,
                                 int& total_rejected_tokens)
 {
+    // Check bounds to prevent segmentation fault
+    if (index < 0 || index >= (int)impl_->engines_.size()) {
+        TM_LOG_ERROR("[DFlash] GetDFlashStats: index {} out of bounds [0, {})",
+                     index, (int)impl_->engines_.size());
+        total_draft_steps = 0;
+        total_draft_tokens = 0;
+        total_accepted_tokens = 0;
+        total_rejected_tokens = 0;
+        return;
+    }
     return impl_->engines_[index].GetDFlashStats(total_draft_steps,
                                                     total_draft_tokens,
                                                     total_accepted_tokens,

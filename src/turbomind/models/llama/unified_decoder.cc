@@ -163,7 +163,7 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
     }
 
     // DFlash 调试：打印 Forward 开始时的状态
-    printf("[DFlash] Forward called: decoder=%p, enable_dflash_=%d, dflash_draft_model_=%p\n",
+    TM_LOG_DEBUG("[DFlash] Forward called: decoder=%p, enable_dflash_=%d, dflash_draft_model_=%p",
            (void*)this, (int)enable_dflash_, (void*)dflash_draft_model_);
 
     // DFlash: 预先获取 selected_token_pos（如果存在）
@@ -179,7 +179,7 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
                     enable_dflash_, (void*)dflash_draft_model_, phase);
     } else {
         if (!enable_dflash_) {
-            TM_LOG_INFO("[DFlash] NOT enabled: enable_dflash_=%d", (int)enable_dflash_);
+            TM_LOG_INFO("[DFlash] NOT enabled: enable_dflash_={}", (int)enable_dflash_);
         }
         if (!dflash_draft_model_) {
             TM_LOG_INFO("[DFlash] NO draft model: dflash_draft_model_={}", (void*)dflash_draft_model_);
@@ -312,7 +312,7 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
 
                     Copy(global_hidden_states, aux_hidden_states_[i]);
                     sync_check_cuda_error();  // Check for CUDA errors after copy
-                    TM_LOG_INFO("[DFlash] Collected aux hidden state at layer %d, token_num=%d, shape=[%d, %d]",
+                    TM_LOG_INFO("[DFlash] Collected aux hidden state at layer {}, token_num={}, shape=[{}, {}]",
                                 layer, (int)collect_size, (int)aux_hidden_states_[i].shape(0), (int)aux_hidden_states_[i].shape(1));
                     break;
                 }
@@ -385,7 +385,7 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
     const bool is_prefill = global_token_num > 1;
     const bool is_decode = global_token_num == 1;
 
-    TM_LOG_INFO("[DFlash] Checking conditions: enable=%d, model=%p, phase=%d, global_tokens=%d (prefill=%d, decode=%d)",
+    TM_LOG_INFO("[DFlash] Checking conditions: enable={}, model={}, phase={}, global_tokens={} (prefill={}, decode={})",
                 (int)enable_dflash_, (void*)dflash_draft_model_, phase, (int)global_token_num, (int)is_prefill, (int)is_decode);
 
     if (enable_dflash_ && dflash_draft_model_) {
@@ -394,7 +394,7 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
         // Log aux hidden state shapes
         for (size_t i = 0; i < aux_hidden_states_.size(); ++i) {
             const auto& t = aux_hidden_states_[i];
-            TM_LOG_INFO("[DFlash] aux_hidden_states_[%zu] shape=[%d, %d] dtype=%d",
+            TM_LOG_INFO("[DFlash] aux_hidden_states_[{}] shape=[{}, {}] dtype={}",
                        i, (int)t.shape(0), (int)t.shape(1), (int)t.dtype());
         }
 
@@ -402,7 +402,7 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
         auto* draft_weight = dflash_draft_model_->GetDraftWeight();
         if (!draft_weight || !draft_weight->lm_head || !draft_weight->embed_tokens) {
             TM_LOG_WARNING("[DFlash] Draft weights not properly loaded, skipping DFlash");
-            TM_LOG_WARNING("[DFlash]   draft_weight=%p, lm_head=%p, embed_tokens=%p",
+            TM_LOG_WARNING("[DFlash]   draft_weight={:p}, lm_head={:p}, embed_tokens={:p}",
                         (void*)draft_weight,
                         draft_weight ? (void*)draft_weight->lm_head.raw_data() : nullptr,
                         draft_weight ? (void*)draft_weight->embed_tokens.raw_data() : nullptr);

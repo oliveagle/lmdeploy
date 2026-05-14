@@ -301,27 +301,27 @@ struct Generation::Impl {
                 // Copy accepted tokens to output_ids
                 // TODO: need to handle multiple batches properly
                 int num_accepted = dflash_accepted.shape(0);
+                int num_draft = dflash_mask.shape(0);  // Total draft tokens generated
                 Copy(dflash_accepted.buffer(), num_accepted, output_ids_);
 
                 // Update DFlash statistics
                 dflash_total_accepted_tokens_ += num_accepted;
                 dflash_total_draft_steps_ += 1;
-                // Assuming 8 speculative tokens per step
-                dflash_total_draft_tokens_ += 8;
+                dflash_total_draft_tokens_ += num_draft;  // Use actual draft count, not hardcoded 8
 
-                TM_LOG_INFO("[DFlash] Using %d accepted tokens from DFlash (stats: steps=%d, accepted=%d, rejected=%d)",
-                           num_accepted, dflash_total_draft_steps_, dflash_total_accepted_tokens_,
-                           8 - num_accepted);
+                int num_rejected = num_draft - num_accepted;
+                dflash_total_rejected_tokens_ += num_rejected;
+
+                TM_LOG_INFO("[DFlash] Using %d accepted tokens from DFlash (stats: steps=%d, draft=%d, accepted=%d, rejected=%d)",
+                           num_accepted, dflash_total_draft_steps_, num_draft, num_accepted, num_rejected);
 
                 // Update token_ids_ptrs
                 AppendTokenIds(d.token_ids_ptrs.data(), output_ids_.data(), output_pos.data(), num_accepted, stream);
 
                 // For rejected tokens, still need to sample
-                int num_rejected = dflash_mask.shape(0) - num_accepted;
                 if (num_rejected > 0) {
-                    dflash_total_rejected_tokens_ += num_rejected;
                     TM_LOG_INFO("[DFlash] Sampling %d rejected tokens (stats: rejected=%d, total_rejected=%d)",
-                               num_rejected, dflash_total_rejected_tokens_);
+                               num_rejected, num_rejected, dflash_total_rejected_tokens_);
                     sampling_->Forward(phase, env);
                 }
 
