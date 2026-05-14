@@ -1,98 +1,63 @@
-# DFlash Implementation Progress
+# Ralph Progress Log
 
-## Codebase Patterns (discovered from recent changes)
+This file tracks progress across iterations. Agents update this file
+after each iteration and it's included in prompts for context.
 
-### 1. Speculative Config Integration
-- `SpeculativeConfig` added to `messages.py` for configuring speculative decoding
-- Added to `turbomind.py` Python API and C++ engine (`turbomind.cc`)
+## Codebase Patterns (Study These First)
 
-### 2. DFlash Draft Model Implementation
-- C++ files: `DFlashDraftModel.h/cc`, `DFlashDraftWeight.h/cc`, `dflash_kernels.h/cu`
-- Integrated into `unified_decoder.h/cc` for speculative decoding
-- Uses 5 hidden states (layers 1, 8, 16, 24, 31) from the target model
+### DFlash Speculative Decoding Log Pattern
 
-### 3. Benchmark Structure
-- Tests organized in `tests/dflash/` directory
-- Separate benchmarks for baseline and DFlash comparison
+All DFlash-related logs use the `[DFlash]` prefix for easy filtering:
+- `unified_decoder.cc`: DECODE/PREFILL mode transitions, draft token verification
+- `generation.cc`: Accepted tokens usage, statistics tracking
+- `language_model.cc`: EnableDFlash initialization, draft model creation
+- `turbomind.cc`: Weight loading, engine enablement
 
----
+### TensorMap args for DFlash
 
-## 2026-05-12: STORY-005 - Cleanup & Optimization
+Key tensors passed between modules via `args`:
+- `dflash_stored_draft_tokens`: Draft tokens from previous iteration (Tensor)
+- `dflash_accepted_tokens`: Verified tokens to output (Tensor)
+- `dflash_accept_mask`: Accept/reject mask (Tensor)
+- `logits`: Target model logits for verification (Tensor)
 
-### ✅ What was implemented
-1. **Removed verbose debug logging**:
-   - Replaced `dflash_log::` namespace wrapper with standard logging
-   - Converted `dflash_log::Info/Debug` to `TM_LOG_DEBUG`
-   - Converted `dflash_log::Error` to `TM_LOG_ERROR`
-   - Converted `dflash_log::Warning` to `TM_LOG_WARNING`
+### DFlash Enablement Flow
 
-2. **Cleaned up Chinese comments**:
-   - Translated all Chinese comments to English in `DFlashDraftModel.cu`
-   - Translated all Chinese comments to English in `DFlashDraftWeight.cc`
-   - Translated all Chinese comments to English in `DFlashDraftWeight.h`
+1. Python: `SpeculativeConfig(method='dflash')` → `turbomind.py`
+2. `turbomind.py`: `_load_dflash()` loads weights, calls `enable_dflash()`
+3. C++: `TurboMind::EnableDFlash` → `Engine::EnableDFlash` → `LanguageModel::EnableDFlash`
+4. `LanguageModel::EnableDFlash`: Creates `DFlashDraftModel`, sets on `UnifiedDecoder`
+5. `UnifiedDecoder::Forward`: Checks `enable_dflash_` and `dflash_draft_model_`
 
-3. **Improved code documentation**:
-   - English comments now consistently document DFlash implementation
-   - Preserved STORY-* references for feature tracking
+### global_token_num for Phase Detection
 
-### ✅ Files changed
-- Modified: `src/turbomind/models/llama/DFlashDraftModel.cu`
-  - Replaced ~63 `dflash_log::` calls with standard logging
-  - Removed Chinese comments
-- Modified: `src/turbomind/models/llama/DFlashDraftWeight.cc`
-  - Translated Chinese comments to English
-- Modified: `src/turbomind/models/llama/DFlashDraftWeight.h`
-  - Translated Chinese comments to English
-
-### 💡 Learnings
-1. **Standard logging pattern**: Use `TM_LOG_DEBUG/WARNING/ERROR` instead of custom namespaces
-2. **Comment consistency**: English comments ensure broader code maintainability
-3. **Cleanup scope**: Focused on main DFlash implementation files, left other files (unified_decoder, LlamaWeight) for future cleanup
-
-### ⚠️ Remaining work
-- Prefix cache code (STORY-010) remains in codebase but unused - can be removed in future cleanup
-- Some Chinese comments remain in `unified_decoder.cc` and `LlamaWeight.cc` - not critical for DFlash functionality
+Use `global_token_num` to distinguish prefill vs decode:
+- `global_token_num > 1`: Prefill mode (process prompt)
+- `global_token_num == 1`: Decode mode (generate tokens)
 
 ---
 
-## Previous Work (from git history)
+## 2026-05-14 - US-001: DFlash Decode Mode Execution
 
-### 2026-05-12 (earlier): STORY-004 - Performance Benchmarking
+**Status**: ✅ Already implemented
 
-### ✅ What was implemented
-1. **Baseline benchmark script**: `tests/dflash/benchmark_baseline.py`
-   - Measures single-user (chat) throughput
-   - Measures batch decoding throughput (batch sizes 4, 8)
-   - Generates JSON results file: `baseline_benchmark_results.json`
+All acceptance criteria for US-001 are already implemented in the codebase:
 
-### ✅ Files changed/added
-- Added: `tests/dflash/benchmark_baseline.py` - Baseline performance benchmark
-- Added: `tests/dflash/benchmark_dflash.py` - DFlash benchmark (for future comparison)
-- Results: `baseline_benchmark_results.json` - Benchmark output
+1. ✅ `[DFlash] === DECODE MODE: Verifying draft tokens ===` (unified_decoder.cc:412)
+2. ✅ `[DFlash] Found stored draft tokens` (unified_decoder.cc:418)
+3. ✅ `[DFlash] VerifyDraft: accepted=X tokens` (unified_decoder.cc:430)
+4. ✅ `[DFlash] Using X accepted tokens from DFlash` (generation.cc:311)
+5. ✅ generation.cc 中的 `dflash_accepted_tokens` 检查逻辑 (generation.cc:295)
 
-### ✅ Baseline Benchmark Results
-| Mode          | Throughput (tokens/s) | Avg Latency |
-|---------------|------------------------|-------------|
-| Single-user   | 83.39                  | 0.736s      |
-| Batch (size 4)| 338.67                 | 1.212s/batch|
-| Batch (size 8)| 639.71                 | 1.284s/batch|
+**Files Changed**: None (already implemented)
+- `src/turbomind/models/llama/unified_decoder.cc` - DECODE/PREFILL mode handling
+- `src/turbomind/generation/generation.cc` - Accepted tokens usage
 
-### 💡 Learnings
-1. **Environment setup**: Need to use the `~/venvs/lmdeploy/` virtual environment
-2. **Model config**: `session_len=8192` works well, avoids truncation warnings
-3. **LMDeploy pipeline API**: Use `sequence_start/sequence_end=True` for clean sessions
-4. **Batch processing**: Throughput scales linearly with batch size (8x batch → ~7.7x throughput)
-5. **Chat template**: Qwen3 needs `chat_template_kwargs={'enable_thinking': False}` for proper generation
+**Learnings:**
+- The `EnableDFlash` flow works correctly but was previously confused by warmup phase logs
+- Use `global_token_num` to detect prefill vs decode (NOT the `phase` variable)
+- Draft tokens are stored in `args["dflash_stored_draft_tokens"]` and verified on next decode
+- After verification, accepted tokens are output via `args["dflash_accepted_tokens"]`
 
 ---
 
-## Previous Work (from git history)
-
-### 2026-05-12 (earlier): STORY-003 - DDTree Verification
-- Commit `6e2400b7`: feat: STORY-003 - Implement DDTree Verification (Key Speed Boost)
-
-### 2026-05-12: STORY-002 - Verification Flow
-- Commit `7959a18b`: feat: STORY-002 - Implement Verification Flow
-
-### 2026-05-12: Initial DFlash Integration
-- C++ core implementation for DFlash speculative decoding

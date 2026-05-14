@@ -928,4 +928,12 @@ void Engine::EnableDFlash(bool enable)
     impl_->model_.EnableDFlash(enable);
 }
 
+void Engine::GetDFlashStats(int& total_draft_steps,
+                            int& total_draft_tokens,
+                            int& total_accepted_tokens,
+                            int& total_rejected_tokens)
+{
+    impl_->model_.GetDFlashStats(total_draft_steps, total_draft_tokens, total_accepted_tokens, total_rejected_tokens);
+}
+
 }  // namespace turbomind

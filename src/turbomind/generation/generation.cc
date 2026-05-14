@@ -75,6 +75,12 @@ struct Generation::Impl {
     const int max_batch_size_;
     const int session_len_;
 
+    // DFlash statistics
+    int dflash_total_draft_steps_{0};
+    int dflash_total_draft_tokens_{0};
+    int dflash_total_accepted_tokens_{0};
+    int dflash_total_rejected_tokens_{0};
+
     Impl(DataType              dtype,
          int                   max_batch_size,
          int                   session_len,
@@ -296,7 +302,15 @@ struct Generation::Impl {
                 int num_accepted = dflash_accepted.shape(0);
                 Copy(dflash_accepted.buffer(), num_accepted, output_ids_);
 
-                TM_LOG_INFO("[DFlash] Using %d accepted tokens from DFlash", num_accepted);
+                // Update DFlash statistics
+                dflash_total_accepted_tokens_ += num_accepted;
+                dflash_total_draft_steps_ += 1;
+                // Assuming 8 speculative tokens per step
+                dflash_total_draft_tokens_ += 8;
+
+                TM_LOG_INFO("[DFlash] Using %d accepted tokens from DFlash (stats: steps=%d, accepted=%d, rejected=%d)",
+                           num_accepted, dflash_total_draft_steps_, dflash_total_accepted_tokens_,
+                           8 - num_accepted);
 
                 // Update token_ids_ptrs
                 AppendTokenIds(d.token_ids_ptrs.data(), output_ids_.data(), output_pos.data(), num_accepted, stream);
@@ -304,7 +318,9 @@ struct Generation::Impl {
                 // For rejected tokens, still need to sample
                 int num_rejected = dflash_mask.shape(0) - num_accepted;
                 if (num_rejected > 0) {
-                    TM_LOG_INFO("[DFlash] Sampling %d rejected tokens", num_rejected);
+                    dflash_total_rejected_tokens_ += num_rejected;
+                    TM_LOG_INFO("[DFlash] Sampling %d rejected tokens (stats: rejected=%d, total_rejected=%d)",
+                               num_rejected, dflash_total_rejected_tokens_);
                     sampling_->Forward(phase, env);
                 }
             } else {
@@ -354,6 +370,14 @@ void Generation::Run(BatchOp op, int phase, TensorMap& env)
     else if (op == BatchOp::kUpdate) {
         return impl_->Update(phase, env);
     }
+}
+
+void Generation::GetDFlashStats(int& total_draft_steps, int& total_draft_tokens, int& total_accepted_tokens, int& total_rejected_tokens) const
+{
+    total_draft_steps = impl_->dflash_total_draft_steps_;
+    total_draft_tokens = impl_->dflash_total_draft_tokens_;
+    total_accepted_tokens = impl_->dflash_total_accepted_tokens_;
+    total_rejected_tokens = impl_->dflash_total_rejected_tokens_;
 }
 
 }  // namespace turbomind
