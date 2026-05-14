@@ -371,8 +371,12 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
     }
 
     // DFlash: aux_hidden_states 已在层循环中收集
+    // NOTE: phase == 0 is prefill phase, phase == 1 is decode phase
+    // For speculative decoding, we generate drafts in prefill and verify in decode
     TM_LOG_INFO("[DFlash] Checking DFlash conditions: enable_dflash_=%d, dflash_draft_model_=%p, phase=%d",
                 (int)enable_dflash_, (void*)dflash_draft_model_, phase);
+    // Only run DFlash in prefill phase (phase == 0) for now
+    // TODO: Add support for decode phase speculative decoding
     if (enable_dflash_ && dflash_draft_model_ && phase == 0) {
         TM_LOG_INFO("[DFlash] Phase={}: attempting speculative decoding", phase);
         TM_LOG_INFO("[DFlash] aux_hidden_states_.size()={}", aux_hidden_states_.size());

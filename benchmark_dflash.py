@@ -10,6 +10,7 @@ import sys
 
 os.environ['LD_LIBRARY_PATH'] = f'/home/oliveagle/opt/lmdeploy/lmdeploy/build/lib:{os.environ.get("LD_LIBRARY_PATH", "")}'
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True,max_split_size_mb:512'
+os.environ['LMDEPLOY_LOG_LEVEL'] = 'DEBUG'  # Enable DEBUG logging for DFlash
 
 from lmdeploy import pipeline, TurbomindEngineConfig, SpeculativeConfig, GenerationConfig
 
@@ -46,18 +47,19 @@ def main():
 
     tm_config = TurbomindEngineConfig(
         model_format='awq',
-        tensor_parallel=1,
+        tp=1,
         cache_max_entry_count=0.2,
         quant_policy=8,
-        session_len=16384,  # 增加到 16k
+        session_len=16384,
     )
 
     print("创建 Pipeline...")
     pipe = pipeline(
         target_model,
+        backend='turbomind',  # Explicitly use turbomind backend
         backend_config=tm_config,
         speculative_config=speculative_config,
-        log_level='INFO'  # Changed to INFO to see DFlash loading logs
+        log_level='DEBUG'  # DEBUG to see DFlash logs
     )
     print("✓ 创建成功！\n")
 
