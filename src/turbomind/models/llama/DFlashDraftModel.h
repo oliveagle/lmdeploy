@@ -177,10 +177,11 @@ private:
 
     // Config
     const int hidden_size_;
+    const int kv_hidden_;  // Key/value hidden dimension (for GQA)
     const int num_draft_layers_;
     const int num_aux_layers_;
     const int num_spec_tokens_;
-    const int target_layer_ids_[5];
+    int target_layer_ids_[5];  // Made non-const for runtime initialization
     const int vocab_size_;
 
     // ========== Prefix Cache (STORY-010) ==========

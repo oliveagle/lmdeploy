@@ -28,7 +28,12 @@ public:
     void Forward(int phase, TensorMap& env, const std::vector<WeightType*>& weights);
 
     // DFlash 支持
-    void EnableDFlash(bool enable) { enable_dflash_ = enable; }
+    void EnableDFlash(bool enable) {
+        TM_LOG_INFO("[DFlash] UnifiedDecoder::EnableDFlash: this={}, enable={}, enable_dflash_ before={}",
+                    (void*)this, enable, (int)enable_dflash_);
+        enable_dflash_ = enable;
+        TM_LOG_INFO("[DFlash] UnifiedDecoder::EnableDFlash: enable_dflash_ after={}", (int)enable_dflash_);
+    }
     bool IsDFlashEnabled() const { return enable_dflash_; }
     void SetDFlashDraftModel(DFlashDraftModel* model) { dflash_draft_model_ = model; }
     DFlashDraftModel* GetDFlashDraftModel() const { return dflash_draft_model_; }

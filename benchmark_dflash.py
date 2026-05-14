@@ -57,7 +57,7 @@ def main():
         target_model,
         backend_config=tm_config,
         speculative_config=speculative_config,
-        log_level='WARNING'
+        log_level='INFO'  # Changed to INFO to see DFlash loading logs
     )
     print("✓ 创建成功！\n")
 
