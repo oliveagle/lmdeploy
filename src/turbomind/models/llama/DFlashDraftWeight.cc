@@ -98,7 +98,7 @@ void DFlashDraftWeight::ToDevice(core::Allocator* allocator,
         move(d_post_layernorm[i],   post_layernorm[i]);
     }
 
-    TM_LOG_INFO("DFlashDraftWeight::ToDevice done, %d layers", num_layers);
+    TM_LOG_INFO("DFlashDraftWeight::ToDevice done, {} layers", num_layers);
 }
 
 }  // namespace turbomind

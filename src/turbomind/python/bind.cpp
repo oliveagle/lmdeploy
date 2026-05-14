@@ -597,12 +597,12 @@ PYBIND11_MODULE(_turbomind, m)
             [](TurboMind* model, int index) {
                 int total_draft_steps, total_draft_tokens, total_accepted_tokens, total_rejected_tokens;
                 model->GetDFlashStats(index, total_draft_steps, total_draft_tokens, total_accepted_tokens, total_rejected_tokens);
+                float accept_rate = total_draft_tokens > 0 ? (float)total_accepted_tokens / total_draft_tokens : 0.0f;
                 return py::dict("total_draft_steps"_a=total_draft_steps,
                                 "total_draft_tokens"_a=total_draft_tokens,
                                 "total_accepted_tokens"_a=total_accepted_tokens,
                                 "total_rejected_tokens"_a=total_rejected_tokens,
-                                "accept_rate"_a=(total_draft_tokens > 0 ? (float)total_accepted_tokens / total_draft_tokens : 0.0f));
+                                "accept_rate"_a=accept_rate);
             },
-            py::call_guard<py::gil_scoped_release>(),
             "index"_a);
 }

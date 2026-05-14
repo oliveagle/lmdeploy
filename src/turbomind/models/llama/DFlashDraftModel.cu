@@ -199,15 +199,15 @@ static void GemmFP16ComputeFP32(cublasHandle_t cublas,
 
     // Validate pointers before GEMM
     if (!A) {
-        TM_LOG_ERROR("[DFlash] %s: A is NULL! m=%d, n=%d, k=%d", label, m, n, k);
+        TM_LOG_ERROR("[DFlash] {}: A is NULL! m={}, n={}, k={}", label, m, n, k);
         return;
     }
     if (!B) {
-        TM_LOG_ERROR("[DFlash] %s: B is NULL! m=%d, n=%d, k=%d", label, m, n, k);
+        TM_LOG_ERROR("[DFlash] {}: B is NULL! m={}, n={}, k={}", label, m, n, k);
         return;
     }
     if (!C) {
-        TM_LOG_ERROR("[DFlash] %s: C is NULL! m=%d, n=%d, k=%d", label, m, n, k);
+        TM_LOG_ERROR("[DFlash] {}: C is NULL! m={}, n={}, k={}", label, m, n, k);
         return;
     }
 
@@ -240,7 +240,7 @@ static void GemmFP16ComputeFP32(cublasHandle_t cublas,
                                     CUBLAS_GEMM_DEFAULT_TENSOR_OP);  // Tensor op for FP16
 
     if (status != CUBLAS_STATUS_SUCCESS) {
-        TM_LOG_ERROR("[DFlash] %s: cuBLAS GEMM failed with status=%d", label, (int)status);
+        TM_LOG_ERROR("[DFlash] {}: cuBLAS GEMM failed with status={}", label, (int)status);
     }
 }
 
@@ -264,7 +264,7 @@ DFlashDraftModel::DFlashDraftModel(const ModelParam& model,
     (void)engine;
     (void)ctx;  // 保存 ctx 引用，但不立即使用 allocator
 
-    TM_LOG_INFO("[DFlash] DFlashDraftModel: hidden_size=%d, kv_hidden=%d, head_num=%zu, kv_head_num=%zu, head_dim=%zu",
+    TM_LOG_INFO("[DFlash] DFlashDraftModel: hidden_size={}, kv_hidden={}, head_num={}, kv_head_num={}, head_dim={}",
                 hidden_size_, kv_hidden_, model.head_num, model.kv_head_num, model.head_dim);
 
     // Calculate target_layer_ids based on the target model's layer count
@@ -293,7 +293,7 @@ DFlashDraftModel::DFlashDraftModel(const ModelParam& model,
         target_layer_ids_[4] = num_target_layers - 1;
     }
 
-    printf("[DFlash] target_layer_ids: {%d, %d, %d, %d, %d} for %d target layers\n",
+    TM_LOG_INFO("[DFlash] target_layer_ids: {%d, %d, %d, %d, %d} for %d target layers",
            target_layer_ids_[0], target_layer_ids_[1], target_layer_ids_[2],
            target_layer_ids_[3], target_layer_ids_[4], num_target_layers);
 
@@ -302,7 +302,7 @@ DFlashDraftModel::DFlashDraftModel(const ModelParam& model,
     // Create cuBLAS handle
     cublasStatus_t cublas_status = cublasCreate(&cublas_);
     if (cublas_status != CUBLAS_STATUS_SUCCESS) {
-        TM_LOG_ERROR("[DFlash] Failed to create cuBLAS handle: status=%d", (int)cublas_status);
+        TM_LOG_ERROR("[DFlash] Failed to create cuBLAS handle: status={}", (int)cublas_status);
         cublas_ = nullptr;
     }
 }
@@ -337,11 +337,11 @@ void DFlashDraftModel::ExtractAuxHidden(
             aux_states[i] = layer_outputs[layer_id];
         }
         else {
-            TM_LOG_WARNING("[DFlash] Layer %d not available in layer_outputs", layer_id);
+            TM_LOG_WARNING("[DFlash] Layer {} not available in layer_outputs", layer_id);
         }
     }
 
-    TM_LOG_DEBUG("[DFlash] Extracted %d aux hidden states", (int)aux_states.size());
+    TM_LOG_DEBUG("[DFlash] Extracted {} aux hidden states", (int)aux_states.size());
 }
 
 // ──────────────────────────────────────────
@@ -438,8 +438,7 @@ void DFlashDraftModel::StoreInPrefixCache(
     prefix_cache_[hash] = std::move(entry);
     cache_order_.push_back(hash);
 
-    TM_LOG_DEBUG("[DFlash PrefixCache] Stored new entry, cache size: %zu",
-                prefix_cache_.size());
+    TM_LOG_DEBUG("[DFlash PrefixCache] Stored new entry, cache size: {}", prefix_cache_.size());
 }
 
 // ──────────────────────────────────────────
@@ -452,7 +451,7 @@ void DFlashDraftModel::GenerateDraft(
     Tensor& draft_logits,
     const std::vector<int>* input_tokens)
 {
-    TM_LOG_INFO("[DFlash] GenerateDraft: ENTRY - num_aux_states=%zu", aux_states.size());
+    TM_LOG_INFO("[DFlash] GenerateDraft: ENTRY - num_aux_states={}", aux_states.size());
 
     // Check CUDA error at entry
     cudaError_t err = cudaGetLastError();
@@ -482,14 +481,14 @@ void DFlashDraftModel::GenerateDraft(
         TM_LOG_ERROR("[DFlash] GenerateDraft: embed_tokens tensor is INVALID/EMPTY!");
         return;
     }
-    TM_LOG_INFO("[DFlash] lm_head: shape=[%zu, %zu], data=%p",
-               weight->lm_head.shape(0), weight->lm_head.shape(1), weight->lm_head.raw_data());
-    TM_LOG_INFO("[DFlash] embed_tokens: shape=[%zu, %zu], data=%p",
-               weight->embed_tokens.shape(0), weight->embed_tokens.shape(1), weight->embed_tokens.raw_data());
+    TM_LOG_INFO("[DFlash] lm_head: shape=[{}, {}], data={:p}",
+               weight->lm_head.shape(0), weight->lm_head.shape(1), (void*)weight->lm_head.raw_data());
+    TM_LOG_INFO("[DFlash] embed_tokens: shape=[{}, {}], data={:p}",
+               weight->embed_tokens.shape(0), weight->embed_tokens.shape(1), (void*)weight->embed_tokens.raw_data());
 
     // Check draft layer weights before running
-    TM_LOG_DEBUG("[DFlash] num_draft_layers_=%d, num_layers=%d", num_draft_layers_, weight->num_layers);
-    TM_LOG_DEBUG("[DFlash] Weight vector sizes: qkv=%zu, o=%zu, ln1=%zu, ln2=%zu, ffn=%zu",
+    TM_LOG_DEBUG("[DFlash] num_draft_layers_={}, num_layers={}", num_draft_layers_, weight->num_layers);
+    TM_LOG_DEBUG("[DFlash] Weight vector sizes: qkv={}, o={}, ln1={}, ln2={}, ffn={}",
                  weight->d_attn_qkv_weight.size(),
                  weight->d_attn_o_weight.size(),
                  weight->d_input_layernorm.size(),
@@ -528,10 +527,10 @@ void DFlashDraftModel::GenerateDraft(
     // Log aux state shapes
     for (size_t i = 0; i < aux_states.size(); ++i) {
         const auto& t = aux_states[i];
-        TM_LOG_INFO("[DFlash] GenerateDraft: aux_state[%zu] shape=[%d, %d] dtype=%d, data=%p",
-                       i, (int)t.shape(0), (int)t.shape(1), (int)t.dtype(), t.raw_data());
+        TM_LOG_INFO("[DFlash] GenerateDraft: aux_state[{}] shape=[{}, {}] dtype={}, data={:p}",
+                       i, (int)t.shape(0), (int)t.shape(1), (int)t.dtype(), (void*)t.raw_data());
         if (t.raw_data() == nullptr) {
-            TM_LOG_ERROR("[DFlash] GenerateDraft: aux_state[%zu] has NULL data!", i);
+            TM_LOG_ERROR("[DFlash] GenerateDraft: aux_state[{}] has NULL data!", i);
             return;
         }
     }
@@ -541,7 +540,7 @@ void DFlashDraftModel::GenerateDraft(
         TM_LOG_ERROR("[DFlash] GenerateDraft: GetDraftWeight() returns NULL!");
         return;
     }
-    TM_LOG_DEBUG("[DFlash] GenerateDraft: Draft weight pointer OK - hidden_size=%d", hidden_size_);
+    TM_LOG_DEBUG("[DFlash] GenerateDraft: Draft weight pointer OK - hidden_size={}", hidden_size_);
 
     // Verify cuBLAS handle
     if (cublas_ == nullptr) {
@@ -588,7 +587,7 @@ void DFlashDraftModel::GenerateDraft(
     const int num_ctx = aux_states[0].shape(0);
     const auto dtype  = aux_states[0].dtype();  // Should be FP16
 
-    TM_LOG_DEBUG("[DFlash] GenerateDraft: num_ctx=%d, hidden_size=%d, num_draft_layers=%d, num_spec_tokens=%d",
+    TM_LOG_DEBUG("[DFlash] GenerateDraft: num_ctx={}, hidden_size={}, num_draft_layers={}, num_spec_tokens={}",
                    num_ctx, hidden, num_draft_layers_, num_spec_tokens_);
 
     // Skip context hidden and K/V computation if we have cache hit
@@ -609,7 +608,7 @@ void DFlashDraftModel::GenerateDraft(
             // Check for CUDA errors after async copy
             sync_check_cuda_error();
         }
-        TM_LOG_DEBUG("[DFlash] GenerateDraft: ctx_hidden shape=[%d, %d] created", num_ctx, hidden);
+        TM_LOG_DEBUG("[DFlash] GenerateDraft: ctx_hidden shape=[{}, {}] created", num_ctx, hidden);
 
         // ── 2) Compute context K and V ──
         // context_K = ctx_hidden @ W_ctx_k  → [num_ctx, hidden]
@@ -633,7 +632,7 @@ void DFlashDraftModel::GenerateDraft(
             const int qkv_out = qkv_weight.shape(0);  // Actual output dimension
             const half* qkv_w = static_cast<const half*>(qkv_weight.raw_data());
 
-            TM_LOG_DEBUG("[DFlash] QKV weight shape: [%d, %d], computing ctx_qkv [%d, %d]",
+            TM_LOG_DEBUG("[DFlash] QKV weight shape: [{}, {}], computing ctx_qkv [{}, {}]",
                         qkv_out, hidden, num_ctx, qkv_out);
 
             // Simplified: compute full QKV for context, then split
@@ -677,7 +676,7 @@ void DFlashDraftModel::GenerateDraft(
     cudaMemsetAsync(draft_hidden.raw_data(), 0, num_spec_tokens_ * hidden * 2, stream);
     cudaStreamSynchronize(stream);  // Sync to ensure memset completes
 
-    TM_LOG_DEBUG("[DFlash] GenerateDraft: Starting %d decoder layers...", num_draft_layers_);
+    TM_LOG_DEBUG("[DFlash] GenerateDraft: Starting {} decoder layers...", num_draft_layers_);
 
     // ── 4) 8 decoder layers ──
     for (int layer = 0; layer < num_draft_layers_; ++layer) {
@@ -814,7 +813,7 @@ void DFlashDraftModel::GenerateDraft(
         }
     }
 
-    TM_LOG_DEBUG("[DFlash] GenerateDraft: All %d decoder layers completed", num_draft_layers_);
+    TM_LOG_DEBUG("[DFlash] GenerateDraft: All {} decoder layers completed", num_draft_layers_);
 
     // ── 5) Final norm ──
     TM_LOG_DEBUG("[DFlash] GenerateDraft: Computing final norm...");
@@ -828,7 +827,7 @@ void DFlashDraftModel::GenerateDraft(
     const half* lm_w = static_cast<const half*>(GetDraftWeight()->lm_head.raw_data());
     if (lm_w && GetDraftWeight()->lm_head) {
         draft_logits = Tensor{{num_spec_tokens_, vocab_size_}, dtype, kDEVICE};
-        TM_LOG_DEBUG("[DFlash] GenerateDraft: draft_logits shape=[%d, %d]", num_spec_tokens_, vocab_size_);
+        TM_LOG_DEBUG("[DFlash] GenerateDraft: draft_logits shape=[{}, {}]", num_spec_tokens_, vocab_size_);
         GemmFP16ComputeFP32(cublas_,
                             static_cast<const half*>(final_norm.raw_data()),
                             lm_w,
@@ -852,7 +851,7 @@ void DFlashDraftModel::GenerateDraft(
     }
 
     sync_check_cuda_error();
-    TM_LOG_DEBUG("[DFlash] GenerateDraft: SUCCESS - generated %d draft tokens, returning", num_spec_tokens_);
+    TM_LOG_DEBUG("[DFlash] GenerateDraft: SUCCESS - generated {} draft tokens, returning", num_spec_tokens_);
 }
 
 // ──────────────────────────────────────────
@@ -978,8 +977,8 @@ void DFlashVerifyDraftGPU(
     const auto stream = core::Context::stream().handle();
 
     TM_LOG_DEBUG("[DFlash] DFlashVerifyDraftGPU starting:");
-    TM_LOG_DEBUG("[DFlash]   num_spec: %d", num_spec);
-    TM_LOG_DEBUG("[DFlash]   vocab_size: %d", vocab_size);
+    TM_LOG_DEBUG("[DFlash]   num_spec: {}", num_spec);
+    TM_LOG_DEBUG("[DFlash]   vocab_size: {}", vocab_size);
 
     accepted_tokens = Tensor{{num_spec}, kInt32, kDEVICE};
     accept_mask = Tensor{{num_spec}, kInt32, kDEVICE};
@@ -992,9 +991,9 @@ void DFlashVerifyDraftGPU(
     int smem = threads * (sizeof(float) + sizeof(int));
 
     TM_LOG_DEBUG("[DFlash] Launching DFlashVerifyDraftKernel:");
-    TM_LOG_DEBUG("[DFlash]   blocks: %d", num_spec);
-    TM_LOG_DEBUG("[DFlash]   threads/block: %d", threads);
-    TM_LOG_DEBUG("[DFlash]   smem/block: %d bytes", smem);
+    TM_LOG_DEBUG("[DFlash]   blocks: {}", num_spec);
+    TM_LOG_DEBUG("[DFlash]   threads/block: {}", threads);
+    TM_LOG_DEBUG("[DFlash]   smem/block: {} bytes", smem);
 
     const half* logits_data = static_cast<const half*>(target_logits.raw_data());
 
@@ -1045,12 +1044,12 @@ void DFlashDraftModel::VerifyDraft(
 
     TM_LOG_DEBUG("[DFlash] ================ VERIFY DRAFT START ================");
     TM_LOG_DEBUG("[DFlash] VerifyDraft called with:");
-    TM_LOG_DEBUG("[DFlash]   num_spec_tokens: %d", num_spec);
-    TM_LOG_DEBUG("[DFlash]   vocab_size: %d", vocab_size);
-    TM_LOG_DEBUG("[DFlash]   target_logits shape: [%zu, %zu]", target_logits.shape(0), target_logits.shape(1));
-    TM_LOG_DEBUG("[DFlash]   target_logits dtype: %d", (int)target_logits.dtype());
-    TM_LOG_DEBUG("[DFlash]   draft_tokens shape: [%zu]", draft_tokens.shape(0));
-    TM_LOG_DEBUG("[DFlash]   draft_tokens dtype: %d", (int)draft_tokens.dtype());
+    TM_LOG_DEBUG("[DFlash]   num_spec_tokens: {}", num_spec);
+    TM_LOG_DEBUG("[DFlash]   vocab_size: {}", vocab_size);
+    TM_LOG_DEBUG("[DFlash]   target_logits shape: [{}, {}]", target_logits.shape(0), target_logits.shape(1));
+    TM_LOG_DEBUG("[DFlash]   target_logits dtype: {}", (int)target_logits.dtype());
+    TM_LOG_DEBUG("[DFlash]   draft_tokens shape: [{}]", draft_tokens.shape(0));
+    TM_LOG_DEBUG("[DFlash]   draft_tokens dtype: {}", (int)draft_tokens.dtype());
 
     accepted_tokens = Tensor{{num_spec}, kInt32, kDEVICE};
     accept_mask = Tensor{{num_spec}, kInt32, kDEVICE};
@@ -1070,7 +1069,7 @@ void DFlashDraftModel::VerifyDraft(
 
     TM_LOG_DEBUG("[DFlash] Draft tokens:");
     for (int i = 0; i < num_spec; ++i) {
-        TM_LOG_DEBUG("[DFlash]   [%d] = %d", i, h_draft_tokens[i]);
+        TM_LOG_DEBUG("[DFlash]   [{}] = {}", i, h_draft_tokens[i]);
     }
 
     TM_LOG_DEBUG("[DFlash] Step 2: Launching GPU verification kernel...");
@@ -1127,20 +1126,20 @@ void DFlashDraftModel::VerifyDraft(
 
         if (h_accept_mask[i]) {
             accepted_count++;
-            TM_LOG_DEBUG("[DFlash]   [%d] ACCEPTED: draft=%d, accepted=%d, max_logit=%.4f, conf=%.4f",
+            TM_LOG_DEBUG("[DFlash]   [{}] ACCEPTED: draft={}, accepted={}, max_logit={:.4f}, conf={:.4f}",
                            i, h_draft_tokens[i], h_accepted_tokens[i], h_max_logits[i], prob);
         } else {
-            TM_LOG_DEBUG("[DFlash]   [%d] REJECTED: draft=%d, accepted=%d, max_logit=%.4f, conf=%.4f",
+            TM_LOG_DEBUG("[DFlash]   [{}] REJECTED: draft={}, accepted={}, max_logit={:.4f}, conf={:.4f}",
                            i, h_draft_tokens[i], h_accepted_tokens[i], h_max_logits[i], prob);
         }
     }
 
     float accept_rate = (float)accepted_count / (float)num_spec * 100.0f;
     TM_LOG_DEBUG("[DFlash] ================ VERIFICATION SUMMARY ================");
-    TM_LOG_DEBUG("[DFlash] Total draft tokens: %d", num_spec);
-    TM_LOG_DEBUG("[DFlash] Accepted tokens: %d", accepted_count);
-    TM_LOG_DEBUG("[DFlash] Rejected tokens: %d", num_spec - accepted_count);
-    TM_LOG_DEBUG("[DFlash] Acceptance rate: %.2f%%", accept_rate);
+    TM_LOG_DEBUG("[DFlash] Total draft tokens: {}", num_spec);
+    TM_LOG_DEBUG("[DFlash] Accepted tokens: {}", accepted_count);
+    TM_LOG_DEBUG("[DFlash] Rejected tokens: {}", num_spec - accepted_count);
+    TM_LOG_DEBUG("[DFlash] Acceptance rate: {:.2f}%", accept_rate);
     TM_LOG_DEBUG("[DFlash] ======================================================");
 }
 
@@ -1208,7 +1207,7 @@ void DFlashDraftModel::GenerateDraftWithDDTree(
         top_log_probs.data(), top_token_ids.data(),
         num_spec, ddtree_top_k_, ddtree_budget_, ddtree_chain_seed_);
 
-    TM_LOG_DEBUG("[DFlash DDTree] DDTree built: %d nodes (excluding root)", tree.n_nodes);
+    TM_LOG_DEBUG("[DFlash DDTree] DDTree built: {} nodes (excluding root)", tree.n_nodes);
 
     // Copy target logits to host for tree verification
     Tensor target_logits_host;
@@ -1302,7 +1301,7 @@ void DFlashDraftModel::GenerateDraftWithDDTree(
 
     num_accepted = accepted_count;
 
-    TM_LOG_INFO("[DFlash DDTree] Accepted tokens: %d/%d (%.1f%%)",
+    TM_LOG_INFO("[DFlash DDTree] Accepted tokens: {}/{} ({:.1f}%)",
                 num_accepted, num_spec,
                 (float)num_accepted / (float)num_spec * 100.0f);
 }

@@ -226,13 +226,13 @@ void LlamaWeight::LoadDFlashDraftWeight(const std::string& ckpt_path)
     // Python 侧通过 SetDFlashWeights() 传入各层权重
 
     TM_LOG_INFO("DFlash draft model weights loaded:");
-    TM_LOG_INFO("  num_layers: %d", dflash_draft_weight_->num_layers);
-    TM_LOG_INFO("  hidden_size: %d", dflash_draft_weight_->hidden_size);
-    TM_LOG_INFO("  intermediate_size: %d", dflash_draft_weight_->intermediate_size);
-    TM_LOG_INFO("  num_attention_heads: %d", dflash_draft_weight_->num_attention_heads);
-    TM_LOG_INFO("  num_key_value_heads: %d", dflash_draft_weight_->num_key_value_heads);
-    TM_LOG_INFO("  head_dim: %d", dflash_draft_weight_->head_dim);
-    TM_LOG_INFO("  rms_norm_eps: %f", dflash_draft_weight_->rms_norm_eps);
+    TM_LOG_INFO("  num_layers: {}", dflash_draft_weight_->num_layers);
+    TM_LOG_INFO("  hidden_size: {}", dflash_draft_weight_->hidden_size);
+    TM_LOG_INFO("  intermediate_size: {}", dflash_draft_weight_->intermediate_size);
+    TM_LOG_INFO("  num_attention_heads: {}", dflash_draft_weight_->num_attention_heads);
+    TM_LOG_INFO("  num_key_value_heads: {}", dflash_draft_weight_->num_key_value_heads);
+    TM_LOG_INFO("  head_dim: {}", dflash_draft_weight_->head_dim);
+    TM_LOG_INFO("  rms_norm_eps: {:.6f}", dflash_draft_weight_->rms_norm_eps);
     TM_LOG_INFO("  embed_tokens: [shared from target model]");
     TM_LOG_INFO("  lm_head: [shared from target model]");
 }
