@@ -3,10 +3,10 @@
   "sessionId": "1968837f-a7c5-4997-9200-c572249e592d",
   "status": "running",
   "startedAt": "2026-05-14T10:36:44.910Z",
-  "updatedAt": "2026-05-14T11:18:36.374Z",
-  "currentIteration": 2,
+  "updatedAt": "2026-05-14T11:31:46.291Z",
+  "currentIteration": 3,
   "maxIterations": 50,
-  "tasksCompleted": 2,
+  "tasksCompleted": 3,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -34,6 +34,16 @@
       "durationMs": 1106161,
       "startedAt": "2026-05-14T10:51:42.803Z",
       "endedAt": "2026-05-14T11:10:08.964Z"
+    },
+    {
+      "iteration": 3,
+      "status": "completed",
+      "taskId": "US-003",
+      "taskTitle": "验证 DFlash 对性能的影响",
+      "taskCompleted": true,
+      "durationMs": 506341,
+      "startedAt": "2026-05-14T11:10:10.032Z",
+      "endedAt": "2026-05-14T11:18:36.373Z"
     }
   ],
   "skippedTaskIds": [],
