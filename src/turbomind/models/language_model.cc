@@ -415,6 +415,8 @@ void LanguageModel::Impl::Prepare(int phase, TensorMap& env)
 
 void LanguageModel::Impl::Forward(int phase, TensorMap& env)
 {
+    TM_LOG_INFO("[DFlash] LanguageModel::Impl::Forward: this={}, unified_decoder_={}, phase={}",
+                (void*)this, (void*)unified_decoder_.get(), phase);
 
     auto& d = data_.at(phase);
     auto& b = *env.at("batch").data<BatchData*>()[0];
@@ -562,10 +564,17 @@ void LanguageModel::EnableDFlash(bool enable)
     // Create DFlash draft model
     try {
         TM_LOG_INFO("[DFlash] Creating DFlashDraftModel instance...");
+
+        // Get the actual number of draft layers from the loaded weights
+        int actual_num_layers = impl->weights_.dflash_draft_weight_->num_layers;
+        TM_LOG_INFO("[DFlash] Draft model has {} layers", actual_num_layers);
+
         auto dflash_model = std::make_unique<DFlashDraftModel>(
             impl->param_,
             impl->engine_param_,
-            *ctx
+            *ctx,
+            8,  // num_spec_tokens
+            actual_num_layers  // num_draft_layers - use actual loaded layer count
         );
 
         // Set the weight pointer (not copy)
@@ -576,6 +585,13 @@ void LanguageModel::EnableDFlash(bool enable)
         DFlashDraftWeight* weight = dflash_model->GetDraftWeight();
         TM_LOG_INFO("[DFlash] Verifying weight pointer: GetDraftWeight()=%p",
                    (void*)weight);
+
+        // Verify weights are accessible
+        if (weight && weight->num_layers > 0) {
+            TM_LOG_INFO("[DFlash] Verifying layer 0 weights: qkv valid={}, data={}",
+                       (bool)weight->d_attn_qkv_weight[0],
+                       (void*)weight->d_attn_qkv_weight[0].raw_data());
+        }
 
         // Attach draft model to decoder
         impl->unified_decoder_->SetDFlashDraftModel(dflash_model.release());

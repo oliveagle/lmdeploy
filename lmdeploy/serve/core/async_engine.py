@@ -176,7 +176,9 @@ class AsyncEngine:
         # Attach speculative_config to backend_config if provided
         if speculative_config is not None and backend_config is not None:
             backend_config.speculative_config = speculative_config
-        return tm.TurboMind.from_pretrained(model_path, engine_config=backend_config, **kwargs)
+        engine = tm.TurboMind.from_pretrained(model_path, engine_config=backend_config, **kwargs)
+        print(f'[DFlash DEBUG] _build_turbomind: engine id={id(engine)}, _tm_model id={id(engine._tm_model) if hasattr(engine, "_tm_model") else "N/A"}')
+        return engine
 
     def _build_pytorch(self,
                        model_path: str,

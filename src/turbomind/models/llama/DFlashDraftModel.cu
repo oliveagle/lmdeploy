@@ -131,84 +131,116 @@ __global__ void DFlashResidualRMSNormKernel(
 }
 
 // Split QKV kernel: extracts Q, K, V from QKV tensor
-// QKV: [num_rows, 3*hidden] → Q: [num_rows, hidden], K: [num_rows, hidden], V: [num_rows, hidden]
-// Optimized with half2 vectorized loads for better memory bandwidth.
+// For MHA (all heads same size): QKV: [num_rows, 3*hidden] → Q,K,V: [num_rows, hidden]
+// For GQA (separate KV heads): QKV: [num_rows, hidden + 2*kv_hidden] → Q: [num_rows, hidden], K,V: [num_rows, kv_hidden]
+// qkv_out: total output dimension of QKV projection
 __global__ void DFlashSplitQKVKernel(
-    const half* __restrict__ qkv,   // [num_rows, 3*hidden]
-    half* __restrict__ q,           // [num_rows, hidden]
-    half* __restrict__ k,           // [num_rows, hidden]
-    half* __restrict__ v,           // [num_rows, hidden]
+    const half* __restrict__ qkv,   // [num_rows, qkv_out]
+    half* __restrict__ q,           // [num_rows, hidden] (can be nullptr to skip Q copy)
+    half* __restrict__ k,           // [num_rows, kv_hidden] (can be nullptr to skip K copy)
+    half* __restrict__ v,           // [num_rows, kv_hidden] (can be nullptr to skip V copy)
     int num_rows,
-    int hidden)
+    int hidden,
+    int kv_hidden,
+    int qkv_out)
 {
     const int row = blockIdx.x;
     if (row >= num_rows) return;
 
-    const half* qkv_row = qkv + row * 3 * hidden;
-    half* q_row = q + row * hidden;
-    half* k_row = k + row * hidden;
-    half* v_row = v + row * hidden;
+    const half* qkv_row = qkv + row * qkv_out;
 
-    // Process 2 elements at a time using half2 vectorized loads/stores
-    const int hidden_aligned = (hidden / 2) * 2;
-    const half2* qkv_row2 = reinterpret_cast<const half2*>(qkv_row);
-    half2* q_row2 = reinterpret_cast<half2*>(q_row);
-    half2* k_row2 = reinterpret_cast<half2*>(k_row);
-    half2* v_row2 = reinterpret_cast<half2*>(v_row);
-
-    for (int i = threadIdx.x; i < hidden_aligned; i += 2 * blockDim.x) {
-        const int idx = i / 2;
-        half2 qkv_vec = qkv_row2[idx];
-        half2 k_vec = qkv_row2[idx + hidden / 2];
-        half2 v_vec = qkv_row2[idx + hidden];
-
-        q_row2[idx] = qkv_vec;
-        k_row2[idx] = k_vec;
-        v_row2[idx] = v_vec;
+    // Copy Q (first hidden elements): qkv[0:hidden] → q[0:hidden]
+    if (q != nullptr) {
+        half* q_row = q + row * hidden;
+        for (int i = threadIdx.x; i < hidden; i += blockDim.x) {
+            q_row[i] = qkv_row[i];
+        }
     }
 
-    // Handle odd dimension
-    if (hidden % 2 != 0) {
-        const int odd_idx = hidden - 1 - threadIdx.x;
-        if (odd_idx >= 0 && threadIdx.x == 0) {
-            q_row[odd_idx] = qkv_row[odd_idx];
-            k_row[odd_idx] = qkv_row[hidden + odd_idx];
-            v_row[odd_idx] = qkv_row[2 * hidden + odd_idx];
+    // Copy K (next kv_hidden elements): qkv[hidden:hidden+kv_hidden] → k[0:kv_hidden]
+    if (k != nullptr) {
+        half* k_row = k + row * kv_hidden;
+        const int k_offset = hidden;
+        for (int i = threadIdx.x; i < kv_hidden; i += blockDim.x) {
+            k_row[i] = qkv_row[k_offset + i];
+        }
+    }
+
+    // Copy V (last kv_hidden elements): qkv[hidden+kv_hidden:] → v[0:kv_hidden]
+    if (v != nullptr) {
+        half* v_row = v + row * kv_hidden;
+        const int v_offset = hidden + kv_hidden;
+        for (int i = threadIdx.x; i < kv_hidden; i += blockDim.x) {
+            v_row[i] = qkv_row[v_offset + i];
         }
     }
 }
 
 // ──────────────────────────────────────────
 // cuBLAS GEMM helper (FP16)
-// C = A * B, both row-major, no transpose
-// A: [m, k], B: [k, n] → C: [m, n]
+// Computes C = A * B^T where:
+// - A is [m, k] row-major from Python
+// - B is [n, k] row-major from Python (will be transposed)
+// - C is [m, n] row-major
 // ──────────────────────────────────────────
 
 static void GemmFP16ComputeFP32(cublasHandle_t cublas,
-                                const half* A,
-                                const half* B,
-                                half* C,
-                                int m,
-                                int n,
-                                int k)
+                                const half* A,  // [m, k] row-major
+                                const half* B,  // [n, k] row-major (transposed during GEMM)
+                                half* C,         // [m, n] row-major
+                                int m,           // rows of A and C
+                                int n,           // cols of C (and rows of B before transpose)
+                                int k,           // cols of A and B (before transpose)
+                                const char* label = "Gemm",  // Call site identifier
+                                cudaStream_t stream = 0)  // CUDA stream
 {
     float alpha = 1.0f;
     float beta  = 0.0f;
 
+    // Validate pointers before GEMM
+    if (!A) {
+        TM_LOG_ERROR("[DFlash] %s: A is NULL! m=%d, n=%d, k=%d", label, m, n, k);
+        return;
+    }
+    if (!B) {
+        TM_LOG_ERROR("[DFlash] %s: B is NULL! m=%d, n=%d, k=%d", label, m, n, k);
+        return;
+    }
+    if (!C) {
+        TM_LOG_ERROR("[DFlash] %s: C is NULL! m=%d, n=%d, k=%d", label, m, n, k);
+        return;
+    }
+
+    // Validate cuBLAS handle
+    if (!cublas) {
+        TM_LOG_ERROR("[DFlash] %s: cuBLAS handle is NULL!", label);
+        return;
+    }
+
+    // Set stream for cuBLAS
+    if (stream != 0) {
+        cublasSetStream(cublas, stream);
+    }
+
+    // For PyTorch row-major tensors, use transpose on B
+    // C = A @ B^T where:
+    // - A is [m, k] → column-major [k, m], lda = k
+    // - B is [n, k] → B^T is [k, n], column-major [n, k], ldb = n
+    // - C is [m, n] → column-major [n, m], ldc = n
     cublasStatus_t status = cublasGemmEx(cublas,
-                                        CUBLAS_OP_N,
-                                        CUBLAS_OP_N,
-                                        n, m, k,
-                                        &alpha,
-                                        B, CUDA_R_16F, n,
-                                        A, CUDA_R_16F, k,
-                                        &beta,
-                                        C, CUDA_R_16F, n,
-                                        CUBLAS_COMPUTE_32F,
-                                        CUBLAS_GEMM_DEFAULT);
+                                    CUBLAS_OP_N,  // A not transposed
+                                    CUBLAS_OP_T,  // B transposed: [n, k] → [k, n]
+                                    n, m, k,
+                                    &alpha,
+                                    B, CUDA_R_16F, n,  // B: [n, k] row-major, lda = n
+                                    A, CUDA_R_16F, k,  // A: [m, k] row-major, lda = k
+                                    &beta,
+                                    C, CUDA_R_16F, n,  // C: [m, n], lda = n
+                                    CUBLAS_COMPUTE_16F,  // Use FP16 compute for better compatibility
+                                    CUBLAS_GEMM_DEFAULT_TENSOR_OP);  // Tensor op for FP16
 
     if (status != CUBLAS_STATUS_SUCCESS) {
-        TM_LOG_ERROR("[DFlash] cuBLAS GEMM failed: status=%d", (int)status);
+        TM_LOG_ERROR("[DFlash] %s: cuBLAS GEMM failed with status=%d", label, (int)status);
     }
 }
 
@@ -222,14 +254,48 @@ DFlashDraftModel::DFlashDraftModel(const ModelParam& model,
                                    int num_spec_tokens,
                                    int num_draft_layers)
     : hidden_size_(model.hidden_units)
+    , kv_hidden_(model.kv_head_num > 0 ? (model.kv_head_num * model.head_dim) : model.hidden_units)
     , num_draft_layers_(num_draft_layers)
     , num_aux_layers_(5)
     , num_spec_tokens_(num_spec_tokens)
-    , target_layer_ids_{1, 10, 19, 28, 37}  // Draft model layers (for internal use only)
+    , target_layer_ids_()  // Initialize to zero, then fill in body
     , vocab_size_(model.vocab_size)
 {
     (void)engine;
     (void)ctx;  // 保存 ctx 引用，但不立即使用 allocator
+
+    TM_LOG_INFO("[DFlash] DFlashDraftModel: hidden_size=%d, kv_hidden=%d, head_num=%zu, kv_head_num=%zu, head_dim=%zu",
+                hidden_size_, kv_hidden_, model.head_num, model.kv_head_num, model.head_dim);
+
+    // Calculate target_layer_ids based on the target model's layer count
+    // For a model with model.layer_num layers, we pick 5 evenly spaced layers
+    int num_target_layers = model.layer_num;
+    if (num_target_layers >= 32) {
+        // 32 layers: {1, 8, 16, 24, 31}
+        target_layer_ids_[0] = 1;
+        target_layer_ids_[1] = num_target_layers * 1 / 4;
+        target_layer_ids_[2] = num_target_layers * 2 / 4;
+        target_layer_ids_[3] = num_target_layers * 3 / 4;
+        target_layer_ids_[4] = num_target_layers - 1;
+    } else if (num_target_layers >= 24) {
+        // 24 layers: {1, 6, 12, 18, 23}
+        target_layer_ids_[0] = 1;
+        target_layer_ids_[1] = num_target_layers * 1 / 4;
+        target_layer_ids_[2] = num_target_layers * 2 / 4;
+        target_layer_ids_[3] = num_target_layers * 3 / 4;
+        target_layer_ids_[4] = num_target_layers - 1;
+    } else {
+        // Default: evenly spaced
+        target_layer_ids_[0] = 1;
+        target_layer_ids_[1] = num_target_layers / 4;
+        target_layer_ids_[2] = num_target_layers / 2;
+        target_layer_ids_[3] = num_target_layers * 3 / 4;
+        target_layer_ids_[4] = num_target_layers - 1;
+    }
+
+    printf("[DFlash] target_layer_ids: {%d, %d, %d, %d, %d} for %d target layers\n",
+           target_layer_ids_[0], target_layer_ids_[1], target_layer_ids_[2],
+           target_layer_ids_[3], target_layer_ids_[4], num_target_layers);
 
     weight_ = std::make_unique<DFlashDraftWeight>();
 
@@ -422,16 +488,27 @@ void DFlashDraftModel::GenerateDraft(
                weight->embed_tokens.shape(0), weight->embed_tokens.shape(1), weight->embed_tokens.raw_data());
 
     // Check draft layer weights before running
+    TM_LOG_DEBUG("[DFlash] num_draft_layers_=%d, num_layers=%d", num_draft_layers_, weight->num_layers);
+    TM_LOG_DEBUG("[DFlash] Weight vector sizes: qkv=%zu, o=%zu, ln1=%zu, ln2=%zu, ffn=%zu",
+                 weight->d_attn_qkv_weight.size(),
+                 weight->d_attn_o_weight.size(),
+                 weight->d_input_layernorm.size(),
+                 weight->d_post_layernorm.size(),
+                 weight->d_gate_up_proj.size());
     bool all_weights_valid = true;
     for (int layer = 0; layer < num_draft_layers_; ++layer) {
-        bool has_qkv = weight->d_attn_qkv_weight[layer] && weight->d_attn_qkv_weight[layer].raw_data() != nullptr;
-        bool has_o = weight->d_attn_o_weight[layer] && weight->d_attn_o_weight[layer].raw_data() != nullptr;
-        bool has_ln1 = weight->d_input_layernorm[layer] && weight->d_input_layernorm[layer].raw_data() != nullptr;
-        bool has_ln2 = weight->d_post_layernorm[layer] && weight->d_post_layernorm[layer].raw_data() != nullptr;
-        bool has_ffn = weight->d_gate_up_proj[layer] && weight->d_gate_up_proj[layer].raw_data() != nullptr &&
-                       weight->d_down_proj[layer] && weight->d_down_proj[layer].raw_data() != nullptr;
-        TM_LOG_INFO("[DFlash] Layer %d weights: qkv=%d, o=%d, ln1=%d, ln2=%d, ffn=%d",
-                   layer, has_qkv?1:0, has_o?1:0, has_ln1?1:0, has_ln2?1:0, has_ffn?1:0);
+        bool has_qkv = layer < (int)weight->d_attn_qkv_weight.size() &&
+                       weight->d_attn_qkv_weight[layer] && weight->d_attn_qkv_weight[layer].raw_data() != nullptr;
+        bool has_o = layer < (int)weight->d_attn_o_weight.size() &&
+                    weight->d_attn_o_weight[layer] && weight->d_attn_o_weight[layer].raw_data() != nullptr;
+        bool has_ln1 = layer < (int)weight->d_input_layernorm.size() &&
+                      weight->d_input_layernorm[layer] && weight->d_input_layernorm[layer].raw_data() != nullptr;
+        bool has_ln2 = layer < (int)weight->d_post_layernorm.size() &&
+                      weight->d_post_layernorm[layer] && weight->d_post_layernorm[layer].raw_data() != nullptr;
+        bool has_ffn = layer < (int)weight->d_gate_up_proj.size() &&
+                      layer < (int)weight->d_down_proj.size() &&
+                      weight->d_gate_up_proj[layer] && weight->d_gate_up_proj[layer].raw_data() != nullptr &&
+                      weight->d_down_proj[layer] && weight->d_down_proj[layer].raw_data() != nullptr;
         if (!has_qkv || !has_o || !has_ln1 || !has_ln2 || !has_ffn) {
             all_weights_valid = false;
         }
@@ -542,36 +619,46 @@ void DFlashDraftModel::GenerateDraft(
         //
         // For now: derive context K/V from context hidden directly
         // by using the draft model's QKV split weights.
-        ctx_k = Tensor{{num_ctx, hidden}, dtype, kDEVICE};
-        ctx_v = Tensor{{num_ctx, hidden}, dtype, kDEVICE};
+        // For GQA: ctx_k and ctx_v are [num_ctx, kv_hidden]
+        ctx_k = Tensor{{num_ctx, kv_hidden_}, dtype, kDEVICE};
+        ctx_v = Tensor{{num_ctx, kv_hidden_}, dtype, kDEVICE};
 
         // Split QKV weight into Q, K, V components
-        // QKV weight is [hidden, 3*hidden] row-major
-        // Q = cols [0, hidden), K = cols [hidden, 2*hidden), V = cols [2*hidden, 3*hidden)
+        // QKV weight is [qkv_out, hidden] where qkv_out = hidden + 2*kv_hidden (column-major from PyTorch)
+        // For GQA: Q = [hidden, hidden], K = [kv_hidden, hidden], V = [kv_hidden, hidden]
+        // Concatenated: [hidden + 2*kv_hidden, hidden] = [qkv_out, hidden]
         if (GetDraftWeight()->d_attn_qkv_weight[0]) {
-            const int qkv_total = 3 * hidden;
-            const half* qkv_w = static_cast<const half*>(GetDraftWeight()->d_attn_qkv_weight[0].raw_data());
+            // Use actual QKV weight dimension instead of assuming 3*hidden
+            const auto& qkv_weight = GetDraftWeight()->d_attn_qkv_weight[0];
+            const int qkv_out = qkv_weight.shape(0);  // Actual output dimension
+            const half* qkv_w = static_cast<const half*>(qkv_weight.raw_data());
 
-            // Extract K weight: rows [0:hidden], cols [hidden:2*hidden]
-            // Extract V weight: rows [0:hidden], cols [2*hidden:3*hidden]
-            // For efficiency, create strided views or copy the relevant columns
+            TM_LOG_DEBUG("[DFlash] QKV weight shape: [%d, %d], computing ctx_qkv [%d, %d]",
+                        qkv_out, hidden, num_ctx, qkv_out);
 
             // Simplified: compute full QKV for context, then split
-            Tensor ctx_qkv = Tensor{{num_ctx, qkv_total}, dtype, kDEVICE};
+            // GEMM: ctx_hidden @ qkv_w^T = ctx_qkv
+            // ctx_hidden: [num_ctx, hidden], qkv_w: [qkv_out, hidden] → need transpose
+            // Result: [num_ctx, qkv_out]
+            Tensor ctx_qkv = Tensor{{num_ctx, qkv_out}, dtype, kDEVICE};
+
+            // Since PyTorch weight is [qkv_out, hidden] column-major (same as [hidden, qkv_out] row-major),
+            // we can treat it as already transposed for our computation
+            // Compute: ctx_qkv = ctx_hidden @ qkv_w^T where qkv_w^T is [hidden, qkv_out]
             GemmFP16ComputeFP32(cublas_,
                                 static_cast<const half*>(ctx_hidden.raw_data()),
                                 qkv_w,
                                 static_cast<half*>(ctx_qkv.raw_data()),
-                                num_ctx, qkv_total, hidden);
+                                num_ctx, qkv_out, hidden, "ctx_qkv", stream);
 
-            // Split: Q, K, V each [num_ctx, hidden]
+            // Split: Q discarded, K [num_ctx, kv_hidden], V [num_ctx, kv_hidden]
             const half* qkv_data = static_cast<const half*>(ctx_qkv.raw_data());
             half* k_data = static_cast<half*>(ctx_k.raw_data());
             half* v_data = static_cast<half*>(ctx_v.raw_data());
 
             // Use kernel instead of loop cudaMemcpyAsync
             const int threads = 256;
-            DFlashSplitQKVKernel<<<num_ctx, threads, 0, stream>>>(qkv_data, nullptr, k_data, v_data, num_ctx, hidden);
+            DFlashSplitQKVKernel<<<num_ctx, threads, 0, stream>>>(qkv_data, nullptr, k_data, v_data, num_ctx, hidden, kv_hidden_, qkv_out);
         }
         else {
             // Fallback: zero K/V if no weights loaded
@@ -588,42 +675,44 @@ void DFlashDraftModel::GenerateDraft(
     // ── 3) Initialize draft hidden states ──
     Tensor draft_hidden = Tensor{{num_spec_tokens_, hidden}, dtype, kDEVICE};
     cudaMemsetAsync(draft_hidden.raw_data(), 0, num_spec_tokens_ * hidden * 2, stream);
+    cudaStreamSynchronize(stream);  // Sync to ensure memset completes
 
     TM_LOG_DEBUG("[DFlash] GenerateDraft: Starting %d decoder layers...", num_draft_layers_);
 
     // ── 4) 8 decoder layers ──
     for (int layer = 0; layer < num_draft_layers_; ++layer) {
-        TM_LOG_DEBUG("[DFlash] GenerateDraft: Layer %d/%d starting", layer, num_draft_layers_);
-
         const int h = hidden;
+
+        // Get the actual QKV output dimension from the weight (for GQA support)
+        const int qkv_out = GetDraftWeight()->d_attn_qkv_weight[layer].shape(0);
 
         // ── 4a. Input RMSNorm ──
         Tensor norm1 = Tensor{{num_spec_tokens_, h}, dtype, kDEVICE};
         invokeRMSNorm(norm1, draft_hidden, GetDraftWeight()->d_input_layernorm[layer],
                       GetDraftWeight()->rms_norm_eps, stream);
-        // Removed sync_check_cuda_error() - avoid synchronization
+        cudaStreamSynchronize(stream);  // Sync to catch CUDA errors immediately
 
-        // ── 4b. QKV GEMM: [num_spec, hidden] @ [hidden, 3*hidden] → [num_spec, 3*hidden] ──
+        // ── 4b. QKV GEMM: [num_spec, hidden] @ [qkv_out, hidden] → [num_spec, qkv_out] ──
         const half* qkv_w = static_cast<const half*>(GetDraftWeight()->d_attn_qkv_weight[layer].raw_data());
-        Tensor qkv = Tensor{{num_spec_tokens_, 3 * h}, dtype, kDEVICE};
+        Tensor qkv = Tensor{{num_spec_tokens_, qkv_out}, dtype, kDEVICE};
 
         if (qkv_w) {
             GemmFP16ComputeFP32(cublas_,
                                 static_cast<const half*>(norm1.raw_data()),
                                 qkv_w,
                                 static_cast<half*>(qkv.raw_data()),
-                                num_spec_tokens_, 3 * h, h);
+                                num_spec_tokens_, qkv_out, h, "qkv", stream);
         }
 
         // ── 4c. Split Q/K/V and reshape for attention ──
-        // Q, K, V each [num_spec, hidden] then reshape to [num_spec, num_heads, head_dim]
+        // Q: [num_spec, hidden], K: [num_spec, kv_hidden], V: [num_spec, kv_hidden]
         const half* qkv_data = static_cast<const half*>(qkv.raw_data());
         Tensor q_flat = Tensor{{num_spec_tokens_, h}, dtype, kDEVICE};
-        Tensor k_flat = Tensor{{num_spec_tokens_, h}, dtype, kDEVICE};
-        Tensor v_flat = Tensor{{num_spec_tokens_, h}, dtype, kDEVICE};
+        Tensor k_flat = Tensor{{num_spec_tokens_, kv_hidden_}, dtype, kDEVICE};
+        Tensor v_flat = Tensor{{num_spec_tokens_, kv_hidden_}, dtype, kDEVICE};
 
         // Use kernel instead of loop cudaMemcpyAsync
-        DFlashSplitQKVKernel<<<num_spec_tokens_, 256, 0, stream>>>(qkv_data, static_cast<half*>(q_flat.raw_data()), static_cast<half*>(k_flat.raw_data()), static_cast<half*>(v_flat.raw_data()), num_spec_tokens_, h);
+        DFlashSplitQKVKernel<<<num_spec_tokens_, 256, 0, stream>>>(qkv_data, static_cast<half*>(q_flat.raw_data()), static_cast<half*>(k_flat.raw_data()), static_cast<half*>(v_flat.raw_data()), num_spec_tokens_, h, kv_hidden_, qkv_out);
 
         // ── 4d. DFlash Attention ──
         // TEMPORARY FIX: Skip attention and just use Q values
@@ -658,7 +747,7 @@ void DFlashDraftModel::GenerateDraft(
                                 static_cast<const half*>(attn_out.raw_data()),
                                 o_w,
                                 static_cast<half*>(attn_proj.raw_data()),
-                                num_spec_tokens_, h, h);
+                                num_spec_tokens_, h, h, "attn_o", stream);
         }
 
         // Add residual: draft_hidden = draft_hidden + attn_proj
@@ -692,7 +781,7 @@ void DFlashDraftModel::GenerateDraft(
                                 static_cast<const half*>(norm2.raw_data()),
                                 gu_w,
                                 static_cast<half*>(gate_out.raw_data()),
-                                num_spec_tokens_, inter_size, h);
+                                num_spec_tokens_, inter_size, h, "gate", stream);
 
             // GEMM: norm2 @ up_proj_weight → up_out (second half of gate_up weight)
             // up weight starts at offset hidden * inter_size in column-major layout
@@ -700,7 +789,7 @@ void DFlashDraftModel::GenerateDraft(
                                 static_cast<const half*>(norm2.raw_data()),
                                 gu_w + hidden * inter_size,
                                 static_cast<half*>(up_out.raw_data()),
-                                num_spec_tokens_, inter_size, h);
+                                num_spec_tokens_, inter_size, h, "up", stream);
 
             // silu(gate) * up (STORY-009: use V2 vectorized kernel for better memory bandwidth)
             int threads_m = 256 < (num_spec_tokens_ * inter_size) ? 256 : (num_spec_tokens_ * inter_size);
@@ -715,7 +804,7 @@ void DFlashDraftModel::GenerateDraft(
                                 static_cast<const half*>(gate_out.raw_data()),
                                 d_w,
                                 static_cast<half*>(mlp_out.raw_data()),
-                                num_spec_tokens_, h, inter_size);
+                                num_spec_tokens_, h, inter_size, "down", stream);
 
             // Add residual
             DFlashAddResidualKernel<<<(num_spec_tokens_ * h + threads - 1) / threads, threads, 0, stream>>>(
@@ -744,7 +833,7 @@ void DFlashDraftModel::GenerateDraft(
                             static_cast<const half*>(final_norm.raw_data()),
                             lm_w,
                             static_cast<half*>(draft_logits.raw_data()),
-                            num_spec_tokens_, vocab_size_, hidden);
+                            num_spec_tokens_, vocab_size_, hidden, "lm_head", stream);
     } else {
         TM_LOG_ERROR("[DFlash] GenerateDraft: LM head weight is NULL!");
     }

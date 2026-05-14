@@ -319,6 +319,18 @@ struct TurboMind::Impl {
         }
     }
 
+    // Helper function to copy tensor from host to device memory
+    static Tensor _TensorToDevice(const Tensor& src) {
+        if (!src) return Tensor{};
+        // Allocate device memory directly
+        void* dev_ptr = nullptr;
+        cudaMalloc(&dev_ptr, src.byte_size());
+        // Copy data from host to device
+        cudaMemcpy(dev_ptr, src.raw_data(), src.byte_size(), cudaMemcpyHostToDevice);
+        // Create tensor from device memory
+        return Tensor{dev_ptr, src.layout(), src.dtype(), kDEVICE};
+    }
+
     void LoadDFlashWeights(int index, const std::unordered_map<std::string, Tensor>& weight_map)
 {
         TM_LOG_INFO("[DFlash] LoadDFlashWeights: START GPU={}", index);
@@ -338,8 +350,51 @@ struct TurboMind::Impl {
 
         TM_LOG_INFO("[DFlash] Processing {} weight tensors", (int)weight_map.size());
 
-        // Parse weight map and populate CPU tensors
-        // Expected keys: "dflash.layers.{i}.{weight_name}" or "layers.{i}.{weight_name}"
+        // First pass: determine the maximum layer index to set num_layers correctly
+        int max_layer = -1;
+        for (const auto& [name, tensor] : weight_map) {
+            std::string prefix = "dflash.layers.";
+            size_t prefix_len = prefix.length();
+
+            // If name doesn't start with "dflash.layers.", try "layers."
+            if (name.find(prefix) != 0) {
+                prefix = "layers.";
+                prefix_len = prefix.length();
+                if (name.find(prefix) != 0) {
+                    continue;
+                }
+            }
+
+            std::string rest = name.substr(prefix_len);
+            size_t dot_pos = rest.find('.');
+            if (dot_pos == std::string::npos) {
+                continue;
+            }
+
+            int layer = std::stoi(rest.substr(0, dot_pos));
+            max_layer = std::max(max_layer, layer);
+        }
+
+        // Update num_layers based on actual weights
+        if (max_layer >= 0) {
+            int new_num_layers = max_layer + 1;
+            TM_LOG_INFO("[DFlash] Resizing weight vectors from {} to {} layers", dflash_w->num_layers, new_num_layers);
+            dflash_w->num_layers = new_num_layers;
+
+            // Resize all weight vectors to match the new num_layers
+            dflash_w->d_attn_qkv_weight.resize(new_num_layers);
+            dflash_w->d_attn_o_weight.resize(new_num_layers);
+            dflash_w->d_input_layernorm.resize(new_num_layers);
+            dflash_w->d_post_layernorm.resize(new_num_layers);
+            dflash_w->d_gate_up_proj.resize(new_num_layers);
+            dflash_w->d_down_proj.resize(new_num_layers);
+            dflash_w->d_qkv_scale.resize(new_num_layers);
+            dflash_w->d_o_scale.resize(new_num_layers);
+            dflash_w->d_gate_up_scale.resize(new_num_layers);
+            dflash_w->d_down_scale.resize(new_num_layers);
+        }
+
+        // Second pass: load weights
         int loaded_count = 0;
         for (const auto& [name, tensor] : weight_map) {
             // Validate tensor before using
@@ -382,23 +437,24 @@ struct TurboMind::Impl {
             TM_LOG_DEBUG("[DFlash] Loading weight: layer {}, type {}", layer, wtype);
 
             // Just store the tensor reference, no copy yet
+            // Note: tensors from Python are in pinned CPU memory, need to copy to GPU
             if (wtype == "qkv_proj") {
-                dflash_w->d_attn_qkv_weight[layer] = tensor;
+                dflash_w->d_attn_qkv_weight[layer] = _TensorToDevice(tensor);
             }
             else if (wtype == "o_proj") {
-                dflash_w->d_attn_o_weight[layer] = tensor;
+                dflash_w->d_attn_o_weight[layer] = _TensorToDevice(tensor);
             }
             else if (wtype == "input_layernorm") {
-                dflash_w->d_input_layernorm[layer] = tensor;
-            }
-            else if (wtype == "gate_up_proj") {
-                dflash_w->d_gate_up_proj[layer] = tensor;
-            }
-            else if (wtype == "down_proj") {
-                dflash_w->d_down_proj[layer] = tensor;
+                dflash_w->d_input_layernorm[layer] = _TensorToDevice(tensor);
             }
             else if (wtype == "post_layernorm") {
-                dflash_w->d_post_layernorm[layer] = tensor;
+                dflash_w->d_post_layernorm[layer] = _TensorToDevice(tensor);
+            }
+            else if (wtype == "gate_up_proj") {
+                dflash_w->d_gate_up_proj[layer] = _TensorToDevice(tensor);
+            }
+            else if (wtype == "down_proj") {
+                dflash_w->d_down_proj[layer] = _TensorToDevice(tensor);
             }
             loaded_count++;
         }
@@ -523,14 +579,19 @@ struct TurboMind::Impl {
     {
         CudaDeviceGuard dev_guard(engine_param_.devices[index]);
 
-        TM_LOG_INFO("[DFlash] EnableDFlash called for GPU {} with {} spec tokens", index, num_spec_tokens);
+        TM_LOG_INFO("[DFlash] EnableDFlash called for GPU {} with {} spec tokens, engines_.size()={}",
+                    index, num_spec_tokens, (int)engines_.size());
 
         // Enable DFlash on the engine's LanguageModel
         if (index < (int)engines_.size() && engines_[index]) {
+            TM_LOG_INFO("[DFlash] Calling engines_[{}].EnableDFlash(true), engines_[{}] valid", index, index);
             engines_[index].EnableDFlash(true);
             TM_LOG_INFO("[DFlash] DFlash enabled for GPU {} with {} spec tokens", index, num_spec_tokens);
         } else {
             TM_LOG_WARNING("[DFlash] Engine {} not created yet, cannot enable DFlash", index);
+            TM_LOG_WARNING("[DFlash]   index={}, engines_.size()={}, engines_[index] valid={}",
+                           index, (int)engines_.size(),
+                           index < (int)engines_.size() ? (bool)engines_[index] : false);
         }
     }
 };

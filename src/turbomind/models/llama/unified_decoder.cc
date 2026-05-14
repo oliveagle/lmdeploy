@@ -10,8 +10,7 @@
 #include "src/turbomind/core/tensor.h"
 #include "src/turbomind/kernels/core/math.h"
 #include "src/turbomind/kernels/norm/rms_norm.h"
-// Temporarily disable DFlash to fix build
-// #include "src/turbomind/models/llama/DFlashDraftModel.h"
+#include "src/turbomind/models/llama/DFlashDraftModel.h"
 #include "src/turbomind/models/llama/llama_kernels.h"
 #include "src/turbomind/models/llama/llama_utils.h"
 #include "src/turbomind/models/llama/moe_ffn_layer.h"
@@ -49,7 +48,7 @@ UnifiedDecoder::UnifiedDecoder(const ModelParam&     model,
     mlp_tp_size_(engine.mlp_tp_size),
     attn_tp_group_(ctx.comm.d_tp_group),
     rmsnorm_eps_(model.norm_eps),
-    dflash_aux_layers_{1, 8, 16, 24, 31},  // 32 层模型：step=(32-2)/(5-1)=7.5 → {1,8.5,16,23.5,31} → {1,8,16,24,31}
+    dflash_aux_layers_{1, 8, 16, 24, 31},  // 32 layer model: step=(32-2)/(5-1)=7.5 → {1,8.5,16,23.5,31} → {1,8,16,24,31}
     d_comm_(ctx.comm.d_comm),
     tune_layer_num_(model.tune_layer_num),
     is_warm_up_{*ctx.is_warm_up},
@@ -159,8 +158,8 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
     const DataType dtype = local_residual.dtype();
 
     // DFlash 调试：打印 Forward 开始时的状态
-    TM_LOG_INFO("[DFlash] Forward called: decoder=%p, enable_dflash_={}, dflash_draft_model_={}",
-                (void*)this, enable_dflash_, (void*)dflash_draft_model_);
+    printf("[DFlash] Forward called: decoder=%p, enable_dflash_=%d, dflash_draft_model_=%p\n",
+           (void*)this, (int)enable_dflash_, (void*)dflash_draft_model_);
 
     // DFlash: 预先获取 selected_token_pos（如果存在）
     const Buffer* selected_pos_ptr = nullptr;
@@ -175,7 +174,7 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
                     enable_dflash_, (void*)dflash_draft_model_, phase);
     } else {
         if (!enable_dflash_) {
-            TM_LOG_INFO("[DFlash] NOT enabled: enable_dflash_={}", enable_dflash_);
+            TM_LOG_INFO("[DFlash] NOT enabled: enable_dflash_=%d", (int)enable_dflash_);
         }
         if (!dflash_draft_model_) {
             TM_LOG_INFO("[DFlash] NO draft model: dflash_draft_model_={}", (void*)dflash_draft_model_);
@@ -372,8 +371,8 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
     }
 
     // DFlash: aux_hidden_states 已在层循环中收集
-    TM_LOG_INFO("[DFlash] Checking DFlash conditions: enable_dflash_={}, dflash_draft_model_={}, phase={}",
-                enable_dflash_, (void*)dflash_draft_model_, phase);
+    TM_LOG_INFO("[DFlash] Checking DFlash conditions: enable_dflash_=%d, dflash_draft_model_=%p, phase=%d",
+                (int)enable_dflash_, (void*)dflash_draft_model_, phase);
     if (enable_dflash_ && dflash_draft_model_ && phase == 0) {
         TM_LOG_INFO("[DFlash] Phase={}: attempting speculative decoding", phase);
         TM_LOG_INFO("[DFlash] aux_hidden_states_.size()={}", aux_hidden_states_.size());
@@ -405,8 +404,9 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
                 dflash_draft_model_->GenerateDraft(aux_hidden_states_, draft_tokens, draft_logits);
                 TM_LOG_INFO("[DFlash] GenerateDraft COMPLETED");
 
-                TM_LOG_INFO("[DFlash] GenerateDraft returned: draft_tokens={}, draft_logits={}",
-                            (void*)draft_tokens.raw_data(), (void*)draft_logits.raw_data());
+                // Check if tensors have valid data before accessing raw_data()
+                TM_LOG_INFO("[DFlash] GenerateDraft returned: draft_tokens valid=%d, draft_logits valid=%d",
+                            draft_tokens ? 1 : 0, draft_logits ? 1 : 0);
 
                 if (draft_tokens && draft_tokens.shape(0) > 0) {
                     TM_LOG_INFO("[DFlash] Draft tokens generated: count={}", draft_tokens.shape(0));
@@ -428,7 +428,12 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
                         TM_LOG_INFO("[DFlash] Success: {} accepted draft tokens output to Generation",
                                   accepted.shape(0));
                     } else {
-                        TM_LOG_WARNING("[DFlash] No target logits found in args!");
+                        // TODO: Fix verification - need to get target logits from the target model
+                        // For now, just log that we generated draft tokens but can't verify them
+                        TM_LOG_DEBUG("[DFlash] No target logits found in args (expected during prefill phase)");
+                        // Still output the draft tokens so they can be used later
+                        args.produce("dflash_draft_tokens", draft_tokens);
+                        args.produce("dflash_draft_logits", draft_logits);
                     }
                 } else {
                     TM_LOG_WARNING("[DFlash] GenerateDraft returned empty tokens!");

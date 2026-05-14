@@ -175,6 +175,7 @@ class TurboMind:
 
         # Save speculative_config for DFlash draft model loading
         self.speculative_config = _engine_config.speculative_config
+        print(f'[DFlash INIT] speculative_config={self.speculative_config}, type={type(self.speculative_config)}')
 
         if not osp.exists(model_path):
             model_path = get_model(model_path, _engine_config.download_dir, _engine_config.revision)
@@ -182,12 +183,22 @@ class TurboMind:
         self.is_dummy = self.model_comm.is_dummy_node()
         self.tokenizer = Tokenizer(model_path)
         if not _engine_config.empty_init:
+            print(f'[DFlash] _engine_config.empty_init=False, checking speculative_config')
             self._load_weights()
             self._process_weights()
             self._create_engine()
-            # Load DFlash draft model if speculative_config is provided (after engine creation)
+            print(f'[DFlash] _create_engine completed')
+            # Load DFlash draft model AFTER engine creation (Engine must be created first!)
+            print(f'[DFlash] Checking speculative_config: self.speculative_config={self.speculative_config}')
             if self.speculative_config is not None:
+                print(f'[DFlash] speculative_config is not None, calling _load_dflash_model AFTER _create_engine')
+                print(f'[DFlash]   self.speculative_config type={type(self.speculative_config)}')
+                print(f'[DFlash]   self.speculative_config method={self.speculative_config.method if hasattr(self.speculative_config, "method") else "N/A"}')
                 self._load_dflash_model()
+            else:
+                print(f'[DFlash] speculative_config is None, skipping _load_dflash_model')
+        else:
+            print(f'[DFlash] _engine_config.empty_init=True, skipping weight loading')
 
         self.session_len = self.config.session_len
 
@@ -323,24 +334,44 @@ class TurboMind:
         This method loads the draft model specified in speculative_config
         and prepares it for speculative decoding with the target model.
         """
+        print('[DFlash DEBUG] _load_dflash_model called')
+        print(f'[DFlash DEBUG] speculative_config={self.speculative_config}, type={type(self.speculative_config)}')
+
         if self.speculative_config is None:
+            print('[DFlash DEBUG] speculative_config is None, returning')
             return
 
+        # speculative_config may be a dict (from TurbomindModelConfig) or SpeculativeConfig object
+        if isinstance(self.speculative_config, dict):
+            # Convert dict to SpeculativeConfig
+            from lmdeploy.messages import SpeculativeConfig as SpecConfig
+            spec_dict = self.speculative_config
+            self.speculative_config = SpecConfig(
+                method=spec_dict.get('method', 'dflash'),
+                model=spec_dict.get('model', ''),
+                num_speculative_tokens=spec_dict.get('num_speculative_tokens', 8),
+                quant_policy=spec_dict.get('quant_policy', 0),
+                group_size=spec_dict.get('group_size', 128),
+                num_groups_per_channel=spec_dict.get('num_groups_per_channel', 1),
+            )
+            print(f'[DFlash DEBUG] Converted dict to SpeculativeConfig: {self.speculative_config}')
+
         if not isinstance(self.speculative_config, SpeculativeConfig):
-            logger.warning('speculative_config is not a SpeculativeConfig instance, '
-                           'skipping draft model loading')
+            print(f'[DFlash WARNING] speculative_config is not a SpeculativeConfig instance (type={type(self.speculative_config)}), '
+                  'skipping draft model loading')
             return
 
         if self.speculative_config.method not in ('dflash', 'eagle'):
-            logger.warning(f'Unknown speculative decoding method: {self.speculative_config.method}, '
-                           'skipping draft model loading')
+            print(f'[DFlash WARNING] Unknown speculative decoding method: {self.speculative_config.method}, '
+                  'skipping draft model loading')
             return
 
         draft_model_path = self.speculative_config.model
         if not draft_model_path:
-            logger.warning('speculative_config.model is empty, skipping draft model loading')
+            print('[DFlash WARNING] speculative_config.model is empty, skipping draft model loading')
             return
 
+        print(f'[DFlash] Loading DFlash draft model from {draft_model_path}')
         logger.info(f'Loading DFlash draft model from {draft_model_path}')
 
         # Detect quantization type (STORY-008)
@@ -384,9 +415,11 @@ class TurboMind:
                 break
 
         if safetensors_path is None:
+            print(f'[DFlash WARNING] No safetensors file found in {draft_model_path}')
             logger.warning(f'No safetensors file found in {draft_model_path}')
             return
 
+        print(f'[DFlash] Loading DFlash weights from {safetensors_path}')
         logger.info(f'Loading DFlash weights from {safetensors_path}')
 
         # Collect weights per layer to combine QKV
@@ -414,6 +447,7 @@ class TurboMind:
                     tensor = f.get_tensor(key)
 
                     # Map HF key to DFlash weight type
+                    # QKV weights are handled separately
                     if 'self_attn.q_proj' in key:
                         layer_weights[layer_idx]['q'] = tensor
                     elif 'self_attn.k_proj' in key:
@@ -424,20 +458,26 @@ class TurboMind:
                         layer_weights[layer_idx]['o_proj'] = tensor
                     elif 'input_layernorm' in key:
                         layer_weights[layer_idx]['input_layernorm'] = tensor
-                    elif 'mlp.gate_up_proj' in key:
-                        layer_weights[layer_idx]['gate_up_proj'] = tensor
+                    # MLP weights: gate_proj and up_proj are stored separately in HF
+                    elif 'mlp.gate_proj' in key:
+                        layer_weights[layer_idx]['gate_proj'] = tensor
+                    elif 'mlp.up_proj' in key:
+                        layer_weights[layer_idx]['up_proj'] = tensor
                     elif 'mlp.down_proj' in key:
                         layer_weights[layer_idx]['down_proj'] = tensor
                     elif 'post_attention_layernorm' in key:
                         layer_weights[layer_idx]['post_layernorm'] = tensor
         except Exception as e:
+            print(f'[DFlash ERROR] Failed to load safetensors: {e}')
             logger.warning(f'Failed to load safetensors: {e}')
             return
 
+        print(f'[DFlash] DFlash weights prepared: {len(layer_weights)} layers')
         logger.info(f'DFlash weights prepared: {len(layer_weights)} layers')
 
         # Second pass: combine QKV and load
         def _load_on_rank(device_id):
+            print(f'[DFlash] _load_on_rank: device_id={device_id}')
             import torch
             tm_map = _tm.TensorMap()
 
@@ -460,9 +500,22 @@ class TurboMind:
                         tm_tensor = _tm.from_dlpack(dlpack_tensor)
                         tm_map[f'dflash.layers.{layer_idx}.qkv_proj'] = tm_tensor
 
-                    # Load other weights
+                    # Combine gate_proj and up_proj (HF stores them separately)
+                    if 'gate_proj' in weights and 'up_proj' in weights:
+                        gate = weights['gate_proj'].float() if weights['gate_proj'].dtype != torch.float32 else weights['gate_proj']
+                        up = weights['up_proj'].float() if weights['up_proj'].dtype != torch.float32 else weights['up_proj']
+
+                        # Concatenate along output dim: [intermediate, hidden] -> [2*intermediate, hidden]
+                        gate_up = torch.cat([gate, up], dim=0)
+                        gate_up_np = gate_up.numpy().astype(np.float16)
+
+                        dlpack_tensor = torch.from_numpy(gate_up_np)
+                        tm_tensor = _tm.from_dlpack(dlpack_tensor)
+                        tm_map[f'dflash.layers.{layer_idx}.gate_up_proj'] = tm_tensor
+
+                    # Load other weights (excluding q, k, v, gate_proj, up_proj which are already handled)
                     for wtype, tensor in weights.items():
-                        if wtype in ['q', 'k', 'v']:
+                        if wtype in ['q', 'k', 'v', 'gate_proj', 'up_proj']:
                             continue
 
                         dflash_key = f'dflash.layers.{layer_idx}.{wtype}'
@@ -471,8 +524,10 @@ class TurboMind:
                         tm_tensor = _tm.from_dlpack(dlpack_tensor)
                         tm_map[dflash_key] = tm_tensor
 
+                print(f'[DFlash] _load_on_rank: device_id={device_id}, loaded {len(dict(tm_map))} tensors')
                 logger.info(f'DFlash: loading {len(dict(tm_map))} tensors on device {device_id}')
                 self.model_comm.load_dflash_weights(device_id, tm_map)
+                print(f'[DFlash] _load_on_rank: device_id={device_id}, load_dflash_weights called')
                 logger.info(f'DFlash: load complete on device {device_id}')
 
         with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
@@ -480,10 +535,13 @@ class TurboMind:
 
         # 4. Enable DFlash on all GPUs
         num_spec = self.speculative_config.num_speculative_tokens or 8
+        print(f'[DFlash] Enabling DFlash on all GPUs with num_spec={num_spec}')
         logger.info(f'DFlash: enabling with num_spec={num_spec}')
         def _enable_on_rank(device_id):
+            print(f'[DFlash] _enable_on_rank: device_id={device_id}')
             logger.info(f'DFlash: enabling on device {device_id}')
             self.model_comm.enable_dflash(device_id, num_spec)
+            print(f'[DFlash] _enable_on_rank: device_id={device_id}, enabled')
             logger.info(f'DFlash: enabled on device {device_id}')
         with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
             list(e.map(_enable_on_rank, range(self.gpu_count)))
