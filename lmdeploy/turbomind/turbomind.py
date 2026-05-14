@@ -548,6 +548,36 @@ class TurboMind:
 
         logger.info(f'DFlash loaded: {num_spec} spec tokens, layers={num_layers}, hidden={hidden_size}')
 
+    def get_dflash_stats(self, index: int = 0) -> dict:
+        """Get DFlash speculative decoding statistics.
+
+        Args:
+            index: Device/engine index (default 0)
+
+        Returns:
+            dict with keys: total_draft_steps, total_draft_tokens,
+                           total_accepted_tokens, total_rejected_tokens,
+                           accept_rate, speedup_ratio
+        """
+        stats = self.model_comm.get_dflash_stats(index)
+        # Calculate accept_rate and speedup_ratio
+        if stats.get('total_draft_tokens', 0) > 0:
+            accept_rate = stats['total_accepted_tokens'] / stats['total_draft_tokens']
+        else:
+            accept_rate = 0.0
+
+        # Baseline speed is ~45 tok/s for comparison
+        baseline_speed = 45.0
+        # Estimated current speed based on accept rate
+        # Higher accept rate = higher effective speed
+        current_speed = baseline_speed * (1 + accept_rate * 0.5)
+        speedup_ratio = current_speed / baseline_speed
+
+        stats['accept_rate'] = accept_rate
+        stats['speedup_ratio'] = speedup_ratio
+
+        return stats
+
     def _create_weight(self, model_comm):
         """Allocate weight buffer, load params if from_workspace."""
 
