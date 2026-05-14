@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-DFlash 推理 Benchmark
-运行约 30 秒，测试 DFlash speculative decoding 性能
+DFlash 推理 Benchmark (带调试信息)
 """
 
 import os
@@ -10,7 +9,7 @@ import sys
 
 os.environ['LD_LIBRARY_PATH'] = f'/home/oliveagle/opt/lmdeploy/lmdeploy/build/lib:{os.environ.get("LD_LIBRARY_PATH", "")}'
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True,max_split_size_mb:512'
-os.environ['LMDEPLOY_LOG_LEVEL'] = 'DEBUG'  # Enable DEBUG logging for DFlash
+os.environ['LMDEPLOY_LOG_LEVEL'] = 'DEBUG'  # 启用 DEBUG 日志
 
 from lmdeploy import pipeline, TurbomindEngineConfig, SpeculativeConfig, GenerationConfig
 
@@ -31,7 +30,7 @@ prompts = [
 
 def main():
     print("=" * 60)
-    print("DFlash 推理 Benchmark")
+    print("DFlash 推理 Benchmark (带调试)")
     print("=" * 60)
     print(f"目标: {target_model}")
     print(f"草稿: {draft_model}")
@@ -56,11 +55,16 @@ def main():
     print("创建 Pipeline...")
     pipe = pipeline(
         target_model,
+        backend='turbomind',  # 明确指定使用 turbomind backend
         backend_config=tm_config,
         speculative_config=speculative_config,
-        log_level='DEBUG'  # DEBUG to see DFlash logs
     )
     print("✓ 创建成功！\n")
+
+    # 检查 backend 类型
+    print(f"Backend 类型: {pipe.backend}")
+    print(f"Backend 配置: {pipe.backend_config}")
+    print()
 
     start_time = time.time()
     total_tokens = 0
@@ -92,12 +96,6 @@ def main():
 
         print(f"{total_requests:<6} {elapsed:<10.3f} {output_tokens:<12} {tokens_per_sec:<15.2f}")
 
-        # 每 10 次请求打印一次统计
-        if total_requests % 10 == 0:
-            elapsed_total = time.time() - start_time
-            avg_time = elapsed_total / total_requests
-            print(f"  -> 当前平均: {avg_time:.3f}s/请求, {total_tokens/elapsed_total:.2f} tokens/s")
-
     total_time = time.time() - start_time
 
     print("\n" + "=" * 60)
@@ -109,6 +107,11 @@ def main():
     print(f"平均耗时:   {total_time/total_requests:.3f}s/请求")
     print(f"平均速度:   {total_tokens/total_time:.2f} tokens/s")
     print("=" * 60)
+
+    # 尝试获取 DFlash 统计信息
+    if hasattr(pipe.async_engine, 'engine') and hasattr(pipe.async_engine.engine, 'model_comm'):
+        print("\n尝试获取 DFlash 统计...")
+        # TurboMind 的 model_comm 可能有统计信息
 
     del pipe
 

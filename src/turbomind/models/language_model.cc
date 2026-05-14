@@ -608,4 +608,13 @@ void LanguageModel::EnableDFlash(bool enable)
     }
 }
 
+void LanguageModel::GetDFlashStats(int& total_draft_steps,
+                                   int& total_draft_tokens,
+                                   int& total_accepted_tokens,
+                                   int& total_rejected_tokens)
+{
+    auto& impl = TM_CHECK_NOTNULL(impl_);
+    impl->generation_->GetDFlashStats(total_draft_steps, total_draft_tokens, total_accepted_tokens, total_rejected_tokens);
+}
+
 }  // namespace turbomind

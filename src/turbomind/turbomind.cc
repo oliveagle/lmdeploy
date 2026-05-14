@@ -1131,4 +1131,16 @@ void TurboMind::EnableDFlash(int index, int num_spec_tokens)
     return impl_->EnableDFlash(index, num_spec_tokens);
 }
 
+void TurboMind::GetDFlashStats(int index,
+                                int& total_draft_steps,
+                                int& total_draft_tokens,
+                                int& total_accepted_tokens,
+                                int& total_rejected_tokens)
+{
+    return impl_->engines_[index].GetDFlashStats(total_draft_steps,
+                                                    total_draft_tokens,
+                                                    total_accepted_tokens,
+                                                    total_rejected_tokens);
+}
+
 }  // namespace turbomind

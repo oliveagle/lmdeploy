@@ -592,5 +592,17 @@ PYBIND11_MODULE(_turbomind, m)
                 model->EnableDFlash(index, num_spec_tokens);
             },
             py::call_guard<py::gil_scoped_release>(),
-            "index"_a, "num_spec_tokens"_a);
+            "index"_a, "num_spec_tokens"_a)
+        .def("get_dflash_stats",
+            [](TurboMind* model, int index) {
+                int total_draft_steps, total_draft_tokens, total_accepted_tokens, total_rejected_tokens;
+                model->GetDFlashStats(index, total_draft_steps, total_draft_tokens, total_accepted_tokens, total_rejected_tokens);
+                return py::dict("total_draft_steps"_a=total_draft_steps,
+                                "total_draft_tokens"_a=total_draft_tokens,
+                                "total_accepted_tokens"_a=total_accepted_tokens,
+                                "total_rejected_tokens"_a=total_rejected_tokens,
+                                "accept_rate"_a=(total_draft_tokens > 0 ? (float)total_accepted_tokens / total_draft_tokens : 0.0f));
+            },
+            py::call_guard<py::gil_scoped_release>(),
+            "index"_a);
 }

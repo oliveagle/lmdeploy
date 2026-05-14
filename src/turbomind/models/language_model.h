@@ -41,6 +41,10 @@ public:
     // DFlash support
     void EnableDFlash(bool enable);
     void SetDFlashContext(Context* ctx);
+    void GetDFlashStats(int& total_draft_steps,
+                        int& total_draft_tokens,
+                        int& total_accepted_tokens,
+                        int& total_rejected_tokens);
 
 private:
     struct Impl;

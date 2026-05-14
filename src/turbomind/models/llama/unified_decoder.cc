@@ -157,6 +157,11 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
 
     const DataType dtype = local_residual.dtype();
 
+    // DFlash: Clear aux_hidden_states_ at the start of each forward pass
+    if (enable_dflash_ && dflash_draft_model_) {
+        aux_hidden_states_.clear();
+    }
+
     // DFlash 调试：打印 Forward 开始时的状态
     printf("[DFlash] Forward called: decoder=%p, enable_dflash_=%d, dflash_draft_model_=%p\n",
            (void*)this, (int)enable_dflash_, (void*)dflash_draft_model_);
@@ -307,9 +312,8 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
 
                     Copy(global_hidden_states, aux_hidden_states_[i]);
                     sync_check_cuda_error();  // Check for CUDA errors after copy
-                    TM_LOG_INFO("[DFlash] Collected aux hidden state at layer {}, token_num={}, shape=[%zu, %d], hidden_units_={}, total_layers={}",
-                                layer, collect_size, aux_hidden_states_[i].shape(0), (int)aux_hidden_states_[i].shape(1),
-                                (int)hidden_units_, aux_hidden_states_.size());
+                    TM_LOG_INFO("[DFlash] Collected aux hidden state at layer %d, token_num=%d, shape=[%d, %d]",
+                                layer, (int)collect_size, (int)aux_hidden_states_[i].shape(0), (int)aux_hidden_states_[i].shape(1));
                     break;
                 }
             }
@@ -371,76 +375,97 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
     }
 
     // DFlash: aux_hidden_states 已在层循环中收集
-    // NOTE: phase == 0 is prefill phase, phase == 1 is decode phase
-    // For speculative decoding, we generate drafts in prefill and verify in decode
-    TM_LOG_INFO("[DFlash] Checking DFlash conditions: enable_dflash_=%d, dflash_draft_model_=%p, phase=%d",
-                (int)enable_dflash_, (void*)dflash_draft_model_, phase);
-    // Only run DFlash in prefill phase (phase == 0) for now
-    // TODO: Add support for decode phase speculative decoding
-    if (enable_dflash_ && dflash_draft_model_ && phase == 0) {
-        TM_LOG_INFO("[DFlash] Phase={}: attempting speculative decoding", phase);
+    // 正确的 speculative decoding 流程：
+    // - prefill 阶段（global_token_num > 1）：生成并存储 draft tokens，但不验证
+    // - decode 阶段（global_token_num == 1）：验证已存储的 draft tokens，生成新的 drafts
+    //
+    // 注意：phase 是异步 pipeline 的阶段（0 或 1），不是 prefill/decode 的标志
+    // 我们使用 global_token_num 来判断当前是 prefill 还是 decode
+
+    const bool is_prefill = global_token_num > 1;
+    const bool is_decode = global_token_num == 1;
+
+    TM_LOG_INFO("[DFlash] Checking conditions: enable=%d, model=%p, phase=%d, global_tokens=%d (prefill=%d, decode=%d)",
+                (int)enable_dflash_, (void*)dflash_draft_model_, phase, (int)global_token_num, (int)is_prefill, (int)is_decode);
+
+    if (enable_dflash_ && dflash_draft_model_) {
         TM_LOG_INFO("[DFlash] aux_hidden_states_.size()={}", aux_hidden_states_.size());
 
-        // Log aux hidden state shapes before GenerateDraft
+        // Log aux hidden state shapes
         for (size_t i = 0; i < aux_hidden_states_.size(); ++i) {
             const auto& t = aux_hidden_states_[i];
             TM_LOG_INFO("[DFlash] aux_hidden_states_[%zu] shape=[%d, %d] dtype=%d",
                        i, (int)t.shape(0), (int)t.shape(1), (int)t.dtype());
         }
 
-        if (!aux_hidden_states_.empty()) {
-            // Check draft model weights before running
-            auto* draft_weight = dflash_draft_model_->GetDraftWeight();
-            if (!draft_weight || !draft_weight->lm_head || !draft_weight->embed_tokens) {
-                TM_LOG_WARNING("[DFlash] Draft weights not properly loaded, skipping DFlash");
-                TM_LOG_WARNING("[DFlash]   draft_weight=%p, lm_head=%p, embed_tokens=%p",
-                            (void*)draft_weight,
-                            draft_weight ? (void*)draft_weight->lm_head.raw_data() : nullptr,
-                            draft_weight ? (void*)draft_weight->embed_tokens.raw_data() : nullptr);
-            } else {
-                // Speculative decoding:
-                // 1. Generate draft tokens from aux hidden states
-                // 2. Verify against target logits
-                // 3. Output accepted tokens to env for Generation to use
+        // Check draft model weights
+        auto* draft_weight = dflash_draft_model_->GetDraftWeight();
+        if (!draft_weight || !draft_weight->lm_head || !draft_weight->embed_tokens) {
+            TM_LOG_WARNING("[DFlash] Draft weights not properly loaded, skipping DFlash");
+            TM_LOG_WARNING("[DFlash]   draft_weight=%p, lm_head=%p, embed_tokens=%p",
+                        (void*)draft_weight,
+                        draft_weight ? (void*)draft_weight->lm_head.raw_data() : nullptr,
+                        draft_weight ? (void*)draft_weight->embed_tokens.raw_data() : nullptr);
+        } else if (!aux_hidden_states_.empty()) {
+            // ========== DECODE 阶段：验证并使用 draft tokens ==========
+            if (is_decode) {
+                TM_LOG_INFO("[DFlash] === DECODE MODE: Verifying draft tokens ===");
 
-                Tensor draft_tokens, draft_logits;
-                TM_LOG_INFO("[DFlash] Calling GenerateDraft NOW...");
-                dflash_draft_model_->GenerateDraft(aux_hidden_states_, draft_tokens, draft_logits);
-                TM_LOG_INFO("[DFlash] GenerateDraft COMPLETED");
+                // 1. 检查是否有已存储的 draft tokens 需要验证
+                Tensor* stored_draft_ptr = args.try_("dflash_stored_draft_tokens");
+                if (stored_draft_ptr && stored_draft_ptr->shape(0) > 0) {
+                    Tensor stored_draft = *stored_draft_ptr;
+                    TM_LOG_INFO("[DFlash] Found stored draft tokens: count={}", stored_draft.shape(0));
 
-                // Check if tensors have valid data before accessing raw_data()
-                TM_LOG_INFO("[DFlash] GenerateDraft returned: draft_tokens valid=%d, draft_logits valid=%d",
-                            draft_tokens ? 1 : 0, draft_logits ? 1 : 0);
-
-                if (draft_tokens && draft_tokens.shape(0) > 0) {
-                    TM_LOG_INFO("[DFlash] Draft tokens generated: count={}", draft_tokens.shape(0));
-
+                    // 2. 获取目标 logits 进行验证
                     Tensor* target_logits_ptr = args.try_("logits");
                     if (target_logits_ptr) {
                         Tensor target_logits = *target_logits_ptr;
                         TM_LOG_INFO("[DFlash] Target logits shape: [{}]", target_logits.shape(0));
 
+                        // 3. 验证 draft tokens
                         Tensor accepted, mask;
-                        dflash_draft_model_->VerifyDraft(draft_tokens, target_logits, accepted, mask);
+                        dflash_draft_model_->VerifyDraft(stored_draft, target_logits, accepted, mask);
 
                         TM_LOG_INFO("[DFlash] VerifyDraft: accepted={} tokens", accepted.shape(0));
 
-                        // Output accepted tokens to env so Generation can use them
+                        // 4. 输出 accepted tokens 到 Generation
                         args.produce("dflash_accepted_tokens", accepted);
                         args.produce("dflash_accept_mask", mask);
 
-                        TM_LOG_INFO("[DFlash] Success: {} accepted draft tokens output to Generation",
-                                  accepted.shape(0));
+                        // 移除已使用的 draft tokens
+                        args.consume("dflash_stored_draft_tokens");
                     } else {
-                        // TODO: Fix verification - need to get target logits from the target model
-                        // For now, just log that we generated draft tokens but can't verify them
-                        TM_LOG_DEBUG("[DFlash] No target logits found in args (expected during prefill phase)");
-                        // Still output the draft tokens so they can be used later
-                        args.produce("dflash_draft_tokens", draft_tokens);
-                        args.produce("dflash_draft_logits", draft_logits);
+                        TM_LOG_WARNING("[DFlash] No target logits for verification, consuming stored drafts");
+                        args.consume("dflash_stored_draft_tokens");
                     }
-                } else {
-                    TM_LOG_WARNING("[DFlash] GenerateDraft returned empty tokens!");
+                }
+
+                // 5. 生成新的 draft tokens 用于下次迭代
+                Tensor draft_tokens, draft_logits;
+                TM_LOG_INFO("[DFlash] Generating new draft tokens for next iteration...");
+                dflash_draft_model_->GenerateDraft(aux_hidden_states_, draft_tokens, draft_logits);
+
+                if (draft_tokens && draft_tokens.shape(0) > 0) {
+                    TM_LOG_INFO("[DFlash] Generated {} new draft tokens", draft_tokens.shape(0));
+                    // 存储到 args 中供下次迭代使用
+                    args.produce("dflash_stored_draft_tokens", draft_tokens);
+                    args.produce("dflash_stored_draft_logits", draft_logits);
+                }
+            }
+            // ========== PREFILL 阶段：只生成 draft tokens，不验证 ==========
+            else if (is_prefill) {
+                TM_LOG_INFO("[DFlash] === PREFILL MODE: Generating draft tokens ===");
+
+                // 生成 draft tokens 并存储，供后续 decode 阶段使用
+                Tensor draft_tokens, draft_logits;
+                dflash_draft_model_->GenerateDraft(aux_hidden_states_, draft_tokens, draft_logits);
+
+                if (draft_tokens && draft_tokens.shape(0) > 0) {
+                    TM_LOG_INFO("[DFlash] Generated {} draft tokens from prefill", draft_tokens.shape(0));
+                    // 存储到 args 中供后续使用
+                    args.produce("dflash_stored_draft_tokens", draft_tokens);
+                    args.produce("dflash_stored_draft_logits", draft_logits);
                 }
             }
         } else {
