@@ -316,3 +316,43 @@ for num_spec in [1, 2, 4, 6, 8, 12, 16]:
 
 ---
 
+## 2026-05-14 - FR-2: 统计追踪
+
+**Status**: ✅ Already implemented
+
+All functional requirements for FR-2 are already present in the codebase:
+
+| FR Criterion | Implementation | Location |
+|-------------|----------------|----------|
+| FR-2.1: `dflash_total_draft_tokens_` records draft tokens | Counter incremented each step | generation.cc:309 |
+| FR-2.2: `dflash_total_accepted_tokens_` records accepted | Counter incremented | generation.cc:306 |
+| FR-2.3: `dflash_total_rejected_tokens_` records rejected | Counter incremented | generation.cc:321 |
+| FR-2.4: accept_rate = accepted / draft_tokens | Calculated in Python | turbomind.py:564-567, bind.cpp:604 |
+| FR-2.5: speedup_ratio = current / baseline (45 tok/s) | Calculated in Python | turbomind.py:569-577 |
+
+**Files**: None (already implemented)
+- `src/turbomind/generation/generation.h` - Stats member variables declaration (lines 79-82)
+- `src/turbomind/generation/generation.cc` - Stats increment logic (lines 306, 309, 321)
+- `src/turbomind/models/language_model.cc` - Stats delegation to Generation (line 617)
+- `src/turbomind/engine/engine.cc` - Stats delegation to LanguageModel (line 936)
+- `src/turbomind/turbomind.cc` - Stats delegation to Engine (line 1140)
+- `src/turbomind/python/bind.cpp` - Python binding with accept_rate (lines 596-607)
+- `lmdeploy/turbomind/turbomind.py` - User-facing API with accept_rate and speedup_ratio (lines 551-579)
+
+**Statistics Flow**:
+```
+C++ Generation (dflash_total_*_) 
+  → LanguageModel::GetDFlashStats 
+    → Engine::GetDFlashStats 
+      → TurboMind::GetDFlashStats 
+        → Python binding (pybind11) 
+          → TurboMind.get_dflash_stats() (user API)
+```
+
+**Learnings:**
+- Statistics tracking is already implemented end-to-end in the codebase
+- C++ tracks raw counters (draft_steps, draft_tokens, accepted, rejected)
+- Python layer calculates derived metrics (accept_rate, speedup_ratio)
+- `speedup_ratio` formula: `baseline * (1 + accept_rate * 0.5)` approximates effective speedup
+- bind.cpp calculates accept_rate but NOT speedup_ratio (only turbomind.py does)
+
