@@ -80,6 +80,7 @@ struct Generation::Impl {
     int dflash_total_draft_tokens_{0};
     int dflash_total_accepted_tokens_{0};
     int dflash_total_rejected_tokens_{0};
+    int dflash_summary_interval_{10};  // Log summary every N draft steps
 
     Impl(DataType              dtype,
          int                   max_batch_size,
@@ -322,6 +323,18 @@ struct Generation::Impl {
                     TM_LOG_INFO("[DFlash] Sampling %d rejected tokens (stats: rejected=%d, total_rejected=%d)",
                                num_rejected, dflash_total_rejected_tokens_);
                     sampling_->Forward(phase, env);
+                }
+
+                // FR-3.3: Periodic summary logging (every N draft steps)
+                if (dflash_total_draft_steps_ % dflash_summary_interval_ == 0 && dflash_total_draft_steps_ > 0) {
+                    float accept_rate = dflash_total_draft_tokens_ > 0
+                        ? (float)dflash_total_accepted_tokens_ / dflash_total_draft_tokens_ * 100.0f : 0.0f;
+                    TM_LOG_INFO("[DFlash] ================ STATS SUMMARY ================");
+                    TM_LOG_INFO("[DFlash] Draft Steps:   %d", dflash_total_draft_steps_);
+                    TM_LOG_INFO("[DFlash] Draft Tokens:  %d", dflash_total_draft_tokens_);
+                    TM_LOG_INFO("[DFlash] Accepted:      %d (%.1f%%)", dflash_total_accepted_tokens_, accept_rate);
+                    TM_LOG_INFO("[DFlash] Rejected:      %d", dflash_total_rejected_tokens_);
+                    TM_LOG_INFO("[DFlash] =================================================");
                 }
             } else {
                 // Normal sampling

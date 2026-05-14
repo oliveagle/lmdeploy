@@ -3,10 +3,10 @@
   "sessionId": "1968837f-a7c5-4997-9200-c572249e592d",
   "status": "running",
   "startedAt": "2026-05-14T10:36:44.910Z",
-  "updatedAt": "2026-05-14T11:38:56.179Z",
-  "currentIteration": 5,
+  "updatedAt": "2026-05-14T11:56:09.332Z",
+  "currentIteration": 6,
   "maxIterations": 50,
-  "tasksCompleted": 5,
+  "tasksCompleted": 6,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -64,6 +64,16 @@
       "durationMs": 171200,
       "startedAt": "2026-05-14T11:31:47.387Z",
       "endedAt": "2026-05-14T11:34:38.587Z"
+    },
+    {
+      "iteration": 6,
+      "status": "completed",
+      "taskId": "FR-2",
+      "taskTitle": "统计追踪",
+      "taskCompleted": true,
+      "durationMs": 256528,
+      "startedAt": "2026-05-14T11:34:39.650Z",
+      "endedAt": "2026-05-14T11:38:56.178Z"
     }
   ],
   "skippedTaskIds": [],
