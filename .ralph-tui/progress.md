@@ -356,3 +356,60 @@ C++ Generation (dflash_total_*_)
 - `speedup_ratio` formula: `baseline * (1 + accept_rate * 0.5)` approximates effective speedup
 - bind.cpp calculates accept_rate but NOT speedup_ratio (only turbomind.py does)
 
+
+---
+
+## 2026-05-14 - FR-3: 日志输出
+
+**Status**: ✅ Completed
+
+### What was implemented
+
+Added periodic DFlash summary logging to `src/turbomind/generation/generation.cc`. Every 10 draft steps, a summary is logged showing:
+
+1. **Draft Steps**: Total number of DFlash speculative decoding steps
+2. **Draft Tokens**: Total draft tokens generated
+3. **Accepted**: Accepted tokens count with percentage
+4. **Rejected**: Rejected tokens count
+
+### Files changed
+
+- `src/turbomind/generation/generation.cc`:
+  - Added `dflash_summary_interval_` member (default: 10)
+  - Added periodic summary logging block after rejected tokens handling
+
+### Acceptance Criteria Verification
+
+| Criteria | Status | Implementation |
+|----------|--------|----------------|
+| FR-3.1: DECODE/PREFILL mode logs | ✅ Already existed | unified_decoder.cc:412, 458 |
+| FR-3.2: Draft tokens generation/verification logs | ✅ Already existed | unified_decoder.cc:418, 430, 450, 465 |
+| FR-3.3: Statistics summary logging | ✅ Added | generation.cc:327-338 |
+
+### FR-3 Log Messages Summary
+
+**DECODE/PREFILL Mode Transitions (unified_decoder.cc)**:
+- `[DFlash] === DECODE MODE: Verifying draft tokens ===`
+- `[DFlash] Found stored draft tokens: count=X`
+- `[DFlash] VerifyDraft: accepted=X tokens`
+- `[DFlash] === PREFILL MODE: Generating draft tokens ===`
+- `[DFlash] Generated X draft tokens from prefill`
+
+**Draft Token Generation/Verification (unified_decoder.cc)**:
+- `[DFlash] Generating new draft tokens for next iteration...`
+- `[DFlash] Generated X new draft tokens`
+
+**Statistics Summary (generation.cc - NEW)**:
+- `[DFlash] ================ STATS SUMMARY ================`
+- `[DFlash] Draft Steps:   X`
+- `[DFlash] Draft Tokens:  X`
+- `[DFlash] Accepted:      X (XX.X%)`
+- `[DFlash] Rejected:      X`
+- `[DFlash] =================================================`
+
+**Learnings:**
+- Summary interval is configurable via `dflash_summary_interval_` member
+- Default interval of 10 steps provides good balance between verbosity and information
+- Accept rate calculation: `accepted / draft_tokens * 100.0f` (as percentage)
+- The periodic logging is placed inside the DFlash block after rejected tokens are processed, ensuring stats are updated before summary
+
