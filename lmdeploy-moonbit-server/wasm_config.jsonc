@@ -1,0 +1,77 @@
+// Wasm deployment configuration for wasmedge runtime
+// Memory-optimized settings for edge deployment (< 10 MB target)
+
+{
+  "name": "lmdeploy-moonbit-wasm",
+  "version": "0.1.0",
+  "description": "LMDeploy MoonBit API Server - Wasm Edge Deployment",
+
+  // Wasm Runtime Configuration
+  "runtime": {
+    "name": "wasmedge",
+    "version": ">=0.13.0",
+    "memory_limit_mb": 10,
+    "max_memory_pages": 160,
+    "enable_wasi": true,
+    "enable_nn_plugin": true,
+    "enable_bulk_memory": true,
+    "enable_simd": true,
+    "enable_multi_value": true
+  },
+
+  // Server Configuration
+  "server": {
+    "address": "0.0.0.0",
+    "port": 8080,
+    "max_connections": 50,
+    "request_timeout_secs": 30,
+    "enable_http2": true,
+    "max_body_size_kb": 100
+  },
+
+  // Model Configuration for Wasm
+  "model": {
+    "model_path": "/etc/lmdeploy/models",
+    "context_length": 4096,
+    "max_batch_size": 4,
+    "enable_quantization": true,
+    "memory_limit_mb": 8
+  },
+
+  // Cache Configuration
+  "cache": {
+    "tokenizer_cache_size": 100,
+    "tokenizer_ttl_secs": 300,
+    "enable_prefix_cache": true
+  },
+
+  // Logging Configuration
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "enable_wasi_logging": true
+  },
+
+  // Metrics Configuration
+  "metrics": {
+    "enable_prometheus": true,
+    "metrics_path": "/metrics",
+    "include_memory_metrics": true
+  },
+
+  // Rate Limiting
+  "rate_limit": {
+    "enabled": true,
+    "max_requests": 100,
+    "window_secs": 60
+  },
+
+  // Environment Variable Overrides
+  "env_overrides": [
+    "LMDEPLOY_PORT",
+    "LMDEPLOY_ADDRESS",
+    "LMDEPLOY_MODEL_PATH",
+    "LMDEPLOY_LOG_LEVEL",
+    "LMDEPLOY_MEMORY_LIMIT_MB"
+  ]
+}

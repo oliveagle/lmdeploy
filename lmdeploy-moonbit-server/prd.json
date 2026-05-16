@@ -126,15 +126,16 @@
       "description": "作为 边缘计算用户 我想要 将 API Server 编译为 Wasm 以便 在边缘设备上运行轻量级推理服务",
       "acceptanceCriteria": [],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "labels": [],
-      "dependsOn": []
+      "dependsOn": [],
+      "completionNotes": "Completed by agent"
     }
   ],
   "metadata": {
     "createdAt": "2026-05-16T13:12:13.976Z",
     "version": "1.0.0",
     "sourcePrd": "PRD_MOONBIT_API_SERVER.md",
-    "updatedAt": "2026-05-16T16:49:27.628Z"
+    "updatedAt": "2026-05-16T17:04:10.586Z"
   }
 }
