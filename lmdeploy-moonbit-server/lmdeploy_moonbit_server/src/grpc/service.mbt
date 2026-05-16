@@ -88,7 +88,7 @@ pub fn LmDeployService::chat_completion_batch(
       choices: [],
       usage: UsageInfo::default(),
     }
-    responses = responses.push(resp)
+    responses = responses.concat([resp])
   }
 
   let end_time = current_timestamp()
@@ -130,7 +130,7 @@ pub fn LmDeployService::embeddings(
       embedding: [],
       index: i,
     }
-    data = data.push(embedding)
+    data = data.concat([embedding])
   }
 
   let response = EmbeddingsResponse {

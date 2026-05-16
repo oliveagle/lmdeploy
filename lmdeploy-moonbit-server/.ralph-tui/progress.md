@@ -54,6 +54,10 @@ after each iteration and it's included in prompts for context.
 - Error response: `build_error_json(code, type, message)` for consistent error formatting
 - Route registration: `server.add_route(HttpMethod::Get, path, handler)` for endpoint setup
 - Validation: always check required fields (model, input) and return 400 Bad Request if missing
+- **Array operations**: MoonBit uses `array.concat([item])` to append elements (not `push()`). Fixed across http.mbt, service.mbt, and model.mbt files
+- **Model management**: `ModelLoadState` enum tracks NotLoaded → Loading → Loaded/Failed transitions; `ModelRegistry` manages multiple models via `Map[String, LoadedModel]`
+- **Module dependencies**: Always add new modules to `moon.pkg.json` deps when used by other modules
+- **Prometheus model metrics**: `lmdeploy_models_total`, `lmdeploy_models_loaded`, `lmdeploy_model_memory_bytes`, `lmdeploy_model_load_state{model_id, model_name}`
 
 ---
 
@@ -214,5 +218,61 @@ after each iteration and it's included in prompts for context.
   - MoonBit 使用不可变结构体 + 模块级变量（生产环境需要考虑并发访问）
   - `Map` 类型使用 `.insert()` 返回新 Map（函数式风格）
   - 直方图 `observe()` 方法更新所有桶的计数（桶值 <= 观察值）
+
+---
+
+## 2026-05-17 - US-009: 模型加载和管理
+- 实现了完整的模型加载和管理系统（启动加载、热加载、多模型路由、卸载释放内存、加载进度）
+- **新增文件**:
+  - `src/model/model.mbt` - 核心模型模型和注册表
+    - `ModelLoadState` 枚举：NotLoaded, Loading, Loaded, LoadFailed, Unloading
+    - `ModelMetadata` 结构体：id, name, path, max_context_length, vocab_size, capabilities, quantization
+    - `LoadedModel` 结构体：模型实例，包含状态、请求计数、内存使用
+    - `ModelRegistry` 结构体：多模型管理，支持注册、查询、卸载、加载状态追踪
+    - `LoadProgress` 结构体：加载进度（0-100），支持 JSON 导出
+  - `src/model/engine.mbt` - TurboMind 引擎封装
+    - `TurboMindEngine` 结构体：引擎初始化、加载/卸载模型、内存追踪
+    - `init()` / `load_model()` / `unload_model()` 方法（FFI 占位符）
+    - 容量限制（最多 3 个模型）
+  - `src/model/manager.mbt` - 模型管理器（高级 API）
+    - `ModelManager` 结构体：整合注册表和引擎
+    - `init()` - 初始化引擎
+    - `load_default_model()` - 启动时加载默认模型
+    - `load_model()` - 加载新模型
+    - `hot_reload_model()` - 热重载模型
+    - `unload_model()` - 卸载模型释放内存
+    - `list_models()` / `list_loaded_models()` - 查询模型列表
+    - `get_load_progress()` - 获取加载进度
+    - `to_prometheus()` - 导出模型 Prometheus 指标
+  - `src/model/moon.pkg.json` - 模块依赖配置
+  - `src/router/moon.pkg.json` - 新增路由模块依赖配置
+- **修改文件**:
+  - `src/handlers/http.mbt` - 集成模型管理模块
+    - 添加 `model_manager` 模块级变量
+    - 增强 `list_models_handler` 返回动态模型列表
+    - 新增 `load_model_handler` - POST /v1/models/load
+    - 新增 `unload_model_handler` - POST /v1/models/unload
+    - 新增 `model_progress_handler` - GET /v1/models/progress
+    - 增强 `metrics_handler` 添加模型 Prometheus 指标
+  - `src/router/router.mbt` - 添加模型管理端点注册
+    - 新增 `enable_model_management` 配置选项
+    - 注册 `/v1/models/load`, `/v1/models/unload`, `/v1/models/progress` 端点
+  - `src/handlers/moon.pkg.json` - 添加 model, error, config 依赖
+  - `src/server/server.mbt` - 添加 model 模块引用
+  - `src/http/http.mbt` - 修复 `push` → `concat` 数组操作
+  - `src/grpc/service.mbt` - 修复 `push` → `concat` 数组操作
+- **实现功能**:
+  - ✅ 启动时加载模型（`load_default_model`）
+  - ✅ 支持热加载模型（API 触发 `load_model`）
+  - ✅ 支持多模型路由（`ModelRegistry` 管理多个模型）
+  - ✅ 模型卸载释放内存（`unload_model`）
+  - ✅ 模型加载进度查询（`LoadProgress` 结构体 + `get_load_progress`）
+  - ✅ Prometheus 模型指标导出
+  - ✅ 容量限制和错误处理
+- **Learnings**:
+  - MoonBit 数组操作使用 `concat([item])` 而非 `push(item)`
+  - 模型加载状态使用枚举模式（NotLoaded → Loading → Loaded/Failed）
+  - 模块级变量用于跨 handler 共享状态（model_manager）
+  - Prometheus 指标格式：`lmdeploy_models_total`, `lmdeploy_models_loaded`, `lmdeploy_model_memory_bytes`, `lmdeploy_model_load_state`
 
 ---

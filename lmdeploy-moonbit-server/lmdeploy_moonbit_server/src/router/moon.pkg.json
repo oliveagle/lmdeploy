@@ -1,0 +1,6 @@
+{
+  "link": {
+    "name": "username/lmdeploy_moonbit_server/router",
+    "deps": ["username/lmdeploy_moonbit_server/http", "username/lmdeploy_moonbit_server/handlers", "username/lmdeploy_moonbit_server/config"]
+  }
+}

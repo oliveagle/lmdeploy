@@ -4,6 +4,7 @@
 
 use username/lmdeploy_moonbit_server/http
 use username/lmdeploy_moonbit_server/handlers
+use username/lmdeploy_moonbit_server/config
 
 /// Router configuration
 pub struct RouterConfig {
@@ -11,6 +12,7 @@ pub struct RouterConfig {
   enable_batch: Bool
   enable_metrics: Bool
   enable_streaming: Bool
+  enable_model_management: Bool
 }
 
 pub fn RouterConfig::default() -> RouterConfig {
@@ -19,6 +21,7 @@ pub fn RouterConfig::default() -> RouterConfig {
     enable_batch: true,
     enable_metrics: true,
     enable_streaming: true,
+    enable_model_management: true,
   }
 }
 
@@ -75,6 +78,13 @@ fn ApiRouter::setup_routes(self : ApiRouter) -> ApiRouter {
   if self.config.enable_batch {
     server = server.add_route(http.HttpMethod::Post, "/" ++ self.config.api_version ++ "/chat/completions/batch", handlers::batch_chat_completions_handler)
     server = server.add_route(http.HttpMethod::Post, "/" ++ self.config.api_version ++ "/completions/batch", handlers::batch_completions_handler)
+  }
+
+  // Model management endpoints
+  if self.config.enable_model_management {
+    server = server.add_route(http.HttpMethod::Post, "/" ++ self.config.api_version ++ "/models/load", handlers::load_model_handler)
+    server = server.add_route(http.HttpMethod::Post, "/" ++ self.config.api_version ++ "/models/unload", handlers::unload_model_handler)
+    server = server.add_route(http.HttpMethod::Get, "/" ++ self.config.api_version ++ "/models/progress", handlers::model_progress_handler)
   }
 
   { config: self.config, server }

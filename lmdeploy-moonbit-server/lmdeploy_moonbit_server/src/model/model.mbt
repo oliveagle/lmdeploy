@@ -271,7 +271,7 @@ pub fn ModelRegistry::update_model(self: ModelRegistry, id: String, model: Loade
     self.loaded_models.filter(fn(id) { id != model.metadata.id })
   } else if !was_loaded && is_loaded {
     // Model was loaded
-    self.loaded_models.push(model.metadata.id)
+    self.loaded_models.concat([model.metadata.id])
   } else {
     self.loaded_models
   }

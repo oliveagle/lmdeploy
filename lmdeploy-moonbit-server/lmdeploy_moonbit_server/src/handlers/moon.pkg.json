@@ -1,6 +1,6 @@
 {
   "link": {
     "name": "username/lmdeploy_moonbit_server/handlers",
-    "deps": ["username/lmdeploy_moonbit_server/http", "username/lmdeploy_moonbit_server/protocol", "username/lmdeploy_moonbit_server/batch", "username/lmdeploy_moonbit_server/cache", "username/lmdeploy_moonbit_server/logger", "username/lmdeploy_moonbit_server/metrics", "username/lmdeploy_moonbit_server/streaming"]
+    "deps": ["username/lmdeploy_moonbit_server/http", "username/lmdeploy_moonbit_server/protocol", "username/lmdeploy_moonbit_server/batch", "username/lmdeploy_moonbit_server/cache", "username/lmdeploy_moonbit_server/logger", "username/lmdeploy_moonbit_server/metrics", "username/lmdeploy_moonbit_server/streaming", "username/lmdeploy_moonbit_server/model", "username/lmdeploy_moonbit_server/error", "username/lmdeploy_moonbit_server/config"]
   }
 }

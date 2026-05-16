@@ -10,6 +10,13 @@ use username/lmdeploy_moonbit_server/streaming
 use username/lmdeploy_moonbit_server/protocol/json_util
 use username/lmdeploy_moonbit_server/logger
 use username/lmdeploy_moonbit_server/metrics
+use username/lmdeploy_moonbit_server/model
+use username/lmdeploy_moonbit_server/error
+use username/lmdeploy_moonbit_server/config
+
+/// Module-level model manager instance
+/// In production, this would be initialized with the app config on startup
+let model_manager = model.ModelManager::new(config.model.ModelConfig::default())
 
 /// Module-level streaming configuration
 let stream_config = streaming::StreamingConfig::default()
@@ -69,15 +76,31 @@ pub fn health_check_handler(req: http.HttpRequest) -> http.HttpResponse {
 pub fn list_models_handler(req: http.HttpRequest) -> http.HttpResponse {
   let start = current_timestamp_ms()
   logger::log_info("Model list requested")
-  let models_json = """
-{"object": "list", "data": [{"id": "default-model", "object": "model", "created": 0, "owned_by": "lmdeploy", "permission": [{"id": "modelperm-0", "object": "model_permission", "created": 0, "allow_create_engine": true, "allow_sampling": true, "allow_logprobs": true, "allow_search_indices": false, "allow_view": true, "allow_fine_tuning": false, "organization": "*", "group": null, "is_blocking": false}], "root": "default-model", "parent": null}]}
-"""
+
+  let models = model_manager.list_models()
+  let loaded_count = model_manager.loaded_count()
+  let total_memory = model_manager.total_memory_mb()
+
+  // Build JSON response with registered models
+  let mut data_json = ""
+  let mut idx = 0
+  while idx < models.length() {
+    let m = models[idx]
+    if idx > 0 {
+      data_json = data_json ++ ","
+    }
+    data_json = data_json ++ build_model_json(m)
+    idx = idx + 1
+  }
+
+  let models_json = "{\"object\":\"list\",\"data\":[" ++ data_json ++ "],\"total_models\":" ++ int_to_string(models.length()) ++ ",\"loaded_models\":" ++ int_to_string(loaded_count) ++ ",\"total_memory_mb\":" ++ int_to_string(total_memory) ++ "}"
+
   let response = http.HttpResponse::ok()
     .set_header("content-type", "application/json")
     .set_header("x-request-id", generate_request_id())
     .json(models_json)
   let duration = current_timestamp_ms() - start
-  logger::log_info("Model list returned in " ++ int_to_string(duration) ++ "ms")
+  logger::log_info("Model list returned " ++ int_to_string(models.length()) ++ " models in " ++ int_to_string(duration) ++ "ms")
   response
 }
 
@@ -404,7 +427,10 @@ pub fn metrics_handler(req: http.HttpRequest) -> http.HttpResponse {
   // Add streaming metrics
   let stream_metrics_str = streaming::StreamingMetrics::to_prometheus(stream_metrics)
 
-  let combined = "# LMDeploy MoonBit Server Metrics\n\n" ++ collector_metrics ++ "\n" ++ stream_metrics_str
+  // Add model management metrics
+  let model_metrics_str = model_manager.to_prometheus()
+
+  let combined = "# LMDeploy MoonBit Server Metrics\n\n" ++ collector_metrics ++ "\n" ++ stream_metrics_str ++ "\n" ++ model_metrics_str
 
   logger::log_debug("Metrics response generated")
 
@@ -724,4 +750,132 @@ fn extract_batch_requests(body: String) -> Array[String] {
 fn extract_int_field(json: String, field: String, default: Int) -> Int {
   // TODO: Implement proper JSON field extraction
   default
+}
+
+/// Build JSON representation of a model
+fn build_model_json(m: model.ModelMetadata) -> String {
+  let is_loaded = false  // TODO: check from registry
+  "{\"id\":\"" ++ m.id ++ "\",\"object\":\"model\",\"created\":0,\"owned_by\":\"" ++ m.model_type ++ "\",\"permission\":[{\"id\":\"modelperm-\"++\"" ++ m.id ++ "\",\"object\":\"model_permission\",\"created\":0,\"allow_create_engine\":true,\"allow_sampling\":true,\"allow_logprobs\":true,\"allow_search_indices\":false,\"allow_view\":true,\"allow_fine_tuning\":false,\"organization\":\"*\",\"group\":null,\"is_blocking\":false}],\"root\":\"" ++ m.id ++ "\",\"parent\":null,\"max_context_length\":" ++ int_to_string(m.max_context_length) ++ ",\"vocab_size\":" ++ int_to_string(m.vocab_size) ++ ",\"supports_streaming\":" ++ bool_to_string(m.supports_streaming) ++ ",\"is_quantized\":" ++ bool_to_string(m.is_quantized) ++ ",\"quantization\":\"" ++ m.quantization ++ "\",\"memory_mb\":0}"
+}
+
+/// Get number of loaded models
+fn loaded_count(self: model.ModelManager) -> Int {
+  self.registry.loaded_count()
+}
+
+/// Get total memory usage in MB
+fn total_memory_mb(self: model.ModelManager) -> Int {
+  self.engine.memory_mb()
+}
+
+/// Model loading endpoint
+/// POST /v1/models/load
+/// Hot-reload a new model
+pub fn load_model_handler(req: http.HttpRequest) -> http.HttpResponse {
+  let body = String::from_utf8_bytes(req.body)
+  let start = current_timestamp_ms()
+
+  logger::log_info("Load model request received")
+
+  let model_path = json_util::parse_json_string_field(body, "model_path", "")
+  let model_name = json_util::parse_json_string_field(body, "model_name", "custom-model")
+
+  if model_path == "" {
+    return http.HttpResponse::bad_request()
+      .json(protocol::build_error_json(
+        400,
+        "invalid_request_error",
+        "model_path parameter is required"
+      ))
+  }
+
+  logger::log_info("Loading model: " ++ model_name ++ " from " ++ model_path)
+
+  match model_manager.load_model(model_path, model_name) {
+    Ok(_) => {
+      let response = "{\"status\":\"loaded\",\"model_name\":\"" ++ model_name ++ "\",\"model_path\":\"" ++ model_path ++ "\"}"
+      http.HttpResponse::ok()
+        .set_header("content-type", "application/json")
+        .set_header("x-request-id", generate_request_id())
+        .json(response)
+    }
+    Err(e) => {
+      logger::log_error("Failed to load model: " ++ e.to_string())
+      http.HttpResponse::internal_error()
+        .json(protocol::build_error_json(
+          500,
+          "engine_error",
+          "Failed to load model: " ++ e.to_string()
+        ))
+    }
+  }
+}
+
+/// Model unloading endpoint
+/// POST /v1/models/unload
+/// Unload a model to free memory
+pub fn unload_model_handler(req: http.HttpRequest) -> http.HttpResponse {
+  let body = String::from_utf8_bytes(req.body)
+  let start = current_timestamp_ms()
+
+  logger::log_info("Unload model request received")
+
+  let model_path = json_util::parse_json_string_field(body, "model_path", "")
+
+  if model_path == "" {
+    return http.HttpResponse::bad_request()
+      .json(protocol::build_error_json(
+        400,
+        "invalid_request_error",
+        "model_path parameter is required"
+      ))
+  }
+
+  logger::log_info("Unloading model: " ++ model_path)
+
+  match model_manager.unload_model(model_path) {
+    Ok(_) => {
+      let response = "{\"status\":\"unloaded\",\"model_path\":\"" ++ model_path ++ "\"}"
+      http.HttpResponse::ok()
+        .set_header("content-type", "application/json")
+        .set_header("x-request-id", generate_request_id())
+        .json(response)
+    }
+    Err(e) => {
+      logger::log_error("Failed to unload model: " ++ e.to_string())
+      http.HttpResponse::internal_error()
+        .json(protocol::build_error_json(
+          500,
+          "engine_error",
+          "Failed to unload model: " ++ e.to_string()
+        ))
+    }
+  }
+}
+
+/// Model loading progress endpoint
+/// GET /v1/models/progress/{model_id}
+/// Query the loading progress of a model
+pub fn model_progress_handler(req: http.HttpRequest) -> http.HttpResponse {
+  logger::log_info("Model progress request received")
+
+  let model_id = req.path  // TODO: extract from path
+  let progress = model_manager.get_load_progress(model_id)
+
+  match progress {
+    Some(p) => {
+      http.HttpResponse::ok()
+        .set_header("content-type", "application/json")
+        .set_header("x-request-id", generate_request_id())
+        .json(p.to_json())
+    }
+    None => {
+      http.HttpResponse::not_found()
+        .json(protocol::build_error_json(
+          404,
+          "model_not_found",
+          "Model not found or not in loading state"
+        ))
+    }
+  }
 }

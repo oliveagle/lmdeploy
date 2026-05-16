@@ -279,7 +279,7 @@ pub fn Http2Server::add_middleware(
   {
     config: self.config,
     routes: self.routes,
-    middleware: self.middleware.push(mw),
+    middleware: self.middleware.concat([mw]),
     connection_pool: self.connection_pool,
     pool_stats: self.pool_stats,
     is_running: self.is_running,

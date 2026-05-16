@@ -3,6 +3,7 @@
 // Reference: lmdeploy-rust-server/src/server.rs
 
 use username/lmdeploy_moonbit_server/config
+use username/lmdeploy_moonbit_server/model
 
 /// Server configuration (wrapper for AppConfig)
 pub struct ServerConfig {

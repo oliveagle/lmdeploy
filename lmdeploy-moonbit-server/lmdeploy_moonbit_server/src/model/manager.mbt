@@ -221,7 +221,7 @@ pub fn ModelManager::get_default_model(self: ModelManager) -> Result[model.Loade
 pub fn ModelManager::list_models(self: ModelManager) -> Array[model.ModelMetadata] {
   let mut models = []
   for (_, m) in self.registry.models {
-    models = models.push(m.metadata)
+    models = models.concat([m.metadata])
   }
   models
 }
