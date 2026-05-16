@@ -17,6 +17,11 @@ max_connections = 10000
 connection_timeout_secs = 30
 request_timeout_secs = 300
 
+# Streaming Configuration
+stream_timeout_secs = 600
+stream_keepalive_interval_ms = 30000
+stream_max_chunk_tokens = 8
+
 # Batching
 batch_enabled = true
 batch_size = 8

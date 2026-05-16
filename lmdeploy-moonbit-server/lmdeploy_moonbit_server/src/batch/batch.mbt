@@ -38,6 +38,23 @@ pub fn RequestType::to_string(self : RequestType) -> String {
   }
 }
 
+/// Batch result for a single request
+pub struct BatchResult {
+  id: String
+  success: Bool
+  response: String
+  error: Option[String]
+  latency_ms: Int
+}
+
+/// Batch processing result containing all request results
+pub struct BatchProcessingResult {
+  results: Array[BatchResult]
+  total_latency_ms: Int
+  processed_count: Int
+  failed_count: Int
+}
+
 /// Batch configuration
 pub struct BatchConfig {
   max_size: Int
@@ -49,6 +66,14 @@ pub fn BatchConfig::default() -> BatchConfig {
   {
     max_size: 8,
     timeout_ms: 50,
+    enable_batching: true,
+  }
+}
+
+pub fn BatchConfig::new(max_size: Int, timeout_ms: Int) -> BatchConfig {
+  {
+    max_size,
+    timeout_ms,
     enable_batching: true,
   }
 }
@@ -216,4 +241,237 @@ fn current_timestamp_ms() -> Int {
 fn float(i: Int) -> Float {
   // TODO: Proper float conversion
   0.0
+}
+
+/// Process a batch of chat completion requests
+/// Returns array of JSON response strings for each request
+pub fn process_batch_chat_completions(
+  requests_json: Array[String],
+  batch_config: BatchConfig,
+) -> BatchProcessingResult {
+  let total_requests = requests_json.length()
+  let mut results: Array[BatchResult] = []
+  let mut processed = 0
+  let mut failed = 0
+
+  let batch_start = current_timestamp_ms()
+
+  // Process each request in the batch
+  let idx = 0
+  while idx < total_requests {
+    let req_json = requests_json[idx]
+    let batch_id = "batch-chat-" ++ int_to_string(idx)
+
+    // Parse and validate each request
+    match parse_chat_request(req_json) {
+      Some(request) => {
+        // Process the request through TurboMind engine
+        match process_chat_request_impl(request) {
+          Some(response_json) => {
+            results = results.push({
+              id: batch_id,
+              success: true,
+              response: response_json,
+              error: None,
+              latency_ms: 0,
+            })
+            processed = processed + 1
+          }
+          None => {
+            results = results.push({
+              id: batch_id,
+              success: false,
+              response: "",
+              error: Some("Engine processing failed"),
+              latency_ms: 0,
+            })
+            failed = failed + 1
+          }
+        }
+      }
+      None => {
+        let err = "Invalid request: " ++ extract_error_detail(req_json)
+        results = results.push({
+          id: batch_id,
+          success: false,
+          response: "",
+          error: Some(err),
+          latency_ms: 0,
+        })
+        failed = failed + 1
+      }
+    }
+
+    idx = idx + 1
+  }
+
+  let total_latency = current_timestamp_ms() - batch_start
+
+  {
+    results: results,
+    total_latency_ms: total_latency,
+    processed_count: processed,
+    failed_count: failed,
+  }
+}
+
+/// Process a batch of text completion requests
+pub fn process_batch_completions(
+  requests_json: Array[String],
+  batch_config: BatchConfig,
+) -> BatchProcessingResult {
+  let total_requests = requests_json.length()
+  let mut results: Array[BatchResult] = []
+  let mut processed = 0
+  let mut failed = 0
+
+  let batch_start = current_timestamp_ms()
+
+  let idx = 0
+  while idx < total_requests {
+    let req_json = requests_json[idx]
+    let batch_id = "batch-compl-" ++ int_to_string(idx)
+
+    match parse_completion_request(req_json) {
+      Some(request) => {
+        match process_completion_request_impl(request) {
+          Some(response_json) => {
+            results = results.push({
+              id: batch_id,
+              success: true,
+              response: response_json,
+              error: None,
+              latency_ms: 0,
+            })
+            processed = processed + 1
+          }
+          None => {
+            results = results.push({
+              id: batch_id,
+              success: false,
+              response: "",
+              error: Some("Engine processing failed"),
+              latency_ms: 0,
+            })
+            failed = failed + 1
+          }
+        }
+      }
+      None => {
+        let err = "Invalid request: " ++ extract_error_detail(req_json)
+        results = results.push({
+          id: batch_id,
+          success: false,
+          response: "",
+          error: Some(err),
+          latency_ms: 0,
+        })
+        failed = failed + 1
+      }
+    }
+
+    idx = idx + 1
+  }
+
+  let total_latency = current_timestamp_ms() - batch_start
+
+  {
+    results: results,
+    total_latency_ms: total_latency,
+    processed_count: processed,
+    failed_count: failed,
+  }
+}
+
+/// Parse a chat completion request from JSON string
+fn parse_chat_request(json_str: String) -> Option[String] {
+  // TODO: Implement proper JSON parsing and ChatCompletionRequest validation
+  if json_str == "" {
+    None
+  } else {
+    Some(json_str)
+  }
+}
+
+/// Parse a completion request from JSON string
+fn parse_completion_request(json_str: String) -> Option[String] {
+  // TODO: Implement proper JSON parsing and CompletionRequest validation
+  if json_str == "" {
+    None
+  } else {
+    Some(json_str)
+  }
+}
+
+/// Process a validated chat request through the TurboMind engine
+fn process_chat_request_impl(request_json: String) -> Option[String] {
+  // TODO: FFI call to TurboMind engine for chat completion
+  // Returns JSON string response or None on error
+  let _ = request_json
+  None
+}
+
+/// Process a validated completion request through the TurboMind engine
+fn process_completion_request_impl(request_json: String) -> Option[String] {
+  // TODO: FFI call to TurboMind engine for text completion
+  let _ = request_json
+  None
+}
+
+/// Extract error detail from invalid request JSON
+fn extract_error_detail(json_str: String) -> String {
+  let _ = json_str
+  "parse error"
+}
+
+/// Build batch response JSON from processing results
+pub fn build_batch_response(
+  results: BatchProcessingResult,
+  response_type: String,
+) -> String {
+  let total_latency_str = float_to_string(float(results.total_latency_ms))
+
+  let mut response = "{\"total_latency_ms\": " ++ total_latency_str
+  response = response ++ ", \"processed_count\": " ++ int_to_string(results.processed_count)
+  response = response ++ ", \"failed_count\": " ++ int_to_string(results.failed_count)
+  response = response ++ ", \"results\": ["
+
+  let idx = 0
+  while idx < results.results.length() {
+    let r = results.results[idx]
+    if idx > 0 {
+      response = response ++ ", "
+    }
+    response = response ++ "{\"id\": \"" ++ r.id ++ "\""
+    response = response ++ ", \"success\": " ++ bool_to_string(r.success)
+    if r.success {
+      response = response ++ ", \"response\": " ++ r.response
+    } else {
+      match r.error {
+        Some(err) => {
+          response = response ++ ", \"error\": \"" ++ err ++ "\""
+        }
+        None => {
+          response = response ++ ", \"error\": \"unknown error\""
+        }
+      }
+    }
+    response = response ++ "}"
+    idx = idx + 1
+  }
+
+  response = response ++ "]}"
+  response
+}
+
+fn float_to_string(f: Float) -> String {
+  // TODO: Proper float to string conversion
+  "0.0"
+}
+
+fn bool_to_string(b: Bool) -> String {
+  match b {
+    true => "true"
+    false => "false"
+  }
 }

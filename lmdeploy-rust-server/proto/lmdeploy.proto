@@ -10,6 +10,9 @@ service LMDeployService {
   // Streaming inference (server-side streaming)
   rpc GenerateStream(GenerateRequest) returns (stream GenerateStreamResponse);
 
+  // Bidirectional streaming (client sends prompts, server streams responses)
+  rpc GenerateBidirectional(stream GenerateRequest) returns (stream GenerateStreamResponse);
+
   // Batch inference
   rpc GenerateBatch(BatchGenerateRequest) returns (BatchGenerateResponse);
 

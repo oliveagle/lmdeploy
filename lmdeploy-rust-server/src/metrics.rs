@@ -4,15 +4,25 @@
 //! throughput, cache hit rates, and streaming performance.
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 
 /// Streaming metrics for tracking first token latency and chunk delivery
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct StreamMetrics {
     pub total_streams: AtomicU64,
     pub first_token_latency_ms: AtomicU64,
     pub total_chunks_sent: AtomicU64,
     pub stream_timeouts: AtomicU64,
+}
+
+impl Clone for StreamMetrics {
+    fn clone(&self) -> Self {
+        Self {
+            total_streams: AtomicU64::new(self.total_streams.load(Ordering::Relaxed)),
+            first_token_latency_ms: AtomicU64::new(self.first_token_latency_ms.load(Ordering::Relaxed)),
+            total_chunks_sent: AtomicU64::new(self.total_chunks_sent.load(Ordering::Relaxed)),
+            stream_timeouts: AtomicU64::new(self.stream_timeouts.load(Ordering::Relaxed)),
+        }
+    }
 }
 
 impl StreamMetrics {

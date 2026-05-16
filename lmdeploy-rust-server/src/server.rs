@@ -1,6 +1,6 @@
 use axum::{
     extract::State,
-    http::{Method, StatusCode},
+    http::Method,
     routing::{get, post},
     Json, Router,
 };
@@ -31,8 +31,9 @@ use crate::error::{AppError, Result};
 use crate::metrics::AppMetrics;
 
 use crate::handlers::http::{
-    cache_metrics, chat_completions, chat_completions_stream, clear_cache, completions, health_check,
-    list_models, stream_metrics, tokenize, ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
+    batch_chat_completions, batch_completions, batch_stats, cache_metrics, chat_completions,
+    chat_completions_stream, clear_cache, completions, health_check, list_models, stream_metrics,
+    tokenize, ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
 };
 use crate::model::TurboMindEngine;
 
@@ -43,11 +44,12 @@ pub type BatchSender = mpsc::UnboundedSender<BatchItem>;
 pub struct AppState {
     pub engine: Arc<RwLock<TurboMindEngine>>,
     pub tokenizer_cache: Arc<TokenizeCache>,
-    pub config: AppConfig,
+    pub config: Arc<RwLock<AppConfig>>,
     pub request_semaphore: Arc<Semaphore>,
     pub batch_sender: Option<Arc<BatchSender>>,
     pub batch_stats: Arc<BatchStats>,
     pub metrics: Arc<AppMetrics>,
+    pub config_reload_tx: mpsc::Sender<()>,
 }
 
 /// Batch request accumulator
@@ -140,6 +142,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         let batch_timeout_ms = config.server.batch_timeout_ms;
         let batch_timeout = Duration::from_millis(config.server.batch_timeout_ms);
         let stats_clone = batch_stats.clone();
+        let engine_clone = engine.clone();
 
         let handle = tokio::spawn(async move {
             tracing::info!(
@@ -147,7 +150,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
                 timeout_ms = batch_timeout_ms,
                 "Batch processor started"
             );
-            run_batch_processor(batch_rx, batch_size, batch_timeout, stats_clone).await
+            run_batch_processor(batch_rx, batch_size, batch_timeout, stats_clone, engine_clone).await
         });
 
         Some((Arc::new(batch_tx), handle))
@@ -155,20 +158,64 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         None
     };
 
+    let (config_reload_tx, mut config_reload_rx) = mpsc::channel::<()>(32);
+
     let state = Arc::new(AppState {
         engine,
         tokenizer_cache: tokenizer_cache.clone(),
-        config: config.clone(),
+        config: Arc::new(RwLock::new(config.clone())),
         request_semaphore,
         batch_sender: batch_sender.as_ref().map(|(tx, _)| tx.clone()),
         batch_stats,
         metrics: Arc::new(AppMetrics::new()),
+        config_reload_tx: config_reload_tx.clone(),
+    });
+
+    // Spawn config reload task
+    let config_state = state.clone();
+    tokio::spawn(async move {
+        while config_reload_rx.recv().await.is_some() {
+            match AppConfig::load() {
+                Ok(new_config) => {
+                    let mut config = config_state.config.write().await;
+                    *config = new_config.clone();
+                    tracing::info!(
+                        config = ?new_config,
+                        "Configuration reloaded successfully"
+                    );
+
+                    // Update log level if changed
+                    let new_filter = tracing_subscriber::EnvFilter::new(&new_config.logging.level);
+                    // Note: Can't re-init subscriber, just log the change
+                    tracing::debug!("Log level changed to: {}", new_config.logging.level);
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to reload configuration");
+                }
+            }
+        }
     });
 
     // Spawn gRPC server
     let grpc_handle = tokio::spawn(async move {
         crate::grpc::start_grpc_server(grpc_addr, env!("CARGO_PKG_VERSION").to_string(), tokenizer_cache).await
     });
+
+    // Spawn SIGHUP handler for hot reload
+    #[cfg(unix)]
+    {
+        let reload_tx = config_reload_tx.clone();
+        tokio::spawn(async move {
+            let mut sighup_stream = signal::unix::signal(signal::unix::SignalKind::hangup())
+                .expect("failed to install SIGHUP handler");
+            while sighup_stream.recv().await.is_some() {
+                tracing::info!("SIGHUP received, triggering configuration reload");
+                if reload_tx.send(()).await.is_err() {
+                    tracing::warn!("Failed to send config reload signal on SIGHUP");
+                }
+            }
+        });
+    }
 
     // Spawn HTTP server
     let http_state = state.clone();
@@ -224,6 +271,8 @@ fn create_router(state: Arc<AppState>) -> Router {
         .route("/health", get(health_check))
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/completions", post(completions))
+        .route("/v1/chat/completions/batch", post(batch_chat_completions))
+        .route("/v1/completions/batch", post(batch_completions))
         .route("/v1/models", get(list_models))
         .route("/v1/chat/completions/stream", post(chat_completions_stream))
         .route("/v1/tokenize", post(tokenize))
@@ -231,6 +280,8 @@ fn create_router(state: Arc<AppState>) -> Router {
         .route("/v1/cache/clear", post(clear_cache))
         .route("/v1/metrics/stream", get(stream_metrics))
         .route("/v1/batch/stats", get(batch_stats))
+        .route("/v1/config/reload", post(reload_config))
+        .route("/v1/config", get(get_config))
         .layer(TraceLayer::new_for_http())
         .layer(RequestBodyLimitLayer::new(10 * 1024 * 1024)) // 10MB limit
         .layer(ServiceBuilder::new().layer(cors))
@@ -266,12 +317,36 @@ async fn shutdown_signal() {
     }
 }
 
+/// Trigger configuration reload (called by POST /v1/config/reload)
+pub async fn reload_config(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>> {
+    tracing::info!("Configuration reload requested");
+    state
+        .config_reload_tx
+        .send(())
+        .await
+        .map_err(|e| AppError::Config(format!("Failed to send reload signal: {}", e)))?;
+    Ok(Json(serde_json::json!({
+        "status": "config_reload_triggered"
+    })))
+}
+
+/// Get current configuration (called by GET /v1/config)
+pub async fn get_config(
+    State(state): State<Arc<AppState>>,
+) -> Json<AppConfig> {
+    let config = state.config.read().await.clone();
+    Json(config)
+}
+
 /// Batch processor for accumulating and executing inference requests
 async fn run_batch_processor(
     mut rx: mpsc::UnboundedReceiver<BatchItem>,
     batch_size: usize,
     batch_timeout: Duration,
     stats: Arc<BatchStats>,
+    engine: Arc<RwLock<TurboMindEngine>>,
 ) {
     let mut accumulator: HashMap<String, BatchAccumulator> = HashMap::new();
 
@@ -281,7 +356,7 @@ async fn run_batch_processor(
             item_opt = rx.recv() => {
                 let Some(item) = item_opt else {
                     // Channel closed, flush remaining batches
-                    flush_all_batches(&mut accumulator, &stats).await;
+                    flush_all_batches(&mut accumulator, &stats, &engine).await;
                     break;
                 };
 
@@ -302,12 +377,12 @@ async fn run_batch_processor(
 
                 // Flush if batch size reached
                 if entry.requests.len() >= batch_size {
-                    flush_batch(model, &mut accumulator, &stats).await;
+                    flush_batch(model, &mut accumulator, &stats, engine.clone()).await;
                 }
             }
             // Timeout flush
             _ = tokio::time::sleep(batch_timeout) => {
-                flush_ready_batches(&mut accumulator, &stats, batch_timeout).await;
+                flush_ready_batches(&mut accumulator, &stats, batch_timeout, &engine).await;
             }
         }
     }
@@ -326,6 +401,7 @@ async fn flush_batch(
     model: String,
     accumulator: &mut HashMap<String, BatchAccumulator>,
     stats: &Arc<BatchStats>,
+    engine: Arc<RwLock<TurboMindEngine>>,
 ) {
     if let Some(entry) = accumulator.remove(&model) {
         if entry.requests.is_empty() {
@@ -341,38 +417,42 @@ async fn flush_batch(
             "Executing batch"
         );
 
-        // Process all requests in parallel using tokio::spawn since we don't need engine lock
+        // Process all requests in parallel
         let tasks: Vec<_> = entry
             .requests
             .into_iter()
-            .map(|item| async move {
-                let prompt = messages_to_prompt(&item.req.messages);
-                let _max_tokens = item.req.max_tokens.unwrap_or(512) as usize;
+            .map(|item| {
+                let engine_clone = engine.clone();
+                async move {
+                    let prompt = messages_to_prompt(&item.req.messages);
+                    let max_tokens = item.req.max_tokens.unwrap_or(512) as usize;
 
-                // Mock response - real implementation would call engine with prompt and _max_tokens
-                let text = format!("Response to: {}", prompt);
+                    // Call the actual engine
+                    let eng = engine_clone.read().await;
+                    let text = eng.generate(&prompt, max_tokens).await;
 
-                let response = ChatCompletionsResponse {
-                    id: format!("chatcmpl-{}", uuid_simple()),
-                    object: "chat.completion".into(),
-                    created: unix_timestamp(),
-                    model: item.req.model.clone(),
-                    choices: vec![Choice {
-                        index: 0,
-                        message: Message {
-                            role: "assistant".into(),
-                            content: text,
+                    let response = ChatCompletionsResponse {
+                        id: format!("chatcmpl-{}", uuid_simple()),
+                        object: "chat.completion".into(),
+                        created: unix_timestamp(),
+                        model: item.req.model.clone(),
+                        choices: vec![Choice {
+                            index: 0,
+                            message: Message {
+                                role: "assistant".into(),
+                                content: text,
+                            },
+                            finish_reason: "stop".into(),
+                        }],
+                        usage: Usage {
+                            prompt_tokens: 0,
+                            completion_tokens: 0,
+                            total_tokens: 0,
                         },
-                        finish_reason: "stop".into(),
-                    }],
-                    usage: Usage {
-                        prompt_tokens: 0,
-                        completion_tokens: 0,
-                        total_tokens: 0,
-                    },
-                };
+                    };
 
-                let _ = item.tx.send(response);
+                    let _ = item.tx.send(response);
+                }
             })
             .collect();
 
@@ -385,6 +465,7 @@ async fn flush_ready_batches(
     accumulator: &mut HashMap<String, BatchAccumulator>,
     stats: &Arc<BatchStats>,
     timeout: Duration,
+    engine: &Arc<RwLock<TurboMindEngine>>,
 ) {
     let now = Instant::now();
     let ready_models: Vec<_> = accumulator
@@ -394,23 +475,15 @@ async fn flush_ready_batches(
         .collect();
 
     for model in ready_models {
-        flush_batch(model, accumulator, stats).await;
+        flush_batch(model, accumulator, stats, engine.clone()).await;
     }
 }
 
-async fn flush_all_batches(accumulator: &mut HashMap<String, BatchAccumulator>, stats: &Arc<BatchStats>) {
+async fn flush_all_batches(accumulator: &mut HashMap<String, BatchAccumulator>, stats: &Arc<BatchStats>, engine: &Arc<RwLock<TurboMindEngine>>) {
     let models: Vec<_> = accumulator.keys().cloned().collect();
     for model in models {
-        flush_batch(model, accumulator, stats).await;
+        flush_batch(model, accumulator, stats, engine.clone()).await;
     }
-}
-
-/// Batch statistics endpoint
-pub async fn batch_stats(
-    State(state): State<Arc<AppState>>,
-) -> (StatusCode, Json<BatchStatsResponse>) {
-    let stats = state.batch_stats.batch_response();
-    (StatusCode::OK, Json(stats))
 }
 
 fn messages_to_prompt(messages: &[Message]) -> String {

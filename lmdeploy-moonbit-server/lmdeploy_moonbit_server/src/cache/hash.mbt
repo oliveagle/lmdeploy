@@ -1,10 +1,49 @@
 // src/cache/hash.mbt
 // Hash utilities for cache key generation
-// Reference: lmdeploy-rust-server/src/cache/tokenizer_cache.rs (compute_hash function)
+
+/// Convert integer to hex string
+fn int_to_hex(n: Int) -> String {
+  let mut result = ""
+  let mut num = n
+  if num < 0 {
+    num = -num
+  }
+  if num == 0 {
+    return "0"
+  }
+  while num > 0 {
+    let digit = num % 16
+    let ch = digit_to_hex_char(digit)
+    result = ch + result
+    num = num / 16
+  }
+  result
+}
+
+/// Convert a single digit to hex char
+fn digit_to_hex_char(digit: Int) -> String {
+  match digit {
+    0 => "0"
+    1 => "1"
+    2 => "2"
+    3 => "3"
+    4 => "4"
+    5 => "5"
+    6 => "6"
+    7 => "7"
+    8 => "8"
+    9 => "9"
+    10 => "a"
+    11 => "b"
+    12 => "c"
+    13 => "d"
+    14 => "e"
+    _ => "f"
+  }
+}
 
 /// Compute hash of text using djb2 algorithm
 /// Note: This is a simple hash for development. Production should use SHA-256.
-/// For SHA-256, would need FFI to a C library or custom implementation.
 pub fn compute_hash(text: String) -> String {
   // djb2 hash algorithm - fast and good distribution for strings
   let mut hash: Int = 5381
@@ -12,24 +51,7 @@ pub fn compute_hash(text: String) -> String {
     hash = ((hash << 5) + hash) + ch.to_int()
   }
   // Convert to hex string (lowercase)
-  to_hex(hash)
-}
-
-/// Convert integer to hex string
-fn to_hex(n: Int) -> String {
-  if n == 0 {
-    "0"
-  } else {
-    let hex_chars = "0123456789abcdef"
-    let mut result = ""
-    let mut num = n
-    while num > 0 {
-      let idx = num % 16
-      result = hex_chars.get(idx) + result
-      num = num / 16
-    }
-    result
-  }
+  int_to_hex(hash)
 }
 
 /// Verify hash consistency

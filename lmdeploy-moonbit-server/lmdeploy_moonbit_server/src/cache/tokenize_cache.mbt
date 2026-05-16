@@ -54,8 +54,8 @@ pub struct TokenizeCache {
 
 pub fn TokenizeCache::new(max_size: Int, ttl_secs: Int) -> TokenizeCache {
   {
-    cache: Map::new(),
-    prefix_cache: Map::new(),
+    cache: Map([], capacity=max_size),
+    prefix_cache: Map([], capacity=max_size),
     max_size,
     ttl_secs,
     metrics: CacheMetrics::default(),
@@ -64,10 +64,10 @@ pub fn TokenizeCache::new(max_size: Int, ttl_secs: Int) -> TokenizeCache {
 }
 
 /// Get tokenized result from cache, or tokenize using the provided function
+/// Note: Tokenization via FFI not yet implemented - this only checks cache
 pub fn TokenizeCache::get_or_tokenize(
   self: TokenizeCache,
   text: String,
-  tokenize_fn: Fn(String) -> Result[Array[Int], String],
 ) -> (TokenizeCache, Result[Array[Int], String]) {
   self = self.record_total_request()
 
@@ -87,16 +87,10 @@ pub fn TokenizeCache::get_or_tokenize(
           (self, Ok(tokens))
         }
         None => {
-          // Cache miss - tokenize and cache
+          // Cache miss - tokenization not yet implemented via FFI
+          // Return empty result indicating cache miss
           let self = self.record_miss()
-          let token_ids = tokenize_fn(text)
-          match token_ids {
-            Ok(ids) => {
-              let self = self.store(text, ids)
-              (self, Ok(ids))
-            }
-            Err(e) => (self, Err(e)),
-          }
+          (self, Err("Tokenization not yet implemented - requires TurboMind FFI"))
         }
       }
     }
@@ -201,7 +195,7 @@ fn TokenizeCache::store(self: TokenizeCache, text: String, token_ids: Array[Int]
     max_size: self.max_size,
     ttl_secs: self.ttl_secs,
     metrics: self.metrics,
-    lru_order: self.lru_order.push(text),
+    lru_order: self.lru_order.concat([text]),
   }
 
   // Also store prefixes for longer texts
@@ -227,8 +221,8 @@ fn TokenizeCache::store(self: TokenizeCache, text: String, token_ids: Array[Int]
 /// Clear all cache entries
 pub fn TokenizeCache::clear(self: TokenizeCache) -> TokenizeCache {
   {
-    cache: Map::new(),
-    prefix_cache: Map::new(),
+    cache: Map([], capacity=self.max_size),
+    prefix_cache: Map([], capacity=self.max_size),
     max_size: self.max_size,
     ttl_secs: self.ttl_secs,
     metrics: self.metrics,
@@ -303,7 +297,7 @@ fn TokenizeCache::record_prefix_hit(self: TokenizeCache) -> TokenizeCache {
 /// Move a key to the most-recently-used position
 fn move_to_mru(order: Array[String], key: String) -> Array[String] {
   let filtered = order.filter(fn (k) { k != key })
-  filtered.push(key)
+  filtered.concat([key])
 }
 
 fn record_eviction(metrics: CacheMetrics) -> CacheMetrics {

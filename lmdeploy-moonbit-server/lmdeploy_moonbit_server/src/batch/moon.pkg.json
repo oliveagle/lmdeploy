@@ -1,6 +1,8 @@
 {
   "link": {
     "name": "username/lmdeploy_moonbit_server/batch",
-    "deps": []
+    "deps": [
+      "username/lmdeploy_moonbit_server/protocol"
+    ]
   }
 }

@@ -176,7 +176,9 @@ pub async fn chat_completions_stream(
     let model = req.model.clone();
     let id = format!("chatcmpl-{}", uuid_simple());
     let created = unix_timestamp();
-    let stream_timeout_ms = state.config.server.stream_keepalive_interval_ms;
+    let config = state.config.read().await;
+    let stream_timeout_ms = config.server.stream_keepalive_interval_ms;
+    drop(config);
     let metrics = state.metrics.clone();
 
     tracing::info!(model = %model, "Chat completions stream request");
@@ -396,6 +398,178 @@ pub async fn list_models() -> (StatusCode, Json<ModelsResponse>) {
             owned_by: "lmdeploy".into(),
         }],
     }))
+}
+
+/// Batch chat completions request
+#[derive(Debug, Deserialize, Clone)]
+pub struct BatchChatCompletionsRequest {
+    pub model: String,
+    pub messages: Vec<Vec<Message>>,
+    pub temperature: Option<f32>,
+    pub top_p: Option<f32>,
+    pub max_tokens: Option<i32>,
+    pub stop: Option<Vec<String>>,
+    pub seed: Option<i32>,
+    pub presence_penalty: Option<f32>,
+    pub frequency_penalty: Option<f32>,
+    pub user: Option<String>,
+}
+
+/// Batch chat completions response
+#[derive(Debug, Serialize)]
+pub struct BatchChatCompletionsResponse {
+    pub id: String,
+    pub object: String,
+    pub created: i64,
+    pub model: String,
+    pub choices: Vec<BatchChoice>,
+    pub usage: BatchUsage,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BatchChoice {
+    pub index: i32,
+    pub message: Message,
+    pub finish_reason: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BatchUsage {
+    pub prompt_tokens: i32,
+    pub completion_tokens: i32,
+    pub total_tokens: i32,
+}
+
+/// Batch completions request
+#[derive(Debug, Deserialize, Clone)]
+pub struct BatchCompletionsRequest {
+    pub model: String,
+    pub prompts: Vec<String>,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<i32>,
+    pub echo: Option<bool>,
+}
+
+/// Batch completions response
+#[derive(Debug, Serialize)]
+pub struct BatchCompletionsResponse {
+    pub id: String,
+    pub object: String,
+    pub created: i64,
+    pub model: String,
+    pub choices: Vec<BatchCompletionChoice>,
+    pub usage: BatchUsage,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BatchCompletionChoice {
+    pub text: String,
+    pub index: i32,
+    pub finish_reason: String,
+}
+
+/// Batch chat completions endpoint (OpenAI-compatible batch format)
+pub async fn batch_chat_completions(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BatchChatCompletionsRequest>,
+) -> (StatusCode, Json<BatchChatCompletionsResponse>) {
+    let model = req.model.clone();
+    let start = std::time::Instant::now();
+
+    tracing::info!(
+        model = %model,
+        batch_size = req.messages.len(),
+        "Batch chat completions request"
+    );
+
+    let engine = state.engine.read().await;
+    let mut choices = Vec::new();
+    let mut total_prompt_tokens = 0;
+    let mut total_completion_tokens = 0;
+
+    for (idx, messages) in req.messages.iter().enumerate() {
+        let prompt = messages_to_prompt(messages);
+        let max_tokens = req.max_tokens.unwrap_or(512) as usize;
+        let text = engine.generate(&prompt, max_tokens).await;
+
+        total_prompt_tokens += prompt.len() as i32;
+        total_completion_tokens += text.len() as i32;
+
+        choices.push(BatchChoice {
+            index: idx as i32,
+            message: Message {
+                role: "assistant".into(),
+                content: text,
+            },
+            finish_reason: "stop".into(),
+        });
+    }
+
+    let response = BatchChatCompletionsResponse {
+        id: format!("chatcmpl-{}", uuid_simple()),
+        object: "chat.completion".into(),
+        created: unix_timestamp(),
+        model,
+        choices,
+        usage: BatchUsage {
+            prompt_tokens: total_prompt_tokens,
+            completion_tokens: total_completion_tokens,
+            total_tokens: total_prompt_tokens + total_completion_tokens,
+        },
+    };
+
+    tracing::info!(latency_ms = start.elapsed().as_millis(), "Batch chat completions done");
+    (StatusCode::OK, Json(response))
+}
+
+/// Batch completions endpoint
+pub async fn batch_completions(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BatchCompletionsRequest>,
+) -> (StatusCode, Json<BatchCompletionsResponse>) {
+    let model = req.model.clone();
+    let start = std::time::Instant::now();
+
+    tracing::info!(
+        model = %model,
+        batch_size = req.prompts.len(),
+        "Batch completions request"
+    );
+
+    let engine = state.engine.read().await;
+    let mut choices = Vec::new();
+    let mut total_prompt_tokens = 0;
+    let mut total_completion_tokens = 0;
+
+    for (idx, prompt) in req.prompts.iter().enumerate() {
+        let max_tokens = req.max_tokens.unwrap_or(512) as usize;
+        let text = engine.generate(prompt, max_tokens).await;
+
+        total_prompt_tokens += prompt.len() as i32;
+        total_completion_tokens += text.len() as i32;
+
+        choices.push(BatchCompletionChoice {
+            text,
+            index: idx as i32,
+            finish_reason: "stop".into(),
+        });
+    }
+
+    let response = BatchCompletionsResponse {
+        id: format!("cmpl-{}", uuid_simple()),
+        object: "text_completion".into(),
+        created: unix_timestamp(),
+        model,
+        choices,
+        usage: BatchUsage {
+            prompt_tokens: total_prompt_tokens,
+            completion_tokens: total_completion_tokens,
+            total_tokens: total_prompt_tokens + total_completion_tokens,
+        },
+    };
+
+    tracing::info!(latency_ms = start.elapsed().as_millis(), "Batch completions done");
+    (StatusCode::OK, Json(response))
 }
 
 #[derive(Debug, Serialize)]

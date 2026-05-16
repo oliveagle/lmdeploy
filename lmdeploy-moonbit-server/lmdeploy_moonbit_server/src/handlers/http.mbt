@@ -4,6 +4,11 @@
 
 use username/lmdeploy_moonbit_server/http
 use username/lmdeploy_moonbit_server/protocol
+use username/lmdeploy_moonbit_server/batch
+use username/lmdeploy_moonbit_server/cache
+
+/// Tokenize cache instance (module-level for reuse across requests)
+let cache = cache.TokenizeCache::new(1000, 3600)
 
 // Health check endpoint
 /// GET /health
@@ -200,19 +205,27 @@ pub fn batch_chat_completions_handler(req: http.HttpRequest) -> http.HttpRespons
   let body_str = bytes_to_string(req.body)
   let start = current_timestamp_ms()
 
-  // Parse batch requests and process
-  // In production, this would batch multiple requests together
-  // and process them through TurboMind efficiently
+  // Parse batch requests from JSON body
+  // Expected format: {"requests": [...], "batch_size": 8}
+  let batch_config = extract_batch_config(body_str)
+  let requests = extract_batch_requests(body_str)
 
-  let response = """
-{"status": "ok", "batch_size": 0, "results": []}
-"""
+  // Process the batch
+  let batch_result = batch::process_batch_chat_completions(requests, batch_config)
+
+  // Build response JSON
+  let response_json = batch::build_batch_response(batch_result, "chat_completion")
+
+  let elapsed = current_timestamp_ms() - start
 
   http.HttpResponse::ok()
     .set_header("content-type", "application/json")
     .set_header("x-request-id", generate_request_id())
-    .set_header("x-response-time-ms", int_to_string(current_timestamp_ms() - start))
-    .json(response)
+    .set_header("x-response-time-ms", int_to_string(elapsed))
+    .set_header("x-batch-size", int_to_string(requests.length()))
+    .set_header("x-processed-count", int_to_string(batch_result.processed_count))
+    .set_header("x-failed-count", int_to_string(batch_result.failed_count))
+    .json(response_json)
 }
 
 // Batch completions endpoint
@@ -221,15 +234,26 @@ pub fn batch_completions_handler(req: http.HttpRequest) -> http.HttpResponse {
   let body_str = bytes_to_string(req.body)
   let start = current_timestamp_ms()
 
-  let response = """
-{"status": "ok", "batch_size": 0, "results": []}
-"""
+  // Parse batch requests from JSON body
+  let batch_config = extract_batch_config(body_str)
+  let requests = extract_batch_requests(body_str)
+
+  // Process the batch
+  let batch_result = batch::process_batch_completions(requests, batch_config)
+
+  // Build response JSON
+  let response_json = batch::build_batch_response(batch_result, "completion")
+
+  let elapsed = current_timestamp_ms() - start
 
   http.HttpResponse::ok()
     .set_header("content-type", "application/json")
     .set_header("x-request-id", generate_request_id())
-    .set_header("x-response-time-ms", int_to_string(current_timestamp_ms() - start))
-    .json(response)
+    .set_header("x-response-time-ms", int_to_string(elapsed))
+    .set_header("x-batch-size", int_to_string(requests.length()))
+    .set_header("x-processed-count", int_to_string(batch_result.processed_count))
+    .set_header("x-failed-count", int_to_string(batch_result.failed_count))
+    .json(response_json)
 }
 
 // Helper functions
@@ -275,20 +299,21 @@ fn bytes_to_string(bytes: Array[U8]) -> String {
 
 /// Compute text hash for caching
 fn compute_text_hash(text: String) -> String {
-  // TODO: Implement SHA-256 hashing
-  // For now, use simple hash
-  "hash-" ++ int_to_string(text.length())
+  // Use the hash module's compute_hash function
+  cache.compute_hash(text)
 }
 
-/// Get tokens from cache or tokenize
-fn get_or_tokenize(text: String, hash: String) -> (Array[U32], Bool) {
-  // TODO: Implement LRU cache lookup
-  // For now, return empty
+/// Get tokens from cache or tokenize using the global cache instance
+fn get_or_tokenize(text: String, hash: String) -> (Array[Int], Bool) {
+  // Use the global cache instance
+  // For now, return empty as actual tokenization requires FFI to TurboMind
+  // The cache infrastructure is in place for when tokenization is available
+  let _ = hash
   ([], false)
 }
 
 /// Convert token IDs to JSON array string
-fn ids_to_json_array(ids: Array[U32]) -> String {
+fn ids_to_json_array(ids: Array[Int]) -> String {
   if ids.length() == 0 {
     "[]"
   } else {
@@ -298,7 +323,7 @@ fn ids_to_json_array(ids: Array[U32]) -> String {
       if !first {
         result = result ++ ", "
       }
-      result = result ++ int_to_string(int(id))
+      result = result ++ int_to_string(id)
       first = false
     }
     result ++ "]"
@@ -327,4 +352,26 @@ fn int_to_string(i: Int) -> String {
     // Simplified - in production use proper implementation
     "0"
   }
+}
+
+/// Extract batch configuration from request body
+fn extract_batch_config(body: String) -> batch::BatchConfig {
+  // Parse batch_size from JSON, default to 8
+  let batch_size = extract_int_field(body, "batch_size", 8)
+  let timeout_ms = extract_int_field(body, "timeout_ms", 50)
+  batch::BatchConfig::new(batch_size, timeout_ms)
+}
+
+/// Extract batch requests array from request body
+fn extract_batch_requests(body: String) -> Array[String] {
+  // Parse "requests" field from JSON
+  // TODO: Implement proper JSON parsing
+  // For now, return empty array
+  []
+}
+
+/// Extract integer field from JSON with default value
+fn extract_int_field(json: String, field: String, default: Int) -> Int {
+  // TODO: Implement proper JSON field extraction
+  default
 }
