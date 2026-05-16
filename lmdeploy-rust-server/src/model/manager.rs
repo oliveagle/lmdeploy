@@ -112,7 +112,7 @@ impl ModelManager {
     /// List all loaded models
     pub async fn list_models(&self) -> Vec<ModelInfo> {
         let mut infos = Vec::new();
-        for (_name, engine) in &self.models {
+        for engine in self.models.values() {
             let eng = engine.read().await;
             infos.push(eng.info());
         }

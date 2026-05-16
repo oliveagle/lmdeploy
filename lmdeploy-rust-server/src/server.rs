@@ -81,6 +81,15 @@ pub struct BatchStats {
     pub total_requests: AtomicU64,
 }
 
+impl Default for BatchStats {
+    fn default() -> Self {
+        Self {
+            batch_count: AtomicU64::new(0),
+            total_requests: AtomicU64::new(0),
+        }
+    }
+}
+
 impl Clone for BatchStats {
     fn clone(&self) -> Self {
         Self {
@@ -92,10 +101,7 @@ impl Clone for BatchStats {
 
 impl BatchStats {
     pub fn new() -> Self {
-        Self {
-            batch_count: AtomicU64::new(0),
-            total_requests: AtomicU64::new(0),
-        }
+        Self::default()
     }
 
     pub fn batch_response(&self) -> BatchStatsResponse {

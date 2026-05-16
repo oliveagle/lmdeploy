@@ -21,6 +21,21 @@ after each iteration and it's included in prompts for context.
   - `Prompt` enum: `Single(String)` or `Multiple(Vec<String>)` for `prompt` parameter
   - `EmbeddingInput` enum: `Single(String)` or `Multiple(Vec<String>)` for `input` parameter
   - This matches OpenAI API spec where these fields accept either format
+- **ModelManager Pattern**: Use `ModelManager` to manage multiple `TurboMindEngine` instances via `HashMap<String, Arc<RwLock<TurboMindEngine>>>`
+  - Default model fallback for requests without model specified
+  - `get_model(Option<&str>)` returns named model or defaults to configured default
+  - Model routing via request `model` field - if not found, falls back to default with warning
+  - Model load/unload/reload via dedicated API endpoints (`/v1/models/load`, `/v1/models/unload`, `/v1/models/reload`)
+  - `ModelLoadTracker` for tracking async loading progress
+  - Error types: `ModelNotFound(404)`, `ModelAlreadyLoaded(409)`, `CannotUnloadDefaultModel(400)`
+- **MultiModelConfig**: Add `multi_model` section to config for loading additional models at startup
+  - `multi_model.enabled` flag to enable/disable multi-model support
+  - `multi_model.models` array of `{name, path}` entries loaded on startup
+- **Engine state tracking**: `TurboMindEngine` now tracks `ModelState` enum (Unloaded, Loading, Ready, Failed), `model_name`, `loaded_at`, and `is_ready` AtomicBool
+  - `reload(new_path)` method simulates hot reload with loading state transitions
+  - `is_ready()` check for inference readiness
+- **AppState migration**: Changed from single `engine: Arc<RwLock<TurboMindEngine>>` to `model_manager: Arc<RwLock<ModelManager>>`
+  - All handlers now resolve engine via `model_manager.get_model(Some(&model)).unwrap_or_else(|| mm.get_model(None).unwrap())`
 - **Prometheus Metrics Pattern**: Use `metrics-exporter-prometheus` crate with its own HTTP listener
   - `PrometheusBuilder::new().with_http_listener(addr).install()` sets up `/metrics` endpoint automatically
   - Use `metrics::histogram!`, `metrics::counter!` macros for recording metrics
@@ -212,6 +227,70 @@ US-007 was already fully implemented in a previous iteration. All acceptance cri
 ### Pre-existing Issues (not fixed in this story)
 - Pre-existing clippy warnings in test code (unused variables)
 - Mock engine responses instead of real TurboMind integration
+
+---
+
+## [2026-05-16] - US-009: 模型加载和管理
+
+### What was implemented
+1. **ModelManager** (`model/manager.rs`):
+   - Multi-model support with `HashMap<String, Arc<RwLock<TurboMindEngine>>>`
+   - `load_model(name, path)` - Load a new model dynamically
+   - `unload_model(name)` - Unload and release memory (prevents unloading default)
+   - `reload_model(name, new_path)` - Hot reload existing model
+   - `get_model(Option<&str>)` - Get model by name or default
+   - `list_models()` - List all loaded models with metadata
+   - `model_count()` - Get number of loaded models
+   - `has_model(name)` - Check if model is loaded
+
+2. **TurboMindEngine enhancements** (`model/engine.rs`):
+   - Added `ModelState` enum (Unloaded, Loading, Ready, Failed)
+   - Added `ModelInfo` struct for metadata (name, path, state, loaded_at)
+   - Added `reload()` method for hot reload
+   - Added `is_ready()` check for inference readiness
+   - `model_name` field extracted from path
+
+3. **Model management API endpoints** (`handlers/http.rs`):
+   - `POST /v1/models/load` - Load a new model
+   - `POST /v1/models/unload` - Unload a model
+   - `POST /v1/models/reload` - Reload an existing model
+   - `POST /v1/models/progress` - Get loading progress
+   - `GET /v1/models` - Enhanced to list all loaded models via ModelManager
+
+4. **Config extension** (`config.rs`):
+   - Added `MultiModelConfig` struct with `enabled` and `models` array
+   - Added `ModelEntry` struct for `{name, path}` entries
+   - Server loads additional models from config on startup if `multi_model.enabled = true`
+
+5. **AppState migration** (`server.rs`):
+   - Changed from `engine: Arc<RwLock<TurboMindEngine>>` to `model_manager: Arc<RwLock<ModelManager>>`
+   - Added `model_load_tracker: Arc<ModelLoadTracker>` for progress tracking
+   - Updated batch processor to use ModelManager for model routing
+   - All inference handlers now resolve engine via ModelManager
+
+6. **Error handling** (`error.rs`):
+   - Added `ModelNotFound(String)` - 404
+   - Added `ModelAlreadyLoaded(String)` - 409
+   - Added `CannotUnloadDefaultModel` - 400
+   - Added `ModelLoadFailed(String)` - 500
+
+### Files changed
+- `lmdeploy-rust-server/src/model/manager.rs` - New file, ModelManager implementation
+- `lmdeploy-rust-server/src/model/engine.rs` - Added ModelState, ModelInfo, reload(), is_ready()
+- `lmdeploy-rust-server/src/model/mod.rs` - Export ModelManager, ModelLoadTracker, ModelState, ModelInfo
+- `lmdeploy-rust-server/src/config.rs` - Added MultiModelConfig, ModelEntry
+- `lmdeploy-rust-server/src/error.rs` - Added model-related error variants
+- `lmdeploy-rust-server/src/handlers/http.rs` - Added model management endpoints, updated all handlers to use ModelManager
+- `lmdeploy-rust-server/src/server.rs` - Updated AppState to use ModelManager, updated batch processor
+
+### Learnings
+- **ModelManager pattern**: Centralized model management via HashMap with Arc<RwLock<TurboMindEngine>> enables clean multi-model routing
+- **Default model fallback**: Requests without model specified use `get_model(None)` which returns configured default
+- **Model routing via request field**: OpenAI-compatible `model` field in requests determines which engine to use
+- **Hot reload implementation**: Model reload() updates model_path, marks state=Loading, then Ready after simulated delay
+- **Memory safety**: Cannot unload default model prevents breaking the server
+- **AtomicBool for ready state**: `is_ready: AtomicBool` in TurboMindEngine provides thread-safe readiness check
+- **Derived Default**: Use `#[derive(Default)]` instead of manual impl when all fields implement Default (e.g., ModelState with `#[default]` variant)
 
 ---
 
