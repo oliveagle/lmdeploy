@@ -13,16 +13,19 @@ use tower_http::{
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use crate::cache::TokenizeCache;
 use crate::config::AppConfig;
 use crate::error::Result;
 use crate::handlers::http::{
-    chat_completions, chat_completions_stream, completions, health_check, list_models,
+    cache_metrics, chat_completions, chat_completions_stream, clear_cache, completions, health_check, list_models,
+    tokenize,
 };
 use crate::model::TurboMindEngine;
 
 #[derive(Clone)]
 pub struct AppState {
     pub engine: Arc<RwLock<TurboMindEngine>>,
+    pub tokenizer_cache: Arc<TokenizeCache>,
 }
 
 pub async fn start_server(config: &AppConfig) -> Result<()> {
@@ -30,7 +33,21 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         TurboMindEngine::new(&config.model.model_path).await?,
     ));
 
-    let state = Arc::new(AppState { engine });
+    let tokenizer_cache = Arc::new(TokenizeCache::new(
+        config.cache.tokenizer_cache_size,
+        config.cache.tokenizer_ttl_secs,
+    ));
+
+    tracing::info!(
+        cache_size = config.cache.tokenizer_cache_size,
+        cache_ttl_secs = config.cache.tokenizer_ttl_secs,
+        "Tokenize cache initialized"
+    );
+
+    let state = Arc::new(AppState {
+        engine,
+        tokenizer_cache: tokenizer_cache.clone(),
+    });
 
     let grpc_addr = format!("{}:{}", config.server.grpc_addr, config.server.grpc_port)
         .parse::<SocketAddr>()
@@ -41,7 +58,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         .unwrap();
 
     let grpc_handle = tokio::spawn(async move {
-        crate::grpc::start_grpc_server(grpc_addr, env!("CARGO_PKG_VERSION").to_string()).await
+        crate::grpc::start_grpc_server(grpc_addr, env!("CARGO_PKG_VERSION").to_string(), tokenizer_cache).await
     });
 
     let http_handle = tokio::spawn(async move {
@@ -77,6 +94,9 @@ fn create_router(state: Arc<AppState>) -> Router {
         .route("/v1/completions", post(completions))
         .route("/v1/models", get(list_models))
         .route("/v1/chat/completions/stream", post(chat_completions_stream))
+        .route("/v1/tokenize", post(tokenize))
+        .route("/v1/cache/metrics", get(cache_metrics))
+        .route("/v1/cache/clear", post(clear_cache))
         .layer(TraceLayer::new_for_http())
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state)

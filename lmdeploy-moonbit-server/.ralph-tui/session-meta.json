@@ -1,0 +1,13 @@
+{
+  "id": "6bec456b-e757-47bf-a9dd-cebe7e1b08bf",
+  "status": "running",
+  "startedAt": "2026-05-16T13:12:29.599Z",
+  "updatedAt": "2026-05-16T13:12:29.599Z",
+  "agentPlugin": "claude",
+  "trackerPlugin": "json",
+  "currentIteration": 0,
+  "maxIterations": 10,
+  "totalTasks": 0,
+  "tasksCompleted": 0,
+  "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-moonbit-server"
+}

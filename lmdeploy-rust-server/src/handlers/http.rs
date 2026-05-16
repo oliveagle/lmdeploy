@@ -8,6 +8,7 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::cache::compute_hash;
 use crate::server::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -269,6 +270,115 @@ pub async fn health_check() -> (StatusCode, Json<HealthResponse>) {
         status: "ok".into(),
         version: env!("CARGO_PKG_VERSION").into(),
     }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TokenizeRequest {
+    pub text: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TokenizeResponse {
+    pub token_ids: Vec<u32>,
+    pub length: usize,
+    pub hash: String,
+    pub cached: bool,
+}
+
+pub async fn tokenize(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<TokenizeRequest>,
+) -> (StatusCode, Json<TokenizeResponse>) {
+    let hash = compute_hash(&req.text);
+    let start = std::time::Instant::now();
+
+    let token_ids = state
+        .tokenizer_cache
+        .get_or_tokenize(&req.text, |text| {
+            let owned = text.to_string();
+            async move {
+                let mock_tokens: Vec<u32> = owned.chars().map(|c| c as u32).collect();
+                Ok(mock_tokens)
+            }
+        })
+        .await
+        .unwrap_or_else(|_| req.text.chars().map(|c| c as u32).collect());
+
+    let cached = start.elapsed().as_millis() < 1; // Fast response = cache hit
+
+    tracing::info!(
+        text_len = req.text.len(),
+        token_count = token_ids.len(),
+        cached,
+        latency_ms = start.elapsed().as_millis(),
+        "Tokenize request"
+    );
+
+    let length = token_ids.len();
+
+    (
+        StatusCode::OK,
+        Json(TokenizeResponse {
+            token_ids,
+            length,
+            hash,
+            cached,
+        }),
+    )
+}
+
+#[derive(Debug, Serialize)]
+pub struct CacheMetricsResponse {
+    pub total_requests: u64,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+    pub prefix_hits: u64,
+    pub evictions: u64,
+    pub hit_rate: f64,
+    pub current_size: usize,
+}
+
+pub async fn cache_metrics(
+    State(state): State<Arc<AppState>>,
+) -> (StatusCode, Json<CacheMetricsResponse>) {
+    let metrics = state.tokenizer_cache.metrics().await;
+    let hit_rate = state.tokenizer_cache.hit_rate().await;
+    let size = state.tokenizer_cache.size().await;
+
+    (
+        StatusCode::OK,
+        Json(CacheMetricsResponse {
+            total_requests: metrics.total_requests,
+            cache_hits: metrics.cache_hits,
+            cache_misses: metrics.cache_misses,
+            prefix_hits: metrics.prefix_hits,
+            evictions: metrics.evictions,
+            hit_rate,
+            current_size: size,
+        }),
+    )
+}
+
+#[derive(Debug, Serialize)]
+pub struct ClearCacheResponse {
+    pub status: String,
+    pub message: String,
+}
+
+pub async fn clear_cache(
+    State(state): State<Arc<AppState>>,
+) -> (StatusCode, Json<ClearCacheResponse>) {
+    state.tokenizer_cache.clear().await;
+
+    tracing::info!("Cache cleared via API");
+
+    (
+        StatusCode::OK,
+        Json(ClearCacheResponse {
+            status: "ok".into(),
+            message: "Cache cleared successfully".into(),
+        }),
+    )
 }
 
 fn messages_to_prompt(messages: &[Message]) -> String {

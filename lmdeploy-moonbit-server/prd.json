@@ -1,7 +1,7 @@
 {
-  "name": "LMDeploy Rust API Server PRD",
-  "description": "**目标**: 用 Rust 重写 LMDeploy 的 API Server，替换当前的 Python FastAPI 实现，显著提升 HTTP API 性能。",
-  "branchName": "feature/lmdeploy-rust-api-server-prd",
+  "name": "LMDeploy MoonBit API Server PRD",
+  "description": "**目标**: 用 MoonBit 重写 LMDeploy 的 Python OpenAI API Server，保持与 Python 版本相同的 API 接口和行为。",
+  "branchName": "feature/lmdeploy-moonbit-api-server-prd",
   "userStories": [
     {
       "id": "US-001",
@@ -9,10 +9,9 @@
       "description": "作为 API 用户 我想要 使用 gRPC 协议调用 LMDeploy 以便 获得比 HTTP/JSON 更高的性能",
       "acceptanceCriteria": [],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "labels": [],
-      "dependsOn": [],
-      "completionNotes": "Completed by agent"
+      "dependsOn": []
     },
     {
       "id": "US-002",
@@ -20,15 +19,14 @@
       "description": "作为 API Server 我想要 缓存已 tokenize 的 prompt 以便 避免重复编码相同输入",
       "acceptanceCriteria": [],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "labels": [],
-      "dependsOn": [],
-      "completionNotes": "Completed by agent"
+      "dependsOn": []
     },
     {
       "id": "US-003",
       "title": "高性能 HTTP/2 服务器",
-      "description": "作为 API Server 我想要 使用高性能 Rust HTTP 框架 以便 充分利用硬件性能",
+      "description": "作为 API Server 我想要 使用高性能 MoonBit HTTP 框架 以便 充分利用硬件性能",
       "acceptanceCriteria": [],
       "priority": 3,
       "passes": false,
@@ -78,7 +76,7 @@
     {
       "id": "US-008",
       "title": "日志和监控",
-      "description": "作为 运维人员 我想要 结构化的日志输出 以便** 问题排查和性能分析",
+      "description": "作为 运维人员 我想要 结构化的日志输出 以便 问题排查和性能分析",
       "acceptanceCriteria": [],
       "priority": 4,
       "passes": false,
@@ -98,7 +96,17 @@
     {
       "id": "US-010",
       "title": "错误处理和限流",
-      "description": "作为 API Server 我想要 优雅的错误处理和限流 以便** 保护服务稳定性",
+      "description": "作为 API Server 我想要 优雅的错误处理和限流 以便 保护服务稳定性",
+      "acceptanceCriteria": [],
+      "priority": 4,
+      "passes": false,
+      "labels": [],
+      "dependsOn": []
+    },
+    {
+      "id": "US-011",
+      "title": "Wasm 边缘部署 (MoonBit 独有)",
+      "description": "作为 边缘计算用户 我想要 将 API Server 编译为 Wasm 以便 在边缘设备上运行轻量级推理服务",
       "acceptanceCriteria": [],
       "priority": 4,
       "passes": false,
@@ -107,9 +115,9 @@
     }
   ],
   "metadata": {
-    "createdAt": "2026-05-16T12:35:44.512Z",
+    "createdAt": "2026-05-16T13:12:13.976Z",
     "version": "1.0.0",
-    "sourcePrd": "docs/PRD_RUST_API_SERVER.md",
-    "updatedAt": "2026-05-16T13:17:44.230Z"
+    "sourcePrd": "PRD_MOONBIT_API_SERVER.md",
+    "updatedAt": "2026-05-16T13:12:32.331Z"
   }
 }

@@ -3,10 +3,10 @@
   "sessionId": "0cae1ce2-0be0-4b21-8881-47993a0597bb",
   "status": "running",
   "startedAt": "2026-05-16T12:35:48.724Z",
-  "updatedAt": "2026-05-16T12:55:45.632Z",
-  "currentIteration": 0,
+  "updatedAt": "2026-05-16T13:17:44.230Z",
+  "currentIteration": 1,
   "maxIterations": 50,
-  "tasksCompleted": 0,
+  "tasksCompleted": 1,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -14,7 +14,18 @@
     "totalTasks": 0,
     "tasks": []
   },
-  "iterations": [],
+  "iterations": [
+    {
+      "iteration": 1,
+      "status": "completed",
+      "taskId": "US-001",
+      "taskTitle": "高性能 gRPC API",
+      "taskCompleted": true,
+      "durationMs": 1193785,
+      "startedAt": "2026-05-16T12:35:51.809Z",
+      "endedAt": "2026-05-16T12:55:45.594Z"
+    }
+  ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
   "activeTaskIds": [],

@@ -1,9 +1,10 @@
 use futures::Stream;
-use sha2::{Digest, Sha256};
 use std::pin::Pin;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tonic::{Response, Status};
 
+use crate::cache::{TokenizeCache, compute_hash};
 use crate::grpc::lmdeploy::v1::{
     BatchGenerateRequest, BatchGenerateResponse, GenerateRequest, GenerateResponse,
     GenerateStreamResponse, HealthRequest, HealthResponse, ModelInfoRequest, ModelInfoResponse,
@@ -13,6 +14,15 @@ use crate::grpc::lmdeploy::v1::{
 #[derive(Clone)]
 pub struct LmDeployServiceImpl {
     pub version: String,
+    pub tokenizer_cache: Arc<TokenizeCache>,
+}
+
+impl LmDeployServiceImpl {
+    /// Mock tokenizer function - replace with real TurboMind tokenizer
+    async fn mock_tokenize(text: &str) -> Vec<u32> {
+        // Simple mock: each character becomes a token
+        text.chars().map(|c| c as u32).collect()
+    }
 }
 
 #[tonic::async_trait]
@@ -147,14 +157,24 @@ impl LmDeployService for LmDeployServiceImpl {
         let req = request.into_inner();
         tracing::info!(text_len = req.text.len(), "Tokenize request");
 
-        let mut hasher = Sha256::new();
-        hasher.update(req.text.as_bytes());
-        let hash = format!("{:x}", hasher.finalize());
+        let hash = compute_hash(&req.text);
+
+        let token_ids = self
+            .tokenizer_cache
+            .get_or_tokenize(&req.text, |text| {
+                let owned = text.to_string();
+                async move { Ok(Self::mock_tokenize(&owned).await) }
+            })
+            .await
+            .map_err(|e| Status::internal(format!("Tokenize error: {}", e)))?;
+
+        let length = token_ids.len() as i32;
+        let token_ids_i32: Vec<i32> = token_ids.iter().map(|&id| id as i32).collect();
 
         let response = TokenizeResponse {
-            token_ids: vec![0; req.text.len()],
+            token_ids: token_ids_i32,
             tokens: vec![],
-            length: req.text.len() as i32,
+            length,
             hash,
         };
 
@@ -165,6 +185,9 @@ impl LmDeployService for LmDeployServiceImpl {
         &self,
         _request: tonic::Request<HealthRequest>,
     ) -> Result<Response<HealthResponse>, Status> {
+        let _cache_metrics = self.tokenizer_cache.metrics().await;
+        let _cache_hit_rate = self.tokenizer_cache.hit_rate().await;
+
         Ok(Response::new(HealthResponse {
             status: "ok".into(),
             version: self.version.clone(),
