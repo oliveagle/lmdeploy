@@ -33,7 +33,7 @@ use crate::metrics::AppMetrics;
 use crate::handlers::http::{
     batch_chat_completions, batch_completions, batch_stats, cache_metrics, chat_completions,
     chat_completions_stream, clear_cache, completions, health_check, list_models, stream_metrics,
-    tokenize, ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
+    tokenize, embeddings, ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
 };
 use crate::model::TurboMindEngine;
 
@@ -270,6 +270,7 @@ fn create_router(state: Arc<AppState>) -> Router {
         .route("/health", get(health_check))
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/completions", post(completions))
+        .route("/v1/embeddings", post(embeddings))
         .route("/v1/chat/completions/batch", post(batch_chat_completions))
         .route("/v1/completions/batch", post(batch_completions))
         .route("/v1/models", get(list_models))

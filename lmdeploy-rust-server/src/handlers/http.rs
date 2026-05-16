@@ -24,11 +24,23 @@ pub struct ChatCompletionsRequest {
     pub top_p: Option<f32>,
     pub max_tokens: Option<i32>,
     pub stream: Option<bool>,
-    pub stop: Option<Vec<String>>,
+    pub stop: Option<Stop>,
     pub seed: Option<i32>,
     pub presence_penalty: Option<f32>,
     pub frequency_penalty: Option<f32>,
+    pub n: Option<u32>,
+    pub logit_bias: Option<std::collections::HashMap<u32, f32>>,
+    pub logprobs: Option<bool>,
+    pub top_logprobs: Option<u32>,
     pub user: Option<String>,
+}
+
+/// Stop sequence(s) - can be a string or array of strings
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum Stop {
+    Single(String),
+    Multiple(Vec<String>),
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -266,11 +278,27 @@ pub async fn chat_completions_stream(
 #[derive(Debug, Deserialize)]
 pub struct CompletionsRequest {
     pub model: String,
-    pub prompt: String,
+    pub prompt: Prompt,
     pub temperature: Option<f32>,
     pub max_tokens: Option<i32>,
     pub stream: Option<bool>,
     pub echo: Option<bool>,
+    pub suffix: Option<String>,
+    pub stop: Option<Stop>,
+    pub presence_penalty: Option<f32>,
+    pub frequency_penalty: Option<f32>,
+    pub n: Option<u32>,
+    pub logit_bias: Option<std::collections::HashMap<u32, f32>>,
+    pub best_of: Option<u32>,
+    pub user: Option<String>,
+}
+
+/// Prompt - can be a string or array of strings
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum Prompt {
+    Single(String),
+    Multiple(Vec<String>),
 }
 
 #[derive(Debug, Serialize)]
@@ -297,6 +325,12 @@ pub async fn completions(
     let model = req.model.clone();
     let start = std::time::Instant::now();
 
+    // Convert Prompt enum to string
+    let prompt_text = match &req.prompt {
+        Prompt::Single(s) => s.clone(),
+        Prompt::Multiple(vec) => vec.join("\n"),
+    };
+
     let response = if let Some(batch_tx) = &state.batch_sender {
         // Batch mode: send to batch processor and wait for response
         let (tx, rx) = oneshot::channel();
@@ -305,17 +339,21 @@ pub async fn completions(
                 model: req.model.clone(),
                 messages: vec![Message {
                     role: "user".into(),
-                    content: req.prompt.clone(),
+                    content: prompt_text.clone(),
                 }],
                 temperature: req.temperature,
                 top_p: None,
                 max_tokens: req.max_tokens,
                 stream: req.stream,
-                stop: None,
+                stop: req.stop.clone(),
                 seed: None,
-                presence_penalty: None,
-                frequency_penalty: None,
-                user: None,
+                presence_penalty: req.presence_penalty,
+                frequency_penalty: req.frequency_penalty,
+                n: req.n,
+                logit_bias: req.logit_bias.clone(),
+                logprobs: None,
+                top_logprobs: None,
+                user: req.user.clone(),
             },
             tx,
         };
@@ -372,8 +410,17 @@ async fn fallback_completions(
     req: &CompletionsRequest,
     model: &str,
 ) -> CompletionsResponse {
+    // Convert Prompt enum to string
+    let prompt_text = match &req.prompt {
+        Prompt::Single(s) => s.as_str(),
+        Prompt::Multiple(vec) => {
+            let joined = vec.join("\n");
+            Box::leak(joined.into_boxed_str())
+        }
+    };
+
     let engine = state.engine.read().await;
-    let text = engine.generate(&req.prompt, req.max_tokens.unwrap_or(512) as usize).await;
+    let text = engine.generate(prompt_text, req.max_tokens.unwrap_or(512) as usize).await;
 
     CompletionsResponse {
         id: format!("cmpl-{}", uuid_simple()),
@@ -738,6 +785,105 @@ pub async fn stream_metrics(
         "Stream metrics requested"
     );
     (StatusCode::OK, Json(metrics))
+}
+
+// ============================================================================
+// Embeddings API (OpenAI-compatible)
+// ============================================================================
+
+/// Embeddings request - matches OpenAI /v1/embeddings API
+#[derive(Debug, Deserialize, Clone)]
+pub struct EmbeddingsRequest {
+    pub model: Option<String>,
+    /// Input text to embed. Can be a string or array of strings.
+    pub input: EmbeddingInput,
+    pub encoding_format: Option<String>,
+    pub dimensions: Option<u32>,
+    pub user: Option<String>,
+}
+
+/// Embedding input - can be a single string or array of strings
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum EmbeddingInput {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+/// Embeddings response - matches OpenAI /v1/embeddings API
+#[derive(Debug, Serialize)]
+pub struct EmbeddingsResponse {
+    pub object: String,
+    pub data: Vec<EmbeddingData>,
+    pub model: String,
+    pub usage: EmbeddingUsage,
+}
+
+/// Single embedding data
+#[derive(Debug, Serialize)]
+pub struct EmbeddingData {
+    pub object: String,
+    pub embedding: Vec<f32>,
+    pub index: u32,
+}
+
+/// Embedding usage statistics
+#[derive(Debug, Serialize)]
+pub struct EmbeddingUsage {
+    pub prompt_tokens: i32,
+    pub total_tokens: i32,
+}
+
+/// Embeddings endpoint (OpenAI-compatible)
+pub async fn embeddings(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<EmbeddingsRequest>,
+) -> (StatusCode, Json<EmbeddingsResponse>) {
+    let start = std::time::Instant::now();
+    let model = req.model.clone().unwrap_or_else(|| "default-embedding-model".to_string());
+
+    tracing::info!(
+        model = %model,
+        "Embeddings request"
+    );
+
+    // Process inputs (single or multiple)
+    let inputs: Vec<String> = match &req.input {
+        EmbeddingInput::Single(s) => vec![s.clone()],
+        EmbeddingInput::Multiple(vec) => vec.clone(),
+    };
+
+    let engine = state.engine.read().await;
+    let mut data = Vec::new();
+    let mut total_tokens = 0;
+
+    for (idx, text) in inputs.iter().enumerate() {
+        // Call the engine's embed method (mocked for now)
+        let embedding = engine.embed(text).await;
+
+        // Estimate tokens (rough: chars / 4)
+        let tokens = (text.len() as i32 + 3) / 4;
+        total_tokens += tokens;
+
+        data.push(EmbeddingData {
+            object: "embedding".into(),
+            embedding,
+            index: idx as u32,
+        });
+    }
+
+    let response = EmbeddingsResponse {
+        object: "list".into(),
+        data,
+        model: model.clone(),
+        usage: EmbeddingUsage {
+            prompt_tokens: total_tokens,
+            total_tokens,
+        },
+    };
+
+    tracing::info!(latency_ms = start.elapsed().as_millis(), "Embeddings done");
+    (StatusCode::OK, Json(response))
 }
 
 fn messages_to_prompt(messages: &[Message]) -> String {

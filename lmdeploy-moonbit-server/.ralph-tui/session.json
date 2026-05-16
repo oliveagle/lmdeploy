@@ -3,10 +3,10 @@
   "sessionId": "57ba8322-4ac3-4108-8670-a84e8acea4ba",
   "status": "running",
   "startedAt": "2026-05-16T14:13:47.025Z",
-  "updatedAt": "2026-05-16T14:57:26.122Z",
-  "currentIteration": 2,
+  "updatedAt": "2026-05-16T14:57:27.201Z",
+  "currentIteration": 3,
   "maxIterations": 10,
-  "tasksCompleted": 2,
+  "tasksCompleted": 3,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -34,10 +34,22 @@
       "durationMs": 652295,
       "startedAt": "2026-05-16T14:32:30.773Z",
       "endedAt": "2026-05-16T14:43:23.068Z"
+    },
+    {
+      "iteration": 3,
+      "status": "completed",
+      "taskId": "US-005",
+      "taskTitle": "流式响应优化",
+      "taskCompleted": true,
+      "durationMs": 841922,
+      "startedAt": "2026-05-16T14:43:24.195Z",
+      "endedAt": "2026-05-16T14:57:26.117Z"
     }
   ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-moonbit-server",
-  "activeTaskIds": [],
+  "activeTaskIds": [
+    "US-006"
+  ],
   "subagentPanelVisible": false
 }

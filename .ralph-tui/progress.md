@@ -16,6 +16,56 @@ after each iteration and it's included in prompts for context.
 - **Metrics Recording Pattern**: Record first token latency on the FIRST chunk, not every chunk
   - Use `first_token_start.elapsed().as_millis()` for milliseconds
   - Track with `AtomicU64` + `fetch_add` for thread-safe counters
+- **OpenAI API Stop/ Prompt Enums**: For OpenAI-compatible API fields that accept single value or array, use `#[serde(untagged)]` enums:
+  - `Stop` enum: `Single(String)` or `Multiple(Vec<String>)` for `stop` parameter
+  - `Prompt` enum: `Single(String)` or `Multiple(Vec<String>)` for `prompt` parameter
+  - `EmbeddingInput` enum: `Single(String)` or `Multiple(Vec<String>)` for `input` parameter
+  - This matches OpenAI API spec where these fields accept either format
+
+---
+
+## [2026-05-16] - US-006: OpenAI API 兼容性
+
+### What was implemented
+1. **Enhanced ChatCompletionsRequest**:
+   - Added `n` (number of completions to generate)
+   - Added `logit_bias` (token bias dictionary)
+   - Added `logprobs` (include log probabilities)
+   - Added `top_logprobs` (number of top logprobs)
+   - Changed `stop` from `Option<Vec<String>>` to `Option<Stop>` enum supporting single/multiple formats
+
+2. **Enhanced CompletionsRequest**:
+   - Added `suffix` (text to insert after model output)
+   - Added `logit_bias` (token bias dictionary)
+   - Added `best_of` (number of completions to generate server-side)
+   - Added `stop` field (stop sequences)
+   - Added `presence_penalty` and `frequency_penalty`
+   - Added `n` and `user` fields
+   - Changed `prompt` from `String` to `Prompt` enum supporting single/multiple formats
+
+3. **Embeddings API** (New):
+   - Implemented `EmbeddingsRequest` with `EmbeddingInput` enum (single or array)
+   - Implemented `EmbeddingsResponse` with `EmbeddingData` and `EmbeddingUsage`
+   - Added `POST /v1/embeddings` route
+   - Added `TurboMindEngine.embed()` method with deterministic mock embedding generation
+   - Supports L2-normalized embeddings (default dimension: 1536)
+   - Matches OpenAI `/v1/embeddings` API format
+
+### Files changed
+- `lmdeploy-rust-server/src/handlers/http.rs` - Added embeddings types, handler, and OpenAI field enhancements
+- `lmdeploy-rust-server/src/model/engine.rs` - Added `embed()` method for embedding generation
+- `lmdeploy-rust-server/src/server.rs` - Added `/v1/embeddings` route
+
+### Learnings
+- **OpenAI Stop Parameter**: OpenAI accepts `stop` as either a single string or array of strings - use `#[serde(untagged)]` enum to handle both
+- **OpenAI Prompt Parameter**: Completions API accepts `prompt` as string or array of strings - same enum pattern
+- **OpenAI Input Parameter**: Embeddings API accepts `input` as string or array of strings - reuse the same pattern
+- **Embedding Generation**: Mock embeddings can use deterministic hash-based generation with L2 normalization for testing
+- **serde untagged enums**: Pattern `#[serde(untagged)]` is essential for OpenAI API compatibility where fields accept multiple formats
+
+### Pre-existing Issues (not fixed in this story)
+- Stream endpoints use hardcoded timeout default instead of reading from config dynamically
+- Mock engine response instead of real TurboMind integration
 
 ---
 
