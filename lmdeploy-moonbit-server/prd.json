@@ -62,11 +62,19 @@
       "id": "US-006",
       "title": "OpenAI API 兼容性",
       "description": "作为 API 用户 我想要 使用标准的 OpenAI API 格式 以便 无缝迁移现有应用",
-      "acceptanceCriteria": [],
+      "acceptanceCriteria": [
+        "兼容 /v1/chat/completions 端点",
+        "兼容 /v1/completions 端点",
+        "兼容 /v1/models 端点",
+        "兼容 /v1/embeddings 端点",
+        "支持 streaming 参数",
+        "支持 temperature, top_p, max_tokens 等参数"
+      ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "labels": [],
-      "dependsOn": []
+      "dependsOn": [],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-007",
@@ -123,6 +131,6 @@
     "createdAt": "2026-05-16T13:12:13.976Z",
     "version": "1.0.0",
     "sourcePrd": "PRD_MOONBIT_API_SERVER.md",
-    "updatedAt": "2026-05-16T14:57:27.200Z"
+    "updatedAt": "2026-05-16T15:25:49.832Z"
   }
 }

@@ -49,6 +49,11 @@ after each iteration and it's included in prompts for context.
 - HTTP response chaining: `.sse()` sets streaming headers, `.set_header()` chains via immutable updates
 - Response headers for streaming: `x-accel-buffering: no` disables nginx buffering for SSE
 - `String::to_utf8_bytes()` and `String::from_byte()` for byte/string conversion in MoonBit
+- JSON parsing: use pattern matching with `String::find()` to extract field values from JSON strings
+- OpenAI API parameters: each handler should parse ~20 parameters using json_util helper functions
+- Error response: `build_error_json(code, type, message)` for consistent error formatting
+- Route registration: `server.add_route(HttpMethod::Get, path, handler)` for endpoint setup
+- Validation: always check required fields (model, input) and return 400 Bad Request if missing
 
 ---
 
