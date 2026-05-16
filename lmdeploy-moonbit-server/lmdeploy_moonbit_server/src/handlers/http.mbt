@@ -7,6 +7,7 @@ use username/lmdeploy_moonbit_server/protocol
 use username/lmdeploy_moonbit_server/batch
 use username/lmdeploy_moonbit_server/cache
 use username/lmdeploy_moonbit_server/streaming
+use username/lmdeploy_moonbit_server/protocol/json_util
 
 /// Module-level streaming configuration
 let stream_config = streaming::StreamingConfig::default()

@@ -183,3 +183,29 @@ impl Clone for StreamMetrics {
 ```
 
 ---
+
+## [2026-05-16] - US-007: 配置管理
+
+### What was implemented
+US-007 was already fully implemented in a previous iteration. All acceptance criteria verified:
+1. **TOML/JSON 配置文件** - `config` crate with `File::with_name()` supports both formats
+2. **环境变量覆盖** - `Environment::with_prefix("LMDEPLOY")` enables env var override
+3. **配置热重载 (SIGHUP)** - SIGHUP signal handler + `reload_config` endpoint + background config reload task
+4. **默认配置文件路径** - `/etc/lmdeploy/config.toml` defined as default
+
+### Files reviewed
+- `lmdeploy-rust-server/src/config.rs` - Config structs, `AppConfig::load()`, env override
+- `lmdeploy-rust-server/config/default.toml` - Default TOML config
+- `lmdeploy-rust-server/src/server.rs` - SIGHUP handler, reload_config endpoint, config reload task
+- `lmdeploy-rust-server/Cargo.toml` - `config` crate dependency with `toml` feature
+
+### Learnings
+- **Config crate merge order**: `set_default()` → `File::with_name()` → `Environment::with_prefix()` gives env vars highest priority
+- **SIGHUP reload pattern**: Use `mpsc::unbounded_channel` to signal reload to a dedicated task, then broadcast via `RwLock` swap
+- **Signal handling on Linux**: `signal_hook::SignalId` returns a handle that must be kept alive — if dropped, handler unregisters
+
+### Pre-existing Issues (not fixed in this story)
+- Pre-existing clippy warnings in test code (unused variables)
+- Mock engine responses instead of real TurboMind integration
+
+---
