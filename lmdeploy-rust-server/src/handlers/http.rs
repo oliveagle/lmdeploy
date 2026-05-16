@@ -157,8 +157,20 @@ async fn fallback_chat_completion(
     model: &str,
 ) -> ChatCompletionsResponse {
     let prompt = messages_to_prompt(&req.messages);
-    let engine = state.engine.read().await;
-    let text = engine.generate(&prompt, req.max_tokens.unwrap_or(512) as usize).await;
+
+    // Get the appropriate engine for the requested model
+    let mm = state.model_manager.read().await;
+    let engine = match mm.get_model(Some(model)) {
+        Some(e) => e,
+        None => {
+            tracing::warn!(model = %model, "Model not found, using default");
+            mm.get_model(None).unwrap()
+        }
+    };
+    drop(mm);
+
+    let eng = engine.read().await;
+    let text = eng.generate(&prompt, req.max_tokens.unwrap_or(512) as usize).await;
 
     ChatCompletionsResponse {
         id: format!("chatcmpl-{}", uuid_simple()),
@@ -197,8 +209,19 @@ pub async fn chat_completions_stream(
     tracing::info!(model = %model, "Chat completions stream request");
 
     let prompt = messages_to_prompt(&req.messages);
-    let engine = state.engine.read().await;
-    let chunks = engine.generate_stream(&prompt).await;
+
+    // Get the appropriate engine for the requested model
+    let mm = state.model_manager.read().await;
+    let engine = match mm.get_model(Some(&model)) {
+        Some(e) => e,
+        None => {
+            tracing::warn!(model = %model, "Model not found, using default");
+            mm.get_model(None).unwrap()
+        }
+    };
+    drop(mm);
+
+    let chunks = engine.read().await.generate_stream(&prompt).await;
 
     let stream_id = id.clone();
     let stream_model = model.clone();
@@ -419,8 +442,15 @@ async fn fallback_completions(
         }
     };
 
-    let engine = state.engine.read().await;
-    let text = engine.generate(prompt_text, req.max_tokens.unwrap_or(512) as usize).await;
+    let mm = state.model_manager.read().await;
+    let engine = match mm.get_model(Some(model)) {
+        Some(e) => e,
+        None => mm.get_model(None).unwrap(),
+    };
+    drop(mm);
+
+    let eng = engine.read().await;
+    let text = eng.generate(prompt_text, req.max_tokens.unwrap_or(512) as usize).await;
 
     CompletionsResponse {
         id: format!("cmpl-{}", uuid_simple()),
@@ -454,15 +484,24 @@ pub struct ModelInfo {
     pub owned_by: String,
 }
 
-pub async fn list_models() -> (StatusCode, Json<ModelsResponse>) {
+pub async fn list_models(
+    State(state): State<Arc<AppState>>,
+) -> (StatusCode, Json<ModelsResponse>) {
+    let models = state.model_manager.read().await.list_models().await;
+
+    let data: Vec<ModelInfo> = models
+        .iter()
+        .map(|m| ModelInfo {
+            id: m.name.clone(),
+            object: "model".into(),
+            created: m.loaded_at.unwrap_or(unix_timestamp()),
+            owned_by: "lmdeploy".into(),
+        })
+        .collect();
+
     (StatusCode::OK, Json(ModelsResponse {
         object: "list".into(),
-        data: vec![ModelInfo {
-            id: "default-model".into(),
-            object: "model".into(),
-            created: unix_timestamp(),
-            owned_by: "lmdeploy".into(),
-        }],
+        data,
     }))
 }
 
@@ -548,7 +587,15 @@ pub async fn batch_chat_completions(
         "Batch chat completions request"
     );
 
-    let engine = state.engine.read().await;
+    // Get the appropriate engine for the requested model
+    let mm = state.model_manager.read().await;
+    let engine = match mm.get_model(Some(&model)) {
+        Some(e) => e,
+        None => mm.get_model(None).unwrap(),
+    };
+    drop(mm);
+
+    let eng = engine.read().await;
     let mut choices = Vec::new();
     let mut total_prompt_tokens = 0;
     let mut total_completion_tokens = 0;
@@ -556,7 +603,7 @@ pub async fn batch_chat_completions(
     for (idx, messages) in req.messages.iter().enumerate() {
         let prompt = messages_to_prompt(messages);
         let max_tokens = req.max_tokens.unwrap_or(512) as usize;
-        let text = engine.generate(&prompt, max_tokens).await;
+        let text = eng.generate(&prompt, max_tokens).await;
 
         total_prompt_tokens += prompt.len() as i32;
         total_completion_tokens += text.len() as i32;
@@ -602,14 +649,22 @@ pub async fn batch_completions(
         "Batch completions request"
     );
 
-    let engine = state.engine.read().await;
+    // Get the appropriate engine for the requested model
+    let mm = state.model_manager.read().await;
+    let engine = match mm.get_model(Some(&model)) {
+        Some(e) => e,
+        None => mm.get_model(None).unwrap(),
+    };
+    drop(mm);
+
+    let eng = engine.read().await;
     let mut choices = Vec::new();
     let mut total_prompt_tokens = 0;
     let mut total_completion_tokens = 0;
 
     for (idx, prompt) in req.prompts.iter().enumerate() {
         let max_tokens = req.max_tokens.unwrap_or(512) as usize;
-        let text = engine.generate(prompt, max_tokens).await;
+        let text = eng.generate(prompt, max_tokens).await;
 
         total_prompt_tokens += prompt.len() as i32;
         total_completion_tokens += text.len() as i32;
@@ -853,13 +908,21 @@ pub async fn embeddings(
         EmbeddingInput::Multiple(vec) => vec.clone(),
     };
 
-    let engine = state.engine.read().await;
+    // Get the appropriate engine for the requested model
+    let mm = state.model_manager.read().await;
+    let engine = match mm.get_model(Some(&model)) {
+        Some(e) => e,
+        None => mm.get_model(None).unwrap(),
+    };
+    drop(mm);
+
+    let eng = engine.read().await;
     let mut data = Vec::new();
     let mut total_tokens = 0;
 
     for (idx, text) in inputs.iter().enumerate() {
         // Call the engine's embed method (mocked for now)
-        let embedding = engine.embed(text).await;
+        let embedding = eng.embed(text).await;
 
         // Estimate tokens (rough: chars / 4)
         let tokens = (text.len() as i32 + 3) / 4;
@@ -884,6 +947,195 @@ pub async fn embeddings(
 
     tracing::info!(latency_ms = start.elapsed().as_millis(), "Embeddings done");
     (StatusCode::OK, Json(response))
+}
+
+/// Model load request
+#[derive(Debug, Deserialize)]
+pub struct ModelLoadRequest {
+    pub name: String,
+    pub path: String,
+}
+
+/// Model unload request
+#[derive(Debug, Deserialize)]
+pub struct ModelUnloadRequest {
+    pub name: String,
+}
+
+/// Model reload request
+#[derive(Debug, Deserialize)]
+pub struct ModelReloadRequest {
+    pub name: String,
+    pub path: String,
+}
+
+/// Model info response
+#[derive(Debug, Serialize)]
+pub struct ModelInfoResponse {
+    pub name: String,
+    pub path: String,
+    pub state: String,
+    pub loaded_at: Option<i64>,
+    pub ready: bool,
+}
+
+/// Model load progress response
+#[derive(Debug, Serialize)]
+pub struct ModelLoadProgressResponse {
+    pub model_name: String,
+    pub progress: f32,
+    pub state: String,
+    pub message: String,
+}
+
+/// Model load response
+#[derive(Debug, Serialize)]
+pub struct ModelLoadResponse {
+    pub status: String,
+    pub model_name: String,
+    pub message: String,
+}
+
+/// Load a new model (API trigger)
+pub async fn model_load(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ModelLoadRequest>,
+) -> (StatusCode, Json<ModelLoadResponse>) {
+    tracing::info!(
+        model_name = %req.name,
+        model_path = %req.path,
+        "Model load request"
+    );
+
+    let result = state.model_manager.write().await.load_model(&req.name, &req.path).await;
+
+    match result {
+        Ok(()) => {
+            (StatusCode::OK, Json(ModelLoadResponse {
+                status: "success".to_string(),
+                model_name: req.name,
+                message: "Model loaded successfully".to_string(),
+            }))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to load model");
+            let status = if matches!(e, crate::error::AppError::ModelAlreadyLoaded(_)) {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, Json(ModelLoadResponse {
+                status: "error".to_string(),
+                model_name: req.name,
+                message: e.to_string(),
+            }))
+        }
+    }
+}
+
+/// Unload a model (release memory)
+pub async fn model_unload(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ModelUnloadRequest>,
+) -> (StatusCode, Json<ModelLoadResponse>) {
+    tracing::info!(model_name = %req.name, "Model unload request");
+
+    let result = state.model_manager.write().await.unload_model(&req.name).await;
+
+    match result {
+        Ok(()) => {
+            (StatusCode::OK, Json(ModelLoadResponse {
+                status: "success".to_string(),
+                model_name: req.name,
+                message: "Model unloaded successfully".to_string(),
+            }))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to unload model");
+            let status = if matches!(e, crate::error::AppError::CannotUnloadDefaultModel) {
+                StatusCode::BAD_REQUEST
+            } else if matches!(e, crate::error::AppError::ModelNotFound(_)) {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, Json(ModelLoadResponse {
+                status: "error".to_string(),
+                model_name: req.name,
+                message: e.to_string(),
+            }))
+        }
+    }
+}
+
+/// Reload an existing model (hot reload)
+pub async fn model_reload(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ModelReloadRequest>,
+) -> (StatusCode, Json<ModelLoadResponse>) {
+    tracing::info!(
+        model_name = %req.name,
+        new_path = %req.path,
+        "Model reload request"
+    );
+
+    let result = state.model_manager.write().await.reload_model(&req.name, &req.path).await;
+
+    match result {
+        Ok(()) => {
+            (StatusCode::OK, Json(ModelLoadResponse {
+                status: "success".to_string(),
+                model_name: req.name.clone(),
+                message: format!("Model '{}' reloaded successfully", req.name),
+            }))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to reload model");
+            let status = if matches!(e, crate::error::AppError::ModelNotFound(_)) {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, Json(ModelLoadResponse {
+                status: "error".to_string(),
+                model_name: req.name,
+                message: e.to_string(),
+            }))
+        }
+    }
+}
+
+/// Get model loading progress
+pub async fn model_load_progress(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ModelUnloadRequest>,
+) -> (StatusCode, Json<ModelLoadProgressResponse>) {
+    let progress = state.model_load_tracker.get_progress(&req.name).await;
+
+    match progress {
+        Some(p) => {
+            let state_str = match p.state {
+                crate::model::ModelState::Unloaded => "unloaded",
+                crate::model::ModelState::Loading => "loading",
+                crate::model::ModelState::Ready => "ready",
+                crate::model::ModelState::Failed(_) => "failed",
+            };
+            (StatusCode::OK, Json(ModelLoadProgressResponse {
+                model_name: p.model_name,
+                progress: p.progress,
+                state: state_str.to_string(),
+                message: p.message,
+            }))
+        }
+        None => {
+            (StatusCode::NOT_FOUND, Json(ModelLoadProgressResponse {
+                model_name: req.name,
+                progress: 0.0,
+                state: "not_found".to_string(),
+                message: "Model loading operation not found".to_string(),
+            }))
+        }
+    }
 }
 
 fn messages_to_prompt(messages: &[Message]) -> String {

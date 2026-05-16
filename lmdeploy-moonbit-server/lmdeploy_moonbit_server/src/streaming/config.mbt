@@ -26,6 +26,17 @@ pub fn StreamingConfig::default() -> StreamingConfig {
   }
 }
 
+use username/lmdeploy_moonbit_server/config
+
+/// Create streaming config from ServerConfig (integrated config system)
+pub fn StreamingConfig::from_server_config(sc: config.ServerConfig) -> StreamingConfig {
+  {
+    stream_timeout_secs: sc.stream_timeout_secs(),
+    keepalive_interval_ms: sc.stream_keepalive_interval_ms(),
+    max_chunk_tokens: sc.stream_max_chunk_tokens(),
+  }
+}
+
 /// Create streaming config from environment variables
 pub fn StreamingConfig::from_env() -> StreamingConfig {
   let default = StreamingConfig::default()

@@ -1,0 +1,8 @@
+{
+  "link": {
+    "name": "username/lmdeploy_moonbit_server/streaming",
+    "deps": [
+      "username/lmdeploy_moonbit_server/config"
+    ]
+  }
+}

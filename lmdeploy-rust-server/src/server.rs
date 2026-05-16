@@ -29,13 +29,13 @@ use crate::cache::TokenizeCache;
 use crate::config::AppConfig;
 use crate::error::{AppError, Result};
 use crate::metrics::{AppMetrics, init_metrics};
-
+use crate::model::{ModelManager, ModelLoadTracker};
 use crate::handlers::http::{
     batch_chat_completions, batch_completions, batch_stats, cache_metrics, chat_completions,
-    chat_completions_stream, clear_cache, completions, health_check, list_models, stream_metrics,
-    tokenize, embeddings, ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
+    chat_completions_stream, clear_cache, completions, embeddings, health_check, list_models,
+    model_load, model_load_progress, model_reload, model_unload, stream_metrics, tokenize,
+    ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
 };
-use crate::model::TurboMindEngine;
 
 use crate::metrics::increment_tokens_generated_total;
 
@@ -44,14 +44,24 @@ pub type BatchSender = mpsc::UnboundedSender<BatchItem>;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub engine: Arc<RwLock<TurboMindEngine>>,
+    /// Main model manager for routing
+    pub model_manager: Arc<RwLock<ModelManager>>,
+    /// Tokenizer cache
     pub tokenizer_cache: Arc<TokenizeCache>,
+    /// Application config
     pub config: Arc<RwLock<AppConfig>>,
+    /// Request semaphore for rate limiting
     pub request_semaphore: Arc<Semaphore>,
+    /// Batch sender channel
     pub batch_sender: Option<Arc<BatchSender>>,
+    /// Batch statistics
     pub batch_stats: Arc<BatchStats>,
+    /// Application metrics
     pub metrics: Arc<AppMetrics>,
+    /// Config reload sender
     pub config_reload_tx: mpsc::Sender<()>,
+    /// Model loading progress tracker
+    pub model_load_tracker: Arc<ModelLoadTracker>,
 }
 
 /// Batch request accumulator
@@ -111,9 +121,39 @@ pub struct BatchStatsResponse {
 }
 
 pub async fn start_server(config: &AppConfig) -> Result<()> {
-    let engine = Arc::new(RwLock::new(
-        TurboMindEngine::new(&config.model.model_path).await?,
+    // Initialize ModelManager with default model
+    let model_manager = Arc::new(RwLock::new(
+        ModelManager::with_default_model(&config.model.model_path).await?,
     ));
+
+    // Log default model info
+    {
+        let mm = model_manager.read().await;
+        tracing::info!(
+            default_model = %mm.default_model(),
+            model_count = mm.model_count(),
+            "Model manager initialized"
+        );
+
+        // Load additional models from config if multi_model is enabled
+        if config.multi_model.enabled {
+            for entry in &config.multi_model.models {
+                tracing::info!(
+                    model_name = %entry.name,
+                    model_path = %entry.path,
+                    "Loading additional model from config"
+                );
+                let mut mm = model_manager.write().await;
+                if let Err(e) = mm.load_model(&entry.name, &entry.path).await {
+                    tracing::warn!(
+                        error = %e,
+                        model_name = %entry.name,
+                        "Failed to load additional model, skipping"
+                    );
+                }
+            }
+        }
+    }
 
     let tokenizer_cache = Arc::new(TokenizeCache::new(
         config.cache.tokenizer_cache_size,
@@ -153,7 +193,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         let batch_timeout_ms = config.server.batch_timeout_ms;
         let batch_timeout = Duration::from_millis(config.server.batch_timeout_ms);
         let stats_clone = batch_stats.clone();
-        let engine_clone = engine.clone();
+        let manager_clone = model_manager.clone();
 
         let handle = tokio::spawn(async move {
             tracing::info!(
@@ -161,7 +201,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
                 timeout_ms = batch_timeout_ms,
                 "Batch processor started"
             );
-            run_batch_processor(batch_rx, batch_size, batch_timeout, stats_clone, engine_clone).await
+            run_batch_processor(batch_rx, batch_size, batch_timeout, stats_clone, manager_clone).await
         });
 
         Some((Arc::new(batch_tx), handle))
@@ -171,8 +211,10 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
 
     let (config_reload_tx, mut config_reload_rx) = mpsc::channel::<()>(32);
 
+    let model_load_tracker = Arc::new(ModelLoadTracker::new());
+
     let state = Arc::new(AppState {
-        engine,
+        model_manager,
         tokenizer_cache: tokenizer_cache.clone(),
         config: Arc::new(RwLock::new(config.clone())),
         request_semaphore,
@@ -180,6 +222,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         batch_stats,
         metrics: metrics.clone(),
         config_reload_tx: config_reload_tx.clone(),
+        model_load_tracker,
     });
 
     // Spawn config reload task
@@ -293,6 +336,10 @@ fn create_router(state: Arc<AppState>) -> Router {
         .route("/v1/batch/stats", get(batch_stats))
         .route("/v1/config/reload", post(reload_config))
         .route("/v1/config", get(get_config))
+        .route("/v1/models/load", post(model_load))
+        .route("/v1/models/unload", post(model_unload))
+        .route("/v1/models/reload", post(model_reload))
+        .route("/v1/models/progress", post(model_load_progress))
         .layer(TraceLayer::new_for_http())
         .layer(RequestBodyLimitLayer::new(10 * 1024 * 1024)) // 10MB limit
         .layer(ServiceBuilder::new().layer(cors))
@@ -357,7 +404,7 @@ async fn run_batch_processor(
     batch_size: usize,
     batch_timeout: Duration,
     stats: Arc<BatchStats>,
-    engine: Arc<RwLock<TurboMindEngine>>,
+    manager: Arc<RwLock<ModelManager>>,
 ) {
     let mut accumulator: HashMap<String, BatchAccumulator> = HashMap::new();
 
@@ -367,7 +414,7 @@ async fn run_batch_processor(
             item_opt = rx.recv() => {
                 let Some(item) = item_opt else {
                     // Channel closed, flush remaining batches
-                    flush_all_batches(&mut accumulator, &stats, &engine).await;
+                    flush_all_batches(&mut accumulator, &stats, &manager).await;
                     break;
                 };
 
@@ -388,12 +435,12 @@ async fn run_batch_processor(
 
                 // Flush if batch size reached
                 if entry.requests.len() >= batch_size {
-                    flush_batch(model, &mut accumulator, &stats, engine.clone()).await;
+                    flush_batch(model, &mut accumulator, &stats, manager.clone()).await;
                 }
             }
             // Timeout flush
             _ = tokio::time::sleep(batch_timeout) => {
-                flush_ready_batches(&mut accumulator, &stats, batch_timeout, &engine).await;
+                flush_ready_batches(&mut accumulator, &stats, batch_timeout, &manager).await;
             }
         }
     }
@@ -412,7 +459,7 @@ async fn flush_batch(
     model: String,
     accumulator: &mut HashMap<String, BatchAccumulator>,
     stats: &Arc<BatchStats>,
-    engine: Arc<RwLock<TurboMindEngine>>,
+    manager: Arc<RwLock<ModelManager>>,
 ) {
     if let Some(entry) = accumulator.remove(&model) {
         if entry.requests.is_empty() {
@@ -427,6 +474,17 @@ async fn flush_batch(
             batch_size,
             "Executing batch"
         );
+
+        // Get the engine for this model
+        let mm = manager.read().await;
+        let engine = match mm.get_model(Some(&model)) {
+            Some(e) => e,
+            None => {
+                tracing::error!(model = %model, "Model not found for batch execution");
+                return;
+            }
+        };
+        drop(mm);
 
         // Process all requests in parallel
         let tasks: Vec<_> = entry
@@ -476,7 +534,7 @@ async fn flush_ready_batches(
     accumulator: &mut HashMap<String, BatchAccumulator>,
     stats: &Arc<BatchStats>,
     timeout: Duration,
-    engine: &Arc<RwLock<TurboMindEngine>>,
+    manager: &Arc<RwLock<ModelManager>>,
 ) {
     let now = Instant::now();
     let ready_models: Vec<_> = accumulator
@@ -486,14 +544,14 @@ async fn flush_ready_batches(
         .collect();
 
     for model in ready_models {
-        flush_batch(model, accumulator, stats, engine.clone()).await;
+        flush_batch(model, accumulator, stats, manager.clone()).await;
     }
 }
 
-async fn flush_all_batches(accumulator: &mut HashMap<String, BatchAccumulator>, stats: &Arc<BatchStats>, engine: &Arc<RwLock<TurboMindEngine>>) {
+async fn flush_all_batches(accumulator: &mut HashMap<String, BatchAccumulator>, stats: &Arc<BatchStats>, manager: &Arc<RwLock<ModelManager>>) {
     let models: Vec<_> = accumulator.keys().cloned().collect();
     for model in models {
-        flush_batch(model, accumulator, stats, engine.clone()).await;
+        flush_batch(model, accumulator, stats, manager.clone()).await;
     }
 }
 

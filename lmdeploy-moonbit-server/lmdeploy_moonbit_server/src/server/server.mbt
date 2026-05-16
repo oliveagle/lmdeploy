@@ -2,7 +2,9 @@
 // gRPC/HTTP server for LMDeploy MoonBit API
 // Reference: lmdeploy-rust-server/src/server.rs
 
-/// Server configuration
+use username/lmdeploy_moonbit_server/config
+
+/// Server configuration (wrapper for AppConfig)
 pub struct ServerConfig {
   host: String
   port: Int
@@ -14,17 +16,24 @@ pub struct ServerConfig {
   model_path: String
 }
 
-pub fn ServerConfig::default() -> ServerConfig {
+/// Load server config from AppConfig (integrated config system)
+pub fn ServerConfig::from_app_config(cfg: config.AppConfig) -> ServerConfig {
   {
-    host: "0.0.0.0",
-    port: 8080,
-    grpc_port: 9090,
-    workers: 4,
-    max_connections: 1000,
-    request_timeout_ms: 30000,
-    model_name: "default-model",
-    model_path: "",
+    host: cfg.server.http_address(),
+    port: cfg.server.http_port(),
+    grpc_port: cfg.server.grpc_port(),
+    workers: cfg.server.workers(),
+    max_connections: cfg.server.max_connections(),
+    request_timeout_ms: cfg.server.request_timeout_secs() * 1000,
+    model_name: cfg.model.model_name(),
+    model_path: cfg.model.model_path(),
   }
+}
+
+pub fn ServerConfig::default() -> ServerConfig {
+  // Load from default AppConfig
+  let app_cfg = config.AppConfig::default()
+  ServerConfig::from_app_config(app_cfg)
 }
 
 /// LMDeploy server

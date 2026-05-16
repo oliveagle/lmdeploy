@@ -10,6 +10,8 @@ pub struct AppConfig {
     pub cache: CacheConfig,
     pub logging: LoggingConfig,
     pub metrics: MetricsConfig,
+    #[serde(default)]
+    pub multi_model: MultiModelConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -100,6 +102,22 @@ fn default_metrics_enabled() -> bool { true }
 fn default_metrics_addr() -> String { "0.0.0.0".into() }
 fn default_metrics_port() -> u16 { 9090 }
 
+/// Additional model to load (for multi-model support)
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelEntry {
+    pub name: String,
+    pub path: String,
+}
+
+/// Multi-model deployment configuration
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct MultiModelConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub models: Vec<ModelEntry>,
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -142,6 +160,7 @@ impl Default for AppConfig {
                 host: "0.0.0.0".into(),
                 port: 9090,
             },
+            multi_model: MultiModelConfig::default(),
         }
     }
 }

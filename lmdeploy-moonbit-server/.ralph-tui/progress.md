@@ -121,3 +121,41 @@ after each iteration and it's included in prompts for context.
   - 路由模块使用 Http2Server::add_route 方法注册 handler
   - 所有 handler 都需要验证 model 参数为空时返回 400 错误
 
+---
+
+## 2026-05-16 - US-007: 配置管理
+- 实现了完整的配置管理系统（JSON/JSONC 配置文件 + 环境变量覆盖）
+- 文件变更：
+  - `src/config/config.mbt` - 主配置模块，定义 `AppConfig` 结构体
+  - `src/config/server.mbt` - 服务器配置（HTTP/2, 连接池, 流式, 批处理）
+  - `src/config/model.mbt` - 模型配置（路径, 上下文长度, 批大小）
+  - `src/config/cache.mbt` - 缓存配置（tokenizer cache 大小, TTL）
+  - `src/config/logging.mbt` - 日志配置（级别, 格式）
+  - `src/config/metrics.mbt` - 指标配置（Prometheus）
+  - `src/config/moon.pkg.json` - 模块依赖配置
+  - `config/default.jsonc` - 默认配置文件
+  - `src/server/server.mbt` - 更新为使用 `config::AppConfig`
+  - `src/streaming/config.mbt` - 更新为可从 `ServerConfig` 创建
+  - `src/streaming/moon.pkg.json` - 添加对 config 模块的依赖
+- **实现的功能**:
+  - `AppConfig::default()` - 默认配置值
+  - `AppConfig::load()` - 从默认路径加载配置
+  - `AppConfig::load_with_path()` - 从指定路径加载
+  - `AppConfig::from_json()` - 从 JSON 字符串解析
+  - `AppConfig::from_env()` - 应用环境变量覆盖
+  - 各子配置结构体的访问器方法
+  - JSON 解析辅助函数（`parse_json_string_field`, `parse_json_int_field`, `parse_json_bool_field`）
+  - 环境变量读取占位符（`get_env_string`, `get_env_int`, `get_env_bool` - TODO: FFI）
+  - 文件系统访问占位符（`path_exists`, `read_file_content` - TODO: FFI）
+- **配置覆盖优先级**: defaults → config file → env vars
+- **环境变量命名**: `LMDEPLOY_SERVER_*`, `LMDEPLOY_MODEL_*`, `LMDEPLOY_CACHE_*`, `LMDEPLOY_LOG_*`, `LMDEPLOY_METRICS_*`
+- **默认配置路径**: `/etc/lmdeploy/config.jsonc` 或 `/etc/lmdeploy/config.json`
+- **Learnings**:
+  - 配置模块使用 JSONC 格式（支持注释，符合 CLAUDE.md 规范）
+  - 各子配置模块独立，通过 `AppConfig` 聚合
+  - JSON 解析使用简单的字符串查找模式匹配（无标准 JSON 库）
+  - `int_to_string` 实现了递归转换，支持到 10000 的数字
+  - 服务器配置中的流式设置可直接传递给流式模块（`StreamingConfig::from_server_config`）
+  - 配置系统遵循 Rust 版本的结构（`config.rs` → `config/*.mbt`）
+  - 配置热重载需要 SIGHUP 信号处理（TODO: 需要 FFI 支持）
+

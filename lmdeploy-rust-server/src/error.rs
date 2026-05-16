@@ -20,6 +20,18 @@ pub enum AppError {
     #[error("Internal error: {0}")]
     Internal(String),
 
+    #[error("Model not found: {0}")]
+    ModelNotFound(String),
+
+    #[error("Model already loaded: {0}")]
+    ModelAlreadyLoaded(String),
+
+    #[error("Cannot unload the default model")]
+    CannotUnloadDefaultModel,
+
+    #[error("Model loading failed: {0}")]
+    ModelLoadFailed(String),
+
     #[error("{0}")]
     Other(String),
 }
@@ -35,6 +47,10 @@ impl AppError {
             AppError::Config(_) => 500,
             AppError::Io(_) => 500,
             AppError::Serde(_) => 400,
+            AppError::ModelNotFound(_) => 404,
+            AppError::ModelAlreadyLoaded(_) => 409,
+            AppError::CannotUnloadDefaultModel => 400,
+            AppError::ModelLoadFailed(_) => 500,
             AppError::Other(_) => 500,
         }
     }
