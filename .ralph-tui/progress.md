@@ -9,7 +9,35 @@ after each iteration and it's included in prompts for context.
 
 - **TokenizeCache pattern**: LRU cache + prefix cache + metrics stored in `Arc<Cache>`, accessed via `get_or_tokenize()` closure API. Used by both HTTP and gRPC endpoints.
 - **Async closure capture**: When passing closures to `get_or_tokenize`, clone `text` to owned `String` before the `async move` block to avoid lifetime issues.
+- **Axum server config pattern**: Extract config values before spawning `tokio::spawn(async move { ... })` to avoid lifetime issues with `&AppConfig` reference. Always clone owned values into the closure scope.
+- **Graceful shutdown pattern**: Use `tokio::signal` for ctrl-c and unix terminate signals. Chain with `axum::serve(...).with_graceful_shutdown(signal_future)`.
+- **Batch processing pattern**: Use `mpsc::unbounded_channel` + `tokio::select!` with timeout to accumulate requests. Process batches when size threshold reached or timeout expires.
 
+---
+
+## 2026-05-16 - US-003
+- **Implemented**: High-performance HTTP/2 server with connection pooling, request batching, and graceful shutdown
+- **Files changed**:
+  - `lmdeploy-rust-server/src/server.rs` — rewritten with HTTP/2 support, connection semaphore, batch processor, graceful shutdown
+  - `lmdeploy-rust-server/src/config.rs` — added HTTP/2, connection pool, batching, and shutdown config fields with serde defaults
+  - `lmdeploy-rust-server/config/default.toml` — added all new configuration sections
+  - `lmdeploy-rust-server/Cargo.toml` — added `tower-http` `limit` feature
+  - `lmdeploy-rust-server/src/handlers/http.rs` — removed re-export duplication, types stay in one place
+- **Acceptance criteria met**:
+  - ✅ Axum framework with http2 feature
+  - ✅ HTTP/2 support configured via `http2_enabled` config flag
+  - ✅ Connection pool management via `Semaphore` (max_connections configurable)
+  - ✅ Request body size limit (10MB via `tower-http::limit`)
+  - ✅ Request batch processing (configurable batch_size + timeout)
+  - ✅ Graceful shutdown (Ctrl+C + SIGTERM via `tokio::signal`)
+  - ✅ Health check endpoint `/health`
+  - ✅ CORS layer for cross-origin requests
+  - ✅ Trace layer for request logging
+- **Learnings**:
+  - `tokio::spawn(async move { ... })` requires owned types — clone config values before capturing
+  - `tower-http` features are opt-in per-module (`limit`, `cors`, `trace` must be explicitly enabled)
+  - `axum::serve(...).with_graceful_shutdown()` is the standard way to handle graceful shutdown
+  - Batch processing uses `mpsc::unbounded_channel` + `tokio::select!` with sleep timeout
 ---
 
 ## 2026-05-16 - US-002

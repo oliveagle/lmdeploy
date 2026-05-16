@@ -18,7 +18,42 @@ pub struct ServerConfig {
     pub grpc_addr: String,
     pub grpc_port: u16,
     pub workers: usize,
+    // HTTP/2 settings
+    #[serde(default = "default_http2_enabled")]
+    pub http2_enabled: bool,
+    #[serde(default = "default_http2_keepalive_interval")]
+    pub http2_keepalive_interval_secs: u64,
+    #[serde(default = "default_http2_keepalive_timeout")]
+    pub http2_keepalive_timeout_secs: u64,
+    // Connection pool settings
+    #[serde(default = "default_max_connections")]
+    pub max_connections: usize,
+    #[serde(default = "default_connection_timeout")]
+    pub connection_timeout_secs: u64,
+    #[serde(default = "default_request_timeout")]
+    pub request_timeout_secs: u64,
+    // Batching settings
+    #[serde(default = "default_batch_enabled")]
+    pub batch_enabled: bool,
+    #[serde(default = "default_batch_size")]
+    pub batch_size: usize,
+    #[serde(default = "default_batch_timeout")]
+    pub batch_timeout_ms: u64,
+    // Graceful shutdown
+    #[serde(default = "default_shutdown_timeout")]
+    pub shutdown_timeout_secs: u64,
 }
+
+fn default_http2_enabled() -> bool { true }
+fn default_http2_keepalive_interval() -> u64 { 60 }
+fn default_http2_keepalive_timeout() -> u64 { 10 }
+fn default_max_connections() -> usize { 10000 }
+fn default_connection_timeout() -> u64 { 30 }
+fn default_request_timeout() -> u64 { 300 }
+fn default_batch_enabled() -> bool { true }
+fn default_batch_size() -> usize { 8 }
+fn default_batch_timeout() -> u64 { 50 }
+fn default_shutdown_timeout() -> u64 { 30 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ModelConfig {
@@ -49,6 +84,16 @@ impl Default for AppConfig {
                 grpc_addr: "0.0.0.0".into(),
                 grpc_port: 50051,
                 workers: num_cpus::get(),
+                http2_enabled: true,
+                http2_keepalive_interval_secs: 60,
+                http2_keepalive_timeout_secs: 10,
+                max_connections: 10000,
+                connection_timeout_secs: 30,
+                request_timeout_secs: 300,
+                batch_enabled: true,
+                batch_size: 8,
+                batch_timeout_ms: 50,
+                shutdown_timeout_secs: 30,
             },
             model: ModelConfig {
                 model_path: "".into(),

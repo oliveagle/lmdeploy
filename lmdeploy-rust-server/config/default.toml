@@ -7,6 +7,24 @@ grpc_addr = "0.0.0.0"
 grpc_port = 50051
 workers = 4
 
+# HTTP/2 Configuration
+http2_enabled = true
+http2_keepalive_interval_secs = 60
+http2_keepalive_timeout_secs = 10
+
+# Connection Pool
+max_connections = 10000
+connection_timeout_secs = 30
+request_timeout_secs = 300
+
+# Batching
+batch_enabled = true
+batch_size = 8
+batch_timeout_ms = 50
+
+# Graceful Shutdown
+shutdown_timeout_secs = 30
+
 [model]
 model_path = ""
 model_name = "default"

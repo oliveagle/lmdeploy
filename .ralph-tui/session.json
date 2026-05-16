@@ -3,10 +3,10 @@
   "sessionId": "0cae1ce2-0be0-4b21-8881-47993a0597bb",
   "status": "running",
   "startedAt": "2026-05-16T12:35:48.724Z",
-  "updatedAt": "2026-05-16T12:56:04.888Z",
-  "currentIteration": 1,
+  "updatedAt": "2026-05-16T13:25:47.495Z",
+  "currentIteration": 2,
   "maxIterations": 50,
-  "tasksCompleted": 1,
+  "tasksCompleted": 2,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -24,12 +24,20 @@
       "durationMs": 1193785,
       "startedAt": "2026-05-16T12:35:51.809Z",
       "endedAt": "2026-05-16T12:55:45.594Z"
+    },
+    {
+      "iteration": 2,
+      "status": "completed",
+      "taskId": "US-002",
+      "taskTitle": "Tokenize 缓存系统",
+      "taskCompleted": true,
+      "durationMs": 1299348,
+      "startedAt": "2026-05-16T12:56:04.881Z",
+      "endedAt": "2026-05-16T13:17:44.229Z"
     }
   ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
-  "activeTaskIds": [
-    "US-002"
-  ],
+  "activeTaskIds": [],
   "subagentPanelVisible": false
 }

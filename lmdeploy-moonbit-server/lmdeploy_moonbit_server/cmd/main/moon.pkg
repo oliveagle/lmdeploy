@@ -1,0 +1,7 @@
+// import {
+//   "username/lmdeploy_moonbit_server" @lib,
+// }
+
+options(
+  "is-main": true,
+)
