@@ -4,7 +4,7 @@
 """
 
 import os
-os.environ['LD_LIBRARY_PATH'] = f'/home/oliveagle/opt/lmdeploy/lmdeploy/build/lib:{os.environ.get("LD_LIBRARY_PATH", "")}'
+os.environ['LD_LIBRARY_PATH'] = f'{os.path.dirname(os.path.abspath(__file__))}/build/lib:{os.environ.get("LD_LIBRARY_PATH", "")}'
 
 from lmdeploy import pipeline, TurbomindEngineConfig, SpeculativeConfig, GenerationConfig
 
@@ -56,6 +56,21 @@ response = pipe(
 
 print(f"\n回答: {response.text}")
 print(f"输出 tokens: {len(response.token_ids) - response.input_token_len}")
+
+# Get DFlash stats
+try:
+    stats = pipe.engine.model.comm.get_dflash_stats(0)
+    print(f"\nDFlash Stats:")
+    print(f"  Draft Steps: {stats.get('total_draft_steps', 0)}")
+    print(f"  Draft Tokens: {stats.get('total_draft_tokens', 0)}")
+    print(f"  Accepted: {stats.get('total_accepted_tokens', 0)}")
+    print(f"  Rejected: {stats.get('total_rejected_tokens', 0)}")
+    if stats.get('total_draft_tokens', 0) > 0:
+        accept_rate = stats['total_accepted_tokens'] / stats['total_draft_tokens'] * 100
+        print(f"  Accept Rate: {accept_rate:.1f}%")
+except Exception as e:
+    print(f"\nFailed to get DFlash stats: {e}")
+
 print("\n检查日志中的 DFlash 相关信息：")
 print("1. [DFlash] 开头的日志")
 print("2. dflash_accepted_tokens 相关信息")
