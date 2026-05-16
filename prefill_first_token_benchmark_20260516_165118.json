@@ -1,0 +1,63 @@
+{
+  "date": "2026-05-16 16:51:18",
+  "gpu": "Tesla PG503-216, 32768 MiB, 2 MiB",
+  "model": "Qwen3.6-35B-A3B-AWQ",
+  "backend": "turbomind",
+  "results": [
+    {
+      "scenario": "1K prefill",
+      "target_prompt_tokens": 1024,
+      "actual_prompt_tokens": 1024,
+      "prefill_time": 0.19729208946228027,
+      "prefill_tokens_per_sec": 5190.273988130557,
+      "decode_time": 6.322835683822632,
+      "decode_tokens": 256,
+      "decode_tokens_per_sec": 40.48816271708466,
+      "status": "success"
+    },
+    {
+      "scenario": "4K prefill",
+      "target_prompt_tokens": 4096,
+      "actual_prompt_tokens": 4096,
+      "prefill_time": 0.7012155055999756,
+      "prefill_tokens_per_sec": 5841.285549576333,
+      "decode_time": 7.28791618347168,
+      "decode_tokens": 256,
+      "decode_tokens_per_sec": 35.126638884868676,
+      "status": "success"
+    },
+    {
+      "scenario": "8K prefill",
+      "target_prompt_tokens": 8192,
+      "actual_prompt_tokens": 8192,
+      "prefill_time": 1.6425728797912598,
+      "prefill_tokens_per_sec": 4987.297733200763,
+      "decode_time": 8.738325595855713,
+      "decode_tokens": 256,
+      "decode_tokens_per_sec": 29.296230403844415,
+      "status": "success"
+    },
+    {
+      "scenario": "16K prefill",
+      "target_prompt_tokens": 16384,
+      "actual_prompt_tokens": 16384,
+      "prefill_time": 4.420891761779785,
+      "prefill_tokens_per_sec": 3706.039614370483,
+      "decode_time": 12.642120838165283,
+      "decode_tokens": 256,
+      "decode_tokens_per_sec": 20.2497668925266,
+      "status": "success"
+    },
+    {
+      "scenario": "32K prefill",
+      "target_prompt_tokens": 32768,
+      "actual_prompt_tokens": 32768,
+      "prefill_time": 13.30752682685852,
+      "prefill_tokens_per_sec": 2462.365879576098,
+      "decode_time": 25.602056980133057,
+      "decode_tokens": 256,
+      "decode_tokens_per_sec": 9.999196556692826,
+      "status": "success"
+    }
+  ]
+}

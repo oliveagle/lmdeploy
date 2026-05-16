@@ -19,12 +19,16 @@ def get_shifts(bits: int, device: torch.device):
 def unpack_awq(qweight: torch.Tensor, qzeros: torch.Tensor, bits: int):
     shifts = get_shifts(bits, qzeros.device)
 
+    # Ensure tensors are in integer format for bitwise operations
+    qweight_int = qweight.int() if qweight.dtype != torch.int32 else qweight
+    qzeros_int = qzeros.int() if qzeros.dtype != torch.int32 else qzeros
+
     # unpacking columnwise
-    iweights = torch.bitwise_right_shift(qweight[:, :, None], shifts[None, None, :]).to(torch.int8)
+    iweights = torch.bitwise_right_shift(qweight_int[:, :, None], shifts[None, None, :]).to(torch.int8)
     iweights = iweights.view(iweights.shape[0], -1)
 
     # unpacking columnwise
-    izeros = torch.bitwise_right_shift(qzeros[:, :, None], shifts[None, None, :]).to(torch.int8)
+    izeros = torch.bitwise_right_shift(qzeros_int[:, :, None], shifts[None, None, :]).to(torch.int8)
     izeros = izeros.view(izeros.shape[0], -1)
 
     # overflow checks
@@ -32,6 +36,7 @@ def unpack_awq(qweight: torch.Tensor, qzeros: torch.Tensor, bits: int):
     izeros = torch.bitwise_and(izeros, (2**bits) - 1)
 
     return iweights, izeros
+
 
 
 def dequantize_gemm(qweight, qzeros, scales, bits, group_size):

@@ -1,0 +1,32 @@
+{
+  "date": "2026-05-16 16:08:25",
+  "gpu": "Tesla PG503-216, 32768 MiB, 2 MiB",
+  "lmdeploy_version": "main",
+  "backend": "turbomind",
+  "results": [
+    {
+      "model": "Qwen3.6-35B-A3B-AWQ",
+      "scenario": "4K-512",
+      "context_len": 4096,
+      "output_len": 512,
+      "tokens_generated": 512,
+      "time": 11.989211320877075,
+      "tokens_per_sec": 42.70506093327784,
+      "status": "success"
+    },
+    {
+      "model": "Qwen3.6-35B-A3B-AWQ",
+      "scenario": "8K-512",
+      "context_len": 8192,
+      "output_len": 512,
+      "tokens_generated": 512,
+      "time": 12.064159154891968,
+      "tokens_per_sec": 42.43975841386228,
+      "status": "success"
+    },
+    {
+      "model": "Qwen3.6-27B-AWQ",
+      "error": "Failed to initialize pipeline: CUDA out of memory. Tried to allocate 2.37 GiB. GPU 0 has a total capacity of 31.74 GiB of which 1.47 GiB is free. Including non-PyTorch memory, this process has 30.26 GiB memory in use. Of the allocated memory 0 bytes is allocated by PyTorch, and 0 bytes is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+    }
+  ]
+}

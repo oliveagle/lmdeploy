@@ -1,0 +1,35 @@
+{
+  "model": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___5-35B-A3B-AWQ",
+  "engine": "turbomind",
+  "load_time": 100.45706820487976,
+  "results": [
+    {
+      "name": "简单问答",
+      "prompt": "What is the capital of France?",
+      "max_tokens": 64,
+      "actual_tokens": 64,
+      "time": 1.7139148712158203,
+      "tokens_per_second": 37.34141121874948,
+      "output": "Thinking Process:\n\n1.  **Identify the core question:** The user is asking \"What is the capital of France?\"\n2.  **Access knowledge base:** Retrieve information about France and its capital city.\n3.  **Verify information:** The capital of France is Paris.\n4.  **"
+    },
+    {
+      "name": "代码生成",
+      "prompt": "Write a Python function to calculate fibonacci numbers.",
+      "max_tokens": 128,
+      "actual_tokens": 128,
+      "time": 3.057342052459717,
+      "tokens_per_second": 41.866430972949345,
+      "output": "The user wants a Python function to calculate Fibonacci numbers. There are several approaches I can take:\n\n1. Recursive (simple but inefficient for large numbers)\n2. Iterative (efficient)\n3. With memoization (efficient for repeated calls)\n4. Using matrix exponentiation (very efficient for large numbers)\n\nI should provide a good solution that's practical and explain the different approaches. Let me start with a clear, efficient iterative solution, and maybe mention alternatives.\n\nLet me write a comprehensive answer with multiple approaches.\n</think>\n\nHere are several Python functions to calculate Fibonacci numbers, each with different trade-offs in terms"
+    },
+    {
+      "name": "中文问答",
+      "prompt": "请解释什么是机器学习？",
+      "max_tokens": 128,
+      "actual_tokens": 128,
+      "time": 3.047504186630249,
+      "tokens_per_second": 42.00158298766273,
+      "output": "Here's a thinking process that leads to the explanation of machine learning:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Machine Learning (ML) / 机器学习.\n    *   **Task:** Explain what it is (请解释什么是机器学习？).\n    *   **Target Audience:** General audience (likely looking for a clear, comprehensive, yet accessible overview).\n    *   **Language:** Chinese.\n\n2.  **Determine the Core Structure of the Explanation:**\n    To provide a good explanation, I need to cover:\n    *   **Definition:** What is it simply"
+    }
+  ],
+  "average_tps": 40.92720003661616
+}

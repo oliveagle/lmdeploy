@@ -1,0 +1,22 @@
+# LMDeploy Rust API Server - Default Configuration
+
+[server]
+http_addr = "0.0.0.0"
+http_port = 3000
+grpc_addr = "0.0.0.0"
+grpc_port = 50051
+workers = 4
+
+[model]
+model_path = ""
+model_name = "default"
+max_context_length = 8192
+max_batch_size = 8
+
+[cache]
+tokenizer_cache_size = 1000
+tokenizer_ttl_secs = 3600
+
+[logging]
+level = "info"
+json_format = true

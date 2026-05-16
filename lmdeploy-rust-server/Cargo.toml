@@ -1,0 +1,54 @@
+[package]
+name = "lmdeploy-server"
+version = "0.1.0"
+edition = "2021"
+description = "High-performance Rust API server for LMDeploy"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+
+# HTTP/gRPC
+axum = { version = "0.7", features = ["http2"] }
+tonic = { version = "0.12", features = ["tls"] }
+tower = { version = "0.5", features = ["timeout", "load-shed"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Protobuf
+prost = "0.13"
+
+# Config
+config = { version = "0.14", features = ["toml"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Metrics
+metrics = "0.23"
+metrics-exporter-prometheus = "0.15"
+
+# Utilities
+uuid = { version = "1.10", features = ["v4"] }
+sha2 = "0.10"
+sha256 = "1.5"
+async-stream = "0.3"
+futures = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
+num_cpus = "1.16"
+
+[dev-dependencies]
+tokio-test = "0.4"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+assert-json-diff = "2.0"
+
+[build-dependencies]
+tonic-build = "0.12"

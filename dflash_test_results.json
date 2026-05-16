@@ -1,0 +1,7 @@
+{
+  "target_model": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ",
+  "draft_model": "/mnt/eaget-4tb/hf_models/models--z-lab--Qwen3.5-35B-A3B-DFlash",
+  "timestamp": "2026-04-30 00:17:23",
+  "baseline": null,
+  "dflash": null
+}

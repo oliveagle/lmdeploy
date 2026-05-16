@@ -1,0 +1,38 @@
+{
+  "engine": "LMDeploy TurboMind",
+  "model": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___5-35B-A3B-AWQ",
+  "gpu": "Tesla PG503-216",
+  "gpu_memory": "31.7 GB",
+  "pytorch_version": "2.5.0+cu124",
+  "date": "2026-04-30",
+  "load_time": 70.15295219421387,
+  "results": [
+    {
+      "context_length": 4096,
+      "output_length": 512,
+      "runs": 3,
+      "prefill_speed": 590.95,
+      "decode_speed": 73.87,
+      "first_token_latency": 6931.26,
+      "total_time": 13.8625
+    },
+    {
+      "context_length": 8192,
+      "output_length": 512,
+      "runs": 3,
+      "prefill_speed": 1014.7,
+      "decode_speed": 63.42,
+      "first_token_latency": 8073.31,
+      "total_time": 16.1466
+    },
+    {
+      "context_length": 16384,
+      "output_length": 512,
+      "runs": 3,
+      "prefill_speed": 1504.83,
+      "decode_speed": 47.02,
+      "first_token_latency": 10887.62,
+      "total_time": 21.7752
+    }
+  ]
+}

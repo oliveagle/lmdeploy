@@ -1,0 +1,114 @@
+{
+  "name": "LMDeploy Rust API Server PRD",
+  "description": "**目标**: 用 Rust 重写 LMDeploy 的 API Server，替换当前的 Python FastAPI 实现，显著提升 HTTP API 性能。",
+  "branchName": "feature/lmdeploy-rust-api-server-prd",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "高性能 gRPC API",
+      "description": "作为 API 用户 我想要 使用 gRPC 协议调用 LMDeploy 以便 获得比 HTTP/JSON 更高的性能",
+      "acceptanceCriteria": [],
+      "priority": 1,
+      "passes": true,
+      "labels": [],
+      "dependsOn": [],
+      "completionNotes": "Completed by agent"
+    },
+    {
+      "id": "US-002",
+      "title": "Tokenize 缓存系统",
+      "description": "作为 API Server 我想要 缓存已 tokenize 的 prompt 以便 避免重复编码相同输入",
+      "acceptanceCriteria": [],
+      "priority": 2,
+      "passes": false,
+      "labels": [],
+      "dependsOn": []
+    },
+    {
+      "id": "US-003",
+      "title": "高性能 HTTP/2 服务器",
+      "description": "作为 API Server 我想要 使用高性能 Rust HTTP 框架 以便 充分利用硬件性能",
+      "acceptanceCriteria": [],
+      "priority": 3,
+      "passes": false,
+      "labels": [],
+      "dependsOn": []
+    },
+    {
+      "id": "US-004",
+      "title": "批量推理支持",
+      "description": "作为 API 用户 我想要 发送批量请求 以便 提高吞吐量",
+      "acceptanceCriteria": [],
+      "priority": 4,
+      "passes": false,
+      "labels": [],
+      "dependsOn": []
+    },
+    {
+      "id": "US-005",
+      "title": "流式响应优化",
+      "description": "作为 API 用户 我想要 低延迟的流式输出 以便 获得更好的用户体验",
+      "acceptanceCriteria": [],
+      "priority": 4,
+      "passes": false,
+      "labels": [],
+      "dependsOn": []
+    },
+    {
+      "id": "US-006",
+      "title": "OpenAI API 兼容性",
+      "description": "作为 API 用户 我想要 使用标准的 OpenAI API 格式 以便 无缝迁移现有应用",
+      "acceptanceCriteria": [],
+      "priority": 4,
+      "passes": false,
+      "labels": [],
+      "dependsOn": []
+    },
+    {
+      "id": "US-007",
+      "title": "配置管理",
+      "description": "作为 运维人员 我想要 通过配置文件管理服务 以便 灵活部署",
+      "acceptanceCriteria": [],
+      "priority": 4,
+      "passes": false,
+      "labels": [],
+      "dependsOn": []
+    },
+    {
+      "id": "US-008",
+      "title": "日志和监控",
+      "description": "作为 运维人员 我想要 结构化的日志输出 以便** 问题排查和性能分析",
+      "acceptanceCriteria": [],
+      "priority": 4,
+      "passes": false,
+      "labels": [],
+      "dependsOn": []
+    },
+    {
+      "id": "US-009",
+      "title": "模型加载和管理",
+      "description": "作为 API Server 我想要 动态加载模型 以便 支持多模型部署",
+      "acceptanceCriteria": [],
+      "priority": 4,
+      "passes": false,
+      "labels": [],
+      "dependsOn": []
+    },
+    {
+      "id": "US-010",
+      "title": "错误处理和限流",
+      "description": "作为 API Server 我想要 优雅的错误处理和限流 以便** 保护服务稳定性",
+      "acceptanceCriteria": [],
+      "priority": 4,
+      "passes": false,
+      "labels": [],
+      "dependsOn": []
+    }
+  ],
+  "metadata": {
+    "createdAt": "2026-05-16T12:35:44.512Z",
+    "version": "1.0.0",
+    "sourcePrd": "docs/PRD_RUST_API_SERVER.md",
+    "updatedAt": "2026-05-16T12:55:45.629Z"
+  }
+}

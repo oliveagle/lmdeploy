@@ -1,0 +1,44 @@
+{
+  "date": "2026-05-16 16:44:31",
+  "gpu": "Tesla PG503-216, 32768 MiB, 2 MiB",
+  "model": "Qwen3.6-35B-A3B-AWQ",
+  "backend": "turbomind",
+  "results": [
+    {
+      "scenario": "1K prefill",
+      "target_prompt_tokens": 1024,
+      "actual_prompt_tokens": 455,
+      "total_time": 10.988080263137817,
+      "tokens_generated": 459,
+      "overall_tokens_per_sec": 41.77253796915071,
+      "status": "success"
+    },
+    {
+      "scenario": "4K prefill",
+      "target_prompt_tokens": 4096,
+      "actual_prompt_tokens": 1821,
+      "total_time": 12.19038200378418,
+      "tokens_generated": 485,
+      "overall_tokens_per_sec": 39.78546364252118,
+      "status": "success"
+    },
+    {
+      "scenario": "8K prefill",
+      "target_prompt_tokens": 8192,
+      "actual_prompt_tokens": 3642,
+      "total_time": 13.572105169296265,
+      "tokens_generated": 512,
+      "overall_tokens_per_sec": 37.724435053618734,
+      "status": "success"
+    },
+    {
+      "scenario": "16K prefill",
+      "target_prompt_tokens": 16384,
+      "actual_prompt_tokens": 7283,
+      "total_time": 15.334389448165894,
+      "tokens_generated": 512,
+      "overall_tokens_per_sec": 33.38900461154252,
+      "status": "success"
+    }
+  ]
+}

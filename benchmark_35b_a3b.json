@@ -1,0 +1,111 @@
+{
+  "model": "Qwen3.5-35B-A3B-AWQ",
+  "backend": "TurboMind",
+  "gpu": "Tesla V100 32GB",
+  "config": {
+    "session_len": 1024,
+    "cache_max_entry_count": 0.1,
+    "quant_policy": "TURBO_QUANT"
+  },
+  "results": [
+    {
+      "name": "\u7b80\u5355\u5bf9\u8bdd",
+      "input_tokens": 12,
+      "output_tokens": 64,
+      "total_time": 1.7928102016448975,
+      "prefill_speed": 6.693402340632622,
+      "decode_speed": 35.69814581670732,
+      "first_token_latency_ms": 28.012659400701523
+    },
+    {
+      "name": "\u81ea\u6211\u4ecb\u7ecd",
+      "input_tokens": 15,
+      "output_tokens": 64,
+      "total_time": 1.6440463066101074,
+      "prefill_speed": 9.123830599959685,
+      "decode_speed": 38.92834389316132,
+      "first_token_latency_ms": 25.68822354078293
+    },
+    {
+      "name": "\u95ee\u7b54",
+      "input_tokens": 17,
+      "output_tokens": 64,
+      "total_time": 1.9988739490509033,
+      "prefill_speed": 8.5047884125319,
+      "decode_speed": 32.01802696482597,
+      "first_token_latency_ms": 31.232405453920364
+    },
+    {
+      "name": "\u4ee3\u7801\u751f\u6210",
+      "input_tokens": 18,
+      "output_tokens": 64,
+      "total_time": 1.8636844158172607,
+      "prefill_speed": 9.658287555142033,
+      "decode_speed": 34.34057797383834,
+      "first_token_latency_ms": 29.1200689971447
+    },
+    {
+      "name": "\u8f93\u51fa 32 tokens",
+      "input_tokens": 19,
+      "output_tokens": 32,
+      "total_time": 0.9533553123474121,
+      "prefill_speed": 19.929610454697094,
+      "decode_speed": 33.56565971317406,
+      "first_token_latency_ms": 29.79235351085663
+    },
+    {
+      "name": "\u8f93\u51fa 64 tokens",
+      "input_tokens": 19,
+      "output_tokens": 64,
+      "total_time": 1.751966953277588,
+      "prefill_speed": 10.84495341904407,
+      "decode_speed": 36.530369411516865,
+      "first_token_latency_ms": 27.37448364496231
+    },
+    {
+      "name": "\u8f93\u51fa 128 tokens",
+      "input_tokens": 19,
+      "output_tokens": 128,
+      "total_time": 3.6247901916503906,
+      "prefill_speed": 5.241682689322544,
+      "decode_speed": 35.31238864385714,
+      "first_token_latency_ms": 28.318673372268677
+    },
+    {
+      "name": "\u8f93\u51fa 256 tokens",
+      "input_tokens": 19,
+      "output_tokens": 256,
+      "total_time": 6.879999160766602,
+      "prefill_speed": 2.761628243844572,
+      "decode_speed": 37.20930686443213,
+      "first_token_latency_ms": 26.874996721744537
+    },
+    {
+      "name": "\u4e0a\u4e0b\u6587 128 tokens",
+      "input_tokens": 131,
+      "output_tokens": 32,
+      "total_time": 0.841794490814209,
+      "prefill_speed": 155.61993031493097,
+      "decode_speed": 38.01402877921978,
+      "first_token_latency_ms": 26.30607783794403
+    },
+    {
+      "name": "\u4e0a\u4e0b\u6587 256 tokens",
+      "input_tokens": 263,
+      "output_tokens": 32,
+      "total_time": 0.9459919929504395,
+      "prefill_speed": 278.01503813973466,
+      "decode_speed": 33.826924792667334,
+      "first_token_latency_ms": 29.562249779701233
+    },
+    {
+      "name": "\u4e0a\u4e0b\u6587 512 tokens",
+      "input_tokens": 527,
+      "output_tokens": 32,
+      "total_time": 1.0380780696868896,
+      "prefill_speed": 507.6689464781357,
+      "decode_speed": 30.82619788861545,
+      "first_token_latency_ms": 32.4399396777153
+    }
+  ]
+}

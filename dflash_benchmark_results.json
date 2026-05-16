@@ -1,0 +1,35 @@
+[
+  {
+    "context_label": "4K",
+    "context_tokens": 4096,
+    "actual_context": 3731,
+    "output_tokens": 512,
+    "actual_output": 512,
+    "total_time": 17.34096598625183,
+    "decode_speed": 29.52546013906728,
+    "overall_speed": 244.68071751965329,
+    "acceptance_rate": null
+  },
+  {
+    "context_label": "8K",
+    "context_tokens": 8192,
+    "actual_context": 7451,
+    "output_tokens": 512,
+    "actual_output": 512,
+    "total_time": 18.568236827850342,
+    "decode_speed": 27.573969717580052,
+    "overall_speed": 428.8506266818163,
+    "acceptance_rate": null
+  },
+  {
+    "context_label": "16K",
+    "context_tokens": 16384,
+    "actual_context": 14901,
+    "output_tokens": 512,
+    "actual_output": 512,
+    "total_time": 24.37532663345337,
+    "decode_speed": 21.004846732897402,
+    "overall_speed": 632.3197318245071,
+    "acceptance_rate": null
+  }
+]

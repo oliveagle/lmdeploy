@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package lmdeploy.v1;
+
+// LMDeploy gRPC service definition
+service LMDeployService {
+  // Non-streaming inference
+  rpc Generate(GenerateRequest) returns (GenerateResponse);
+
+  // Streaming inference (server-side streaming)
+  rpc GenerateStream(GenerateRequest) returns (stream GenerateStreamResponse);
+
+  // Batch inference
+  rpc GenerateBatch(BatchGenerateRequest) returns (BatchGenerateResponse);
+
+  // Tokenize only (for caching)
+  rpc Tokenize(TokenizeRequest) returns (TokenizeResponse);
+
+  // Health check
+  rpc Health(HealthRequest) returns (HealthResponse);
+
+  // Model info
+  rpc ModelInfo(ModelInfoRequest) returns (ModelInfoResponse);
+}
+
+// Basic generation request
+message GenerateRequest {
+  string model = 1;
+  string prompt = 2;
+  int32 max_tokens = 3;
+  float temperature = 4;
+  float top_p = 5;
+  int32 top_k = 6;
+  repeated int32 stop_token_ids = 7;
+  bool echo = 8;
+  int32 seed = 9;
+  int32 repetition_penalty = 10;
+}
+
+// Generation response
+message GenerateResponse {
+  string text = 1;
+  repeated int32 token_ids = 2;
+  int32 prompt_tokens = 3;
+  int32 completion_tokens = 4;
+  float finish_reason = 5;  // 0: stop, 1: length, 2: error
+  string error = 6;
+  float latency_ms = 7;
+  float tokens_per_second = 8;
+}
+
+// Streaming response chunk
+message GenerateStreamResponse {
+  oneof payload {
+    GenerateResponse response = 1;  // Final response when done
+    StreamChunk chunk = 2;          // Streaming tokens
+  }
+}
+
+message StreamChunk {
+  string text = 1;
+  int32 token_id = 2;
+  bool is_final = 3;
+}
+
+// Batch generation request
+message BatchGenerateRequest {
+  repeated GenerateRequest requests = 1;
+  int32 batch_size = 2;  // Max batch size (may process smaller batches)
+}
+
+// Batch generation response
+message BatchGenerateResponse {
+  repeated GenerateResponse responses = 1;
+  float total_latency_ms = 2;
+  float throughput_tokens_per_second = 3;
+}
+
+// Tokenize request
+message TokenizeRequest {
+  string model = 1;
+  string text = 2;
+  bool return_tokens = 3;
+  bool special_tokens = 4;
+}
+
+// Tokenize response
+message TokenizeResponse {
+  repeated int32 token_ids = 1;
+  repeated string tokens = 2;  // Optional: actual token strings
+  int32 length = 3;
+  string hash = 4;  // SHA-256 hash of input text (for cache key)
+}
+
+// Health check
+message HealthRequest {}
+
+message HealthResponse {
+  string status = 1;  // "ok", "degraded", "error"
+  string version = 2;
+  string model = 3;
+  int64 uptime_seconds = 4;
+}
+
+// Model info
+message ModelInfoRequest {}
+
+message ModelInfoResponse {
+  string model_name = 1;
+  string model_path = 2;
+  int32 max_context_length = 3;
+  int32 vocab_size = 4;
+  bool supports_streaming = 5;
+  repeated string capabilities = 6;
+}

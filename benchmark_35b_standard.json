@@ -1,0 +1,71 @@
+{
+  "model": "Qwen3.5-35B-A3B-AWQ",
+  "backend": "TurboMind",
+  "gpu": "Tesla V100 32GB",
+  "results": [
+    {
+      "name": "\u7b80\u5355\u5bf9\u8bdd",
+      "input_tokens": 16,
+      "output_tokens": 128,
+      "total_time": 3.9599950313568115,
+      "prefill_speed": 20.202045549685863,
+      "decode_speed": 40.404091099371726
+    },
+    {
+      "name": "\u95ee\u7b54",
+      "input_tokens": 17,
+      "output_tokens": 121,
+      "total_time": 3.733464479446411,
+      "prefill_speed": 22.767057372031992,
+      "decode_speed": 40.511969735527515
+    },
+    {
+      "name": "\u4ee3\u7801\u751f\u6210",
+      "input_tokens": 18,
+      "output_tokens": 128,
+      "total_time": 3.9961369037628174,
+      "prefill_speed": 22.52175092281117,
+      "decode_speed": 40.03866830721986
+    },
+    {
+      "name": "\u4e2d\u6587\u95ee\u7b54",
+      "input_tokens": 15,
+      "output_tokens": 128,
+      "total_time": 3.6049208641052246,
+      "prefill_speed": 20.80489498307356,
+      "decode_speed": 44.38377596389027
+    },
+    {
+      "name": "\u4e0a\u4e0b\u6587 512 tokens",
+      "input_tokens": 610,
+      "output_tokens": 64,
+      "total_time": 2.1411633491516113,
+      "prefill_speed": 1424.4592787413885,
+      "decode_speed": 37.362866327642976
+    },
+    {
+      "name": "\u4e0a\u4e0b\u6587 1024 tokens",
+      "input_tokens": 1201,
+      "output_tokens": 64,
+      "total_time": 1.9909508228302002,
+      "prefill_speed": 3016.1468234879353,
+      "decode_speed": 40.18180614138798
+    },
+    {
+      "name": "\u4e0a\u4e0b\u6587 2048 tokens",
+      "input_tokens": 2382,
+      "output_tokens": 64,
+      "total_time": 2.318472146987915,
+      "prefill_speed": 5137.003701111135,
+      "decode_speed": 34.50548245918479
+    },
+    {
+      "name": "\u4e0a\u4e0b\u6587 4096 tokens",
+      "input_tokens": 4746,
+      "output_tokens": 64,
+      "total_time": 2.7305028438568115,
+      "prefill_speed": 8690.70693458117,
+      "decode_speed": 29.2986327335227
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+[
+  {
+    "context_label": "4K",
+    "context_tokens": 3731,
+    "output_tokens": 512,
+    "total_time": 17.605811834335327,
+    "decode_speed": 29.081305924301873,
+    "overall_speed": 240.9999629625251
+  },
+  {
+    "context_label": "8K",
+    "context_tokens": 7451,
+    "output_tokens": 512,
+    "total_time": 19.559414386749268,
+    "decode_speed": 26.176652832042855,
+    "overall_speed": 407.11852832335404
+  }
+]
