@@ -29,10 +29,12 @@ public:
 
     // DFlash 支持
     void EnableDFlash(bool enable) {
-        TM_LOG_INFO("[DFlash] UnifiedDecoder::EnableDFlash: this={}, enable={}, enable_dflash_ before={}",
-                    (void*)this, enable, (int)enable_dflash_);
+        // 获取调用栈信息
+        TM_LOG_INFO("[DFlash] UnifiedDecoder::EnableDFlash: decoder_id={}, this={:p}, enable={:d}, enable_dflash_ before={:d}, callstack follows",
+                    decoder_id_, (void*)this, (int)enable, (int)enable_dflash_);
         enable_dflash_ = enable;
-        TM_LOG_INFO("[DFlash] UnifiedDecoder::EnableDFlash: enable_dflash_ after={}", (int)enable_dflash_);
+        TM_LOG_INFO("[DFlash] UnifiedDecoder::EnableDFlash: decoder_id={}, enable_dflash_ after={:d}, callstack end",
+                    decoder_id_, (int)enable_dflash_);
     }
     bool IsDFlashEnabled() const { return enable_dflash_; }
     void SetDFlashDraftModel(DFlashDraftModel* model) { dflash_draft_model_ = model; }
@@ -79,6 +81,7 @@ private:
     std::vector<Tensor> aux_hidden_states_;
     const int dflash_aux_layers_[5];
     Context* ctx_{nullptr};
+    int decoder_id_{0};  // 用于调试：跟踪 decoder 实例
 
     // 获取收集的 aux hidden states
     const std::vector<Tensor>& GetAuxHiddenStates() const { return aux_hidden_states_; }

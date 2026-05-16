@@ -176,6 +176,36 @@ __global__ void DFlashSplitQKVKernel(
     }
 }
 
+// Pad K/V from kv_hidden stride to hidden_size stride.
+// Attention kernel indexes as `key[row * hidden_size + d]` so stride must match hidden_size.
+__global__ void DFlashPadKVKernel(
+    const half* __restrict__ k_src,   // [num_rows, kv_hidden]
+    const half* __restrict__ v_src,   // [num_rows, kv_hidden]
+    half* __restrict__ k_dst,         // [num_rows, hidden] (kv_hidden + zero-pad)
+    half* __restrict__ v_dst,         // [num_rows, hidden] (kv_hidden + zero-pad)
+    int num_rows,
+    int kv_hidden,
+    int hidden)
+{
+    const int row = blockIdx.x;
+    if (row >= num_rows) return;
+
+    const half* k_s = k_src + row * kv_hidden;
+    const half* v_s = v_src + row * kv_hidden;
+    half* k_d = k_dst + row * hidden;
+    half* v_d = v_dst + row * hidden;
+
+    for (int i = threadIdx.x; i < hidden; i += blockDim.x) {
+        if (i < kv_hidden) {
+            k_d[i] = k_s[i];
+            v_d[i] = v_s[i];
+        } else {
+            k_d[i] = __float2half(0.f);
+            v_d[i] = __float2half(0.f);
+        }
+    }
+}
+
 // ──────────────────────────────────────────
 // cuBLAS GEMM helper (FP16)
 // Computes C = A * B^T where:
@@ -293,11 +323,7 @@ DFlashDraftModel::DFlashDraftModel(const ModelParam& model,
         target_layer_ids_[4] = num_target_layers - 1;
     }
 
-    TM_LOG_INFO("[DFlash] target_layer_ids: {%d, %d, %d, %d, %d} for %d target layers",
-           target_layer_ids_[0], target_layer_ids_[1], target_layer_ids_[2],
-           target_layer_ids_[3], target_layer_ids_[4], num_target_layers);
-
-    weight_ = std::make_unique<DFlashDraftWeight>();
+        weight_ = std::make_unique<DFlashDraftWeight>();
 
     // Create cuBLAS handle
     cublasStatus_t cublas_status = cublasCreate(&cublas_);
@@ -305,6 +331,8 @@ DFlashDraftModel::DFlashDraftModel(const ModelParam& model,
         TM_LOG_ERROR("[DFlash] Failed to create cuBLAS handle: status={}", (int)cublas_status);
         cublas_ = nullptr;
     }
+
+    TM_LOG_INFO("[DFlash] DFlashDraftModel constructor completed");
 }
 
 DFlashDraftModel::~DFlashDraftModel()
@@ -619,8 +647,9 @@ void DFlashDraftModel::GenerateDraft(
         // For now: derive context K/V from context hidden directly
         // by using the draft model's QKV split weights.
         // For GQA: ctx_k and ctx_v are [num_ctx, kv_hidden]
-        ctx_k = Tensor{{num_ctx, kv_hidden_}, dtype, kDEVICE};
-        ctx_v = Tensor{{num_ctx, kv_hidden_}, dtype, kDEVICE};
+        // But attention kernel expects [num_ctx, hidden], so we'll pad them
+        Tensor ctx_k_unpadded = Tensor{{num_ctx, kv_hidden_}, dtype, kDEVICE};
+        Tensor ctx_v_unpadded = Tensor{{num_ctx, kv_hidden_}, dtype, kDEVICE};
 
         // Split QKV weight into Q, K, V components
         // QKV weight is [qkv_out, hidden] where qkv_out = hidden + 2*kv_hidden (column-major from PyTorch)
@@ -652,8 +681,8 @@ void DFlashDraftModel::GenerateDraft(
 
             // Split: Q discarded, K [num_ctx, kv_hidden], V [num_ctx, kv_hidden]
             const half* qkv_data = static_cast<const half*>(ctx_qkv.raw_data());
-            half* k_data = static_cast<half*>(ctx_k.raw_data());
-            half* v_data = static_cast<half*>(ctx_v.raw_data());
+            half* k_data = static_cast<half*>(ctx_k_unpadded.raw_data());
+            half* v_data = static_cast<half*>(ctx_v_unpadded.raw_data());
 
             // Use kernel instead of loop cudaMemcpyAsync
             const int threads = 256;
@@ -661,9 +690,21 @@ void DFlashDraftModel::GenerateDraft(
         }
         else {
             // Fallback: zero K/V if no weights loaded
-            cudaMemsetAsync(ctx_k.raw_data(), 0, num_ctx * hidden * 2, stream);
-            cudaMemsetAsync(ctx_v.raw_data(), 0, num_ctx * hidden * 2, stream);
+            cudaMemsetAsync(ctx_k_unpadded.raw_data(), 0, num_ctx * kv_hidden_ * 2, stream);
+            cudaMemsetAsync(ctx_v_unpadded.raw_data(), 0, num_ctx * kv_hidden_ * 2, stream);
         }
+
+        // Pad context K/V from [num_ctx, kv_hidden] to [num_ctx, hidden] for attention kernel
+        ctx_k = Tensor{{num_ctx, hidden}, dtype, kDEVICE};
+        ctx_v = Tensor{{num_ctx, hidden}, dtype, kDEVICE};
+        const int threads_pad = 256;
+        const int total_ctx_pad_elements = num_ctx * hidden;
+        DFlashPadKVKernel<<<(total_ctx_pad_elements + threads_pad - 1) / threads_pad, threads_pad, 0, stream>>>(
+            static_cast<const half*>(ctx_k_unpadded.raw_data()),
+            static_cast<const half*>(ctx_v_unpadded.raw_data()),
+            static_cast<half*>(ctx_k.raw_data()),
+            static_cast<half*>(ctx_v.raw_data()),
+            num_ctx, kv_hidden_, hidden);
 
         // Store to cache if enabled and we have input tokens
         if (enable_prefix_cache_ && input_tokens != nullptr && !input_tokens->empty()) {
@@ -714,28 +755,35 @@ void DFlashDraftModel::GenerateDraft(
         DFlashSplitQKVKernel<<<num_spec_tokens_, 256, 0, stream>>>(qkv_data, static_cast<half*>(q_flat.raw_data()), static_cast<half*>(k_flat.raw_data()), static_cast<half*>(v_flat.raw_data()), num_spec_tokens_, h, kv_hidden_, qkv_out);
 
         // ── 4d. DFlash Attention ──
-        // TEMPORARY FIX: Skip attention and just use Q values
-        // TODO: Fix the attention kernel for proper QKV layout
+        // Pad K/V to match hidden_size stride expected by the attention kernel
+        // Kernel indexes as `key[i * hidden_size + ...]` so stride must be hidden_size
+        Tensor k_padded = Tensor{{num_spec_tokens_, h}, dtype, kDEVICE};
+        Tensor v_padded = Tensor{{num_spec_tokens_, h}, dtype, kDEVICE};
+
+        // Copy kv_hidden data and zero-pad the rest
+        int threads_pad = 256;
+        int total_pad_elements = num_spec_tokens_ * h;
+        DFlashPadKVKernel<<<(total_pad_elements + threads_pad - 1) / threads_pad, threads_pad, 0, stream>>>(
+            static_cast<const half*>(k_flat.raw_data()),
+            static_cast<const half*>(v_flat.raw_data()),
+            static_cast<half*>(k_padded.raw_data()),
+            static_cast<half*>(v_padded.raw_data()),
+            num_spec_tokens_, kv_hidden_, h);
+
         Tensor attn_out = Tensor{{num_spec_tokens_, h}, dtype, kDEVICE};
 
-        // For now, just copy Q to output (no attention mechanism)
-        // This is incorrect but avoids the illegal memory access
-        cudaMemcpyAsync(attn_out.raw_data(), q_flat.raw_data(),
-                       num_spec_tokens_ * h * 2, cudaMemcpyDeviceToDevice, stream);
-
-        // Original code (disabled due to memory layout issue):
-        // DFlashAttentionKernel(
-        //     static_cast<const void*>(q_flat.raw_data()),
-        //     static_cast<const void*>(ctx_k.raw_data()),
-        //     static_cast<const void*>(k_flat.raw_data()),
-        //     static_cast<const void*>(ctx_v.raw_data()),
-        //     static_cast<const void*>(v_flat.raw_data()),
-        //     static_cast<void*>(attn_out.raw_data()),
-        //     num_spec_tokens_,
-        //     num_ctx,
-        //     h,
-        //     head_dim,
-        //     stream);
+        DFlashAttentionKernel(
+            static_cast<const void*>(q_flat.raw_data()),
+            static_cast<const void*>(ctx_k.raw_data()),
+            static_cast<const void*>(k_padded.raw_data()),
+            static_cast<const void*>(ctx_v.raw_data()),
+            static_cast<const void*>(v_padded.raw_data()),
+            static_cast<void*>(attn_out.raw_data()),
+            num_spec_tokens_,
+            num_ctx,
+            h,
+            head_dim,
+            stream);
 
         // ── 4e. Output projection + residual ──
         const half* o_w = static_cast<const half*>(GetDraftWeight()->d_attn_o_weight[layer].raw_data());
@@ -970,6 +1018,7 @@ void DFlashVerifyDraftGPU(
     Tensor& accepted_tokens,
     Tensor& accept_mask,
     Tensor& max_logits,  // Output: max logit for each position
+    Tensor& accepted_count,  // Output: [1] tensor for count (device or CPU)
     int num_spec_tokens)
 {
     const int num_spec = num_spec_tokens;
@@ -979,10 +1028,23 @@ void DFlashVerifyDraftGPU(
     TM_LOG_DEBUG("[DFlash] DFlashVerifyDraftGPU starting:");
     TM_LOG_DEBUG("[DFlash]   num_spec: {}", num_spec);
     TM_LOG_DEBUG("[DFlash]   vocab_size: {}", vocab_size);
+    TM_LOG_DEBUG("[DFlash]   accepted_count device: {}",
+                 accepted_count.device() == kCPU ? "CPU" : "GPU");
 
     accepted_tokens = Tensor{{num_spec}, kInt32, kDEVICE};
     accept_mask = Tensor{{num_spec}, kInt32, kDEVICE};
     max_logits = Tensor{{num_spec}, kFloat32, kDEVICE};
+
+    // Allocate count tensor based on passed tensor's device
+    // Use the device of the passed tensor
+    const bool use_cpu_count = (accepted_count.device() == kCPU);
+    Tensor d_count;
+    if (use_cpu_count) {
+        // Need a temporary device tensor for the kernel, then copy to CPU
+        d_count = Tensor{{1}, kInt32, kDEVICE};
+    } else {
+        d_count = accepted_count;  // Use directly if it's device memory
+    }
 
     // Launch verification kernel
     // One block per spec position (8 blocks for 8 spec tokens)
@@ -1009,10 +1071,7 @@ void DFlashVerifyDraftGPU(
     sync_check_cuda_error();
     TM_LOG_DEBUG("[DFlash] DFlashVerifyDraftKernel launched successfully");
 
-    // Count accepted tokens for logging
-    Tensor d_count = Tensor{{1}, kInt32, kDEVICE};
-    Tensor h_count = Tensor{{1}, kInt32, kCPUpinned};
-
+    // Count accepted tokens using the kernel
     TM_LOG_DEBUG("[DFlash] Launching DFlashCountAcceptedKernel...");
     DFlashCountAcceptedKernel<<<1, std::min(256, num_spec), 256 * sizeof(int), stream>>>(
         static_cast<const int*>(accept_mask.raw_data()),
@@ -1022,13 +1081,16 @@ void DFlashVerifyDraftGPU(
     sync_check_cuda_error();
     TM_LOG_DEBUG("[DFlash] DFlashCountAcceptedKernel launched successfully");
 
-    // Copy count to host (FIX: was DeviceToDevice, now DeviceToHost)
-    TM_LOG_DEBUG("[DFlash] Copying accepted count from device to host...");
-    cudaMemcpyAsync(static_cast<int*>(h_count.raw_data()),
-                    static_cast<const int*>(d_count.raw_data()),
-                    sizeof(int), cudaMemcpyDeviceToHost,
-                    stream);
-    sync_check_cuda_error();
+    // Copy count to CPU tensor if needed
+    if (use_cpu_count) {
+        TM_LOG_DEBUG("[DFlash] Copying count from device to CPU...");
+        cudaMemcpyAsync(accepted_count.raw_data(),
+                        d_count.raw_data(),
+                        sizeof(int), cudaMemcpyDeviceToHost,
+                        stream);
+        sync_check_cuda_error();
+    }
+
     TM_LOG_DEBUG("[DFlash] DFlashVerifyDraftGPU complete");
 }
 
@@ -1086,7 +1148,8 @@ void DFlashDraftModel::VerifyDraft(
 
     TM_LOG_DEBUG("[DFlash] Step 3: Calling DFlashVerifyDraftGPU...");
     Tensor max_logits;  // Will be allocated by DFlashVerifyDraftGPU
-    DFlashVerifyDraftGPU(draft_tokens, logits_to_use, accepted_tokens, accept_mask, max_logits, num_spec);
+    Tensor accepted_count;  // Output: accepted count on device
+    DFlashVerifyDraftGPU(draft_tokens, logits_to_use, accepted_tokens, accept_mask, max_logits, accepted_count, num_spec);
     TM_LOG_DEBUG("[DFlash] DFlashVerifyDraftGPU returned");
 
     TM_LOG_DEBUG("[DFlash] Step 4: Copying accept_mask, accepted_tokens, and max_logits to host...");
@@ -1115,7 +1178,7 @@ void DFlashDraftModel::VerifyDraft(
     cudaStreamSynchronize(stream);
 
     TM_LOG_DEBUG("[DFlash] Step 5: Calculating acceptance rate and token probabilities...");
-    int accepted_count = 0;
+    int num_accepted_local = 0;
     TM_LOG_DEBUG("[DFlash] Verification results:");
     for (int i = 0; i < num_spec; ++i) {
         // Calculate probability using softmax: exp(max_logit) / sum(exp(logits))
@@ -1125,7 +1188,7 @@ void DFlashDraftModel::VerifyDraft(
         float prob = confidence / (1.0f + confidence);
 
         if (h_accept_mask[i]) {
-            accepted_count++;
+            num_accepted_local++;
             TM_LOG_DEBUG("[DFlash]   [{}] ACCEPTED: draft={}, accepted={}, max_logit={:.4f}, conf={:.4f}",
                            i, h_draft_tokens[i], h_accepted_tokens[i], h_max_logits[i], prob);
         } else {
@@ -1134,11 +1197,11 @@ void DFlashDraftModel::VerifyDraft(
         }
     }
 
-    float accept_rate = (float)accepted_count / (float)num_spec * 100.0f;
+    float accept_rate = (float)num_accepted_local / (float)num_spec * 100.0f;
     TM_LOG_DEBUG("[DFlash] ================ VERIFICATION SUMMARY ================");
     TM_LOG_DEBUG("[DFlash] Total draft tokens: {}", num_spec);
-    TM_LOG_DEBUG("[DFlash] Accepted tokens: {}", accepted_count);
-    TM_LOG_DEBUG("[DFlash] Rejected tokens: {}", num_spec - accepted_count);
+    TM_LOG_DEBUG("[DFlash] Accepted tokens: {}", num_accepted_local);
+    TM_LOG_DEBUG("[DFlash] Rejected tokens: {}", num_spec - num_accepted_local);
     TM_LOG_DEBUG("[DFlash] Acceptance rate: {:.2f}%", accept_rate);
     TM_LOG_DEBUG("[DFlash] ======================================================");
 }

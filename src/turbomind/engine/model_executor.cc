@@ -1,6 +1,7 @@
 
 #include "src/turbomind/engine/model_executor.h"
 
+#include <iostream>
 #include <memory>
 
 #include "src/turbomind/core/allocator.h"
@@ -61,16 +62,13 @@ struct ModelExecutor::Impl {
         TensorMap env{{"batch", d.buf()}, {"copy", copy.buf()}};
 
         model_.Run(BatchOp::kPrepare, d.phase, env);
-        // dbg(copy);
         copy.Run();
 
         model_.Run(BatchOp::kForward, d.phase, env);
 
         model_.Run(BatchOp::kUnprep, d.phase, env);
-        // dbg(copy);
         copy.Run();
 
-        // TM_CHECK(0);
         AnomalyHandler::instance().Summarize([](...) {});
         AnomalyHandler::instance().Reset();
     }

@@ -26,6 +26,12 @@
 
 namespace turbomind {
 
+// Global counter to track if UnifiedDecoder::Forward is called
+static std::atomic<int> g_unified_decoder_forward_count{0};
+
+// Global counter for decoder instance IDs
+static std::atomic<int> g_decoder_id_counter{0};
+
 void UnifiedDecoder::Run(BatchOp op, int phase, TensorMap& env)
 {
     attn_layer_->Run(op, phase, env);
@@ -52,7 +58,8 @@ UnifiedDecoder::UnifiedDecoder(const ModelParam&     model,
     d_comm_(ctx.comm.d_comm),
     tune_layer_num_(model.tune_layer_num),
     is_warm_up_{*ctx.is_warm_up},
-    ctx_(const_cast<Context*>(&ctx))
+    ctx_(const_cast<Context*>(&ctx)),
+    decoder_id_(g_decoder_id_counter.fetch_add(1))
 {
     if (std::accumulate(moe.expert_num.begin(), moe.expert_num.end(), 0LL)) {
         moe_ffn_layer_ = std::make_unique<MoeFfnLayer>(model, moe, engine, ctx);
@@ -171,18 +178,18 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
     if (enable_dflash_ && dflash_draft_model_) {
         if (args.try_("selected_token_pos")) {
             selected_pos_ptr = &args.at("selected_token_pos").buffer();
-            TM_LOG_INFO("[DFlash] Found selected_token_pos, size={}", selected_pos_ptr->size());
+            TM_LOG_INFO("[DFlash] Found selected_token_pos, decoder_id={}, size={}", decoder_id_, selected_pos_ptr->size());
         } else {
-            TM_LOG_INFO("[DFlash] No selected_token_pos in args (phase={})", phase);
+            TM_LOG_INFO("[DFlash] No selected_token_pos in args, decoder_id={}, phase={}", decoder_id_, phase);
         }
-        TM_LOG_INFO("[DFlash] DFlash enabled: enable={}, model={}, phase={}",
-                    enable_dflash_, (void*)dflash_draft_model_, phase);
+        TM_LOG_INFO("[DFlash] DFlash enabled: decoder_id={}, enable={}, model={}, phase={}, decoder={:p}",
+                    decoder_id_, enable_dflash_, (void*)dflash_draft_model_, phase, (void*)this);
     } else {
         if (!enable_dflash_) {
-            TM_LOG_INFO("[DFlash] NOT enabled: enable_dflash_={}", (int)enable_dflash_);
+            TM_LOG_INFO("[DFlash] NOT enabled: decoder_id={}, enable_dflash_={}, decoder={:p}", decoder_id_, (int)enable_dflash_, (void*)this);
         }
         if (!dflash_draft_model_) {
-            TM_LOG_INFO("[DFlash] NO draft model: dflash_draft_model_={}", (void*)dflash_draft_model_);
+            TM_LOG_INFO("[DFlash] NO draft model: decoder_id={}, dflash_draft_model_={}, decoder={:p}", decoder_id_, (void*)dflash_draft_model_, (void*)this);
         }
     }
 
@@ -222,7 +229,7 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
     // auto stack_alloc{core::Context::device_alloc().adapt<core::StackAllocatorImpl>()};
     // core::ContextGuard ctx{Allocator{stack_alloc}};
 
-    TM_LOG_INFO("[DFlash] Starting layer loop: layer_num_={}", (int)layer_num_);
+    TM_LOG_INFO("[DFlash] Starting layer loop: decoder_id={}, layer_num_={}", decoder_id_, (int)layer_num_);
 
     for (int layer = 0; layer < layer_num_; ++layer) {
 
@@ -385,8 +392,8 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
     const bool is_prefill = global_token_num > 1;
     const bool is_decode = global_token_num == 1;
 
-    TM_LOG_INFO("[DFlash] Checking conditions: enable={}, model={}, phase={}, global_tokens={} (prefill={}, decode={})",
-                (int)enable_dflash_, (void*)dflash_draft_model_, phase, (int)global_token_num, (int)is_prefill, (int)is_decode);
+    TM_LOG_INFO("[DFlash] Checking conditions: decoder_id={}, enable={}, model={}, phase={}, global_tokens={} (prefill={}, decode={})",
+                decoder_id_, (int)enable_dflash_, (void*)dflash_draft_model_, phase, (int)global_token_num, (int)is_prefill, (int)is_decode);
 
     if (enable_dflash_ && dflash_draft_model_) {
         TM_LOG_INFO("[DFlash] aux_hidden_states_.size()={}", aux_hidden_states_.size());
@@ -407,9 +414,9 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
                         draft_weight ? (void*)draft_weight->lm_head.raw_data() : nullptr,
                         draft_weight ? (void*)draft_weight->embed_tokens.raw_data() : nullptr);
         } else if (!aux_hidden_states_.empty()) {
-            // ========== DECODE 阶段：验证并使用 draft tokens ==========
+            // ========== DECODE 阶段：验证 draft tokens 并生成新的 draft tokens ==========
             if (is_decode) {
-                TM_LOG_INFO("[DFlash] === DECODE MODE: Verifying draft tokens ===");
+                TM_LOG_INFO("[DFlash] === DECODE MODE: Verifying and generating draft tokens ===");
 
                 // 1. 检查是否有已存储的 draft tokens 需要验证
                 Tensor* stored_draft_ptr = args.try_("dflash_stored_draft_tokens");
@@ -417,31 +424,34 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
                     Tensor stored_draft = *stored_draft_ptr;
                     TM_LOG_INFO("[DFlash] Found stored draft tokens: count={}", stored_draft.shape(0));
 
-                    // 2. 获取目标 logits 进行验证
-                    Tensor* target_logits_ptr = args.try_("logits");
-                    if (target_logits_ptr) {
-                        Tensor target_logits = *target_logits_ptr;
-                        TM_LOG_INFO("[DFlash] Target logits shape: [{}]", target_logits.shape(0));
+                    // 2. 获取目标 logits 进行验证（在调用这里之前，logits 还未被生成）
+                    // 注意：在 Decoder Forward 结束时，logits 会被 produce 到 env 中
+                    // 所以我们不能在这里直接访问 logits
+                    // 正确的做法是在 Generation 阶段验证，但我们需要 draft model
+                    // 所以这里我们只是将 stored draft 传递给下一阶段
+                    // 但这需要将 draft model 也传递下去...
 
-                        // 3. 验证 draft tokens
-                        Tensor accepted, mask;
-                        dflash_draft_model_->VerifyDraft(stored_draft, target_logits, accepted, mask);
+                    // 简化方案：将 stored draft 存储起来，在 Generation 中进行验证
+                    // 但 Generation 无法访问 draft model...
 
-                        TM_LOG_INFO("[DFlash] VerifyDraft: accepted={} tokens", accepted.shape(0));
+                    // 最终方案：在 unified_decoder.cc 中，调用完 GenerateDraft 后，
+                    // 我们尝试从 logits 中验证 draft tokens
+                    // 但 logits 此时还不存在...
 
-                        // 4. 输出 accepted tokens 到 Generation
-                        args.produce("dflash_accepted_tokens", accepted);
-                        args.produce("dflash_accept_mask", mask);
-
-                        // 移除已使用的 draft tokens
-                        args.consume("dflash_stored_draft_tokens");
-                    } else {
-                        TM_LOG_WARNING("[DFlash] No target logits for verification, consuming stored drafts");
-                        args.consume("dflash_stored_draft_tokens");
-                    }
+                    // 实际上，我们需要在 Generation 阶段进行验证
+                    // 因为 logits 是在 Generation 阶段才被使用的
+                    // 所以我们先存储 draft tokens，让 Generation 使用
+                    args.produce("dflash_pending_draft_tokens", stored_draft);
+                    TM_LOG_INFO("[DFlash] Stored pending draft tokens for verification in Generation");
                 }
 
-                // 5. 生成新的 draft tokens 用于下次迭代
+                // 3. 生成新的 draft tokens 用于下次迭代
+                // 首先消费掉旧的 draft tokens（如果存在）
+                if (args.contains("dflash_stored_draft_tokens")) {
+                    args.try_consume("dflash_stored_draft_tokens");
+                    args.try_consume("dflash_stored_draft_logits");
+                }
+
                 Tensor draft_tokens, draft_logits;
                 TM_LOG_INFO("[DFlash] Generating new draft tokens for next iteration...");
                 dflash_draft_model_->GenerateDraft(aux_hidden_states_, draft_tokens, draft_logits);
@@ -457,6 +467,12 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
             else if (is_prefill) {
                 TM_LOG_INFO("[DFlash] === PREFILL MODE: Generating draft tokens ===");
 
+                // 首先消费掉旧的 draft tokens（如果存在）
+                if (args.contains("dflash_stored_draft_tokens")) {
+                    args.try_consume("dflash_stored_draft_tokens");
+                    args.try_consume("dflash_stored_draft_logits");
+                }
+
                 // 生成 draft tokens 并存储，供后续 decode 阶段使用
                 Tensor draft_tokens, draft_logits;
                 dflash_draft_model_->GenerateDraft(aux_hidden_states_, draft_tokens, draft_logits);
@@ -466,6 +482,7 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
                     // 存储到 args 中供后续使用
                     args.produce("dflash_stored_draft_tokens", draft_tokens);
                     args.produce("dflash_stored_draft_logits", draft_logits);
+                    TM_LOG_INFO("[DFlash] PREFILL: stored draft tokens in args, key exists={}", args.contains("dflash_stored_draft_tokens"));
                 }
             }
         } else {
