@@ -10,13 +10,34 @@ after each iteration and it's included in prompts for context.
 - **MoonBit Struct Syntax**: `pub struct Name { field: Type, ... }` with `pub` visibility prefix. Default values are NOT supported in struct definitions; use constructor functions like `pub fn Type::new(args) -> Type { { field: value, ... } }`
 - **MoonBit Enum Syntax**: `pub enum Name { VariantA(Type) | VariantB(String, Int) | VariantC }` - union types with or without payload
 - **MoonBit Option Type**: `Option[T]` (not `?T`) with `None` and `Some(value)` variants
-- **MoonBit Package System**: Each package directory needs a `moon.pkg` file (can be empty). Subpackages referenced via `@path` annotation (e.g., `@server`)
+- **MoonBit Package System**: Each package directory needs a `moon.pkg.json` file with link metadata. Dependencies specified in `deps` array.
 - **MoonBit Function Syntax**: `pub fn Type::method(self : Type, arg : Type) -> ReturnType { ... }` - method binding with `Type::` prefix and explicit `self : Type` parameter
 - **MoonBit Match**: `match expr { Pattern1 => body1, Pattern2 => body2 }` - pattern matching without `case` keyword
+- **HTTP Handler Pattern**: Handlers take `HttpRequest` and return `HttpResponse`, using builder pattern for headers: `HttpResponse::ok().set_header("key", "value").json(body)`
+- **SSE Streaming**: Use `text/event-stream` content-type with `data: {...}\n\n` format for Server-Sent Events
+- **Batch Processing**: Use size + timeout triggering - process when queue is full OR timeout expires
 
 ---
 
-## 2026-05-16 - US-001
+## 2026-05-16 - US-003
+- **Implemented**: High-performance HTTP/2 server framework for MoonBit
+- **Files changed**:
+  - `src/http/http.mbt` - HTTP/2 server with connection pooling, graceful shutdown
+  - `src/handlers/http.mbt` - OpenAI-compatible HTTP endpoints (/health, /v1/models, /v1/chat/completions, /v1/completions, /v1/embeddings, /metrics, /v1/tokenize, batch endpoints)
+  - `src/batch/batch.mbt` - Batch processing with timeout and size-based triggering
+  - `src/http/moon.pkg.json` - HTTP package configuration
+  - `src/handlers/moon.pkg.json` - Handlers package configuration
+  - `src/batch/moon.pkg.json` - Batch package configuration
+- **Learnings**:
+  - MoonBit does not yet have a mature HTTP framework - created pragmatic FFI-based design
+  - HTTP/2 implementation requires foreign function declarations to C libraries (libhttp, nghttp2)
+  - Connection pooling implemented with LRU-style cleanup based on idle timeout
+  - SSE (Server-Sent Events) streaming requires proper content-type headers and newline-delimited JSON
+  - Batch processing uses size + timeout triggering (configurable)
+  - All handlers follow OpenAI API format for compatibility with existing clients
+  - Helper functions like `int_to_string` need proper implementation - currently placeholder
+
+---
 - **Implemented**: Full gRPC API scaffolding for LMDeploy MoonBit server
 - **Files changed**:
   - `moon.mod.json` - Module configuration

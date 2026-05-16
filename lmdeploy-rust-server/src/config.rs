@@ -32,6 +32,13 @@ pub struct ServerConfig {
     pub connection_timeout_secs: u64,
     #[serde(default = "default_request_timeout")]
     pub request_timeout_secs: u64,
+    // Streaming settings
+    #[serde(default = "default_stream_timeout")]
+    pub stream_timeout_secs: u64,
+    #[serde(default = "default_stream_keepalive")]
+    pub stream_keepalive_interval_ms: u64,
+    #[serde(default = "default_stream_chunk_size")]
+    pub stream_max_chunk_tokens: usize,
     // Batching settings
     #[serde(default = "default_batch_enabled")]
     pub batch_enabled: bool,
@@ -50,6 +57,9 @@ fn default_http2_keepalive_timeout() -> u64 { 10 }
 fn default_max_connections() -> usize { 10000 }
 fn default_connection_timeout() -> u64 { 30 }
 fn default_request_timeout() -> u64 { 300 }
+fn default_stream_timeout() -> u64 { 600 }
+fn default_stream_keepalive() -> u64 { 30000 }
+fn default_stream_chunk_size() -> usize { 8 }
 fn default_batch_enabled() -> bool { true }
 fn default_batch_size() -> usize { 8 }
 fn default_batch_timeout() -> u64 { 50 }
@@ -90,6 +100,9 @@ impl Default for AppConfig {
                 max_connections: 10000,
                 connection_timeout_secs: 30,
                 request_timeout_secs: 300,
+                stream_timeout_secs: 600,
+                stream_keepalive_interval_ms: 30000,
+                stream_max_chunk_tokens: 8,
                 batch_enabled: true,
                 batch_size: 8,
                 batch_timeout_ms: 50,

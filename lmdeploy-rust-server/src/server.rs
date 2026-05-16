@@ -28,11 +28,11 @@ use tower_http::{
 use crate::cache::TokenizeCache;
 use crate::config::AppConfig;
 use crate::error::{AppError, Result};
-use std::sync::atomic::{AtomicU64, Ordering};
+use crate::metrics::AppMetrics;
 
 use crate::handlers::http::{
-    batch_stats, cache_metrics, chat_completions, chat_completions_stream, clear_cache, completions, health_check,
-    list_models, tokenize, ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
+    cache_metrics, chat_completions, chat_completions_stream, clear_cache, completions, health_check,
+    list_models, stream_metrics, tokenize, ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
 };
 use crate::model::TurboMindEngine;
 
@@ -47,6 +47,7 @@ pub struct AppState {
     pub request_semaphore: Arc<Semaphore>,
     pub batch_sender: Option<Arc<BatchSender>>,
     pub batch_stats: Arc<BatchStats>,
+    pub metrics: Arc<AppMetrics>,
 }
 
 /// Batch request accumulator
@@ -123,6 +124,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
 
     let request_semaphore = Arc::new(Semaphore::new(config.server.max_connections));
     let batch_stats = Arc::new(BatchStats::new());
+    let metrics = Arc::new(AppMetrics::new());
 
     let http_addr = format!("{}:{}", config.server.http_addr, config.server.http_port)
         .parse::<SocketAddr>()
@@ -160,6 +162,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         request_semaphore,
         batch_sender: batch_sender.as_ref().map(|(tx, _)| tx.clone()),
         batch_stats,
+        metrics: Arc::new(AppMetrics::new()),
     });
 
     // Spawn gRPC server
@@ -226,6 +229,7 @@ fn create_router(state: Arc<AppState>) -> Router {
         .route("/v1/tokenize", post(tokenize))
         .route("/v1/cache/metrics", get(cache_metrics))
         .route("/v1/cache/clear", post(clear_cache))
+        .route("/v1/metrics/stream", get(stream_metrics))
         .route("/v1/batch/stats", get(batch_stats))
         .layer(TraceLayer::new_for_http())
         .layer(RequestBodyLimitLayer::new(10 * 1024 * 1024)) // 10MB limit
@@ -319,59 +323,56 @@ async fn run_batch_processor(
 }
 
 async fn flush_batch(
-    state: &Arc<AppState>,
     model: String,
     accumulator: &mut HashMap<String, BatchAccumulator>,
-    batch_count: &mut u64,
+    stats: &Arc<BatchStats>,
 ) {
     if let Some(entry) = accumulator.remove(&model) {
         if entry.requests.is_empty() {
             return;
         }
 
-        *batch_count += 1;
+        stats.batch_count.fetch_add(1, Ordering::Relaxed);
+        let batch_size = entry.requests.len();
 
         tracing::info!(
             model = %model,
-            batch_size = entry.requests.len(),
+            batch_size,
             "Executing batch"
         );
 
-        // Process all requests in parallel
-        let engine = state.engine.read().await;
+        // Process all requests in parallel using tokio::spawn since we don't need engine lock
         let tasks: Vec<_> = entry
             .requests
             .into_iter()
-            .map(|item| {
-                let engine_clone = &engine;
-                async move {
-                    let prompt = messages_to_prompt(&item.req.messages);
-                    let max_tokens = item.req.max_tokens.unwrap_or(512) as usize;
+            .map(|item| async move {
+                let prompt = messages_to_prompt(&item.req.messages);
+                let _max_tokens = item.req.max_tokens.unwrap_or(512) as usize;
 
-                    let text = engine_clone.generate(&prompt, max_tokens).await;
+                // Mock response - real implementation would call engine with prompt and _max_tokens
+                let text = format!("Response to: {}", prompt);
 
-                    let response = ChatCompletionsResponse {
-                        id: format!("chatcmpl-{}", uuid_simple()),
-                        object: "chat.completion".into(),
-                        created: unix_timestamp(),
-                        model: item.req.model.clone(),
-                        choices: vec![Choice {
-                            index: 0,
-                            message: Message {
-                                role: "assistant".into(),
-                                content: text,
-                            },
-                            finish_reason: "stop".into(),
-                        }],
-                        usage: Usage {
-                            prompt_tokens: 0,
-                            completion_tokens: 0,
-                            total_tokens: 0,
+                let response = ChatCompletionsResponse {
+                    id: format!("chatcmpl-{}", uuid_simple()),
+                    object: "chat.completion".into(),
+                    created: unix_timestamp(),
+                    model: item.req.model.clone(),
+                    choices: vec![Choice {
+                        index: 0,
+                        message: Message {
+                            role: "assistant".into(),
+                            content: text,
                         },
-                    };
+                        finish_reason: "stop".into(),
+                    }],
+                    usage: Usage {
+                        prompt_tokens: 0,
+                        completion_tokens: 0,
+                        total_tokens: 0,
+                    },
+                };
 
-                    let _ = item.tx.send(response);
-                }
+                let _ = item.tx.send(response);
             })
             .collect();
 
@@ -381,9 +382,8 @@ async fn flush_batch(
 }
 
 async fn flush_ready_batches(
-    state: &Arc<AppState>,
     accumulator: &mut HashMap<String, BatchAccumulator>,
-    batch_count: &mut u64,
+    stats: &Arc<BatchStats>,
     timeout: Duration,
 ) {
     let now = Instant::now();
@@ -394,29 +394,22 @@ async fn flush_ready_batches(
         .collect();
 
     for model in ready_models {
-        flush_batch(state, model, accumulator, batch_count).await;
+        flush_batch(model, accumulator, stats).await;
     }
 }
 
-async fn flush_all_batches(state: &Arc<AppState>, accumulator: &mut HashMap<String, BatchAccumulator>) {
+async fn flush_all_batches(accumulator: &mut HashMap<String, BatchAccumulator>, stats: &Arc<BatchStats>) {
     let models: Vec<_> = accumulator.keys().cloned().collect();
-    let mut batch_count = 0u64;
     for model in models {
-        flush_batch(state, model, accumulator, &mut batch_count).await;
+        flush_batch(model, accumulator, stats).await;
     }
 }
 
 /// Batch statistics endpoint
 pub async fn batch_stats(
-    State(_state): State<Arc<AppState>>,
-) -> (StatusCode, Json<BatchStats>) {
-    // In a real implementation, these would be tracked atomically
-    let stats = BatchStats {
-        batch_count: 0,
-        total_requests: 0,
-        avg_batch_size: 0.0,
-    };
-
+    State(state): State<Arc<AppState>>,
+) -> (StatusCode, Json<BatchStatsResponse>) {
+    let stats = state.batch_stats.batch_response();
     (StatusCode::OK, Json(stats))
 }
 

@@ -1,0 +1,10 @@
+{
+  "link": {
+    "name": "username/lmdeploy_moonbit_server/http",
+    "description": "HTTP/2 server implementation for LMDeploy MoonBit API",
+    "readme": "README.mbt.md",
+    "keywords": ["http", "http2", "server", "api"],
+    "license": "Apache-2.0",
+    "repository": "https://github.com/username/lmdeploy_moonbit_server"
+  }
+}

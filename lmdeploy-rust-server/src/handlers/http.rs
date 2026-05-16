@@ -6,12 +6,17 @@ use axum::{
 };
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use tokio::sync::oneshot;
 
 use crate::cache::compute_hash;
-use crate::server::AppState;
+use crate::metrics::StreamMetricsSnapshot;
+use crate::server::{AppState, BatchItem, BatchStatsResponse};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ChatCompletionsRequest {
     pub model: String,
     pub messages: Vec<Message>,
@@ -26,13 +31,13 @@ pub struct ChatCompletionsRequest {
     pub user: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Message {
     pub role: String,
     pub content: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct ChatCompletionsResponse {
     pub id: String,
     pub object: String,
@@ -42,14 +47,14 @@ pub struct ChatCompletionsResponse {
     pub usage: Usage,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Choice {
     pub index: i32,
     pub message: Message,
     pub finish_reason: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Usage {
     pub prompt_tokens: i32,
     pub completion_tokens: i32,
@@ -89,14 +94,65 @@ pub async fn chat_completions(
 
     tracing::info!(model = %model, prompt_len = prompt.len(), "Chat completions request");
 
+    // Use batch processor if enabled and not streaming
+    let response = if let Some(batch_tx) = &state.batch_sender {
+        // Batch mode: send to batch processor and wait for response
+        let (tx, rx) = oneshot::channel();
+        let batch_item = BatchItem {
+            req: req.clone(),
+            tx,
+        };
+
+        if batch_tx.send(batch_item).is_ok() {
+            match rx.await {
+                Ok(resp) => resp,
+                Err(_) => ChatCompletionsResponse {
+                    id: format!("chatcmpl-{}", uuid_simple()),
+                    object: "chat.completion".into(),
+                    created: unix_timestamp(),
+                    model,
+                    choices: vec![Choice {
+                        index: 0,
+                        message: Message {
+                            role: "assistant".into(),
+                            content: "Batch processor error".into(),
+                        },
+                        finish_reason: "error".into(),
+                    }],
+                    usage: Usage {
+                        prompt_tokens: 0,
+                        completion_tokens: 0,
+                        total_tokens: 0,
+                    },
+                },
+            }
+        } else {
+            // Batch channel closed, fallback to direct mode
+            fallback_chat_completion(&state, &req, &model).await
+        }
+    } else {
+        // Direct mode: process immediately
+        fallback_chat_completion(&state, &req, &model).await
+    };
+
+    tracing::info!(latency_ms = start.elapsed().as_millis(), "Chat completions done");
+    (StatusCode::OK, Json(response))
+}
+
+async fn fallback_chat_completion(
+    state: &Arc<AppState>,
+    req: &ChatCompletionsRequest,
+    model: &str,
+) -> ChatCompletionsResponse {
+    let prompt = messages_to_prompt(&req.messages);
     let engine = state.engine.read().await;
     let text = engine.generate(&prompt, req.max_tokens.unwrap_or(512) as usize).await;
 
-    let response = ChatCompletionsResponse {
+    ChatCompletionsResponse {
         id: format!("chatcmpl-{}", uuid_simple()),
         object: "chat.completion".into(),
         created: unix_timestamp(),
-        model,
+        model: model.to_string(),
         choices: vec![Choice {
             index: 0,
             message: Message {
@@ -106,14 +162,11 @@ pub async fn chat_completions(
             finish_reason: "stop".into(),
         }],
         usage: Usage {
-            prompt_tokens: 0, // placeholder
+            prompt_tokens: 0,
             completion_tokens: 0,
             total_tokens: 0,
         },
-    };
-
-    tracing::info!(latency_ms = start.elapsed().as_millis(), "Chat completions done");
-    (StatusCode::OK, Json(response))
+    }
 }
 
 pub async fn chat_completions_stream(
@@ -123,8 +176,12 @@ pub async fn chat_completions_stream(
     let model = req.model.clone();
     let id = format!("chatcmpl-{}", uuid_simple());
     let created = unix_timestamp();
+    let stream_timeout_ms = state.config.server.stream_keepalive_interval_ms;
+    let metrics = state.metrics.clone();
 
     tracing::info!(model = %model, "Chat completions stream request");
+
+    metrics.streams.record_stream_start(0);
 
     let prompt = messages_to_prompt(&req.messages);
     let engine = state.engine.read().await;
@@ -134,8 +191,16 @@ pub async fn chat_completions_stream(
     let stream_model = model.clone();
     let final_id = id.clone();
     let final_model = model.clone();
+    let first_token_start = Instant::now();
+    let metrics_inner = metrics.clone();
 
     let stream = chunks.map(move |chunk_text| {
+        // Record first token latency on first chunk
+        if first_token_start.elapsed().as_millis() > 0 {
+            metrics_inner.streams.record_stream_start(first_token_start.elapsed().as_micros() as u64);
+        }
+        metrics_inner.streams.record_chunk();
+
         let chunk = ChatCompletionChunk {
             id: stream_id.clone(),
             object: "chat.completion.chunk".into(),
@@ -174,7 +239,7 @@ pub async fn chat_completions_stream(
             .data(json))
     }));
 
-    Sse::new(stream)
+    Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_millis(stream_timeout_ms)))
 }
 
 #[derive(Debug, Deserialize)]
@@ -209,15 +274,91 @@ pub async fn completions(
     Json(req): Json<CompletionsRequest>,
 ) -> (StatusCode, Json<CompletionsResponse>) {
     let model = req.model.clone();
-    let engine = state.engine.read().await;
+    let start = std::time::Instant::now();
 
+    let response = if let Some(batch_tx) = &state.batch_sender {
+        // Batch mode: send to batch processor and wait for response
+        let (tx, rx) = oneshot::channel();
+        let batch_item = BatchItem {
+            req: ChatCompletionsRequest {
+                model: req.model.clone(),
+                messages: vec![Message {
+                    role: "user".into(),
+                    content: req.prompt.clone(),
+                }],
+                temperature: req.temperature,
+                top_p: None,
+                max_tokens: req.max_tokens,
+                stream: req.stream,
+                stop: None,
+                seed: None,
+                presence_penalty: None,
+                frequency_penalty: None,
+                user: None,
+            },
+            tx,
+        };
+
+        if batch_tx.send(batch_item).is_ok() {
+            match rx.await {
+                Ok(chat_resp) => {
+                    // Convert ChatCompletionsResponse to CompletionsResponse
+                    CompletionsResponse {
+                        id: chat_resp.id,
+                        object: "text_completion".into(),
+                        created: chat_resp.created,
+                        model: chat_resp.model,
+                        choices: chat_resp.choices.iter().map(|c| CompletionChoice {
+                            text: c.message.content.clone(),
+                            index: c.index,
+                            finish_reason: c.finish_reason.clone(),
+                        }).collect(),
+                        usage: chat_resp.usage,
+                    }
+                }
+                Err(_) => CompletionsResponse {
+                    id: format!("cmpl-{}", uuid_simple()),
+                    object: "text_completion".into(),
+                    created: unix_timestamp(),
+                    model,
+                    choices: vec![CompletionChoice {
+                        text: "Batch processor error".into(),
+                        index: 0,
+                        finish_reason: "error".into(),
+                    }],
+                    usage: Usage {
+                        prompt_tokens: 0,
+                        completion_tokens: 0,
+                        total_tokens: 0,
+                    },
+                },
+            }
+        } else {
+            // Batch channel closed, fallback to direct mode
+            fallback_completions(&state, &req, &model).await
+        }
+    } else {
+        // Direct mode: process immediately
+        fallback_completions(&state, &req, &model).await
+    };
+
+    tracing::info!(latency_ms = start.elapsed().as_millis(), "Completions done");
+    (StatusCode::OK, Json(response))
+}
+
+async fn fallback_completions(
+    state: &Arc<AppState>,
+    req: &CompletionsRequest,
+    model: &str,
+) -> CompletionsResponse {
+    let engine = state.engine.read().await;
     let text = engine.generate(&req.prompt, req.max_tokens.unwrap_or(512) as usize).await;
 
-    let response = CompletionsResponse {
+    CompletionsResponse {
         id: format!("cmpl-{}", uuid_simple()),
         object: "text_completion".into(),
         created: unix_timestamp(),
-        model,
+        model: model.to_string(),
         choices: vec![CompletionChoice {
             text,
             index: 0,
@@ -228,9 +369,7 @@ pub async fn completions(
             completion_tokens: 0,
             total_tokens: 0,
         },
-    };
-
-    (StatusCode::OK, Json(response))
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -379,6 +518,33 @@ pub async fn clear_cache(
             message: "Cache cleared successfully".into(),
         }),
     )
+}
+
+/// Batch statistics endpoint
+pub async fn batch_stats(
+    State(state): State<Arc<AppState>>,
+) -> (StatusCode, Json<BatchStatsResponse>) {
+    let stats = state.batch_stats.batch_response();
+    tracing::debug!(
+        batch_count = stats.batch_count,
+        total_requests = stats.total_requests,
+        avg_batch_size = stats.avg_batch_size,
+        "Batch stats requested"
+    );
+    (StatusCode::OK, Json(stats))
+}
+
+/// Stream metrics endpoint
+pub async fn stream_metrics(
+    State(state): State<Arc<AppState>>,
+) -> (StatusCode, Json<StreamMetricsSnapshot>) {
+    let metrics = state.metrics.streams.snapshot();
+    tracing::debug!(
+        total_streams = metrics.total_streams,
+        avg_first_token_latency_ms = metrics.avg_first_token_latency_ms,
+        "Stream metrics requested"
+    );
+    (StatusCode::OK, Json(metrics))
 }
 
 fn messages_to_prompt(messages: &[Message]) -> String {

@@ -3,8 +3,8 @@
   "sessionId": "0cae1ce2-0be0-4b21-8881-47993a0597bb",
   "status": "running",
   "startedAt": "2026-05-16T12:35:48.724Z",
-  "updatedAt": "2026-05-16T13:25:57.092Z",
-  "currentIteration": 3,
+  "updatedAt": "2026-05-16T13:47:31.584Z",
+  "currentIteration": 4,
   "maxIterations": 50,
   "tasksCompleted": 3,
   "isPaused": false,
@@ -44,12 +44,23 @@
       "durationMs": 480181,
       "startedAt": "2026-05-16T13:17:47.309Z",
       "endedAt": "2026-05-16T13:25:47.490Z"
+    },
+    {
+      "iteration": 4,
+      "status": "failed",
+      "taskId": "US-004",
+      "taskTitle": "批量推理支持",
+      "taskCompleted": false,
+      "durationMs": 1293419,
+      "startedAt": "2026-05-16T13:25:57.086Z",
+      "endedAt": "2026-05-16T13:47:30.505Z"
     }
   ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
   "activeTaskIds": [
-    "US-004"
+    "US-004",
+    "US-005"
   ],
   "subagentPanelVisible": false
 }
