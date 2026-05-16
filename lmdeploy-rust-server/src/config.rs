@@ -127,7 +127,7 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
-    pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn load() -> Result<Self, config::ConfigError> {
         let mut builder = Config::builder()
             .add_source(File::with_name(DEFAULT_CONFIG_PATH).required(false))
             .add_source(Environment::with_prefix("LMDEPLOY").separator("_"));

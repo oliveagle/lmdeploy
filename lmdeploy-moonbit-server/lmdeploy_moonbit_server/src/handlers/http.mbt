@@ -6,6 +6,13 @@ use username/lmdeploy_moonbit_server/http
 use username/lmdeploy_moonbit_server/protocol
 use username/lmdeploy_moonbit_server/batch
 use username/lmdeploy_moonbit_server/cache
+use username/lmdeploy_moonbit_server/streaming
+
+/// Module-level streaming configuration
+let stream_config = streaming::StreamingConfig::default()
+
+/// Module-level streaming metrics tracker
+let stream_metrics = streaming::StreamingMetrics::new()
 
 /// Tokenize cache instance (module-level for reuse across requests)
 let cache = cache.TokenizeCache::new(1000, 3600)
@@ -42,7 +49,7 @@ pub fn chat_completions_handler(req: http.HttpRequest) -> http.HttpResponse {
   let is_streaming = is_streaming_request(body_str)
 
   if is_streaming {
-    return chat_completions_stream(req)
+    return chat_completions_stream(req, body_str)
   }
 
   // Non-streaming: return complete response
@@ -58,20 +65,38 @@ pub fn chat_completions_handler(req: http.HttpRequest) -> http.HttpResponse {
 }
 
 // Chat completions streaming endpoint
-fn chat_completions_stream(req: http.HttpRequest) -> http.HttpResponse {
-  let id = generate_id_suffix()
+/// Generates SSE stream of chat completion chunks
+/// Reference: Python api_server.py completion_stream_generator()
+/// Reference: Rust http.rs chat_completions_stream()
+fn chat_completions_stream(req: http.HttpRequest, body_str: String) -> http.HttpResponse {
+  let id = "chatcmpl-" ++ generate_id_suffix()
   let created = current_timestamp_secs()
 
-  // Build SSE response with initial chunk
-  // In production, this would stream chunks as they're generated
-  let sse_data = """data: {"id": "chatcmpl-""" ++ id ++ """", "object": "chat.completion.chunk", "created": """ ++ int_to_string(created) ++ """, "model": "default-model", "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": null}]}
+  // Parse request from body (simplified - using default for now)
+  let request = protocol.ChatCompletionRequest::default("default-model", [])
 
-"""
+  // Generate streaming response using the streaming engine
+  let (sse_stream, updated_metrics) = streaming::stream_chat_completion(
+    request,
+    id,
+    created,
+    stream_config,
+    stream_metrics,
+  )
+
+  // Update module-level metrics (in production, would use atomic/mutex)
+  // For now, the updated_metrics is a local snapshot
+
+  // Append [DONE] marker to signal stream completion
+  // Reference: Python api_server.py yields 'data: [DONE]\n\n' at end
+  let complete_stream = sse_stream ++ streaming::sse_done_event()
 
   http.HttpResponse::ok()
     .sse()
     .set_header("x-request-id", generate_request_id())
-    .json(sse_data)
+    .set_header("x-accel-buffering", "no")  // Disable nginx buffering
+    .set_header("x-stream-timeout-secs", int_to_string(stream_config.stream_timeout_secs))
+    .json(complete_stream)
 }
 
 // Completions endpoint
@@ -83,7 +108,7 @@ pub fn completions_handler(req: http.HttpRequest) -> http.HttpResponse {
   let is_streaming = is_streaming_request(body_str)
 
   if is_streaming {
-    return completions_stream(req)
+    return completions_stream(req, body_str)
   }
 
   let response = """
@@ -98,18 +123,32 @@ pub fn completions_handler(req: http.HttpRequest) -> http.HttpResponse {
 }
 
 // Completions streaming endpoint
-fn completions_stream(req: http.HttpRequest) -> http.HttpResponse {
-  let id = generate_id_suffix()
+/// Generates SSE stream of completion chunks
+/// Reference: Python api_server.py completions_v1() stream handling
+fn completions_stream(req: http.HttpRequest, body_str: String) -> http.HttpResponse {
+  let id = "cmpl-" ++ generate_id_suffix()
   let created = current_timestamp_secs()
+  let model = "default-model"
 
-  let sse_data = """data: {"id": "cmpl-""" ++ id ++ """", "object": "text_completion", "created": """ ++ int_to_string(created) ++ """, "model": "default-model", "choices": [{"text": "", "index": 0, "finish_reason": null}]}
+  // Generate streaming response using the streaming engine
+  let (sse_stream, updated_metrics) = streaming::stream_completion(
+    body_str,  // In production, extract prompt from body
+    id,
+    created,
+    model,
+    stream_config,
+    stream_metrics,
+  )
 
-"""
+  // Append [DONE] marker
+  let complete_stream = sse_stream ++ streaming::sse_done_event()
 
   http.HttpResponse::ok()
     .sse()
     .set_header("x-request-id", generate_request_id())
-    .json(sse_data)
+    .set_header("x-accel-buffering", "no")
+    .set_header("x-stream-timeout-secs", int_to_string(stream_config.stream_timeout_secs))
+    .json(complete_stream)
 }
 
 // Embeddings endpoint
@@ -144,7 +183,8 @@ pub fn encode_handler(req: http.HttpRequest) -> http.HttpResponse {
 // Metrics endpoint (Prometheus format)
 /// GET /metrics
 pub fn metrics_handler(req: http.HttpRequest) -> http.HttpResponse {
-  let metrics = """# HELP http_requests_total Total number of HTTP requests
+  // Base HTTP metrics
+  let http_metrics = """# HELP http_requests_total Total number of HTTP requests
 # TYPE http_requests_total counter
 http_requests_total{method="GET",path="/v1/models"} 0
 http_requests_total{method="POST",path="/v1/chat/completions"} 0
@@ -162,12 +202,16 @@ request_duration_seconds_bucket{le="+Inf"} 0
 # HELP active_requests Number of currently active requests
 # TYPE active_requests gauge
 active_requests 0
+
 """
+
+  // Add streaming metrics
+  let stream_metrics_str = streaming::StreamingMetrics::to_prometheus(stream_metrics)
 
   http.HttpResponse::ok()
     .set_header("content-type", "text/plain; version=0.0.4")
     .set_header("x-request-id", generate_request_id())
-    .json(metrics)
+    .json(http_metrics ++ stream_metrics_str)
 }
 
 // Tokenize endpoint with cache

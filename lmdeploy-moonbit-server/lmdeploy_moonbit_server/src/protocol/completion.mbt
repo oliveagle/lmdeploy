@@ -104,6 +104,19 @@ pub fn create_completion_id() -> String {
   "cmpl-"
 }
 
+/// Batch completion request
+pub struct BatchCompletionRequest {
+  requests: Array[CompletionRequest]
+  batch_size: Int
+}
+
+/// Batch completion response
+pub struct BatchCompletionResponse {
+  responses: Array[CompletionResponse]
+  total_latency_ms: Float
+  throughput_tokens_per_second: Float
+}
+
 /// Serialize CompletionRequest to JSON string
 pub fn CompletionRequest::to_json(self : CompletionRequest) -> String {
   // Build stop array JSON

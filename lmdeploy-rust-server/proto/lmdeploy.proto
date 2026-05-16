@@ -43,7 +43,7 @@ message GenerateRequest {
 // Generation response
 message GenerateResponse {
   string text = 1;
-  repeated int32 token_ids = 2;
+  repeated uint32 token_ids = 2;
   int32 prompt_tokens = 3;
   int32 completion_tokens = 4;
   float finish_reason = 5;  // 0: stop, 1: length, 2: error
@@ -89,7 +89,7 @@ message TokenizeRequest {
 
 // Tokenize response
 message TokenizeResponse {
-  repeated int32 token_ids = 1;
+  repeated uint32 token_ids = 1;
   repeated string tokens = 2;  // Optional: actual token strings
   int32 length = 3;
   string hash = 4;  // SHA-256 hash of input text (for cache key)

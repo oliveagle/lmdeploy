@@ -177,13 +177,12 @@ pub async fn chat_completions_stream(
     let id = format!("chatcmpl-{}", uuid_simple());
     let created = unix_timestamp();
     let config = state.config.read().await;
-    let stream_timeout_ms = config.server.stream_keepalive_interval_ms;
+    let _stream_timeout_ms = config.server.stream_timeout_secs * 1000;
+    let keepalive_interval_ms = config.server.stream_keepalive_interval_ms;
     drop(config);
     let metrics = state.metrics.clone();
 
     tracing::info!(model = %model, "Chat completions stream request");
-
-    metrics.streams.record_stream_start(0);
 
     let prompt = messages_to_prompt(&req.messages);
     let engine = state.engine.read().await;
@@ -196,11 +195,26 @@ pub async fn chat_completions_stream(
     let first_token_start = Instant::now();
     let metrics_inner = metrics.clone();
 
+    // Create stream with timeout handling
     let stream = chunks.map(move |chunk_text| {
-        // Record first token latency on first chunk
-        if first_token_start.elapsed().as_millis() > 0 {
-            metrics_inner.streams.record_stream_start(first_token_start.elapsed().as_micros() as u64);
+        // Record first token latency on first chunk (in milliseconds)
+        let latency_ms = first_token_start.elapsed().as_millis() as u64;
+        metrics_inner.streams.record_stream_start(latency_ms);
+
+        tracing::debug!(
+            first_token_latency_ms = latency_ms,
+            "First token latency"
+        );
+
+        // Log warning if latency exceeds threshold
+        if latency_ms > 50 {
+            tracing::warn!(
+                first_token_latency_ms = latency_ms,
+                threshold_ms = 50,
+                "First token latency exceeds threshold"
+            );
         }
+
         metrics_inner.streams.record_chunk();
 
         let chunk = ChatCompletionChunk {
@@ -241,7 +255,12 @@ pub async fn chat_completions_stream(
             .data(json))
     }));
 
-    Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_millis(stream_timeout_ms)))
+    // Apply keep-alive and return SSE response
+    Sse::new(stream)
+        .keep_alive(
+            axum::response::sse::KeepAlive::new()
+                .interval(Duration::from_millis(keepalive_interval_ms))
+        )
 }
 
 #[derive(Debug, Deserialize)]

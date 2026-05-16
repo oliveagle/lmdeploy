@@ -1,6 +1,6 @@
 use axum::{
     extract::State,
-    http::Method,
+    http::{Method, StatusCode},
     routing::{get, post},
     Json, Router,
 };
@@ -167,7 +167,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         request_semaphore,
         batch_sender: batch_sender.as_ref().map(|(tx, _)| tx.clone()),
         batch_stats,
-        metrics: Arc::new(AppMetrics::new()),
+        metrics: metrics.clone(),
         config_reload_tx: config_reload_tx.clone(),
     });
 
@@ -185,7 +185,6 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
                     );
 
                     // Update log level if changed
-                    let new_filter = tracing_subscriber::EnvFilter::new(&new_config.logging.level);
                     // Note: Can't re-init subscriber, just log the change
                     tracing::debug!("Log level changed to: {}", new_config.logging.level);
                 }
@@ -320,16 +319,16 @@ async fn shutdown_signal() {
 /// Trigger configuration reload (called by POST /v1/config/reload)
 pub async fn reload_config(
     State(state): State<Arc<AppState>>,
-) -> Result<Json<serde_json::Value>> {
+) -> (StatusCode, Json<serde_json::Value>) {
     tracing::info!("Configuration reload requested");
-    state
-        .config_reload_tx
-        .send(())
-        .await
-        .map_err(|e| AppError::Config(format!("Failed to send reload signal: {}", e)))?;
-    Ok(Json(serde_json::json!({
-        "status": "config_reload_triggered"
-    })))
+    match state.config_reload_tx.send(()).await {
+        Ok(_) => (StatusCode::OK, Json(serde_json::json!({
+            "status": "config_reload_triggered"
+        }))),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
+            "status": "config_reload_failed"
+        }))),
+    }
 }
 
 /// Get current configuration (called by GET /v1/config)

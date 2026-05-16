@@ -3,6 +3,7 @@
 //! Provides Prometheus-compatible metrics for monitoring request latency,
 //! throughput, cache hit rates, and streaming performance.
 
+use serde::Serialize;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Streaming metrics for tracking first token latency and chunk delivery
@@ -76,7 +77,7 @@ impl Default for StreamMetrics {
 }
 
 /// Snapshot of streaming metrics at a point in time
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StreamMetricsSnapshot {
     pub total_streams: u64,
     pub avg_first_token_latency_ms: f64,

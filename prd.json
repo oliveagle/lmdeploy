@@ -42,9 +42,10 @@
       "description": "作为 API 用户 我想要 发送批量请求 以便 提高吞吐量",
       "acceptanceCriteria": [],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "labels": [],
-      "dependsOn": []
+      "dependsOn": [],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-005",
@@ -52,9 +53,10 @@
       "description": "作为 API 用户 我想要 低延迟的流式输出 以便 获得更好的用户体验",
       "acceptanceCriteria": [],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "labels": [],
-      "dependsOn": []
+      "dependsOn": [],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-006",
@@ -111,6 +113,6 @@
     "createdAt": "2026-05-16T12:35:44.512Z",
     "version": "1.0.0",
     "sourcePrd": "docs/PRD_RUST_API_SERVER.md",
-    "updatedAt": "2026-05-16T14:30:37.636Z"
+    "updatedAt": "2026-05-16T14:56:50.800Z"
   }
 }

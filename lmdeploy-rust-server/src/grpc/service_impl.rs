@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
@@ -58,9 +59,25 @@ impl LmDeployService for LmDeployServiceImpl {
 
         let words: Vec<String> = req.prompt.split_whitespace().map(String::from).collect();
         let (tx, rx) = tokio::sync::mpsc::channel(1024);
+        let timeout_secs = 600u64; // Default stream timeout (matches config default)
 
         tokio::spawn(async move {
+            let mut first_token_recorded = false;
+            let first_token_start = Instant::now();
+            let timeout_duration = std::time::Duration::from_secs(timeout_secs);
+
             for word in words {
+                if first_token_start.elapsed() > timeout_duration {
+                    tracing::warn!("gRPC stream timeout after {}s", timeout_secs);
+                    break;
+                }
+
+                let latency_ms = first_token_start.elapsed().as_millis() as u64;
+                if !first_token_recorded {
+                    tracing::info!(first_token_latency_ms = latency_ms, "First token latency recorded (gRPC stream)");
+                    first_token_recorded = true;
+                }
+
                 let chunk = GenerateStreamResponse {
                     payload: Some(generate_stream_response::Payload::Chunk(StreamChunk {
                         text: word.clone(),
@@ -93,7 +110,7 @@ impl LmDeployService for LmDeployServiceImpl {
 
     type GenerateBidirectionalStream = ReceiverStream<Result<GenerateStreamResponse, Status>>;
 
-    async fn generate_bidirectional(
+        async fn generate_bidirectional(
         &self,
         request: Request<Streaming<GenerateRequest>>,
     ) -> Result<Response<Self::GenerateBidirectionalStream>, Status> {
@@ -102,58 +119,81 @@ impl LmDeployService for LmDeployServiceImpl {
         tracing::info!("gRPC GenerateBidirectional request");
 
         let (tx, rx) = tokio::sync::mpsc::channel(1024);
+        let timeout_secs = 600u64; // Default stream timeout (matches config default)
+        let timeout_duration = std::time::Duration::from_secs(timeout_secs);
 
         tokio::spawn(async move {
-            while let Some(request_result) = stream.next().await {
-                match request_result {
-                    Ok(req) => {
-                        tracing::info!(
-                            prompt_len = req.prompt.len(),
-                            "Bidirectional stream request"
-                        );
+            let mut last_activity = Instant::now();
+            let mut stream_ended = false;
 
-                        let words: Vec<String> =
-                            req.prompt.split_whitespace().map(String::from).collect();
+            while !stream_ended && last_activity.elapsed() < timeout_duration {
+                tokio::select! {
+                    biased;
 
-                        for word in words {
-                            let chunk = GenerateStreamResponse {
-                                payload: Some(
-                                    generate_stream_response::Payload::Chunk(StreamChunk {
-                                        text: word.clone(),
-                                        token_id: 0,
-                                        is_final: false,
-                                    }),
-                                ),
-                            };
-
-                            if tx.send(Ok(chunk)).await.is_err() {
-                                tracing::info!("Client disconnected, stopping stream");
-                                return;
-                            }
-
-                            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                        }
-
-                        let final_chunk = GenerateStreamResponse {
-                            payload: Some(
-                                generate_stream_response::Payload::Chunk(StreamChunk {
-                                    text: "[END]".to_string(),
-                                    token_id: 0,
-                                    is_final: true,
-                                }),
-                            ),
-                        };
-
-                        if tx.send(Ok(final_chunk)).await.is_err() {
+                    _ = tokio::time::sleep(timeout_duration.saturating_sub(last_activity.elapsed())) => {
+                        if last_activity.elapsed() >= timeout_duration {
+                            tracing::warn!("gRPC bidirectional stream timeout after {}s of inactivity", timeout_secs);
                             break;
                         }
                     }
-                    Err(e) => {
-                        tracing::error!("Error in bidirectional stream: {:?}", e);
-                        let _ = tx
-                            .send(Err(Status::invalid_argument(format!("Invalid request: {}", e))))
-                            .await;
-                        break;
+                    request_result = stream.next() => {
+                        match request_result {
+                            Some(Ok(req)) => {
+                                last_activity = Instant::now();
+
+                                tracing::info!(
+                                    prompt_len = req.prompt.len(),
+                                    "Bidirectional stream request"
+                                );
+
+                                let words: Vec<String> =
+                                    req.prompt.split_whitespace().map(String::from).collect();
+
+                                for word in words {
+                                    let chunk = GenerateStreamResponse {
+                                        payload: Some(
+                                            generate_stream_response::Payload::Chunk(StreamChunk {
+                                                text: word.clone(),
+                                                token_id: 0,
+                                                is_final: false,
+                                            }),
+                                        ),
+                                    };
+
+                                    if tx.send(Ok(chunk)).await.is_err() {
+                                        tracing::info!("Client disconnected, stopping stream");
+                                        return;
+                                    }
+
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                                }
+
+                                let final_chunk = GenerateStreamResponse {
+                                    payload: Some(
+                                        generate_stream_response::Payload::Chunk(StreamChunk {
+                                            text: "[END]".to_string(),
+                                            token_id: 0,
+                                            is_final: true,
+                                        }),
+                                    ),
+                                };
+
+                                if tx.send(Ok(final_chunk)).await.is_err() {
+                                    break;
+                                }
+                            }
+                            Some(Err(e)) => {
+                                tracing::error!("Error in bidirectional stream: {:?}", e);
+                                let _ = tx
+                                    .send(Err(Status::invalid_argument(format!("Invalid request: {}", e))))
+                                    .await;
+                                break;
+                            }
+                            None => {
+                                tracing::info!("Client stream ended");
+                                stream_ended = true;
+                            }
+                        }
                     }
                 }
             }
