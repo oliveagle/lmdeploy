@@ -217,10 +217,10 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
 
     let http_addr = format!("{}:{}", config.server.http_addr, config.server.http_port)
         .parse::<SocketAddr>()
-        .unwrap();
+        .map_err(|e| AppError::Config(format!("Invalid HTTP address: {e}")))?;
     let grpc_addr = format!("{}:{}", config.server.grpc_addr, config.server.grpc_port)
         .parse::<SocketAddr>()
-        .unwrap();
+        .map_err(|e| AppError::Config(format!("Invalid gRPC address: {e}")))?;
 
     // Initialize batch sender if batching is enabled
     let batch_sender = if config.server.batch_enabled {
@@ -358,9 +358,6 @@ fn create_router(state: Arc<AppState>) -> Router {
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(AllowHeaders::any());
 
-    // Build concurrency limit from config
-    let concurrency_limit = state.request_semaphore.available_permits();
-
     Router::new()
         .route("/health", get(health_check))
         .route("/v1/chat/completions", post(chat_completions))
@@ -385,7 +382,6 @@ fn create_router(state: Arc<AppState>) -> Router {
         .layer(TraceLayer::new_for_http())
         .layer(RequestBodyLimitLayer::new(10 * 1024 * 1024)) // 10MB limit
         .layer(ServiceBuilder::new().layer(cors))
-        .layer(tower::limit::GlobalConcurrencyLimitLayer::new(concurrency_limit))
         .with_state(state)
 }
 
@@ -599,11 +595,22 @@ async fn flush_all_batches(accumulator: &mut HashMap<String, BatchAccumulator>, 
 }
 
 fn messages_to_prompt(messages: &[Message]) -> String {
-    messages
-        .iter()
-        .map(|m| format!("{}: {}", m.role, m.content))
-        .collect::<Vec<_>>()
-        .join("\n")
+    // TODO: Replace with configurable chat templates (chatml, llama-2, qwen, etc.)
+    // This should be driven by a `chat_template` field in AppConfig or the model config.
+    //
+    // Common formats:
+    // - ChatML: "<|im_start|>{role}\n{content}<|im_end|>"
+    // - LLaMA-2: "[INST] {user_msg} [/INST] {assistant_msg}"
+    // - Qwen: "<|im_start|>{role}\n{content}<|im_end|>"
+    // - OpenAI: "{role}: {content}\n\n"
+    //
+    // For now, use a simple format that works for most models:
+    let mut prompt = String::new();
+    for m in messages {
+        prompt.push_str(&format!("<|im_start|>{}\n{}\n<|im_end|>\n", m.role, m.content));
+    }
+    prompt.push_str("<|im_start|>assistant\n");
+    prompt
 }
 
 fn uuid_simple() -> String {

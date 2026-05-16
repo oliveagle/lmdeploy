@@ -12,6 +12,7 @@ use username/lmdeploy_moonbit_server/logger
 use username/lmdeploy_moonbit_server/metrics
 use username/lmdeploy_moonbit_server/model
 use username/lmdeploy_moonbit_server/error
+use username/lmdeploy_moonbit_server/ratelimit
 use username/lmdeploy_moonbit_server/config
 
 /// Module-level model manager instance
@@ -32,6 +33,35 @@ let request_metrics = metrics::MetricsCollector::new()
 
 /// Module-level logger
 let app_logger = logger::Logger::with_component("handlers")
+
+/// Module-level error handler with rate limiting
+let error_handler = error.ErrorHandler::default()
+
+/// Get client identifier from request for rate limiting
+fn get_client_id(req: http.HttpRequest) -> String {
+  // Try to get from X-Forwarded-For header (reverse proxy), then X-Real-IP, then remote_addr
+  match req.get_header("x-forwarded-for") {
+    Some(forwarded) => forwarded.split(",")[0],
+    None => match req.get_header("x-real-ip") {
+      Some(real_ip) => real_ip,
+      None => if req.remote_addr != "" { req.remote_addr } else { "unknown" },
+    },
+  }
+}
+
+/// Check rate limit for a request, return error response if exceeded
+fn check_rate_limit(req: http.HttpRequest) -> Option[http.HttpResponse] {
+  let client_id = get_client_id(req)
+  let (updated_handler, error) = error_handler.check_rate_limit(client_id)
+  // In production: error_handler = updated_handler
+  match error {
+    Some(err_json) => {
+      logger::log_warn("Rate limit exceeded for client: " ++ client_id)
+      Some(http.HttpResponse::rate_limited().json(err_json))
+    }
+    None => None,
+  }
+}
 
 /// Record request start and log
 fn start_request_metrics(endpoint: String, method: String) -> Unit {
@@ -108,6 +138,12 @@ pub fn list_models_handler(req: http.HttpRequest) -> http.HttpResponse {
 /// POST /v1/chat/completions
 /// OpenAI-compatible chat completions with full parameter support
 pub fn chat_completions_handler(req: http.HttpRequest) -> http.HttpResponse {
+  // Check rate limit first
+  match check_rate_limit(req) {
+    Some(response) => return response,
+    None => {},
+  }
+
   let body_bytes = req.body
   let body = String::from_utf8_bytes(body_bytes)
   let start = current_timestamp_ms()
@@ -227,6 +263,12 @@ fn chat_completions_stream(req: http.HttpRequest, body_str: String) -> http.Http
 /// POST /v1/completions
 /// OpenAI-compatible completion with full parameter support
 pub fn completions_handler(req: http.HttpRequest) -> http.HttpResponse {
+  // Check rate limit first
+  match check_rate_limit(req) {
+    Some(response) => return response,
+    None => {},
+  }
+
   let body_bytes = req.body
   let body = String::from_utf8_bytes(body_bytes)
   let start = current_timestamp_ms()
@@ -430,7 +472,10 @@ pub fn metrics_handler(req: http.HttpRequest) -> http.HttpResponse {
   // Add model management metrics
   let model_metrics_str = model_manager.to_prometheus()
 
-  let combined = "# LMDeploy MoonBit Server Metrics\n\n" ++ collector_metrics ++ "\n" ++ stream_metrics_str ++ "\n" ++ model_metrics_str
+  // Add rate limiting metrics
+  let ratelimit_metrics_str = error_handler.to_prometheus()
+
+  let combined = "# LMDeploy MoonBit Server Metrics\n\n" ++ collector_metrics ++ "\n" ++ stream_metrics_str ++ "\n" ++ model_metrics_str ++ "\n" ++ ratelimit_metrics_str
 
   logger::log_debug("Metrics response generated")
 

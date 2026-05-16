@@ -1,3 +1,10 @@
+//! Model engine implementation
+//!
+//! NOTE: This module contains mock implementations of the TurboMind engine.
+//! The current implementations return placeholder data and are not connected
+//! to the actual TurboMind inference engine. These mocks serve as placeholders
+//! for the API surface and infrastructure.
+
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -131,12 +138,14 @@ impl TurboMindEngine {
 
     /// Generate embeddings for the given text
     /// Returns a vector of floats representing the embedding
-    pub async fn embed(&self, text: &str) -> Vec<f32> {
+    ///
+    /// NOTE: This is a mock implementation that generates deterministic pseudo-random vectors.
+    /// In production, this would call the actual TurboMind embedding model.
+    pub async fn embed(&self, text: &str, dimensions: Option<usize>) -> Vec<f32> {
         tracing::info!(text_len = text.len(), "TurboMind embed");
 
-        // Mock embedding: generate deterministic pseudo-random vector
-        // In production, this would call the actual embedding model
-        let embedding_dim = 1536; // Common embedding dimension (e.g., OpenAI ada-002)
+        // Use requested dimensions or default to 1536 (OpenAI ada-002 compatible)
+        let embedding_dim = dimensions.unwrap_or(1536);
         let mut embedding = Vec::with_capacity(embedding_dim);
 
         // Generate deterministic embedding based on text hash

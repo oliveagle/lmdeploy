@@ -11,6 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::oneshot;
+use tokio_stream::wrappers::ReceiverStream;
 
 use crate::cache::compute_hash;
 use crate::metrics::StreamMetricsSnapshot;
@@ -201,10 +202,8 @@ pub async fn chat_completions_stream(
     let id = format!("chatcmpl-{}", uuid_simple());
     let created = unix_timestamp();
     let config = state.config.read().await;
-    let _stream_timeout_ms = config.server.stream_timeout_secs * 1000;
     let keepalive_interval_ms = config.server.stream_keepalive_interval_ms;
     drop(config);
-    let metrics = state.metrics.clone();
 
     tracing::info!(model = %model, "Chat completions stream request");
 
@@ -221,74 +220,77 @@ pub async fn chat_completions_stream(
     };
     drop(mm);
 
-    let chunks = engine.read().await.generate_stream(&prompt).await;
-
+    let metrics = state.metrics.clone();
+    let (tx, rx) = tokio::sync::mpsc::channel::<String>(1024);
     let stream_id = id.clone();
     let stream_model = model.clone();
     let final_id = id.clone();
     let final_model = model.clone();
-    let first_token_start = Instant::now();
+
+    // Spawn a task that generates tokens and sends them through the channel
     let metrics_inner = metrics.clone();
+    let first_token_start = Instant::now();
+    tokio::spawn(async move {
+        let eng = engine.read().await;
+        let chunks = eng.generate_stream(&prompt).await;
+        futures::pin_mut!(chunks);
 
-    // Create stream with timeout handling
-    let stream = chunks.map(move |chunk_text| {
-        // Record first token latency on first chunk (in milliseconds)
-        let latency_ms = first_token_start.elapsed().as_millis() as u64;
-        metrics_inner.streams.record_stream_start(latency_ms);
+        let mut first_token_recorded = false;
+        while let Some(chunk_text) = chunks.next().await {
+            if !first_token_recorded {
+                let latency_ms = first_token_start.elapsed().as_millis() as u64;
+                metrics_inner.streams.record_stream_start(latency_ms);
+                tracing::info!(first_token_latency_ms = latency_ms, "First token latency (SSE stream)");
+                first_token_recorded = true;
+                metrics_inner.streams.record_chunk();
+            }
 
-        tracing::debug!(
-            first_token_latency_ms = latency_ms,
-            "First token latency"
-        );
-
-        // Log warning if latency exceeds threshold
-        if latency_ms > 50 {
-            tracing::warn!(
-                first_token_latency_ms = latency_ms,
-                threshold_ms = 50,
-                "First token latency exceeds threshold"
-            );
+            if tx.send(chunk_text).await.is_err() {
+                tracing::info!("Client disconnected, stopping stream");
+                break;
+            }
         }
+    });
 
-        metrics_inner.streams.record_chunk();
-
-        let chunk = ChatCompletionChunk {
-            id: stream_id.clone(),
-            object: "chat.completion.chunk".into(),
-            created,
-            model: stream_model.clone(),
-            choices: vec![DeltaChoice {
-                index: 0,
-                delta: Delta {
-                    content: Some(chunk_text),
-                    role: None,
-                },
-                finish_reason: None,
-            }],
-        };
-
-        let json = serde_json::to_string(&chunk).unwrap_or_default();
-        Ok(Event::default()
-            .event("chat.completion.chunk")
-            .data(json))
-    }).chain(futures::stream::once(async move {
-        let final_chunk = ChatCompletionChunk {
-            id: final_id,
-            object: "chat.completion.chunk".into(),
-            created,
-            model: final_model,
-            choices: vec![DeltaChoice {
-                index: 0,
-                delta: Delta { content: None, role: None },
-                finish_reason: Some("stop".into()),
-            }],
-        };
-
-        let json = serde_json::to_string(&final_chunk).unwrap_or_default();
-        Ok(Event::default()
-            .event("chat.completion.chunk")
-            .data(json))
-    }));
+    // Convert channel into SSE stream with metrics tracking
+    let stream = ReceiverStream::new(rx)
+        .map(move |chunk_text| {
+            let chunk = ChatCompletionChunk {
+                id: stream_id.clone(),
+                object: "chat.completion.chunk".into(),
+                created,
+                model: stream_model.clone(),
+                choices: vec![DeltaChoice {
+                    index: 0,
+                    delta: Delta {
+                        content: Some(chunk_text),
+                        role: None,
+                    },
+                    finish_reason: None,
+                }],
+            };
+            let json = serde_json::to_string(&chunk).unwrap_or_default();
+            Ok(Event::default()
+                .event("chat.completion.chunk")
+                .data(json))
+        })
+        .chain(futures::stream::once(async move {
+            let final_chunk = ChatCompletionChunk {
+                id: final_id,
+                object: "chat.completion.chunk".into(),
+                created,
+                model: final_model,
+                choices: vec![DeltaChoice {
+                    index: 0,
+                    delta: Delta { content: None, role: None },
+                    finish_reason: Some("stop".into()),
+                }],
+            };
+            let json = serde_json::to_string(&final_chunk).unwrap_or_default();
+            Ok(Event::default()
+                .event("chat.completion.chunk")
+                .data(json))
+        }));
 
     // Apply keep-alive and return SSE response
     Sse::new(stream)
@@ -973,10 +975,11 @@ pub async fn embeddings(
     let eng = engine.read().await;
     let mut data = Vec::new();
     let mut total_tokens = 0;
+    let dimensions = req.dimensions.map(|d| d as usize);
 
     for (idx, text) in inputs.iter().enumerate() {
         // Call the engine's embed method (mocked for now)
-        let embedding = eng.embed(text).await;
+        let embedding = eng.embed(text, dimensions).await;
 
         // Estimate tokens (rough: chars / 4)
         let tokens = (text.len() as i32 + 3) / 4;

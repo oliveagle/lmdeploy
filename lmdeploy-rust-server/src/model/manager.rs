@@ -5,6 +5,9 @@
 //! - Model routing (multiple models support)
 //! - Hot loading via API
 //! - Model loading progress tracking
+//!
+//! NOTE: The underlying engine is a mock implementation. Model loading/unloading
+//! is simulated with delays. Real TurboMind engine integration is pending.
 
 use std::collections::HashMap;
 use std::sync::Arc;

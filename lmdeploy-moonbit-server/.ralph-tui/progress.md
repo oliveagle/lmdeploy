@@ -39,6 +39,10 @@ after each iteration and it's included in prompts for context.
 ## Codebase Patterns (Study These First)
 
 *Add reusable patterns discovered during development here.*
+- Token Bucket rate limiter: track tokens + last_refill timestamp, refill based on elapsed time
+- Client identification: X-Forwarded-For → X-Real-IP → remote_addr fallback chain
+- Error handler as stateful struct: wraps RateLimiter + timeout settings, provides unified error responses
+- Config extension pattern: add new fields to struct → update default() → update new() → update from_json() → update from_env_overrides() → add accessors → update to_debug_string()
 - Cache pattern: LRU via `Array[String]` tracking (not linked list) + TTL expiration via `expires_at` field
 - Prefix cache: store prefixes for long texts (>50 chars), derive truncated token subset proportionally
 - Metrics: immutable struct updates - create new struct with updated fields (MoonBit functional style)
@@ -274,5 +278,57 @@ after each iteration and it's included in prompts for context.
   - 模型加载状态使用枚举模式（NotLoaded → Loading → Loaded/Failed）
   - 模块级变量用于跨 handler 共享状态（model_manager）
   - Prometheus 指标格式：`lmdeploy_models_total`, `lmdeploy_models_loaded`, `lmdeploy_model_memory_bytes`, `lmdeploy_model_load_state`
+
+---
+
+## 2026-05-17 - US-010: 错误处理和限流
+- 实现了完整的错误处理和限流系统
+- **新增文件**:
+  - `src/ratelimit/ratelimit.mbt` - Rate Limiter 实现
+    - `ClientState` 结构体：tokens 计数 + last_refill 时间戳
+    - `RateLimiter` 结构体：Token Bucket 算法，支持配置 max_requests 和 window_secs
+    - `allow_request()` 方法：检查并消费 token，返回 (updated_limiter, is_allowed)
+    - `cleanup()` 方法：清理过期客户端状态，防止内存泄漏
+  - `src/ratelimit/moon.pkg.json` - 模块依赖配置
+  - `src/error/handler.mbt` - 统一错误处理器
+    - `ErrorHandler` 结构体：封装 RateLimiter + timeout 配置
+    - `check_rate_limit()` 方法：检查客户端限流，返回错误 JSON 或 None
+    - 错误响应方法：`rate_limit_exceeded_response()`, `timeout_response()`, `internal_error_response()`, `service_unavailable_response()`, `oom_response()`, `bad_request_response()`, `not_found_response()`
+    - `from_lm_error()` 方法：从 LmDeployError 转换为响应 JSON
+    - `to_prometheus()` 方法：导出限流 Prometheus 指标
+  - `src/error/error.mbt` - 增强错误模块
+    - 添加 `ErrorResponse::new()` 和 `ErrorResponse::to_json()` 方法
+    - 添加 `build_error_json()` 辅助函数
+    - 添加 `LmDeployError::to_json()` 和 `LmDeployError::to_string()` 方法
+  - `src/error/moon.pkg.json` - 模块依赖配置
+- **修改文件**:
+  - `src/config/server.mbt` - 添加限流配置
+    - 添加 `rate_limit_enabled: Bool` 字段
+    - 添加 `rate_limit_max_requests: Int` 字段
+    - 添加 `rate_limit_window_secs: Int` 字段
+    - 添加相应访问器方法和 JSON/环境变量解析
+  - `src/handlers/http.mbt` - 集成限流检查
+    - 添加 `ratelimit` 模块导入
+    - 添加 `error_handler` 模块级变量
+    - 添加 `get_client_id()` 函数：X-Forwarded-For → X-Real-IP → remote_addr 优先链
+    - 添加 `check_rate_limit()` 函数：检查限流并返回 429 响应（如超限）
+    - 在 `chat_completions_handler` 和 `completions_handler` 中集成限流检查
+    - 在 `metrics_handler` 中添加限流 Prometheus 指标导出
+  - `src/handlers/moon.pkg.json` - 添加 ratelimit 依赖
+- **实现功能**:
+  - ✅ 统一的错误响应格式（与 Python API 一致）
+  - ✅ 请求速率限制（Token Bucket 算法，100 req/60s 默认）
+  - ✅ 请求超时处理（408 响应）
+  - ✅ 模型 OOM 处理（507 响应）
+  - ✅ 优雅降级（503 服务不可用）
+  - ✅ 限流 Prometheus 指标（`lmdeploy_ratelimit_clients_current`, `lmdeploy_ratelimit_max_requests`）
+- **Learnings:**
+  - Token Bucket 算法：tokens = min(max_tokens, tokens + elapsed * rate)，每次请求消耗一个 token
+  - 客户端识别优先级：X-Forwarded-For（支持多代理链取第一个）→ X-Real-IP → remote_addr → "unknown"
+  - MoonBit 不可变更新模式：`(updated_self, result)` 返回新状态 + 结果
+  - 限流清理策略：超过 2x window 无活动的客户端从 Map 中移除
+  - Python 参考：`ConcurrencyLimitMiddleware` 使用 `asyncio.Semaphore` 实现并发限制
+  - MoonBit 函数式风格：ErrorHandler 通过不可变更新管理 rate_limiter 状态
+  - Prometheus 指标命名：`lmdeploy_ratelimit_*` 前缀符合项目规范
 
 ---

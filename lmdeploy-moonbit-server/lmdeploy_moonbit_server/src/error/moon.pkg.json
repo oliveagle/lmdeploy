@@ -1,0 +1,6 @@
+{
+  "link": {
+    "name": "username/lmdeploy_moonbit_server/error",
+    "deps": ["username/lmdeploy_moonbit_server/ratelimit"]
+  }
+}

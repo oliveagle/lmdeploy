@@ -1,33 +1,56 @@
 // src/error/error.mbt
 // Error types and handling for LMDeploy MoonBit server
-// Reference: lmdeploy-rust-server/src/error.rs
+// Reference: lmdeploy-rust-server/src/error.rs, Python api_server.py ErrorResponse
+
+/// Error response structure matching OpenAI API error format
+pub struct ErrorResponse {
+  message: String
+  type_: String
+  code: Int
+  param: Option[String]
+  object: String
+}
+
+pub fn ErrorResponse::default() -> ErrorResponse {
+  { message: "", type_: "error", code: 500, param: None, object: "error" }
+}
+
+pub fn ErrorResponse::new(message: String, type_: String, code: Int) -> ErrorResponse {
+  { message, type_, code, param: None, object: "error" }
+}
+
+pub fn ErrorResponse::to_json(self: ErrorResponse) -> String {
+  """
+{"error": {"message": """" ++ self.message ++ """", "type": """" ++ self.type_ ++ """", "code": """ ++ int_to_string(self.code) ++ """}}
+"""
+}
+
+/// Build error JSON string
+pub fn build_error_json(code: Int, type_: String, message: String) -> String {
+  """
+{"error": {"message": """" ++ message ++ """", "type": """" ++ type_ ++ """", "code": """ ++ int_to_string(code) ++ """}}
+"""
+}
 
 /// LMDeploy error types
 pub enum LmDeployError {
   /// Invalid request parameters
   InvalidRequest(String)
-
   /// Model not found
   ModelNotFound(String)
-
   /// Tokenization error
   TokenizeError(String)
-
   /// TurboMind engine error
   EngineError(String)
-
   /// Internal server error
   InternalError(String)
-
   /// Timeout error
   TimeoutError(String)
-
   /// Rate limit exceeded
   RateLimitExceeded(String)
 }
 
-/// Convert error to HTTP status code
-pub fn LmDeployError::status_code(self : LmDeployError) -> Int {
+pub fn LmDeployError::status_code(self: LmDeployError) -> Int {
   match self {
     InvalidRequest(_) => 400
     ModelNotFound(_) => 404
@@ -39,8 +62,7 @@ pub fn LmDeployError::status_code(self : LmDeployError) -> Int {
   }
 }
 
-/// Convert error to error response
-pub fn LmDeployError::to_response(self : LmDeployError) -> ErrorResponse {
+pub fn LmDeployError::to_response(self: LmDeployError) -> ErrorResponse {
   let (message, type_) = match self {
     InvalidRequest(msg) => (msg, "invalid_request_error")
     ModelNotFound(msg) => (msg, "model_not_found")
@@ -60,40 +82,42 @@ pub fn LmDeployError::to_response(self : LmDeployError) -> ErrorResponse {
   }
 }
 
-/// Result type alias for LMDeploy operations
+pub fn LmDeployError::to_json(self: LmDeployError) -> String {
+  let resp = self.to_response()
+  resp.to_json()
+}
+
+pub fn LmDeployError::to_string(self: LmDeployError) -> String {
+  let resp = self.to_response()
+  resp.message
+}
+
 pub type LmResult[T] = Result[T, LmDeployError]
 
-/// Create invalid request error
 pub fn invalid_request(msg: String) -> LmDeployError {
   InvalidRequest(msg)
 }
 
-/// Create model not found error
 pub fn model_not_found(model: String) -> LmDeployError {
   ModelNotFound(model)
 }
 
-/// Create tokenize error
 pub fn tokenize_error(msg: String) -> LmDeployError {
   TokenizeError(msg)
 }
 
-/// Create engine error
 pub fn engine_error(msg: String) -> LmDeployError {
   EngineError(msg)
 }
 
-/// Create internal error
 pub fn internal_error(msg: String) -> LmDeployError {
   InternalError(msg)
 }
 
-/// Create timeout error
 pub fn timeout_error(msg: String) -> LmDeployError {
   TimeoutError(msg)
 }
 
-/// Create rate limit error
 pub fn rate_limit_exceeded(msg: String) -> LmDeployError {
   RateLimitExceeded(msg)
 }

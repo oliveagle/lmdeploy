@@ -249,7 +249,16 @@ impl AppConfig {
             .required(false),
         );
 
-        let config = builder.build()?.try_deserialize()?;
+        let mut config: Self = builder.build()?.try_deserialize()?;
+
+        // Override model_path from LMDEPLOY_MODEL_PATH if set
+        // (the standard config crate expects LMDEPLOY_MODEL_MODEL_PATH for nested fields)
+        if let Ok(path) = std::env::var("LMDEPLOY_MODEL_PATH") {
+            if !path.is_empty() {
+                config.model.model_path = path;
+            }
+        }
+
         Ok(config)
     }
 }

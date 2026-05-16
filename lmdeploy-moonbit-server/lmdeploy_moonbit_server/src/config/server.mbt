@@ -35,6 +35,11 @@ pub struct ServerConfig {
   batch_size: Int
   batch_timeout_ms: Int
 
+  // Rate limiting settings
+  rate_limit_enabled: Bool
+  rate_limit_max_requests: Int
+  rate_limit_window_secs: Int
+
   // Graceful shutdown
   shutdown_timeout_secs: Int
 }
@@ -58,6 +63,9 @@ pub fn ServerConfig::default() -> ServerConfig {
     batch_enabled: true,
     batch_size: 8,
     batch_timeout_ms: 50,
+    rate_limit_enabled: true,
+    rate_limit_max_requests: 100,
+    rate_limit_window_secs: 60,
     shutdown_timeout_secs: 30,
   }
 }
@@ -86,6 +94,9 @@ pub fn ServerConfig::new(
     batch_enabled: defaults.batch_enabled,
     batch_size: defaults.batch_size,
     batch_timeout_ms: defaults.batch_timeout_ms,
+    rate_limit_enabled: defaults.rate_limit_enabled,
+    rate_limit_max_requests: defaults.rate_limit_max_requests,
+    rate_limit_window_secs: defaults.rate_limit_window_secs,
     shutdown_timeout_secs: defaults.shutdown_timeout_secs,
   }
 }
@@ -170,6 +181,21 @@ pub fn ServerConfig::shutdown_timeout_secs(self: ServerConfig) -> Int {
   self.shutdown_timeout_secs
 }
 
+/// Rate limiting enabled
+pub fn ServerConfig::rate_limit_enabled(self: ServerConfig) -> Bool {
+  self.rate_limit_enabled
+}
+
+/// Max requests per window
+pub fn ServerConfig::rate_limit_max_requests(self: ServerConfig) -> Int {
+  self.rate_limit_max_requests
+}
+
+/// Rate limit window in seconds
+pub fn ServerConfig::rate_limit_window_secs(self: ServerConfig) -> Int {
+  self.rate_limit_window_secs
+}
+
 /// Parse from JSON string
 fn ServerConfig::from_json(json: String) -> ServerConfig {
   let defaults = ServerConfig::default()
@@ -191,6 +217,9 @@ fn ServerConfig::from_json(json: String) -> ServerConfig {
     batch_enabled: parse_json_bool_field(json, "batch_enabled", defaults.batch_enabled),
     batch_size: parse_json_int_field(json, "batch_size", defaults.batch_size),
     batch_timeout_ms: parse_json_int_field(json, "batch_timeout_ms", defaults.batch_timeout_ms),
+    rate_limit_enabled: parse_json_bool_field(json, "rate_limit_enabled", defaults.rate_limit_enabled),
+    rate_limit_max_requests: parse_json_int_field(json, "rate_limit_max_requests", defaults.rate_limit_max_requests),
+    rate_limit_window_secs: parse_json_int_field(json, "rate_limit_window_secs", defaults.rate_limit_window_secs),
     shutdown_timeout_secs: parse_json_int_field(json, "shutdown_timeout_secs", defaults.shutdown_timeout_secs),
   }
 }
@@ -216,6 +245,9 @@ fn ServerConfig::from_env_overrides(base: ServerConfig) -> ServerConfig {
     batch_enabled: get_env_bool("LMDEPLOY_SERVER_BATCH_ENABLED", base.batch_enabled),
     batch_size: get_env_int("LMDEPLOY_SERVER_BATCH_SIZE", base.batch_size),
     batch_timeout_ms: get_env_int("LMDEPLOY_SERVER_BATCH_TIMEOUT_MS", base.batch_timeout_ms),
+    rate_limit_enabled: get_env_bool("LMDEPLOY_SERVER_RATE_LIMIT_ENABLED", base.rate_limit_enabled),
+    rate_limit_max_requests: get_env_int("LMDEPLOY_SERVER_RATE_LIMIT_MAX_REQUESTS", base.rate_limit_max_requests),
+    rate_limit_window_secs: get_env_int("LMDEPLOY_SERVER_RATE_LIMIT_WINDOW_SECS", base.rate_limit_window_secs),
     shutdown_timeout_secs: get_env_int("LMDEPLOY_SERVER_SHUTDOWN_TIMEOUT_SECS", base.shutdown_timeout_secs),
   }
 }
