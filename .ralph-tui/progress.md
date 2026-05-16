@@ -7,6 +7,18 @@ after each iteration and it's included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
+- **Rate Limiting with Token Bucket**: Use `TokenBucket` algorithm with refill rate for smooth rate limiting
+  - Global rate limiter via `GlobalRateLimiter` with `try_acquire()` method
+  - Per-IP rate limiter via `PerIpRateLimiter` with stale entry eviction
+  - Configured via `[server.rate_limit]` section in TOML
+  - Status endpoint at `/v1/rate-limit/status` returns current metrics
+- **Error Response Format**: OpenAI-compatible error format with `message`, `type`, and `code` fields
+  - `AppError` enum variants map to HTTP status codes via `status_code()` method
+  - `ErrorResponse` struct for JSON serialization: `{message, type, code}`
+- **Concurrency Limiting**: Use `tower::limit::GlobalConcurrencyLimitLayer::new(max)` as Axum layer
+  - Configurable via `max_connections` in server config
+  - Returns 503 when limit reached
+
 - **Axum SSE Streaming**: Use `axum::response::sse::Sse::new(stream).keep_alive(KeepAlive::new().interval(duration))`
   - Stream should return `futures::Stream<Item = Result<Event, std::convert::Infallible>>`
   - Use `.chain(futures::stream::once(...))` to append final "[DONE]" event
@@ -335,6 +347,52 @@ US-007 was already fully implemented in a previous iteration. All acceptance cri
 - **Metrics Macro API**: `metrics::histogram!("name").record(value)` and `metrics::counter!("name").increment(n)` are the standard patterns.
 - **AtomicU64 Clone**: Manual Clone implementation required for `AtomicU64` fields in metrics structs.
 - **RAII Timer Pattern**: `RequestTimer` uses `finish(self)` for explicit timing, auto-records request count and duration.
+
+---
+
+## [2026-05-17] - US-010: 错误处理和限流
+
+### What was implemented
+1. **Unified Error Handling**:
+   - Extended `AppError` enum with `RateLimitExceeded`, `RequestTimeout`, and `ServiceUnavailable` variants
+   - `status_code()` method maps errors to proper HTTP status codes (429, 408, 503)
+   - `error_type()` method for OpenAI-compatible error type classification
+   - `ErrorResponse` struct for standardized JSON error responses
+2. **Error Handler Module** (`error_handler.rs`):
+   - `error_response()` helper function for converting errors to Axum responses
+   - `TimeoutLayer` and `TimeoutService` for request timeout middleware
+   - Structured error logging with `tracing`
+3. **Rate Limiting** (`rate_limiter.rs`):
+   - `TokenBucket` algorithm with configurable refill rate and burst size
+   - `GlobalRateLimiter` - global request rate limiting with tracking
+   - `PerIpRateLimiter` - per-IP rate limiting with stale entry eviction
+   - Rate limiter metrics exposed via `RateLimiterMetrics` struct
+4. **Rate Limit Configuration** (`config.rs`):
+   - `[server.rate_limit]` section with `enabled`, `requests_per_second`, `burst_size`
+   - Per-IP config via `[server.rate_limit.per_ip]`
+   - Default values: 100 RPS global, 30 RPS per IP, burst 200/60
+5. **Concurrency Limiting** (`server.rs`):
+   - `tower::limit::GlobalConcurrencyLimitLayer` applied to all routes
+   - Configurable via `max_connections` setting (default 10000)
+6. **Rate Limit Status Endpoint** (`handlers/http.rs`):
+   - `GET /v1/rate-limit/status` returns current rate limiter state and statistics
+   - Shows enabled/disabled status, limits, and current usage metrics
+
+### Files changed
+- `lmdeploy-rust-server/src/config.rs` - Rate limiting config structs
+- `lmdeploy-rust-server/src/error.rs` - Extended error types and `ErrorResponse`
+- `lmdeploy-rust-server/src/error_handler.rs` - New error handler module
+- `lmdeploy-rust-server/src/rate_limiter.rs` - New rate limiter module
+- `lmdeploy-rust-server/src/lib.rs` - Module exports
+- `lmdeploy-rust-server/src/server.rs` - Rate limiter initialization, concurrency limit layer
+- `lmdeploy-rust-server/src/handlers/http.rs` - Rate limit status endpoint
+- `lmdeploy-rust-server/Cargo.toml` - Added `tower` `limit` feature
+
+### Learnings:
+  - `tower::limit::GlobalConcurrencyLimitLayer` takes a `usize`, not `Semaphore` - pass the number directly
+  - `config` crate name conflicts with local `config` variable - avoid naming conflicts
+  - Token bucket algorithm is simple and effective for rate limiting with burst support
+  - Per-IP rate limiting requires stale entry eviction to avoid unbounded memory growth
 - **Config Extension**: Adding new config sections requires updating both the struct AND the `Default` impl.
 
 ---

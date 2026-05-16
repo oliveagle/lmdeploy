@@ -32,6 +32,15 @@ pub enum AppError {
     #[error("Model loading failed: {0}")]
     ModelLoadFailed(String),
 
+    #[error("Rate limit exceeded: {0}")]
+    RateLimitExceeded(String),
+
+    #[error("Request timeout")]
+    RequestTimeout,
+
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
+
     #[error("{0}")]
     Other(String),
 }
@@ -51,7 +60,43 @@ impl AppError {
             AppError::ModelAlreadyLoaded(_) => 409,
             AppError::CannotUnloadDefaultModel => 400,
             AppError::ModelLoadFailed(_) => 500,
+            AppError::RateLimitExceeded(_) => 429,
+            AppError::RequestTimeout => 408,
+            AppError::ServiceUnavailable(_) => 503,
             AppError::Other(_) => 500,
         }
     }
+
+    pub fn error_type(&self) -> &'static str {
+        match self {
+            AppError::InvalidRequest(_) => "invalid_request_error",
+            AppError::RateLimitExceeded(_) => "rate_limit_exceeded",
+            AppError::RequestTimeout => "request_timeout",
+            AppError::ServiceUnavailable(_) => "service_unavailable",
+            AppError::TurboMind(_) => "turbomind_error",
+            AppError::ModelNotFound(_) => "model_not_found",
+            AppError::ModelLoadFailed(_) => "model_load_failed",
+            _ => "internal_error",
+        }
+    }
 }
+
+/// OpenAI-compatible error response format
+#[derive(serde::Serialize)]
+pub struct ErrorResponse {
+    pub message: String,
+    #[serde(rename = "type")]
+    pub error_type: String,
+    pub code: u16,
+}
+
+impl From<&AppError> for ErrorResponse {
+    fn from(err: &AppError) -> Self {
+        Self {
+            message: err.to_string(),
+            error_type: err.error_type().to_string(),
+            code: err.status_code(),
+        }
+    }
+}
+

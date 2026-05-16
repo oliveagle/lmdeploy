@@ -11,7 +11,7 @@ tokio = { version = "1.40", features = ["full"] }
 # HTTP/gRPC
 axum = { version = "0.7", features = ["http2"] }
 tonic = { version = "0.12", features = ["tls"] }
-tower = { version = "0.5", features = ["timeout", "load-shed"] }
+tower = { version = "0.5", features = ["timeout", "load-shed", "limit"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
 
 # Serialization

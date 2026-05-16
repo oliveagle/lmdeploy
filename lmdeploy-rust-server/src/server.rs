@@ -30,10 +30,11 @@ use crate::config::AppConfig;
 use crate::error::{AppError, Result};
 use crate::metrics::{AppMetrics, init_metrics};
 use crate::model::{ModelManager, ModelLoadTracker};
+use crate::rate_limiter::{GlobalRateLimiter, PerIpRateLimiter};
 use crate::handlers::http::{
     batch_chat_completions, batch_completions, batch_stats, cache_metrics, chat_completions,
     chat_completions_stream, clear_cache, completions, embeddings, health_check, list_models,
-    model_load, model_load_progress, model_reload, model_unload, stream_metrics, tokenize,
+    model_load, model_load_progress, model_reload, model_unload, rate_limit_status, stream_metrics, tokenize,
     ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
 };
 
@@ -62,6 +63,10 @@ pub struct AppState {
     pub config_reload_tx: mpsc::Sender<()>,
     /// Model loading progress tracker
     pub model_load_tracker: Arc<ModelLoadTracker>,
+    /// Global rate limiter
+    pub global_rate_limiter: Option<Arc<GlobalRateLimiter>>,
+    /// Per-IP rate limiter
+    pub per_ip_rate_limiter: Option<Arc<PerIpRateLimiter>>,
 }
 
 /// Batch request accumulator
@@ -176,6 +181,31 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
     let batch_stats = Arc::new(BatchStats::new());
     let metrics = Arc::new(AppMetrics::new());
 
+    // Initialize rate limiters
+    let (global_rate_limiter, per_ip_rate_limiter) = if config.server.rate_limit.enabled {
+        let global = Arc::new(GlobalRateLimiter::new(
+            config.server.rate_limit.requests_per_second,
+            config.server.rate_limit.burst_size,
+        ));
+        let per_ip = Arc::new(PerIpRateLimiter::new(
+            config.server.rate_limit.per_ip.requests_per_second,
+            config.server.rate_limit.per_ip.burst_size,
+            config.server.rate_limit.per_ip.max_tracked_ips,
+        ));
+        tracing::info!(
+            rate_limit_enabled = true,
+            global_rps = config.server.rate_limit.requests_per_second,
+            global_burst = config.server.rate_limit.burst_size,
+            per_ip_enabled = config.server.rate_limit.per_ip.enabled,
+            per_ip_rps = config.server.rate_limit.per_ip.requests_per_second,
+            "Rate limiters initialized"
+        );
+        (Some(global), if config.server.rate_limit.per_ip.enabled { Some(per_ip) } else { None })
+    } else {
+        tracing::info!("Rate limiting disabled");
+        (None, None)
+    };
+
     // Initialize Prometheus metrics exporter
     init_metrics(&config.metrics);
     tracing::info!(
@@ -229,6 +259,8 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         metrics: metrics.clone(),
         config_reload_tx: config_reload_tx.clone(),
         model_load_tracker,
+        global_rate_limiter,
+        per_ip_rate_limiter,
     });
 
     // Spawn config reload task
@@ -326,6 +358,9 @@ fn create_router(state: Arc<AppState>) -> Router {
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(AllowHeaders::any());
 
+    // Build concurrency limit from config
+    let concurrency_limit = state.request_semaphore.available_permits();
+
     Router::new()
         .route("/health", get(health_check))
         .route("/v1/chat/completions", post(chat_completions))
@@ -346,9 +381,11 @@ fn create_router(state: Arc<AppState>) -> Router {
         .route("/v1/models/unload", post(model_unload))
         .route("/v1/models/reload", post(model_reload))
         .route("/v1/models/progress", post(model_load_progress))
+        .route("/v1/rate-limit/status", get(rate_limit_status))
         .layer(TraceLayer::new_for_http())
         .layer(RequestBodyLimitLayer::new(10 * 1024 * 1024)) // 10MB limit
         .layer(ServiceBuilder::new().layer(cors))
+        .layer(tower::limit::GlobalConcurrencyLimitLayer::new(concurrency_limit))
         .with_state(state)
 }
 

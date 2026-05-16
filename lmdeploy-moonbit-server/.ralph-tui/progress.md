@@ -159,3 +159,60 @@ after each iteration and it's included in prompts for context.
   - 配置系统遵循 Rust 版本的结构（`config.rs` → `config/*.mbt`）
   - 配置热重载需要 SIGHUP 信号处理（TODO: 需要 FFI 支持）
 
+---
+
+## 2026-05-16 - US-008: 日志和监控
+- 实现了完整的结构化日志和 Prometheus 监控系统
+- 文件变更：
+  - `src/logger/logger.mbt` - 新增日志模块（LogLevel, LoggerConfig, LogEntry, Logger）
+  - `src/metrics/metrics.mbt` - 新增指标模块（MetricsCollector, RequestMetrics, Histogram）
+  - `src/logger/moon.pkg.json` - 日志模块依赖配置
+  - `src/metrics/moon.pkg.json` - 指标模块依赖配置
+  - `src/handlers/moon.pkg.json` - 添加对 logger 和 metrics 的依赖
+  - `src/handlers/http.mbt` - 集成日志和指标到所有 handlers
+- **实现的功能**:
+  - **日志系统**:
+    - `LogLevel` 枚举：Debug, Info, Warn, Error
+    - `LoggerConfig`：配置日志级别、JSON 格式、组件名、时间戳、请求 ID
+    - `LogEntry`：结构化日志条目（level, message, component, timestamp, request_id, fields, error）
+    - `Logger`：提供 debug/info/warn/error 级别的日志方法
+    - JSON 格式日志输出（符合现代日志标准）
+    - 纯文本格式日志输出（开发调试）
+  - **指标系统**:
+    - `MetricsCollector`：收集所有 Prometheus 指标
+    - `RequestMetrics`：单个请求的指标（endpoint, method, status_code, duration_ms, tokens, cache_hit, stream）
+    - `Histogram`：Prometheus 直方图（请求延迟、Prefill 延迟、解码吞吐量）
+    - 指标类型：Counter（计数器）、Gauge（仪表盘）、Histogram（直方图）
+    - Prometheus 格式导出（`# HELP`, `# TYPE` 注释 + 数据行）
+  - **Handler 集成**:
+    - 每个请求开始时记录日志（`log_info`）
+    - 每个请求结束时记录日志和指标（`end_request_metrics`）
+    - 错误请求记录错误日志
+    - `/metrics` 端点导出所有收集的指标
+  - **指标列表**:
+    - `active_requests`：当前活跃请求数（Gauge）
+    - `http_requests_total`：HTTP 请求总数（Counter, 按端点、方法、状态码分组）
+    - `request_duration_seconds`：请求延迟直方图
+    - `prefill_duration_seconds`：Prefill 延迟直方图
+    - `decode_tokens_per_second`：解码吞吐量直方图
+    - `tokens_generated_total`：生成的 token 总数
+    - `prompt_tokens_total`：处理的 prompt token 总数
+    - `cache_hits_total` / `cache_misses_total`：缓存命中/未命中统计
+    - `streaming_requests_total` / `non_streaming_requests_total`：流式/非流式请求统计
+    - `errors_total`：错误总数（按类型分组）
+- **Learnings**:
+  - MoonBit 函数式风格：指标收集器通过不可变更新传递（`metrics.record_request()` 返回新的 metrics）
+  - 模块级常量：`let request_metrics = metrics::MetricsCollector::new()` 和 `let app_logger = logger::Logger::with_component("handlers")`
+  - 日志级别比较：使用 `ordinal()` 方法进行数值比较（Debug=0, Info=1, Warn=2, Error=3）
+  - JSON 字符串转义：需要处理 `"`, `\`, `\n`, `\r`, `\t` 等特殊字符
+  - Prometheus 直方图格式：`*_bucket{le="x"}` 计数 + `*_sum` 总和 + `*_count` 计数
+  - 直方图桶（buckets）数组包含 `+Inf` 作为最后一个桶
+  - MoonBit 中 `Float` 类型使用 `+Inf` 表示正无穷
+  - 日志和指标是分离的关注点：日志用于人类调试，指标用于机器监控
+  - Python 参考：`lmdeploy/metrics/metrics_processor.py` 使用 asyncio.Queue 异步处理指标
+  - Rust 参考：`lmdeploy-rust-server/src/metrics.rs` 使用 AtomicU64 进行线程安全计数
+  - MoonBit 使用不可变结构体 + 模块级变量（生产环境需要考虑并发访问）
+  - `Map` 类型使用 `.insert()` 返回新 Map（函数式风格）
+  - 直方图 `observe()` 方法更新所有桶的计数（桶值 <= 观察值）
+
+---

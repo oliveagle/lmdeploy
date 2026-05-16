@@ -843,6 +843,60 @@ pub async fn stream_metrics(
 }
 
 // ============================================================================
+// Rate Limiting Status
+// ============================================================================
+
+/// Rate limit status response
+#[derive(Debug, Serialize)]
+pub struct RateLimitStatusResponse {
+    pub rate_limiting_enabled: bool,
+    pub global_requests_per_second: u32,
+    pub global_burst_size: u32,
+    pub per_ip_enabled: bool,
+    pub per_ip_requests_per_second: u32,
+    pub per_ip_burst_size: u32,
+    pub global_total_requests: u64,
+    pub global_rate_limited: u64,
+    pub per_ip_total_requests: u64,
+    pub per_ip_rate_limited: u64,
+    pub tracked_ips: usize,
+}
+
+/// Rate limit status endpoint
+pub async fn rate_limit_status(
+    State(state): State<Arc<AppState>>,
+) -> (StatusCode, Json<RateLimitStatusResponse>) {
+    let config = state.config.read().await;
+    let rl_config = &config.server.rate_limit;
+
+    let (global_total, global_limited, per_ip_total, per_ip_limited, tracked_ips) = if let Some(rl) = &state.global_rate_limiter {
+        let gt = rl.total_requests();
+        let gl = rl.rate_limited();
+        if let Some(per_ip) = &state.per_ip_rate_limiter {
+            (gt, gl, per_ip.total_requests(), per_ip.rate_limited(), per_ip.tracked_ips())
+        } else {
+            (gt, gl, 0, 0, 0)
+        }
+    } else {
+        (0, 0, 0, 0, 0)
+    };
+
+    (StatusCode::OK, Json(RateLimitStatusResponse {
+        rate_limiting_enabled: rl_config.enabled,
+        global_requests_per_second: rl_config.requests_per_second,
+        global_burst_size: rl_config.burst_size,
+        per_ip_enabled: rl_config.per_ip.enabled,
+        per_ip_requests_per_second: rl_config.per_ip.requests_per_second,
+        per_ip_burst_size: rl_config.per_ip.burst_size,
+        global_total_requests: global_total,
+        global_rate_limited: global_limited,
+        per_ip_total_requests: per_ip_total,
+        per_ip_rate_limited: per_ip_limited,
+        tracked_ips,
+    }))
+}
+
+// ============================================================================
 // Embeddings API (OpenAI-compatible)
 // ============================================================================
 

@@ -52,6 +52,11 @@ pub struct ServerConfig {
     // Graceful shutdown
     #[serde(default = "default_shutdown_timeout")]
     pub shutdown_timeout_secs: u64,
+    // Error handling and rate limiting
+    #[serde(default)]
+    pub rate_limit: RateLimitConfig,
+    #[serde(default = "default_default_timeout_secs")]
+    pub default_timeout_secs: u64,
 }
 
 fn default_http2_enabled() -> bool { true }
@@ -67,6 +72,69 @@ fn default_batch_enabled() -> bool { true }
 fn default_batch_size() -> usize { 8 }
 fn default_batch_timeout() -> u64 { 50 }
 fn default_shutdown_timeout() -> u64 { 30 }
+fn default_default_timeout_secs() -> u64 { 60 }
+
+/// Rate limiting configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RateLimitConfig {
+    /// Enable rate limiting
+    #[serde(default = "default_rate_limit_enabled")]
+    pub enabled: bool,
+    /// Requests per second (global)
+    #[serde(default = "default_requests_per_second")]
+    pub requests_per_second: u32,
+    /// Burst size (allows temporary spikes)
+    #[serde(default = "default_burst_size")]
+    pub burst_size: u32,
+    /// Per-IP rate limiting
+    #[serde(default)]
+    pub per_ip: PerIpRateLimitConfig,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PerIpRateLimitConfig {
+    /// Enable per-IP rate limiting
+    #[serde(default)]
+    pub enabled: bool,
+    /// Requests per second per IP
+    #[serde(default = "default_per_ip_requests_per_second")]
+    pub requests_per_second: u32,
+    /// Burst size per IP
+    #[serde(default = "default_per_ip_burst_size")]
+    pub burst_size: u32,
+    /// Maximum number of tracked IPs
+    #[serde(default = "default_max_tracked_ips")]
+    pub max_tracked_ips: usize,
+}
+
+fn default_rate_limit_enabled() -> bool { false }
+fn default_requests_per_second() -> u32 { 100 }
+fn default_burst_size() -> u32 { 200 }
+fn default_per_ip_requests_per_second() -> u32 { 30 }
+fn default_per_ip_burst_size() -> u32 { 60 }
+fn default_max_tracked_ips() -> usize { 10000 }
+
+impl Default for RateLimitConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            requests_per_second: 100,
+            burst_size: 200,
+            per_ip: PerIpRateLimitConfig::default(),
+        }
+    }
+}
+
+impl Default for PerIpRateLimitConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            requests_per_second: 30,
+            burst_size: 60,
+            max_tracked_ips: 10000,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ModelConfig {
@@ -140,6 +208,8 @@ impl Default for AppConfig {
                 batch_size: 8,
                 batch_timeout_ms: 50,
                 shutdown_timeout_secs: 30,
+                rate_limit: RateLimitConfig::default(),
+                default_timeout_secs: 60,
             },
             model: ModelConfig {
                 model_path: "".into(),

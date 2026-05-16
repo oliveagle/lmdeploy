@@ -8,6 +8,8 @@ use username/lmdeploy_moonbit_server/batch
 use username/lmdeploy_moonbit_server/cache
 use username/lmdeploy_moonbit_server/streaming
 use username/lmdeploy_moonbit_server/protocol/json_util
+use username/lmdeploy_moonbit_server/logger
+use username/lmdeploy_moonbit_server/metrics
 
 /// Module-level streaming configuration
 let stream_config = streaming::StreamingConfig::default()
@@ -18,26 +20,65 @@ let stream_metrics = streaming::StreamingMetrics::new()
 /// Tokenize cache instance (module-level for reuse across requests)
 let cache = cache.TokenizeCache::new(1000, 3600)
 
+/// Module-level metrics collector
+let request_metrics = metrics::MetricsCollector::new()
+
+/// Module-level logger
+let app_logger = logger::Logger::with_component("handlers")
+
+/// Record request start and log
+fn start_request_metrics(endpoint: String, method: String) -> Unit {
+  logger::log_info("Request started: " ++ method ++ " " ++ endpoint)
+}
+
+/// Record request completion with metrics and log
+fn end_request_metrics(endpoint: String, method: String, status_code: Int, duration_ms: Int, prompt_tokens: Int, completion_tokens: Int) -> Unit {
+  let req_metrics = metrics::RequestMetrics::new(endpoint, method)
+    .with_status(status_code)
+    .with_duration(duration_ms)
+    .with_tokens(prompt_tokens, completion_tokens)
+  let updated = request_metrics.record_request(req_metrics)
+  let _ = updated
+
+  let status_str = if status_code >= 200 && status_code < 300 { "completed" } else if status_code >= 400 { "failed" } else { "in_progress" }
+  let log_msg = "Request " ++ status_str ++ ": " ++ method ++ " " ++ endpoint ++ " - " ++ int_to_string(status_code) ++ " in " ++ int_to_string(duration_ms) ++ "ms"
+  if status_code >= 400 {
+    logger::log_error(log_msg)
+  } else {
+    logger::log_info(log_msg)
+  }
+}
+
 // Health check endpoint
 /// GET /health
 pub fn health_check_handler(req: http.HttpRequest) -> http.HttpResponse {
-  let body = """{"status": "ok", "version": "0.1.0", "uptime_secs": 0}"""
-  http.HttpResponse::ok()
+  let start = current_timestamp_ms()
+  logger::log_debug("Health check requested")
+  let response_body = """{"status": "ok", "version": "0.1.0", "model": "default-model"}"""
+  let response = http.HttpResponse::ok()
     .set_header("content-type", "application/json")
     .set_header("x-request-id", generate_request_id())
-    .json(body)
+    .json(response_body)
+  let duration = current_timestamp_ms() - start
+  logger::log_debug("Health check completed in " ++ int_to_string(duration) ++ "ms")
+  response
 }
 
 // Model list endpoint
 /// GET /v1/models
 pub fn list_models_handler(req: http.HttpRequest) -> http.HttpResponse {
+  let start = current_timestamp_ms()
+  logger::log_info("Model list requested")
   let models_json = """
 {"object": "list", "data": [{"id": "default-model", "object": "model", "created": 0, "owned_by": "lmdeploy", "permission": [{"id": "modelperm-0", "object": "model_permission", "created": 0, "allow_create_engine": true, "allow_sampling": true, "allow_logprobs": true, "allow_search_indices": false, "allow_view": true, "allow_fine_tuning": false, "organization": "*", "group": null, "is_blocking": false}], "root": "default-model", "parent": null}]}
 """
-  http.HttpResponse::ok()
+  let response = http.HttpResponse::ok()
     .set_header("content-type", "application/json")
     .set_header("x-request-id", generate_request_id())
     .json(models_json)
+  let duration = current_timestamp_ms() - start
+  logger::log_info("Model list returned in " ++ int_to_string(duration) ++ "ms")
+  response
 }
 
 // Chat completions endpoint
@@ -47,6 +88,8 @@ pub fn chat_completions_handler(req: http.HttpRequest) -> http.HttpResponse {
   let body_bytes = req.body
   let body = String::from_utf8_bytes(body_bytes)
   let start = current_timestamp_ms()
+
+  start_request_metrics("/v1/chat/completions", "POST")
 
   // Parse request using JSON utilities
   let model = json_util::parse_json_string_field(body, "model", "default-model")
@@ -74,13 +117,18 @@ pub fn chat_completions_handler(req: http.HttpRequest) -> http.HttpResponse {
 
   // Validate required fields
   if model == "" {
-    return http.HttpResponse::bad_request()
+    logger::log_warn("Chat completion request missing model parameter")
+    let response = http.HttpResponse::bad_request()
       .json(protocol::build_error_json(
         400,
         "invalid_request_error",
         "model parameter is required"
       ))
+    end_request_metrics("/v1/chat/completions", "POST", 400, current_timestamp_ms() - start, 0, 0)
+    return response
   }
+
+  logger::log_info("Chat completion request for model: " ++ model)
 
   // Redirect to streaming handler if requested
   if stream {
@@ -105,10 +153,13 @@ pub fn chat_completions_handler(req: http.HttpRequest) -> http.HttpResponse {
 {"id": """" ++ response_id ++ """", "object": "chat.completion", "created": """ ++ int_to_string(created) ++ """, "model": """" ++ model ++ """", "choices": [{"index": 0, "message": {"role": "assistant", "content": """" ++ response_text ++ """", "tool_calls": null}, "logprobs": null, "finish_reason": "stop"}], "usage": {"prompt_tokens": """ ++ int_to_string(prompt_tokens) ++ """, "completion_tokens": """ ++ int_to_string(completion_tokens) ++ """, "total_tokens": """ ++ int_to_string(total_tokens) ++ """}, "system_fingerprint": null}
 """
 
+  let duration = current_timestamp_ms() - start
+  end_request_metrics("/v1/chat/completions", "POST", 200, duration, prompt_tokens, completion_tokens)
+
   http.HttpResponse::ok()
     .set_header("content-type", "application/json")
     .set_header("x-request-id", generate_request_id())
-    .set_header("x-response-time-ms", int_to_string(current_timestamp_ms() - start))
+    .set_header("x-response-time-ms", int_to_string(duration))
     .json(response)
 }
 
@@ -157,6 +208,8 @@ pub fn completions_handler(req: http.HttpRequest) -> http.HttpResponse {
   let body = String::from_utf8_bytes(body_bytes)
   let start = current_timestamp_ms()
 
+  start_request_metrics("/v1/completions", "POST")
+
   // Parse request using JSON utilities
   let model = json_util::parse_json_string_field(body, "model", "default-model")
   let prompt = json_util::parse_json_string_field(body, "prompt", "")
@@ -179,13 +232,18 @@ pub fn completions_handler(req: http.HttpRequest) -> http.HttpResponse {
 
   // Validate required fields
   if model == "" {
-    return http.HttpResponse::bad_request()
+    logger::log_warn("Completion request missing model parameter")
+    let response = http.HttpResponse::bad_request()
       .json(protocol::build_error_json(
         400,
         "invalid_request_error",
         "model parameter is required"
       ))
+    end_request_metrics("/v1/completions", "POST", 400, current_timestamp_ms() - start, 0, 0)
+    return response
   }
+
+  logger::log_info("Completion request for model: " ++ model)
 
   // Handle streaming
   if stream {
@@ -209,10 +267,13 @@ pub fn completions_handler(req: http.HttpRequest) -> http.HttpResponse {
 {"id": """" ++ response_id ++ """", "object": "text_completion", "created": """ ++ int_to_string(created) ++ """, "model": """" ++ model ++ """", "choices": [{"index": 0, "text": """" ++ response_text ++ """", "logprobs": null, "finish_reason": "stop"}], "usage": {"prompt_tokens": """ ++ int_to_string(prompt_tokens) ++ """, "completion_tokens": """ ++ int_to_string(completion_tokens) ++ """, "total_tokens": """ ++ int_to_string(total_tokens) ++ """}}
 """
 
+  let duration = current_timestamp_ms() - start
+  end_request_metrics("/v1/completions", "POST", 200, duration, prompt_tokens, completion_tokens)
+
   http.HttpResponse::ok()
     .set_header("content-type", "application/json")
     .set_header("x-request-id", generate_request_id())
-    .set_header("x-response-time-ms", int_to_string(current_timestamp_ms() - start))
+    .set_header("x-response-time-ms", int_to_string(duration))
     .json(response)
 }
 
@@ -335,35 +396,22 @@ pub fn encode_handler(req: http.HttpRequest) -> http.HttpResponse {
 // Metrics endpoint (Prometheus format)
 /// GET /metrics
 pub fn metrics_handler(req: http.HttpRequest) -> http.HttpResponse {
-  // Base HTTP metrics
-  let http_metrics = """# HELP http_requests_total Total number of HTTP requests
-# TYPE http_requests_total counter
-http_requests_total{method="GET",path="/v1/models"} 0
-http_requests_total{method="POST",path="/v1/chat/completions"} 0
-http_requests_total{method="POST",path="/v1/completions"} 0
+  logger::log_debug("Metrics endpoint requested")
 
-# HELP request_duration_seconds Request duration in seconds
-# TYPE request_duration_seconds histogram
-request_duration_seconds_bucket{le="0.005"} 0
-request_duration_seconds_bucket{le="0.01"} 0
-request_duration_seconds_bucket{le="0.05"} 0
-request_duration_seconds_bucket{le="0.1"} 0
-request_duration_seconds_bucket{le="1"} 0
-request_duration_seconds_bucket{le="+Inf"} 0
-
-# HELP active_requests Number of currently active requests
-# TYPE active_requests gauge
-active_requests 0
-
-"""
+  // Export metrics from the collector
+  let collector_metrics = request_metrics.to_prometheus()
 
   // Add streaming metrics
   let stream_metrics_str = streaming::StreamingMetrics::to_prometheus(stream_metrics)
 
+  let combined = "# LMDeploy MoonBit Server Metrics\n\n" ++ collector_metrics ++ "\n" ++ stream_metrics_str
+
+  logger::log_debug("Metrics response generated")
+
   http.HttpResponse::ok()
     .set_header("content-type", "text/plain; version=0.0.4")
     .set_header("x-request-id", generate_request_id())
-    .json(http_metrics ++ stream_metrics_str)
+    .json(combined)
 }
 
 // Tokenize endpoint with cache
