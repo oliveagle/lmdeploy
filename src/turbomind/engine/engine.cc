@@ -924,8 +924,11 @@ shared_ptr<ScheduleMetrics> Engine::GetScheduleMetrics()
 
 void Engine::EnableDFlash(bool enable)
 {
+    TM_LOG_INFO("[DFlash] Engine::EnableDFlash: this={:p}, enable={:d}", (void*)this, (int)enable);
     impl_->model_.SetDFlashContext(impl_->ctx_);
     impl_->model_.EnableDFlash(enable);
+    // Just log that we're done - the decoder's EnableDFlash will log the final state
+    TM_LOG_INFO("[DFlash] Engine::EnableDFlash: done, enable={:d}", (int)enable);
 }
 
 void Engine::GetDFlashStats(int& total_draft_steps,

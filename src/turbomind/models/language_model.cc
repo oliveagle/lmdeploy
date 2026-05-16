@@ -83,6 +83,13 @@ struct LanguageModel::Impl {
     std::optional<OutputProcessor>  output_processor_;
     std::unique_ptr<Generation>     generation_;  // token generator
 
+    // DFlash draft token storage (跨调用持久化)
+    Tensor dflash_stored_draft_tokens_;  // 存储待验证的 draft tokens
+    Tensor dflash_stored_draft_logits_;  // 存储 draft logits
+
+    // DFlash draft model pointer for verification
+    DFlashDraftModel* dflash_draft_model_{nullptr};
+
     void Run(BatchOp op, int phase, TensorMap& env)
     {
         switch (op) {
@@ -446,7 +453,22 @@ void LanguageModel::Impl::Forward(int phase, TensorMap& env)
 
     env.produce("output_norm_weight", weights_.output_norm_weight);
 
+    // DFlash: 传递已存储的 draft tokens 给 decoder（用于 DECODE 阶段验证）
+    if (dflash_stored_draft_tokens_) {
+        TM_LOG_INFO("[DFlash] LanguageModel::Forward: passing stored draft tokens, shape={}", dflash_stored_draft_tokens_.shape(0));
+        env.produce("dflash_stored_draft_tokens", dflash_stored_draft_tokens_);
+    }
+
     unified_decoder_->Forward(phase, env, weights_.decoder_layer_weights);
+
+    // DFlash: 获取新生成的 draft tokens 并存储（用于下一次迭代）
+    if (auto* draft_tokens = env.try_("dflash_stored_draft_tokens")) {
+        TM_LOG_INFO("[DFlash] LanguageModel::Forward: storing new draft tokens, shape={}", draft_tokens->shape(0));
+        dflash_stored_draft_tokens_ = *draft_tokens;
+        if (auto* draft_logits = env.try_("dflash_stored_draft_logits")) {
+            dflash_stored_draft_logits_ = *draft_logits;
+        }
+    }
 
     // env.at("batch").data<BatchData*>()[0]->Notify();
 
@@ -458,7 +480,9 @@ void LanguageModel::Impl::Forward(int phase, TensorMap& env)
 
     output_processor_->OutputHiddenStatesAndLogits(phase, env, 1);
 
+    TM_LOG_INFO("[DFlash] LanguageModel::Forward END: d.n_generating={}", d.n_generating);
     if (d.n_generating) {
+        TM_LOG_INFO("[DFlash] LanguageModel::Forward: Calling generation_->Run");
         generation_->Run(BatchOp::kForward, phase, env);
         Copy(env.at("output_ids").buffer(), autoreg_ids_);
     }
@@ -583,23 +607,28 @@ void LanguageModel::EnableDFlash(bool enable)
 
         // Verify weight pointer was set correctly
         DFlashDraftWeight* weight = dflash_model->GetDraftWeight();
-        TM_LOG_INFO("[DFlash] Verifying weight pointer: GetDraftWeight()=%p",
+        TM_LOG_INFO("[DFlash] Verifying weight pointer: GetDraftWeight()={}",
                    (void*)weight);
 
         // Verify weights are accessible
         if (weight && weight->num_layers > 0) {
-            TM_LOG_INFO("[DFlash] Verifying layer 0 weights: qkv valid={}, data={}",
-                       (bool)weight->d_attn_qkv_weight[0],
-                       (void*)weight->d_attn_qkv_weight[0].raw_data());
+            TM_LOG_INFO("[DFlash] Verifying layer 0 weights");
         }
 
         // Attach draft model to decoder
         impl->unified_decoder_->SetDFlashDraftModel(dflash_model.release());
         impl->unified_decoder_->EnableDFlash(true);
 
-        TM_LOG_INFO("[DFlash] Enabled DFlash on LanguageModel decoder: enable={}, model={}",
-                    impl->unified_decoder_->IsDFlashEnabled(),
-                    (void*)impl->unified_decoder_->GetDFlashDraftModel());
+        TM_LOG_INFO("[DFlash] DFlash enabled successfully!");
+        TM_LOG_INFO("[DFlash]   enable_dflash_={:d}, dflash_draft_model_={:p}",
+                   (int)impl->unified_decoder_->IsDFlashEnabled(),
+                   (void*)impl->unified_decoder_->GetDFlashDraftModel());
+
+        // Force synchronized check - verify decoder state right now
+        TM_LOG_INFO("[DFlash] POST-ENABLE CHECK: IsDFlashEnabled()={:d}, GetDFlashDraftModel()={:p}, decoder addr={:p}",
+                   (int)impl->unified_decoder_->IsDFlashEnabled(),
+                   (void*)impl->unified_decoder_->GetDFlashDraftModel(),
+                   (void*)impl->unified_decoder_.get());
     }
     catch (const std::exception& e) {
         TM_LOG_ERROR("[DFlash] Failed to enable DFlash: {}", e.what());
