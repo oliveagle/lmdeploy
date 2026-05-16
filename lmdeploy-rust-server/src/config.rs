@@ -9,6 +9,7 @@ pub struct AppConfig {
     pub model: ModelConfig,
     pub cache: CacheConfig,
     pub logging: LoggingConfig,
+    pub metrics: MetricsConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -85,6 +86,20 @@ pub struct LoggingConfig {
     pub json_format: bool,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MetricsConfig {
+    #[serde(default = "default_metrics_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_metrics_addr")]
+    pub host: String,
+    #[serde(default = "default_metrics_port")]
+    pub port: u16,
+}
+
+fn default_metrics_enabled() -> bool { true }
+fn default_metrics_addr() -> String { "0.0.0.0".into() }
+fn default_metrics_port() -> u16 { 9090 }
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -121,6 +136,11 @@ impl Default for AppConfig {
             logging: LoggingConfig {
                 level: "info".into(),
                 json_format: true,
+            },
+            metrics: MetricsConfig {
+                enabled: true,
+                host: "0.0.0.0".into(),
+                port: 9090,
             },
         }
     }

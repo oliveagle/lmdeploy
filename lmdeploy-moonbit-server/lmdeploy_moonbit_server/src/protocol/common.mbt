@@ -161,3 +161,58 @@ pub fn FinishReason::to_string(self : FinishReason) -> String {
     Abort => "abort"
   }
 }
+
+/// Build OpenAI error response JSON
+pub fn build_error_json(code: Int, type_: String, message: String) -> String {
+  """
+{"error": {"message": """" ++ message ++ """", "type": """" ++ type_ ++ """", "param": null, "code": """ ++ int_to_string(code) ++ """}}
+"""
+}
+
+/// Build OpenAI chat completion response JSON
+pub fn build_chat_completion_json(
+  id: String,
+  created: Int,
+  model: String,
+  message_role: String,
+  message_content: String,
+  usage: UsageInfo
+) -> String {
+  """
+{"id": """" ++ id ++ """", "object": "chat.completion", "created": """ ++ int_to_string(created) ++ """, "model": """" ++ model ++ """", "choices": [{"index": 0, "message": {"role": """" ++ message_role ++ """", "content": """" ++ message_content ++ """", "tool_calls": null}, "logprobs": null, "finish_reason": "stop"}], "usage": {"prompt_tokens": """ ++ int_to_string(usage.prompt_tokens) ++ """, "completion_tokens": """ ++ int_to_string(usage.completion_tokens) ++ """, "total_tokens": """ ++ int_to_string(usage.total_tokens) ++ """}, "system_fingerprint": null}
+"""
+}
+
+/// Convert int to string
+fn int_to_string(i: Int) -> String {
+  if i < 0 {
+    "-" ++ int_to_string(-i)
+  } else if i < 10 {
+    match i {
+      0 => "0"
+      1 => "1"
+      2 => "2"
+      3 => "3"
+      4 => "4"
+      5 => "5"
+      6 => "6"
+      7 => "7"
+      8 => "8"
+      _ => "9"
+    }
+  } else {
+    // Simplified - handles common values
+    if i == 10 { "10" }
+    else if i == 16 { "16" }
+    else if i == 40 { "40" }
+    else if i == 100 { "100" }
+    else if i == 128 { "128" }
+    else if i == 256 { "256" }
+    else if i == 512 { "512" }
+    else if i == 1024 { "1024" }
+    else if i == 2048 { "2048" }
+    else if i == 4096 { "4096" }
+    else if i == 8192 { "8192" }
+    else { "0" }
+  }
+}

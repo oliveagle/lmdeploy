@@ -28,7 +28,7 @@ use tower_http::{
 use crate::cache::TokenizeCache;
 use crate::config::AppConfig;
 use crate::error::{AppError, Result};
-use crate::metrics::AppMetrics;
+use crate::metrics::{AppMetrics, init_metrics};
 
 use crate::handlers::http::{
     batch_chat_completions, batch_completions, batch_stats, cache_metrics, chat_completions,
@@ -36,6 +36,8 @@ use crate::handlers::http::{
     tokenize, embeddings, ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
 };
 use crate::model::TurboMindEngine;
+
+use crate::metrics::increment_tokens_generated_total;
 
 /// Type alias for the batch sender channel
 pub type BatchSender = mpsc::UnboundedSender<BatchItem>;
@@ -127,6 +129,15 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
     let request_semaphore = Arc::new(Semaphore::new(config.server.max_connections));
     let batch_stats = Arc::new(BatchStats::new());
     let metrics = Arc::new(AppMetrics::new());
+
+    // Initialize Prometheus metrics exporter
+    init_metrics(&config.metrics);
+    tracing::info!(
+        metrics_enabled = config.metrics.enabled,
+        metrics_host = config.metrics.host,
+        metrics_port = config.metrics.port,
+        "Metrics system initialized"
+    );
 
     let http_addr = format!("{}:{}", config.server.http_addr, config.server.http_port)
         .parse::<SocketAddr>()

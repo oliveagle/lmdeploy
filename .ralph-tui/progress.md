@@ -21,6 +21,11 @@ after each iteration and it's included in prompts for context.
   - `Prompt` enum: `Single(String)` or `Multiple(Vec<String>)` for `prompt` parameter
   - `EmbeddingInput` enum: `Single(String)` or `Multiple(Vec<String>)` for `input` parameter
   - This matches OpenAI API spec where these fields accept either format
+- **Prometheus Metrics Pattern**: Use `metrics-exporter-prometheus` crate with its own HTTP listener
+  - `PrometheusBuilder::new().with_http_listener(addr).install()` sets up `/metrics` endpoint automatically
+  - Use `metrics::histogram!`, `metrics::counter!` macros for recording metrics
+  - Separate metrics server on dedicated port (default 9090) avoids mixing with application traffic
+  - Metrics config via `[metrics]` section in TOML: `enabled`, `host`, `port`
 
 ---
 
@@ -207,5 +212,50 @@ US-007 was already fully implemented in a previous iteration. All acceptance cri
 ### Pre-existing Issues (not fixed in this story)
 - Pre-existing clippy warnings in test code (unused variables)
 - Mock engine responses instead of real TurboMind integration
+
+---
+
+## [2026-05-16] - US-008: 日志和监控
+
+### What was implemented
+1. **Prometheus Metrics Exporter** (`metrics.rs`):
+   - `init_metrics()` initializes `metrics-exporter-prometheus` HTTP server on configurable port
+   - `record_request_duration()` - request latency histogram (`request_duration_seconds`)
+   - `record_prefill_duration()` - prefill latency histogram (`prefill_duration_seconds`)
+   - `record_decode_tokens_per_second()` - decode throughput histogram (`decode_tokens_per_second`)
+   - `increment_requests_total()` - request counter (`requests_total`)
+   - `increment_tokens_generated_total(n)` - token counter (`tokens_generated_total`)
+   - `RequestTimer` - RAII-style timer that auto-records on drop
+   - `InferenceTimer` - tracks prefill + decode timing with structured logging
+   - `StreamMetrics` enhanced with `total_stream_tokens` counter and Prometheus histogram integration
+
+2. **Config Extension** (`config.rs`):
+   - Added `MetricsConfig` struct with `enabled`, `host`, `port` fields
+   - Added to `AppConfig` with defaults: port 9090, host 0.0.0.0
+
+3. **Server Integration** (`server.rs`):
+   - Metrics initialized in `start_server()` before HTTP server starts
+   - Logs metrics configuration on startup
+
+4. **Default Config** (`config/default.toml`):
+   - Added `[metrics]` section with enabled=true, host=0.0.0.0, port=9090
+
+5. **Structured JSON Logging** (pre-existing, verified):
+   - `tracing-subscriber` with JSON layer enabled via `config.logging.json_format`
+   - Log level configurable via `EnvFilter` (DEBUG/INFO/WARN/ERROR)
+   - Env var override: `RUST_LOG=debug`
+
+### Files changed
+- `lmdeploy-rust-server/src/metrics.rs` - Rewritten with full Prometheus metrics support
+- `lmdeploy-rust-server/src/config.rs` - Added `MetricsConfig` struct and default
+- `lmdeploy-rust-server/src/server.rs` - Added metrics initialization call
+- `lmdeploy-rust-server/config/default.toml` - Added `[metrics]` section
+
+### Learnings
+- **PrometheusBuilder Pattern**: The `metrics-exporter-prometheus` crate sets up its own HTTP server via `with_http_listener(addr)`, automatically serving `/metrics` at that address. No separate Axum route needed.
+- **Metrics Macro API**: `metrics::histogram!("name").record(value)` and `metrics::counter!("name").increment(n)` are the standard patterns.
+- **AtomicU64 Clone**: Manual Clone implementation required for `AtomicU64` fields in metrics structs.
+- **RAII Timer Pattern**: `RequestTimer` uses `finish(self)` for explicit timing, auto-records request count and duration.
+- **Config Extension**: Adding new config sections requires updating both the struct AND the `Default` impl.
 
 ---

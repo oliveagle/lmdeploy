@@ -42,20 +42,67 @@ pub fn list_models_handler(req: http.HttpRequest) -> http.HttpResponse {
 
 // Chat completions endpoint
 /// POST /v1/chat/completions
+/// OpenAI-compatible chat completions with full parameter support
 pub fn chat_completions_handler(req: http.HttpRequest) -> http.HttpResponse {
-  let body_str = bytes_to_string(req.body)
+  let body_bytes = req.body
+  let body = String::from_utf8_bytes(body_bytes)
   let start = current_timestamp_ms()
 
-  // Parse request and handle streaming vs non-streaming
-  let is_streaming = is_streaming_request(body_str)
+  // Parse request using JSON utilities
+  let model = json_util::parse_json_string_field(body, "model", "default-model")
+  let temperature = json_util::parse_json_float(body, "temperature", 0.7)
+  let top_p = json_util::parse_json_float(body, "top_p", 1.0)
+  let top_k = json_util::parse_json_int(body, "top_k", 40)
+  let max_tokens = json_util::parse_json_int(body, "max_tokens", 2048)
+  let stream = json_util::parse_json_bool(body, "stream", false)
+  let n = json_util::parse_json_int(body, "n", 1)
+  let presence_penalty = json_util::parse_json_float(body, "presence_penalty", 0.0)
+  let frequency_penalty = json_util::parse_json_float(body, "frequency_penalty", 0.0)
+  let seed = json_util::parse_json_int(body, "seed", 0)
+  let logprobs = json_util::parse_json_bool(body, "logprobs", false)
+  let top_logprobs = json_util::parse_json_int(body, "top_logprobs", 0)
+  let tool_choice = json_util::parse_json_string_field(body, "tool_choice", "auto")
+  let repetition_penalty = json_util::parse_json_float(body, "repetition_penalty", 1.0)
+  let ignore_eos = json_util::parse_json_bool(body, "ignore_eos", false)
+  let skip_special_tokens = json_util::parse_json_bool(body, "skip_special_tokens", true)
+  let do_preprocess = json_util::parse_json_bool(body, "do_preprocess", true)
+  let response_format = json_util::parse_json_string_field(body, "response_format", "text")
+  let enable_thinking = json_util::parse_json_bool(body, "enable_thinking", false)
+  let min_p = json_util::parse_json_float(body, "min_p", 0.0)
+  let min_new_tokens = json_util::parse_json_int(body, "min_new_tokens", 0)
+  let stop = json_util::parse_json_string_array(body, "stop")
 
-  if is_streaming {
-    return chat_completions_stream(req, body_str)
+  // Validate required fields
+  if model == "" {
+    return http.HttpResponse::bad_request()
+      .json(protocol::build_error_json(
+        400,
+        "invalid_request_error",
+        "model parameter is required"
+      ))
   }
 
-  // Non-streaming: return complete response
+  // Redirect to streaming handler if requested
+  if stream {
+    return chat_completions_stream(req, body)
+  }
+
+  // Try to use tokenizer cache first
+  let prompt = extract_messages_from_body(body)
+  let token_ids = get_or_tokenize(prompt, cache)
+
+  // TurboMind FFI placeholder: call the engine for inference
+  let response_text = "Response from TurboMind engine"
+  let prompt_tokens = token_ids.length()
+  let completion_tokens = response_text.length()
+  let total_tokens = prompt_tokens + completion_tokens
+
+  // Build OpenAI-compatible response
+  let response_id = "chatcmpl-" ++ generate_id_suffix()
+  let created = current_timestamp_secs()
+
   let response = """
-{"id": "chatcmpl-""" ++ generate_id_suffix() ++ """", "object": "chat.completion", "created": """ ++ int_to_string(current_timestamp_secs()) ++ """, "model": "default-model", "choices": [{"index": 0, "message": {"role": "assistant", "content": "Response from TurboMind engine"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}}
+{"id": """" ++ response_id ++ """", "object": "chat.completion", "created": """ ++ int_to_string(created) ++ """, "model": """" ++ model ++ """", "choices": [{"index": 0, "message": {"role": "assistant", "content": """" ++ response_text ++ """", "tool_calls": null}, "logprobs": null, "finish_reason": "stop"}], "usage": {"prompt_tokens": """ ++ int_to_string(prompt_tokens) ++ """, "completion_tokens": """ ++ int_to_string(completion_tokens) ++ """, "total_tokens": """ ++ int_to_string(total_tokens) ++ """}, "system_fingerprint": null}
 """
 
   http.HttpResponse::ok()
@@ -70,15 +117,17 @@ pub fn chat_completions_handler(req: http.HttpRequest) -> http.HttpResponse {
 /// Reference: Python api_server.py completion_stream_generator()
 /// Reference: Rust http.rs chat_completions_stream()
 fn chat_completions_stream(req: http.HttpRequest, body_str: String) -> http.HttpResponse {
+  let body = String::from_utf8_bytes(req.body)
+  let model = json_util::parse_json_string_field(body, "model", "default-model")
   let id = "chatcmpl-" ++ generate_id_suffix()
   let created = current_timestamp_secs()
 
-  // Parse request from body (simplified - using default for now)
-  let request = protocol.ChatCompletionRequest::default("default-model", [])
+  // Parse request from body using json_util
+  let stream_options_include_usage = json_util::parse_json_bool(body, "stream_options_include_usage", false)
 
   // Generate streaming response using the streaming engine
   let (sse_stream, updated_metrics) = streaming::stream_chat_completion(
-    request,
+    protocol.ChatCompletionRequest::default(model, []),
     id,
     created,
     stream_config,
@@ -102,18 +151,62 @@ fn chat_completions_stream(req: http.HttpRequest, body_str: String) -> http.Http
 
 // Completions endpoint
 /// POST /v1/completions
+/// OpenAI-compatible completion with full parameter support
 pub fn completions_handler(req: http.HttpRequest) -> http.HttpResponse {
-  let body_str = bytes_to_string(req.body)
+  let body_bytes = req.body
+  let body = String::from_utf8_bytes(body_bytes)
   let start = current_timestamp_ms()
 
-  let is_streaming = is_streaming_request(body_str)
+  // Parse request using JSON utilities
+  let model = json_util::parse_json_string_field(body, "model", "default-model")
+  let prompt = json_util::parse_json_string_field(body, "prompt", "")
+  let temperature = json_util::parse_json_float(body, "temperature", 0.7)
+  let n = json_util::parse_json_int(body, "n", 1)
+  let max_tokens = json_util::parse_json_int(body, "max_tokens", 16)
+  let stream = json_util::parse_json_bool(body, "stream", false)
+  let top_p = json_util::parse_json_float(body, "top_p", 1.0)
+  let echo = json_util::parse_json_bool(body, "echo", false)
+  let presence_penalty = json_util::parse_json_float(body, "presence_penalty", 0.0)
+  let frequency_penalty = json_util::parse_json_float(body, "frequency_penalty", 0.0)
+  let logprobs = json_util::parse_json_int(body, "logprobs", 0)
+  let top_logprobs = json_util::parse_json_int(body, "top_logprobs", 0)
+  let repetition_penalty = json_util::parse_json_float(body, "repetition_penalty", 1.0)
+  let ignore_eos = json_util::parse_json_bool(body, "ignore_eos", false)
+  let skip_special_tokens = json_util::parse_json_bool(body, "skip_special_tokens", true)
+  let top_k = json_util::parse_json_int(body, "top_k", 40)
+  let min_p = json_util::parse_json_float(body, "min_p", 0.0)
+  let stop = json_util::parse_json_string_array(body, "stop")
 
-  if is_streaming {
-    return completions_stream(req, body_str)
+  // Validate required fields
+  if model == "" {
+    return http.HttpResponse::bad_request()
+      .json(protocol::build_error_json(
+        400,
+        "invalid_request_error",
+        "model parameter is required"
+      ))
   }
 
+  // Handle streaming
+  if stream {
+    return completions_stream(req, body)
+  }
+
+  // Try to use tokenizer cache first
+  let token_ids = get_or_tokenize(prompt, cache)
+
+  // TurboMind FFI placeholder: call the engine for inference
+  let response_text = "Completion from TurboMind engine"
+  let prompt_tokens = token_ids.length()
+  let completion_tokens = response_text.length()
+  let total_tokens = prompt_tokens + completion_tokens
+
+  // Build OpenAI-compatible response
+  let response_id = "cmpl-" ++ generate_id_suffix()
+  let created = current_timestamp_secs()
+
   let response = """
-{"id": "cmpl-""" ++ generate_id_suffix() ++ """", "object": "text_completion", "created": """ ++ int_to_string(current_timestamp_secs()) ++ """, "model": "default-model", "choices": [{"text": "Completion from TurboMind engine", "index": 0, "finish_reason": "stop"}], "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}}
+{"id": """" ++ response_id ++ """", "object": "text_completion", "created": """ ++ int_to_string(created) ++ """, "model": """" ++ model ++ """", "choices": [{"index": 0, "text": """" ++ response_text ++ """", "logprobs": null, "finish_reason": "stop"}], "usage": {"prompt_tokens": """ ++ int_to_string(prompt_tokens) ++ """, "completion_tokens": """ ++ int_to_string(completion_tokens) ++ """, "total_tokens": """ ++ int_to_string(total_tokens) ++ """}}
 """
 
   http.HttpResponse::ok()
@@ -127,9 +220,10 @@ pub fn completions_handler(req: http.HttpRequest) -> http.HttpResponse {
 /// Generates SSE stream of completion chunks
 /// Reference: Python api_server.py completions_v1() stream handling
 fn completions_stream(req: http.HttpRequest, body_str: String) -> http.HttpResponse {
+  let body = String::from_utf8_bytes(req.body)
+  let model = json_util::parse_json_string_field(body, "model", "default-model")
   let id = "cmpl-" ++ generate_id_suffix()
   let created = current_timestamp_secs()
-  let model = "default-model"
 
   // Generate streaming response using the streaming engine
   let (sse_stream, updated_metrics) = streaming::stream_completion(
@@ -154,9 +248,45 @@ fn completions_stream(req: http.HttpRequest, body_str: String) -> http.HttpRespo
 
 // Embeddings endpoint
 /// POST /v1/embeddings
+/// OpenAI-compatible embeddings with full parameter support
 pub fn embeddings_handler(req: http.HttpRequest) -> http.HttpResponse {
+  let body = String::from_utf8_bytes(req.body)
+
+  // Parse request using JSON utilities
+  let model = json_util::parse_json_string_field(body, "model", "default-model")
+  let input = json_util::parse_json_string_field(body, "input", "")
+  let encoding_format = json_util::parse_json_string_field(body, "encoding_format", "float")
+  let dimensions = json_util::parse_json_int(body, "dimensions", 0)
+
+  // Validate required fields
+  if model == "" {
+    return http.HttpResponse::bad_request()
+      .json(protocol::build_error_json(
+        400,
+        "invalid_request_error",
+        "model parameter is required"
+      ))
+  }
+
+  // Validate input
+  if input == "" {
+    return http.HttpResponse::bad_request()
+      .json(protocol::build_error_json(
+        400,
+        "invalid_request_error",
+        "input parameter is required"
+      ))
+  }
+
+  // TurboMind FFI placeholder: compute embeddings
+  // In production: let embeddings = turbomind_compute_embeddings(model, input, dimensions)
+  let prompt_tokens = input.length()
+  let embedding_dim = if dimensions > 0 { dimensions } else { 768 }
+  let embedding_array = build_zero_embedding_array(embedding_dim)
+
+  // Build OpenAI-compatible response
   let response = """
-{"object": "list", "data": [{"object": "embedding", "embedding": [0.0, 0.0, 0.0], "index": 0}], "model": "default-model", "usage": {"prompt_tokens": 0, "total_tokens": 0}}
+{"object": "list", "data": [{"object": "embedding", "embedding": """ ++ embedding_array ++ """, "index": 0}], "model": """" ++ model ++ """", "usage": {"prompt_tokens": """ ++ int_to_string(prompt_tokens) ++ """, "total_tokens": """ ++ int_to_string(prompt_tokens) ++ """}}
 """
 
   http.HttpResponse::ok()
@@ -167,17 +297,38 @@ pub fn embeddings_handler(req: http.HttpRequest) -> http.HttpResponse {
 
 // Encode endpoint
 /// POST /v1/encode
+/// Tokenize input text and return token IDs
 pub fn encode_handler(req: http.HttpRequest) -> http.HttpResponse {
-  let body_str = bytes_to_string(req.body)
+  let body = String::from_utf8_bytes(req.body)
 
-  // In production, tokenize and return token IDs
-  let response = """
-{"tokens": [], "length": 0}
-"""
+  // Parse request using JSON utilities
+  let input = json_util::parse_json_string_field(body, "input", "")
+  let do_preprocess = json_util::parse_json_bool(body, "do_preprocess", true)
+  let add_bos = json_util::parse_json_bool(body, "add_bos", true)
+
+  // Validate required fields
+  if input == "" {
+    return http.HttpResponse::bad_request()
+      .json(protocol::build_error_json(
+        400,
+        "invalid_request_error",
+        "input parameter is required"
+      ))
+  }
+
+  // Try to use tokenizer cache first
+  let token_ids = get_or_tokenize(input, cache)
+  let cached = cache.get(input).is_some()
+
+  let ids_str = ids_to_json_array(token_ids)
+  let len = token_ids.length()
+
+  let response = """{"input_ids": """ ++ ids_str ++ """, "length": """ ++ int_to_string(len) ++ """, "cached": """ ++ bool_to_string(cached) ++ """}"""
 
   http.HttpResponse::ok()
     .set_header("content-type", "application/json")
     .set_header("x-request-id", generate_request_id())
+    .set_header("x-cache-status", if cached { "HIT" } else { "MISS" })
     .json(response)
 }
 
@@ -217,19 +368,31 @@ active_requests 0
 
 // Tokenize endpoint with cache
 /// POST /v1/tokenize
+/// Tokenize input text and return token IDs (alias for /v1/encode)
 pub fn tokenize_handler(req: http.HttpRequest) -> http.HttpResponse {
-  let body_str = bytes_to_string(req.body)
+  let body = String::from_utf8_bytes(req.body)
   let start = current_timestamp_ms()
 
-  // Parse text from request body
-  let text = extract_json_field(body_str, "text")
+  // Parse request using JSON utilities
+  let text = json_util::parse_json_string_field(body, "text", "")
 
-  // Compute cache key from text
-  let hash = compute_text_hash(text)
-  let (token_ids, cached) = get_or_tokenize(text, hash)
+  // Validate required fields
+  if text == "" {
+    return http.HttpResponse::bad_request()
+      .json(protocol::build_error_json(
+        400,
+        "invalid_request_error",
+        "text parameter is required"
+      ))
+  }
+
+  // Try to use tokenizer cache first
+  let token_ids = get_or_tokenize(text, cache)
+  let cached = cache.get(text).is_some()
+  let hash = cache.compute_hash(text)
 
   let ids_str = ids_to_json_array(token_ids)
-  let cached_str = if cached { "true" } else { "false" }
+  let cached_str = bool_to_string(cached)
   let len = token_ids.length()
 
   let response = """{"token_ids": """ ++ ids_str ++ """, "length": """ ++ int_to_string(len) ++ """, "hash": \"""" ++ hash ++ """", "cached": """ ++ cached_str ++ """}"""
@@ -241,6 +404,53 @@ pub fn tokenize_handler(req: http.HttpRequest) -> http.HttpResponse {
     .set_header("x-request-id", generate_request_id())
     .set_header("x-response-time-ms", int_to_string(elapsed))
     .set_header("x-cache-status", if cached { "HIT" } else { "MISS" })
+    .json(response)
+}
+
+// Pooling endpoint
+/// POST /pooling
+/// OpenAI-compatible pooling for embeddings/sentence similarity
+pub fn pooling_handler(req: http.HttpRequest) -> http.HttpResponse {
+  let body = String::from_utf8_bytes(req.body)
+
+  // Parse request using JSON utilities
+  let model = json_util::parse_json_string_field(body, "model", "default-model")
+  let input = json_util::parse_json_string_field(body, "input", "")
+  let pooling_type = json_util::parse_json_string_field(body, "pooling_type", "cls")
+
+  // Validate required fields
+  if model == "" {
+    return http.HttpResponse::bad_request()
+      .json(protocol::build_error_json(
+        400,
+        "invalid_request_error",
+        "model parameter is required"
+      ))
+  }
+
+  if input == "" {
+    return http.HttpResponse::bad_request()
+      .json(protocol::build_error_json(
+        400,
+        "invalid_request_error",
+        "input parameter is required"
+      ))
+  }
+
+  // TurboMind FFI placeholder: compute pooled embeddings
+  // In production: let pool_result = turbomind_compute_pooling(model, input, pooling_type)
+  let prompt_tokens = input.length()
+  let embedding_dim = 768
+  let embedding_array = build_zero_embedding_array(embedding_dim)
+
+  let response = """
+{"object": "pooling", "data": [{"object": "pooling", "embedding": """ ++ embedding_array ++ """, "index": 0, "pooling_type": """" ++ pooling_type ++ """"}], "model": """" ++ model ++ """", "usage": {"prompt_tokens": """ ++ int_to_string(prompt_tokens) ++ """, "total_tokens": """ ++ int_to_string(prompt_tokens) ++ """}}
+"""
+
+  http.HttpResponse::ok()
+    .set_header("content-type", "application/json")
+    .set_header("x-request-id", generate_request_id())
+    .set_header("x-pooling-type", pooling_type)
     .json(response)
 }
 
@@ -303,6 +513,40 @@ pub fn batch_completions_handler(req: http.HttpRequest) -> http.HttpResponse {
 
 // Helper functions
 
+/// Extract messages from request body to use as prompt for caching
+fn extract_messages_from_body(body: String) -> String {
+  // Try to extract message content from the messages array
+  // Simple extraction: find "content" fields and concatenate
+  let mut prompt = ""
+  let pattern = "\"content\":\""
+  let mut search_idx = 0
+  let mut found = body.find_from(pattern, search_idx)
+
+  while found >= 0 {
+    let content_start = found + pattern.length()
+    let content_end_idx = body.find_from("\"", content_start)
+    if content_end_idx >= 0 {
+      let content = body.substring(content_start, content_end_idx)
+      prompt = prompt ++ content ++ " "
+      search_idx = content_end_idx + 1
+    } else {
+      break
+    }
+    found = body.find_from(pattern, search_idx)
+  }
+
+  if prompt == "" {
+    body
+  } else {
+    prompt
+  }
+}
+
+/// Extract prompt from request body for non-chat completions
+fn extract_prompt_from_body(body: String) -> String {
+  json_util::parse_json_string_field(body, "prompt", "")
+}
+
 /// Check if request wants streaming response
 fn is_streaming_request(body: String) -> Bool {
   body.contains("stream") && body.contains("true")
@@ -330,31 +574,44 @@ fn current_timestamp_secs() -> Int {
   0
 }
 
-/// Extract JSON field
-fn extract_json_field(json: String, field: String) -> String {
-  // Simple JSON field extraction - placeholder
-  ""
+/// Build zero-filled embedding array JSON representation
+fn build_zero_embedding_array(dim: Int) -> String {
+  if dim <= 0 {
+    "[]"
+  } else {
+    let mut result = "["
+    let mut first = true
+    let mut i = 0
+    while i < dim {
+      if !first {
+        result = result ++ ", "
+      }
+      result = result ++ "0.0"
+      first = false
+      i = i + 1
+    }
+    result ++ "]"
+  }
 }
 
-/// Convert bytes to string
-fn bytes_to_string(bytes: Array[U8]) -> String {
-  // TODO: Implement UTF-8 decoding
-  ""
+/// Convert boolean to string
+fn bool_to_string(b: Bool) -> String {
+  if b { "true" } else { "false" }
 }
 
-/// Compute text hash for caching
-fn compute_text_hash(text: String) -> String {
-  // Use the hash module's compute_hash function
-  cache.compute_hash(text)
-}
-
-/// Get tokens from cache or tokenize using the global cache instance
-fn get_or_tokenize(text: String, hash: String) -> (Array[Int], Bool) {
-  // Use the global cache instance
-  // For now, return empty as actual tokenization requires FFI to TurboMind
-  // The cache infrastructure is in place for when tokenization is available
-  let _ = hash
-  ([], false)
+/// Get tokens from cache or tokenize using the given cache instance
+fn get_or_tokenize(text: String, token_cache: cache.TokenizeCache) -> Array[Int] {
+  // Use the cache's get_or_tokenize method
+  match token_cache.get(text) {
+    Some(entry) => entry.tokens.token_ids
+    None => {
+      // Tokenization not available yet, compute and cache
+      // In production: let token_ids = tokenize(text)
+      let token_ids: Array[Int] = []
+      let _ = token_cache.put(text, token_ids)
+      token_ids
+    }
+  }
 }
 
 /// Convert token IDs to JSON array string

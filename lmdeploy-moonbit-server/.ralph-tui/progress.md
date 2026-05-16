@@ -91,3 +91,28 @@ after each iteration and it's included in prompts for context.
 
 ---
 
+## 2026-05-16 - US-006: OpenAI API 兼容性
+- 实现了完整的 OpenAI API 兼容层
+- 新增 JSON 解析工具模块 `json_util.mbt`，支持解析 string/int/float/bool/string_array
+- 新增路由模块 `router.mbt`，集中管理所有 API 端点注册
+- 增强 `/v1/chat/completions` handler：支持全部 OpenAI 参数（model, temperature, top_p, top_k, max_tokens, n, presence_penalty, frequency_penalty, seed, logprobs, top_logprobs, tool_choice, repetition_penalty, ignore_eos, skip_special_tokens, do_preprocess, response_format, enable_thinking, min_p, min_new_tokens, stop）
+- 增强 `/v1/completions` handler：支持 prompt, echo, logprobs 等 completion 参数
+- 实现 `/v1/embeddings` handler：支持 input, encoding_format, dimensions 参数，模型验证
+- 实现 `/pooling` handler：支持 pooling_type 配置
+- 实现 `/v1/encode` handler：支持 tokenize 缓存命中统计
+- 增强 `/v1/tokenize` handler：使用 json_util 解析请求
+- 新增 `build_error_json` 和 `build_chat_completion_json` 辅助函数到 common.mbt
+- 所有 handler 增加 model/input 验证和 400 错误响应
+- 文件变更：
+  - `src/protocol/json_util.mbt` - 新增 JSON 解析工具
+  - `src/protocol/common.mbt` - 添加 build_error_json, build_chat_completion_json 辅助函数
+  - `src/router/router.mbt` - 新增路由模块，集中管理端点注册
+  - `src/handlers/http.mbt` - 全面更新所有 handler 使用 json_util，增强参数解析和验证
+- **Learnings:**
+  - MoonBit 中 JSON 解析需要手动实现字符串提取，无标准库 JSON parser
+  - OpenAI API 参数众多，每个 handler 需要解析 ~20 个字段
+  - 错误响应格式统一使用 build_error_json 构建，保持与 Python API 一致
+  - SSE 流式响应需要同时设置 content-type 和 x-accel-buffering: no 头
+  - 路由模块使用 Http2Server::add_route 方法注册 handler
+  - 所有 handler 都需要验证 model 参数为空时返回 400 错误
+

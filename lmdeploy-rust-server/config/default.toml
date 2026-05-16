@@ -43,3 +43,8 @@ tokenizer_ttl_secs = 3600
 [logging]
 level = "info"
 json_format = true
+
+[metrics]
+enabled = true
+host = "0.0.0.0"
+port = 9090
