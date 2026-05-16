@@ -52,3 +52,42 @@ after each iteration and it's included in prompts for context.
 
 ---
 
+## 2026-05-16 - US-005: 流式响应优化
+- 实现了完整的 SSE (Server-Sent Events) 流式响应系统
+- 文件变更：
+  - `src/streaming/config.mbt` - 流式配置（stream_timeout_secs, keepalive_interval_ms, max_chunk_tokens）
+  - `src/streaming/metrics.mbt` - 流式指标（total_streams, avg_first_token_latency_us, total_chunks_sent, stream_timeouts）
+  - `src/streaming/sse.mbt` - SSE 格式化工具（build_chat_stream_chunk, build_completion_stream_chunk, sse_done_event）
+  - `src/streaming/engine.mbt` - 流式引擎集成（stream_chat_completion, stream_completion, is_stream_timeout）
+  - `src/streaming/streaming.mbt` - 流式模块入口（聚合所有流式功能）
+  - `src/handlers/http.mbt` - 更新了 chat_completions_stream 和 completions_stream 使用新流式模块
+- **实现的功能**:
+  - SSE 响应格式：`data: {json}\n\n` 每个数据块
+  - 流终止标记：`data: [DONE]\n\n`
+  - 首次空块（建立流 ID 和 model）
+  - Usage 信息仅在最终块发送（符合 OpenAI API 规范）
+  - JSON 字符串转义（`\"`, `\\`, `\n`, `\r`, `\t`）
+  - Keep-alive 注释支持（`: comment\n\n`）
+  - 首次 token 延迟跟踪（微秒级精度）
+  - 流超时检测（stream_timeout_secs 配置）
+  - Prometheus 指标导出（stream_total, stream_first_token_latency_avg_us, stream_chunks_total, stream_timeouts_total）
+- **响应头优化**:
+  - `content-type: text/event-stream`
+  - `cache-control: no-cache`
+  - `connection: keep-alive`
+  - `x-accel-buffering: no` （禁用 nginx 缓冲）
+  - `x-stream-timeout-secs` （配置的超时时间）
+- **Learnings:**
+  - MoonBit 模块系统使用 `mod` 关键字导入子模块（如 `mod config`, `mod metrics`）
+  - MoonBit 函数式风格：metrics 通过不可变更新传递（如 `metrics.record_chunk()` 返回新 metrics）
+  - SSE 格式严格遵循 OpenAI 规范：初始块有 `role: "assistant"`，后续块只有 `delta.content`
+  - Python 参考：`completion_stream_generator()` 使用 `async for` 迭代器，MoonBit 使用占位符结构
+  - Rust 参考：`StreamMetrics` 使用 AtomicU64，MoonBit 使用不可变结构体（函数式风格）
+  - `Option[T]` 类型用于可选值（如 `finish_reason: Option[String]`），使用 `match` 解构
+  - `String::to_bytes()` 和 `String::from_byte()` 用于字节/字符串转换
+  - Prometheus 指标格式：`# HELP`, `# TYPE` 注释行 + 数据行
+  - 流式响应需要在 HTTP 层设置 `sse()` 响应类型
+  - 模块级常量：`let stream_config = streaming::StreamingConfig::default()` 在模块初始化时设置
+
+---
+

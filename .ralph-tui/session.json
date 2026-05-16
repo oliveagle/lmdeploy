@@ -3,10 +3,10 @@
   "sessionId": "983267ca-dbe9-40a8-a99a-7c92174cccae",
   "status": "running",
   "startedAt": "2026-05-16T14:13:55.196Z",
-  "updatedAt": "2026-05-16T14:46:36.511Z",
-  "currentIteration": 2,
+  "updatedAt": "2026-05-16T14:56:58.440Z",
+  "currentIteration": 3,
   "maxIterations": 50,
-  "tasksCompleted": 1,
+  "tasksCompleted": 2,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -34,12 +34,22 @@
       "durationMs": 957768,
       "startedAt": "2026-05-16T14:30:37.632Z",
       "endedAt": "2026-05-16T14:46:35.400Z"
+    },
+    {
+      "iteration": 3,
+      "status": "completed",
+      "taskId": "US-005",
+      "taskTitle": "流式响应优化",
+      "taskCompleted": true,
+      "durationMs": 614298,
+      "startedAt": "2026-05-16T14:46:36.501Z",
+      "endedAt": "2026-05-16T14:56:50.799Z"
     }
   ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
   "activeTaskIds": [
-    "US-005"
+    "US-006"
   ],
   "subagentPanelVisible": false
 }
