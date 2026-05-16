@@ -9,9 +9,10 @@
       "description": "作为 API 用户 我想要 使用 gRPC 协议调用 LMDeploy 以便 获得比 HTTP/JSON 更高的性能",
       "acceptanceCriteria": [],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "labels": [],
-      "dependsOn": []
+      "dependsOn": [],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-002",
@@ -118,6 +119,6 @@
     "createdAt": "2026-05-16T13:12:13.976Z",
     "version": "1.0.0",
     "sourcePrd": "PRD_MOONBIT_API_SERVER.md",
-    "updatedAt": "2026-05-16T13:12:32.331Z"
+    "updatedAt": "2026-05-16T13:35:56.440Z"
   }
 }

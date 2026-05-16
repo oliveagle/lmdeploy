@@ -8,7 +8,10 @@ use serde::Serialize;
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 use tokio::{
@@ -25,11 +28,16 @@ use tower_http::{
 use crate::cache::TokenizeCache;
 use crate::config::AppConfig;
 use crate::error::{AppError, Result};
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use crate::handlers::http::{
-    cache_metrics, chat_completions, chat_completions_stream, clear_cache, completions, health_check, list_models,
-    tokenize, ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
+    batch_stats, cache_metrics, chat_completions, chat_completions_stream, clear_cache, completions, health_check,
+    list_models, tokenize, ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
 };
 use crate::model::TurboMindEngine;
+
+/// Type alias for the batch sender channel
+pub type BatchSender = mpsc::UnboundedSender<BatchItem>;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -37,6 +45,8 @@ pub struct AppState {
     pub tokenizer_cache: Arc<TokenizeCache>,
     pub config: AppConfig,
     pub request_semaphore: Arc<Semaphore>,
+    pub batch_sender: Option<Arc<BatchSender>>,
+    pub batch_stats: Arc<BatchStats>,
 }
 
 /// Batch request accumulator
@@ -45,13 +55,51 @@ struct BatchAccumulator {
     last_add: Instant,
 }
 
-struct BatchItem {
-    req: ChatCompletionsRequest,
-    tx: oneshot::Sender<ChatCompletionsResponse>,
+pub struct BatchItem {
+    pub req: ChatCompletionsRequest,
+    pub tx: oneshot::Sender<ChatCompletionsResponse>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct BatchStats {
+    pub batch_count: AtomicU64,
+    pub total_requests: AtomicU64,
+}
+
+impl Clone for BatchStats {
+    fn clone(&self) -> Self {
+        Self {
+            batch_count: AtomicU64::new(self.batch_count.load(Ordering::Relaxed)),
+            total_requests: AtomicU64::new(self.total_requests.load(Ordering::Relaxed)),
+        }
+    }
+}
+
+impl BatchStats {
+    pub fn new() -> Self {
+        Self {
+            batch_count: AtomicU64::new(0),
+            total_requests: AtomicU64::new(0),
+        }
+    }
+
+    pub fn batch_response(&self) -> BatchStatsResponse {
+        let batch_count = self.batch_count.load(Ordering::Relaxed);
+        let total_requests = self.total_requests.load(Ordering::Relaxed);
+        BatchStatsResponse {
+            batch_count,
+            total_requests,
+            avg_batch_size: if batch_count > 0 {
+                total_requests as f64 / batch_count as f64
+            } else {
+                0.0
+            },
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct BatchStatsResponse {
     pub batch_count: u64,
     pub total_requests: u64,
     pub avg_batch_size: f64,
@@ -74,13 +122,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
     );
 
     let request_semaphore = Arc::new(Semaphore::new(config.server.max_connections));
-
-    let state = Arc::new(AppState {
-        engine,
-        tokenizer_cache: tokenizer_cache.clone(),
-        config: config.clone(),
-        request_semaphore,
-    });
+    let batch_stats = Arc::new(BatchStats::new());
 
     let http_addr = format!("{}:{}", config.server.http_addr, config.server.http_port)
         .parse::<SocketAddr>()
@@ -89,13 +131,13 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         .parse::<SocketAddr>()
         .unwrap();
 
-    // Start batch processor if enabled
-    let batch_task = if config.server.batch_enabled {
+    // Initialize batch sender if batching is enabled
+    let batch_sender = if config.server.batch_enabled {
         let (batch_tx, batch_rx) = mpsc::unbounded_channel::<BatchItem>();
-        let batch_state = state.clone();
         let batch_size = config.server.batch_size;
         let batch_timeout_ms = config.server.batch_timeout_ms;
         let batch_timeout = Duration::from_millis(config.server.batch_timeout_ms);
+        let stats_clone = batch_stats.clone();
 
         let handle = tokio::spawn(async move {
             tracing::info!(
@@ -103,13 +145,22 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
                 timeout_ms = batch_timeout_ms,
                 "Batch processor started"
             );
-            run_batch_processor(batch_state, batch_rx, batch_size, batch_timeout).await
+            run_batch_processor(batch_rx, batch_size, batch_timeout, stats_clone).await
         });
 
-        Some((handle, batch_tx))
+        Some((Arc::new(batch_tx), handle))
     } else {
         None
     };
+
+    let state = Arc::new(AppState {
+        engine,
+        tokenizer_cache: tokenizer_cache.clone(),
+        config: config.clone(),
+        request_semaphore,
+        batch_sender: batch_sender.as_ref().map(|(tx, _)| tx.clone()),
+        batch_stats,
+    });
 
     // Spawn gRPC server
     let grpc_handle = tokio::spawn(async move {
@@ -153,7 +204,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
     }
 
     // Shutdown batch processor
-    if let Some((handle, _tx)) = batch_task {
+    if let Some((_, handle)) = batch_sender {
         handle.abort();
     }
 
@@ -213,14 +264,12 @@ async fn shutdown_signal() {
 
 /// Batch processor for accumulating and executing inference requests
 async fn run_batch_processor(
-    state: Arc<AppState>,
     mut rx: mpsc::UnboundedReceiver<BatchItem>,
     batch_size: usize,
     batch_timeout: Duration,
+    stats: Arc<BatchStats>,
 ) {
     let mut accumulator: HashMap<String, BatchAccumulator> = HashMap::new();
-    let mut batch_count: u64 = 0;
-    let mut total_requests: u64 = 0;
 
     loop {
         tokio::select! {
@@ -228,7 +277,7 @@ async fn run_batch_processor(
             item_opt = rx.recv() => {
                 let Some(item) = item_opt else {
                     // Channel closed, flush remaining batches
-                    flush_all_batches(&state, &mut accumulator).await;
+                    flush_all_batches(&mut accumulator, &stats).await;
                     break;
                 };
 
@@ -239,7 +288,7 @@ async fn run_batch_processor(
                 });
 
                 entry.requests.push(item);
-                total_requests += 1;
+                stats.total_requests.fetch_add(1, Ordering::Relaxed);
 
                 tracing::debug!(
                     model = %model,
@@ -249,16 +298,18 @@ async fn run_batch_processor(
 
                 // Flush if batch size reached
                 if entry.requests.len() >= batch_size {
-                    flush_batch(&state, model, &mut accumulator, &mut batch_count).await;
+                    flush_batch(model, &mut accumulator, &stats).await;
                 }
             }
             // Timeout flush
             _ = tokio::time::sleep(batch_timeout) => {
-                flush_ready_batches(&state, &mut accumulator, &mut batch_count, batch_timeout).await;
+                flush_ready_batches(&mut accumulator, &stats, batch_timeout).await;
             }
         }
     }
 
+    let batch_count = stats.batch_count.load(Ordering::Relaxed);
+    let total_requests = stats.total_requests.load(Ordering::Relaxed);
     tracing::info!(
         batch_count,
         total_requests,
