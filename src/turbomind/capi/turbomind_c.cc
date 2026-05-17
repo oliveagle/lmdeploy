@@ -814,6 +814,56 @@ const char* TM_Safetensors_GetTensorName(void* handle, int index)
     return last_name.c_str();
 }
 
+int TM_TurboMind_InitFromHF(
+    TM_TurboMind* tm,
+    int device_id,
+    const char* model_dir,
+    int trust_remote_code,
+    int session_len)
+{
+    // Use Python bridge for HF model loading.
+    // The Python TurboMind API already supports HF safetensors loading.
+    // We'll call it via a simple Python script.
+    std::string python_cmd = "python3 -c \""
+        "import sys; "
+        "sys.path.insert(0, '/mnt/eaget-4tb/data/llm_server/lmdeploy'); "
+        "from lmdeploy.turbomind.turbomind import TurboMind; "
+        "from lmdeploy.messages import TurbomindEngineConfig; "
+        "cfg = TurbomindEngineConfig(session_len=" + std::to_string(session_len) + ", max_batch_size=8); "
+        "tm = TurboMind('" + std::string(model_dir) + "', engine_config=cfg, trust_remote_code=" + (trust_remote_code ? "True" : "False") + "); "
+        "print('SUCCESS')"
+        "\" 2>&1";
+
+    FILE* pipe = popen(python_cmd.c_str(), "r");
+    if (!pipe) {
+        SetError(TM_ERR_RUNTIME, "Failed to run Python model loading script");
+        return TM_ERR_RUNTIME;
+    }
+
+    char buffer[4096];
+    std::string result;
+    while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
+        result += buffer;
+    }
+    int status = pclose(pipe);
+
+    // Check if Python succeeded
+    if (result.find("SUCCESS") == std::string::npos) {
+        std::string error_msg = "Python model loading failed. Output:\n" + result;
+        SetError(TM_ERR_RUNTIME, error_msg.c_str());
+        return TM_ERR_RUNTIME;
+    }
+
+    // Python succeeded - now initialize the C++ TurboMind instance
+    // The Python script would have populated the model structure
+    // For now, we need to return an error that the user should use Python bridge
+    SetError(TM_ERR_NOT_IMPLEMENTED,
+        "HF model loading requires Python bridge. "
+        "Please use the Python API (lmdeploy.turbomind.TurboMind) or PyTorch backend. "
+        "The C API currently only supports TurboMind-converted models.");
+    return TM_ERR_NOT_IMPLEMENTED;
+}
+
 int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model_dir, int trust_remote_code)
 {
     if (!tm || !model_dir) {

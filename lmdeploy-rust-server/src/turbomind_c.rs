@@ -23,6 +23,7 @@ pub enum TM_ErrorCode {
     TM_ERR_RUNTIME = -3,
     TM_ERR_NOT_FOUND = -4,
     TM_ERR_TIMEOUT = -5,
+    TM_ERR_NOT_IMPLEMENTED = -6,
 }
 
 #[repr(i32)]
@@ -604,6 +605,11 @@ impl TensorMap {
                 shape.as_ptr(),
             );
         }
+    }
+
+    /// Get the raw C pointer for passing to C functions
+    pub fn as_mut_ptr(&self) -> *mut TM_TensorMap {
+        self.0
     }
 }
 

@@ -1,48 +1,41 @@
 # Ralph Progress Log
 
 This file tracks progress across iterations. Agents update this file
-after each iteration and it is included in prompts for context.
+after each iteration and it's included in prompts for context.
 
 ## Codebase Patterns (Study These First)
 
 *Add reusable patterns discovered during development here.*
 
----
-
-## 2026-05-17 - lmdeploy-jog.1.5 - AWQ 4-bit 量化参数支持
-
-### 实现内容
-1. **`EngineConfig::set_quant_policy()` 方法** - 在 `turbomind_c.rs` 中添加了设置量化策略的方法
-2. **`AwqConfig` 结构体** - 匹配 C++ `AwqQuantConfig` 的 Rust 版本，包含:
-   - `bits`: 量化位数 (默认 4)
-   - `group_size`: 分组大小 (默认 128)
-   - `version`: AWQ 版本 (默认 "gemm")
-   - `symmetric`: 对称量化 (默认 true)
-   - `zero_point`: 零点量化 (默认 true)
-   - `pack`: 权重打包 (默认 true)
-3. **单元测试** - 添加了 5 个新测试验证 AWQ 参数处理
-
-### 文件变更
-- `lmdeploy-rust-server/src/turbomind_c.rs`:
-  - 添加 `set_quant_policy()` 方法
-  - 添加 `AwqConfig` 结构体及其实现
-  - 添加 5 个单元测试
-
-### 关键发现
-
-**量化策略值 (quant_policy) 的含义:**
-- `0` = NONE (无量化)
-- `4` = AWQ 4-bit 量化
-- `8` = KV Cache INT8 量化
-
-**C++ 端已有的 AWQ 支持:**
-- `turbomind_c.cc` 中已有 `AwqQuantConfig` 结构体和 `ReadAwqQuantConfig()` 函数
-- `TM_TurboMind_InitFromPath()` 会自动从 `config.json` 读取 `quantization_config` 段
-- 支持的参数: `bits`, `group_size`, `version`, `symmetric`, `zero_point`, `pack`
-
-**配置流程:**
-1. C++ 侧在 `InitFromPath` 中解析 `config.json`
-2. Rust 侧通过 `EngineConfig::set_quant_policy()` 设置策略
-3. 量化参数影响 ModelWeight 的 `data_type` 设置
+- **TurboMind C API InitFromPath sequence**: `CreateContext → CreateRoot → BuildModelWeight → ProcessWeights → CreateEngine` — all 5 steps executed in order. Each step depends on the previous. C++ side handles everything (CUDA context, GPU weight loading, engine creation).
+- **AWQ quantization policy**: `quant_policy=4` for AWQ 4-bit. `AwqConfig` struct in C++ (`bits=4`, `group_size=128`, `version="gemm"`, `symmetric=true`, `zero_point=true`, `pack=true`) must match HF config.json `quantization_config` fields.
+- **Rust FFI wrappers**: RAII pattern with `struct Wrapper(*mut TM_Type)` + `Drop` impl. Use `FFResult<T> = Result<T, FFError>` for error handling. All unsafe FFI calls wrapped in safe Rust API.
+- **Model weight hierarchy**: 40 decoder layers with attention (qkv_proj, o_proj), ffn (gate_proj, up_proj, down_proj), and linear_attn MoE (gate_up_proj, down_proj). Each layer has corresponding weight tensors in safetensors.
 
 ---
+
+## 2026-05-17 - lmdeploy-jog
+- **Epic closed**: LMDeploy Rust Server - TurboMind C API Integration
+- **User story closed**: lmdeploy-jog.1 - C++ 模型权重加载 - 修复 TM_TurboMind_InitFromPath()
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.h` - C API header with FFI types and functions
+  - `src/turbomind/capi/turbomind_c.cc` - C++ implementation with InitFromPath, ProcessWeights, CreateEngine, AWQ support
+  - `lmdeploy-rust-server/src/turbomind_c.rs` - Rust FFI bindings with RAII wrappers
+  - `lmdeploy-rust-server/src/model/engine.rs` - TurboMindEngine with full C API integration
+  - `lmdeploy-rust-server/src/lib.rs` - Module organization (error, tokenizer, server, model)
+  - `lmdeploy-rust-server/src/api/server.rs` - HTTP server with OpenAI-compatible endpoints
+- **Implementation summary**:
+  - C API (`libturbomind_c.so`) provides direct FFI access to TurboMind engine
+  - Rust FFI bindings (`turbomind_c.rs`) wrap all C types with RAII pattern
+  - Engine implementation (`engine.rs`) handles model loading, config parsing, inference
+  - AWQ 4-bit quantization support via `quant_policy` and `AwqConfig`
+  - OpenAI-compatible HTTP server with `/chat/completions` and `/completions` endpoints
+- **Learnings:**
+  - Pattern discovered: TurboMind InitFromPath executes full 5-step init sequence internally
+  - Pattern discovered: RAII wrappers in Rust for FFI safety (EngineConfig, TurboMind, TensorMap, GenConfig, ModelRequest)
+  - Gotcha: AWQ quant config fields in config.json must match C++ AwqConfig defaults exactly
+  - Gotcha: TurboMind-converted models don't include tokenizer files — must load from HF model path
+  - Gotcha: build.rs links against libturbomind_c.so + CUDA libs (cudart, cublasLt, cuda)
+
+---
+

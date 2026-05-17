@@ -89,3 +89,6 @@ proxy_config.yml
 
 # Claude Code local config
 CLAUDE.local.md
+
+# bv (beads viewer) local config and caches
+.bv/

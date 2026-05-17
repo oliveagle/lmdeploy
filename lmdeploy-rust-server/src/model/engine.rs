@@ -1,13 +1,30 @@
-//! TurboMind Engine - Real C API integration
+//! TurboMind Engine - C API integration
 //!
-//! Uses the TurboMind C API (libturbomind_c.so) directly for inference.
-//! No Python overhead - pure Rust + C FFI.
+//! Uses the TurboMind C API (libturbomind_c.so) for inference.
+//!
+//! # Model Format Support
+//!
+//! The C API currently supports **TurboMind-converted models** (.bin files).
+//! For HuggingFace safetensors models (.safetensors), use:
+//! - PyTorch backend: fully supports HF safetensors with AWQ/GPTQ quantization
+//! - Python TurboMind API: automatic HF→TM conversion during load
+//!
+//! # Converting HF Models to TurboMind Format
+//!
+//! ```bash
+//! # The Python API automatically converts HF models during first load
+//! python -c "
+//! from lmdeploy.turbomind import TurboMind
+//! tm = TurboMind('/path/to/hf/model')
+//! "
+//! ```
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::error::Result;
 use crate::turbomind_c as tm;
+use crate::tokenizer::LMTokenizer;
 
 /// Model loading state
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -51,6 +68,9 @@ pub struct TurboMindEngine {
     tm: Option<Box<tm::TurboMind>>,
     device_id: i32,
     session_len: i32,
+
+    // Tokenizer for encoding/decoding
+    tokenizer: Option<LMTokenizer>,
 }
 
 impl TurboMindEngine {
@@ -71,6 +91,7 @@ impl TurboMindEngine {
             tm: None,
             device_id: 0,
             session_len: 2048,
+            tokenizer: None,
         };
 
         engine.init().await?;
@@ -81,6 +102,43 @@ impl TurboMindEngine {
     async fn init(&mut self) -> Result<()> {
         self.state = ModelState::Loading;
         tracing::info!(model_path = %self.model_path, "Loading model via TurboMind C API");
+
+        // Check if model path exists
+        let config_path = std::path::PathBuf::from(&self.model_path).join("config.yaml");
+        let config_json = std::path::PathBuf::from(&self.model_path).join("config.json");
+
+        if !config_path.exists() && !config_json.exists() {
+            tracing::error!(model_path = %self.model_path, "config.yaml/config.json not found in model path");
+            return Err(crate::error::AppError::ModelLoadFailed(
+                format!("Neither config.yaml nor config.json found at {}", self.model_path)
+            ));
+        }
+
+        // Load tokenizer
+        tracing::info!("Loading tokenizer...");
+        match LMTokenizer::from_path(&self.model_path) {
+            Ok(tokenizer) => {
+                tracing::info!(vocab_size = tokenizer.vocab_size(), "Tokenizer loaded successfully");
+                self.tokenizer = Some(tokenizer);
+            }
+            Err(_) => {
+                tracing::warn!("Failed to load tokenizer from model path, trying parent directory");
+                // Try HF model path for tokenizer (turbomind converted models don't have tokenizer)
+                let hf_model_path = "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ";
+                match LMTokenizer::from_path(hf_model_path) {
+                    Ok(tokenizer) => {
+                        tracing::info!(vocab_size = tokenizer.vocab_size(), "Tokenizer loaded from HF model");
+                        self.tokenizer = Some(tokenizer);
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, "Failed to load tokenizer");
+                        return Err(crate::error::AppError::ModelLoadFailed(
+                            format!("Failed to load tokenizer: {}", e)
+                        ));
+                    }
+                }
+            }
+        }
 
         // Create engine config
         tracing::info!("Creating engine config...");
@@ -179,37 +237,40 @@ impl TurboMindEngine {
 
     /// Generate text with TurboMind
     pub async fn generate(&self, prompt: &str, max_tokens: usize) -> String {
-        if let Some(tm) = &self.tm {
-            match self.generate_with_tm(tm, prompt, max_tokens).await {
-                Ok(output) => return output,
-                Err(e) => {
-                    tracing::error!(error = %e, "TurboMind inference failed, using fallback");
-                }
-            }
-        }
-
-        // Fallback: return prompt echo
-        format!("[TM unavailable] {}", &prompt[..prompt.len().min(50)])
+        let tm = self.tm.as_ref().expect("TurboMind not initialized - cannot generate");
+        self.generate_with_tm(tm, prompt, max_tokens).await
+            .unwrap_or_else(|e| {
+                tracing::error!(error = %e, "TurboMind inference failed");
+                String::new()
+            })
     }
 
     /// Internal generate using TurboMind C API
     async fn generate_with_tm(&self, turbomind: &tm::TurboMind, prompt: &str, max_tokens: usize) -> Result<String> {
+        let tokenizer = self.tokenizer.as_ref()
+            .ok_or_else(|| crate::error::AppError::InferenceFailed("Tokenizer not initialized".to_string()))?;
 
-        // Tokenize input (simplified - use token IDs directly)
-        let input_ids: Vec<i32> = prompt.chars().map(|c| c as i32 % 32000).collect();
+        // Tokenize input using the real tokenizer
+        let input_ids = tokenizer.encode(prompt, false, false)
+            .map_err(|e| crate::error::AppError::InferenceFailed(format!("Tokenization failed: {}", e)))?;
+
+        tracing::debug!(input_len = input_ids.len(), "Tokenized prompt");
+
+        // Convert to i32 for C API
+        let input_ids_i32: Vec<i32> = input_ids.iter().map(|&id| id as i32).collect();
 
         // Build input tensor
         let mut input_tensors = tm::TensorMap::new()
             .map_err(|e| crate::error::AppError::InferenceFailed(e.to_string()))?;
 
-        let shape = [input_ids.len() as i64];
-        input_tensors.set_int32("input_ids", &input_ids, &shape);
+        let shape = [input_ids_i32.len() as i64];
+        input_tensors.set_int32("input_ids", &input_ids_i32, &shape);
 
         // Build generation config
         let mut gen_config = tm::GenConfig::new()
             .map_err(|e| crate::error::AppError::InferenceFailed(e.to_string()))?;
         gen_config.set_max_new_tokens(max_tokens as i32);
-        gen_config.set_temperature(1.0);
+        gen_config.set_temperature(0.7);
         gen_config.set_top_p(0.95);
         gen_config.set_top_k(50);
 
@@ -240,29 +301,71 @@ impl TurboMindEngine {
         ).map_err(|e| crate::error::AppError::InferenceFailed(e.to_string()))?;
 
         // Extract output IDs from result
-        // For now, return the result as string
-        Ok("Generation completed via TurboMind C API".to_string())
+        // Get output_ids tensor from output_tensors
+        let mut out_data: *mut std::ffi::c_void = std::ptr::null_mut();
+        let mut out_size: usize = 0;
+        let mut out_dtype: tm::TM_DataType = tm::TM_DataType::TM_DATATYPE_INVALID;
+        let mut out_mem_type: tm::TM_MemoryType = tm::TM_MemoryType::TM_MEMORY_CPU;
+        let mut out_ndim: std::os::raw::c_int = 0;
+        let mut out_shape: [i64; 4] = [0; 4];
+
+        // Get the output tensor
+        let got_output = unsafe {
+            let tensor_name = std::ffi::CString::new("output_ids").unwrap();
+            tm::TM_TensorMap_Get(
+                output_tensors.as_mut_ptr(),
+                tensor_name.as_ptr(),
+                &mut out_data as *mut *mut std::ffi::c_void,
+                &mut out_dtype,
+                &mut out_mem_type,
+                &mut out_ndim,
+                out_shape.as_mut_ptr(),
+            )
+        };
+
+        if !got_output || out_data.is_null() {
+            return Err(crate::error::AppError::InferenceFailed(
+                "Failed to get output_ids from inference result".to_string()
+            ));
+        }
+
+        // Parse output shape
+        let output_len = if out_ndim >= 2 {
+            (out_shape[1] as usize)
+        } else {
+            (out_shape[0] as usize)
+        };
+
+        // Read output token IDs
+        let output_ids: Vec<i32> = if out_dtype == tm::TM_DataType::TM_DATATYPE_INT32 {
+            unsafe {
+                let ptr = out_data as *const i32;
+                std::slice::from_raw_parts(ptr, output_len).to_vec()
+            }
+        } else {
+            return Err(crate::error::AppError::InferenceFailed(
+                format!("Unexpected output dtype: {:?}", out_dtype)
+            ));
+        };
+
+        // Decode output tokens to text
+        let output_u32: Vec<u32> = output_ids.iter().map(|&id| id as u32).collect();
+        let text = tokenizer.decode(&output_u32, true)
+            .map_err(|e| crate::error::AppError::InferenceFailed(format!("Decoding failed: {}", e)))?;
+
+        Ok(text)
     }
 
     /// Generate text with streaming
-    pub async fn generate_stream(&self, prompt: &str) -> impl futures::Stream<Item = String> {
-        let words: Vec<String> = if let Some(tm) = &self.tm {
-            // Try TurboMind streaming
-            match self.generate_stream_with_tm(tm, prompt).await {
-                Ok(stream) => {
-                    use futures::StreamExt;
-                    stream.collect().await
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, "TurboMind streaming failed, using fallback");
-                    vec!["[TM unavailable] ".to_string(), prompt.to_string()]
-                }
+    pub async fn generate_stream(&self, prompt: &str) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+        let tm = self.tm.as_ref().expect("TurboMind not initialized - cannot generate");
+        match self.generate_stream_with_tm(tm, prompt).await {
+            Ok(stream) => Box::pin(stream),
+            Err(e) => {
+                tracing::error!(error = %e, "TurboMind streaming failed");
+                Box::pin(futures::stream::empty())
             }
-        } else {
-            vec!["[TM unavailable] ".to_string(), prompt.to_string()]
-        };
-
-        futures::stream::iter(words)
+        }
     }
 
     /// Internal streaming generate

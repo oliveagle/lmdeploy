@@ -1,26 +1,11 @@
 {
-  "id": "3d7ebd48-fbb9-4342-91c0-da22c3f571e8",
+  "id": "405a7d3e-aed8-46f7-801d-ffd3f507fe25",
   "status": "running",
-  "startedAt": "2026-05-17T10:24:15.666Z",
-  "updatedAt": "2026-05-17T10:24:15.666Z",
+  "startedAt": "2026-05-17T16:18:28.470Z",
+  "updatedAt": "2026-05-17T16:18:28.470Z",
   "agentPlugin": "claude",
   "trackerPlugin": "beads-rust",
-  "epicId": "lmdeploy-jog",
-  "epicIds": [
-    "lmdeploy-jog"
-  ],
-  "executionScopes": [
-    {
-      "id": "lmdeploy-jog",
-      "title": "LMDeploy Rust Server - TurboMind C API Integration",
-      "type": "epic",
-      "description": "不使用 Python，通过 TurboMind C API 实现 Qwen3.6-35B 模型推理",
-      "metadata": {
-        "dependencyCount": 0,
-        "dependentCount": 1
-      }
-    }
-  ],
+  "executionScopes": [],
   "currentIteration": 0,
   "maxIterations": 50,
   "totalTasks": 0,
