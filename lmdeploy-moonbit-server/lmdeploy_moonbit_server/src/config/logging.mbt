@@ -93,12 +93,12 @@ fn parse_json_bool_field(json: String, field: String, default: Bool) -> Bool {
 }
 
 fn get_env_string(key: String, default: String) -> String {
-  // TODO: Implement FFI to getenv()
+  // Requires WASI getenv FFI. Returns default until FFI binding is available.
   default
 }
 
 fn get_env_bool(key: String, default: Bool) -> Bool {
-  // TODO: Implement FFI to getenv()
+  // Requires WASI getenv FFI. Returns default until FFI binding is available.
   default
 }
 

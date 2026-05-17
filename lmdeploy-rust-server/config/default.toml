@@ -2,7 +2,7 @@
 
 [server]
 http_addr = "0.0.0.0"
-http_port = 3000
+http_port = 8000
 grpc_addr = "0.0.0.0"
 grpc_port = 50051
 workers = 4
@@ -31,8 +31,8 @@ batch_timeout_ms = 50
 shutdown_timeout_secs = 30
 
 [model]
-model_path = ""
-model_name = "default"
+model_path = "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ"
+model_name = "qwen3.6-35B-A3B-AWQ"
 max_context_length = 8192
 max_batch_size = 8
 
@@ -42,9 +42,9 @@ tokenizer_ttl_secs = 3600
 
 [logging]
 level = "info"
-json_format = true
+json_format = false
 
 [metrics]
 enabled = true
 host = "0.0.0.0"
-port = 9090
+port = 9092

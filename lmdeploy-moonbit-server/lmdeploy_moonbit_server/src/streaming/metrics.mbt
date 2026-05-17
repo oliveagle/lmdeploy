@@ -90,22 +90,72 @@ pub fn StreamingMetrics::to_json(self : StreamingMetrics) -> String {
 
 /// Helper: integer to string
 fn int_to_string(i: Int) -> String {
-  if i == 0 {
-    "0"
-  } else if i == 1 {
-    "1"
-  } else {
-    // TODO: Implement full integer-to-string conversion
-    "0"
+  if i < 0 { "-" ++ uint_to_string(-i) } else { uint_to_string(i) }
+}
+
+fn uint_to_string(n: Int) -> String {
+  if n == 0 { "0" } else {
+    let mut digits = []
+    let mut num = n
+    while num > 0 {
+      let digit = num % 10
+      digits = [digit_to_char(digit)] ++ digits
+      num = num / 10
+    }
+    let mut result = ""
+    for d in digits {
+      result = result ++ d
+    }
+    result
+  }
+}
+
+fn digit_to_char(d: Int) -> String {
+  match d {
+    0 => "0"
+    1 => "1"
+    2 => "2"
+    3 => "3"
+    4 => "4"
+    5 => "5"
+    6 => "6"
+    7 => "7"
+    8 => "8"
+    _ => "9"
   }
 }
 
 /// Helper: float to string
 fn float_to_string(f: Float) -> String {
-  if f == 0.0 {
-    "0.0"
-  } else {
-    // TODO: Implement full float-to-string conversion
-    "0.0"
+  if f == 0.0 { "0.0" }
+  else if f == 1.0 { "1.0" }
+  else if f == -1.0 { "-1.0" }
+  else if f == 0.5 { "0.5" }
+  else if f == 100.0 { "100.0" }
+  else {
+    let is_negative = f < 0.0
+    let abs_f = if is_negative { -.f } else { f }
+    let int_part = float_to_int(abs_f)
+    let frac_part = float_to_int((abs_f -. (int_part as Float)) *. 1000000.0)
+    let int_str = if is_negative { "-" ++ int_to_string(int_part) } else { int_to_string(int_part) }
+    if frac_part == 0 {
+      int_str ++ ".0"
+    } else {
+      let mut frac_str = int_to_string(frac_part)
+      while frac_str != "" && frac_str[frac_str.length() - 1] == '0' {
+        frac_str = frac_str.substring(0, frac_str.length() - 1)
+      }
+      int_str ++ "." ++ (if frac_str == "" { "0" } else { frac_str })
+    }
+  }
+}
+
+fn float_to_int(f: Float) -> Int {
+  if f < 0.0 { 0 } else {
+    let mut result = 0
+    while (result as Float) <= f {
+      result = result + 1
+    }
+    result - 1
   }
 }

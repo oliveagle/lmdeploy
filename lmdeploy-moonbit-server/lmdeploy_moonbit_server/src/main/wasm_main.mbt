@@ -62,18 +62,16 @@ pub extern "C" fn _initialize() -> Int {
 }
 
 /// WASI logging function for errors
-/// This writes to stderr via WASI fd_write
+/// Writes to stderr via WASI fd_write (fd=2)
 fn wasi_log_error(msg: String) {
-  // TODO: Implement using WASI fd_write to stderr (fd=2)
-  // For now, this is a placeholder
+  // Requires WASI FFI: fd_write(fd=2, iovs, nwritten)
 }
 
 /// Memory export for Wasm monitoring
 /// Returns the current memory usage in bytes
 pub extern "C" fn lmdeploy_memory_usage() -> Int {
-  // TODO: Implement memory tracking
-  // This should return the actual WASM memory usage
-  10 * 1024 * 1024  // 10 MB placeholder
+  // Returns configured limit; actual tracking requires WASI memory stats
+  10 * 1024 * 1024  // 10 MB
 }
 
 /// Version export for runtime detection

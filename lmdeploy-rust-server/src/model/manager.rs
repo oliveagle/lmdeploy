@@ -104,7 +104,21 @@ impl ModelManager {
     /// Get a model by name (or default if not specified)
     pub fn get_model(&self, model_name: Option<&str>) -> Option<Arc<RwLock<TurboMindEngine>>> {
         let name = model_name.unwrap_or(&self.default_model);
-        self.models.get(name).cloned()
+        // Try exact match first
+        if let Some(engine) = self.models.get(name) {
+            return Some(engine.clone());
+        }
+        // If requested name is "default" or matches default_model, return the default model
+        if name == "default" || name == self.default_model {
+            return self.models.get(&self.default_model).cloned();
+        }
+        // Try matching by model path suffix
+        for (key, engine) in &self.models {
+            if key.contains(name) || name.contains(key) {
+                return Some(engine.clone());
+            }
+        }
+        None
     }
 
     /// Get the default model name

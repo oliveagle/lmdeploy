@@ -1,7 +1,7 @@
 use axum::{
     extract::State,
     http::StatusCode,
-    response::{sse::Event, Sse},
+    response::{sse::Event, IntoResponse, Response, Sse},
     Json,
 };
 use futures::StreamExt;
@@ -81,6 +81,15 @@ pub struct ChatCompletionChunk {
     pub created: i64,
     pub model: String,
     pub choices: Vec<DeltaChoice>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<ChunkUsage>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ChunkUsage {
+    pub prompt_tokens: i32,
+    pub completion_tokens: i32,
+    pub total_tokens: i32,
 }
 
 #[derive(Debug, Serialize)]
@@ -99,13 +108,15 @@ pub struct Delta {
 pub async fn chat_completions(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ChatCompletionsRequest>,
-) -> (StatusCode, Json<ChatCompletionsResponse>) {
+) -> Response {
     let model = req.model.clone();
     let start = std::time::Instant::now();
 
-    let prompt = messages_to_prompt(&req.messages);
-
-    tracing::info!(model = %model, prompt_len = prompt.len(), "Chat completions request");
+    // If stream: true, delegate to streaming endpoint
+    if req.stream == Some(true) {
+        let response = chat_completions_stream_impl(&state, &req, &model).await;
+        return response;
+    }
 
     // Use batch processor if enabled and not streaming
     let response = if let Some(batch_tx) = &state.batch_sender {
@@ -149,7 +160,129 @@ pub async fn chat_completions(
     };
 
     tracing::info!(latency_ms = start.elapsed().as_millis(), "Chat completions done");
-    (StatusCode::OK, Json(response))
+    Json(response).into_response()
+}
+
+async fn chat_completions_stream_impl(
+    state: &Arc<AppState>,
+    req: &ChatCompletionsRequest,
+    model: &str,
+) -> Response {
+    let id = format!("chatcmpl-{}", uuid_simple());
+    let created = unix_timestamp();
+    let keepalive_interval_ms = state.config.read().await.server.stream_keepalive_interval_ms;
+
+    tracing::info!(model = %model, "Chat completions stream request");
+
+    let prompt = messages_to_prompt(&req.messages);
+
+    // Get the appropriate engine for the requested model
+    let mm = state.model_manager.read().await;
+    let engine = match mm.get_model(Some(model)) {
+        Some(e) => e,
+        None => {
+            tracing::warn!(model = %model, "Model not found, using default");
+            mm.get_model(None).unwrap()
+        }
+    };
+    drop(mm);
+
+    let metrics = state.metrics.clone();
+    let (tx, rx) = tokio::sync::mpsc::channel::<String>(1024);
+    let stream_id = id.clone();
+    let stream_model = model.to_string();
+    let final_id = id.clone();
+    let final_model = model.to_string();
+    let prompt_len = prompt.len();
+
+    // Spawn a task that generates tokens and sends them through the channel
+    let metrics_inner = metrics.clone();
+    let first_token_start = Instant::now();
+    let prompt_for_task = prompt.clone();
+    tokio::spawn(async move {
+        let eng = engine.read().await;
+        let chunks = eng.generate_stream(&prompt_for_task).await;
+        futures::pin_mut!(chunks);
+
+        let mut first_token_recorded = false;
+        while let Some(chunk_text) = chunks.next().await {
+            if !first_token_recorded {
+                let latency_ms = first_token_start.elapsed().as_millis() as u64;
+                metrics_inner.streams.record_stream_start(latency_ms);
+                first_token_recorded = true;
+            }
+
+            metrics_inner.streams.record_chunk();
+
+            if tx.send(chunk_text).await.is_err() {
+                tracing::info!("Client disconnected, stopping stream");
+                break;
+            }
+        }
+    });
+
+    // Convert channel into SSE stream with usage tracking
+    let stream = ReceiverStream::new(rx)
+        .enumerate()
+        .map(move |(idx, chunk_text)| {
+            let completion_tokens = ((idx + 1) * 4).max(1) as i32;
+            let prompt_tokens = (prompt_len / 4) as i32;
+
+            let chunk = ChatCompletionChunk {
+                id: stream_id.clone(),
+                object: "chat.completion.chunk".into(),
+                created,
+                model: stream_model.clone(),
+                choices: vec![DeltaChoice {
+                    index: 0,
+                    delta: Delta {
+                        content: Some(chunk_text),
+                        role: None,
+                    },
+                    finish_reason: None,
+                }],
+                usage: Some(ChunkUsage {
+                    prompt_tokens,
+                    completion_tokens,
+                    total_tokens: prompt_tokens + completion_tokens,
+                }),
+            };
+            let json = serde_json::to_string(&chunk).unwrap_or_default();
+            let event = Event::default()
+                .event("chat.completion.chunk")
+                .data(json);
+            Ok::<_, std::convert::Infallible>(event)
+        })
+        .chain(futures::stream::once(async move {
+            let prompt_tokens = (prompt_len / 4) as i32;
+            let final_chunk = ChatCompletionChunk {
+                id: final_id,
+                object: "chat.completion.chunk".into(),
+                created,
+                model: final_model,
+                choices: vec![DeltaChoice {
+                    index: 0,
+                    delta: Delta { content: None, role: None },
+                    finish_reason: Some("stop".into()),
+                }],
+                usage: Some(ChunkUsage {
+                    prompt_tokens,
+                    completion_tokens: 0,
+                    total_tokens: prompt_tokens,
+                }),
+            };
+            let json = serde_json::to_string(&final_chunk).unwrap_or_default();
+            Ok(Event::default()
+                .event("chat.completion.chunk")
+                .data(json))
+        }));
+
+    Sse::new(stream)
+        .keep_alive(
+            axum::response::sse::KeepAlive::new()
+                .interval(Duration::from_millis(keepalive_interval_ms))
+        )
+        .into_response()
 }
 
 async fn fallback_chat_completion(
@@ -197,107 +330,9 @@ async fn fallback_chat_completion(
 pub async fn chat_completions_stream(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ChatCompletionsRequest>,
-) -> Sse<impl futures::Stream<Item = Result<Event, std::convert::Infallible>>> {
+) -> Response {
     let model = req.model.clone();
-    let id = format!("chatcmpl-{}", uuid_simple());
-    let created = unix_timestamp();
-    let config = state.config.read().await;
-    let keepalive_interval_ms = config.server.stream_keepalive_interval_ms;
-    drop(config);
-
-    tracing::info!(model = %model, "Chat completions stream request");
-
-    let prompt = messages_to_prompt(&req.messages);
-
-    // Get the appropriate engine for the requested model
-    let mm = state.model_manager.read().await;
-    let engine = match mm.get_model(Some(&model)) {
-        Some(e) => e,
-        None => {
-            tracing::warn!(model = %model, "Model not found, using default");
-            mm.get_model(None).unwrap()
-        }
-    };
-    drop(mm);
-
-    let metrics = state.metrics.clone();
-    let (tx, rx) = tokio::sync::mpsc::channel::<String>(1024);
-    let stream_id = id.clone();
-    let stream_model = model.clone();
-    let final_id = id.clone();
-    let final_model = model.clone();
-
-    // Spawn a task that generates tokens and sends them through the channel
-    let metrics_inner = metrics.clone();
-    let first_token_start = Instant::now();
-    tokio::spawn(async move {
-        let eng = engine.read().await;
-        let chunks = eng.generate_stream(&prompt).await;
-        futures::pin_mut!(chunks);
-
-        let mut first_token_recorded = false;
-        while let Some(chunk_text) = chunks.next().await {
-            if !first_token_recorded {
-                let latency_ms = first_token_start.elapsed().as_millis() as u64;
-                metrics_inner.streams.record_stream_start(latency_ms);
-                tracing::info!(first_token_latency_ms = latency_ms, "First token latency (SSE stream)");
-                first_token_recorded = true;
-                metrics_inner.streams.record_chunk();
-            }
-
-            if tx.send(chunk_text).await.is_err() {
-                tracing::info!("Client disconnected, stopping stream");
-                break;
-            }
-        }
-    });
-
-    // Convert channel into SSE stream with metrics tracking
-    let stream = ReceiverStream::new(rx)
-        .map(move |chunk_text| {
-            let chunk = ChatCompletionChunk {
-                id: stream_id.clone(),
-                object: "chat.completion.chunk".into(),
-                created,
-                model: stream_model.clone(),
-                choices: vec![DeltaChoice {
-                    index: 0,
-                    delta: Delta {
-                        content: Some(chunk_text),
-                        role: None,
-                    },
-                    finish_reason: None,
-                }],
-            };
-            let json = serde_json::to_string(&chunk).unwrap_or_default();
-            Ok(Event::default()
-                .event("chat.completion.chunk")
-                .data(json))
-        })
-        .chain(futures::stream::once(async move {
-            let final_chunk = ChatCompletionChunk {
-                id: final_id,
-                object: "chat.completion.chunk".into(),
-                created,
-                model: final_model,
-                choices: vec![DeltaChoice {
-                    index: 0,
-                    delta: Delta { content: None, role: None },
-                    finish_reason: Some("stop".into()),
-                }],
-            };
-            let json = serde_json::to_string(&final_chunk).unwrap_or_default();
-            Ok(Event::default()
-                .event("chat.completion.chunk")
-                .data(json))
-        }));
-
-    // Apply keep-alive and return SSE response
-    Sse::new(stream)
-        .keep_alive(
-            axum::response::sse::KeepAlive::new()
-                .interval(Duration::from_millis(keepalive_interval_ms))
-        )
+    chat_completions_stream_impl(&state, &req, &model).await
 }
 
 #[derive(Debug, Deserialize)]
@@ -1196,11 +1231,18 @@ pub async fn model_load_progress(
 }
 
 fn messages_to_prompt(messages: &[Message]) -> String {
-    messages
-        .iter()
-        .map(|m| format!("{}: {}", m.role, m.content))
-        .collect::<Vec<_>>()
-        .join("\n")
+    // Use ChatML format which is compatible with Qwen, LLaMA-2, etc.
+    // Format: <|im_start|>{role}\n{content}<|im_end|>
+    let mut prompt = String::new();
+    for m in messages {
+        prompt.push_str("<|im_start|>");
+        prompt.push_str(&m.role);
+        prompt.push('\n');
+        prompt.push_str(&m.content);
+        prompt.push_str("<|im_end|>\n");
+    }
+    prompt.push_str("<|im_start|>assistant\n");
+    prompt
 }
 
 fn uuid_simple() -> String {

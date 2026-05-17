@@ -1,0 +1,9 @@
+{
+  "base_url": "http://localhost:8000",
+  "model": "Qwen3___6-35B-A3B-AWQ",
+  "context_sizes": [512, 1024, 2048],
+  "output_lens": [128, 256],
+  "concurrency": [1, 2],
+  "num_requests": 3,
+  "timeout_sec": 300
+}

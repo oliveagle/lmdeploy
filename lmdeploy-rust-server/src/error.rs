@@ -41,6 +41,9 @@ pub enum AppError {
     #[error("Service unavailable: {0}")]
     ServiceUnavailable(String),
 
+    #[error("Inference failed: {0}")]
+    InferenceFailed(String),
+
     #[error("{0}")]
     Other(String),
 }
@@ -60,6 +63,7 @@ impl AppError {
             AppError::ModelAlreadyLoaded(_) => 409,
             AppError::CannotUnloadDefaultModel => 400,
             AppError::ModelLoadFailed(_) => 500,
+            AppError::InferenceFailed(_) => 500,
             AppError::RateLimitExceeded(_) => 429,
             AppError::RequestTimeout => 408,
             AppError::ServiceUnavailable(_) => 503,

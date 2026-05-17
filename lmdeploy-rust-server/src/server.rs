@@ -222,8 +222,8 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         .parse::<SocketAddr>()
         .map_err(|e| AppError::Config(format!("Invalid gRPC address: {e}")))?;
 
-    // Initialize batch sender if batching is enabled
-    let batch_sender = if config.server.batch_enabled {
+    // Spawn batch processor if enabled
+    let batch_processor_handle = if config.server.batch_enabled {
         let (batch_tx, batch_rx) = mpsc::unbounded_channel::<BatchItem>();
         let batch_size = config.server.batch_size;
         let batch_timeout_ms = config.server.batch_timeout_ms;
@@ -240,6 +240,11 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
             run_batch_processor(batch_rx, batch_size, batch_timeout, stats_clone, manager_clone).await
         });
 
+        tracing::info!(
+            batch_size = config.server.batch_size,
+            timeout_ms = config.server.batch_timeout_ms,
+            "Batch processor started"
+        );
         Some((Arc::new(batch_tx), handle))
     } else {
         None
@@ -254,7 +259,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
         tokenizer_cache: tokenizer_cache.clone(),
         config: Arc::new(RwLock::new(config.clone())),
         request_semaphore,
-        batch_sender: batch_sender.as_ref().map(|(tx, _)| tx.clone()),
+        batch_sender: batch_processor_handle.as_ref().map(|(tx, _)| tx.clone()),
         batch_stats,
         metrics: metrics.clone(),
         config_reload_tx: config_reload_tx.clone(),
@@ -345,7 +350,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
     }
 
     // Shutdown batch processor
-    if let Some((_, handle)) = batch_sender {
+    if let Some((_, handle)) = batch_processor_handle {
         handle.abort();
     }
 
@@ -595,19 +600,15 @@ async fn flush_all_batches(accumulator: &mut HashMap<String, BatchAccumulator>, 
 }
 
 fn messages_to_prompt(messages: &[Message]) -> String {
-    // TODO: Replace with configurable chat templates (chatml, llama-2, qwen, etc.)
-    // This should be driven by a `chat_template` field in AppConfig or the model config.
-    //
-    // Common formats:
-    // - ChatML: "<|im_start|>{role}\n{content}<|im_end|>"
-    // - LLaMA-2: "[INST] {user_msg} [/INST] {assistant_msg}"
-    // - Qwen: "<|im_start|>{role}\n{content}<|im_end|>"
-    // - OpenAI: "{role}: {content}\n\n"
-    //
-    // For now, use a simple format that works for most models:
+    // Use ChatML format which is compatible with Qwen, LLaMA-2, etc.
+    // Format: <|im_start|>{role}\n{content}<|im_end|>
     let mut prompt = String::new();
     for m in messages {
-        prompt.push_str(&format!("<|im_start|>{}\n{}\n<|im_end|>\n", m.role, m.content));
+        prompt.push_str("<|im_start|>");
+        prompt.push_str(&m.role);
+        prompt.push('\n');
+        prompt.push_str(&m.content);
+        prompt.push_str("<|im_end|>\n");
     }
     prompt.push_str("<|im_start|>assistant\n");
     prompt

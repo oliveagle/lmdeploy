@@ -1,0 +1,169 @@
+{
+  "epic": "LMDeploy Rust Server - TurboMind C API Integration",
+  "description": "不使用 Python，通过 TurboMind C API 实现 Qwen3.6-35B 模型推理",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "C++ 模型权重加载",
+      "description": "修复 TM_TurboMind_InitFromPath() 使其能正确初始化 Qwen3.5 MoE 模型",
+      "acceptanceCriteria": [
+        "从 config.json 读取完整模型配置",
+        "创建正确的 ModelWeight 层级结构 (40 层 decoder)",
+        "从 safetensors 文件加载权重",
+        "支持 AWQ 4-bit 量化",
+        "ProcessWeights() 成功调用 prepare()",
+        "CreateEngine() 成功创建推理引擎"
+      ],
+      "blockedBy": [],
+      "beads": [
+        {
+          "id": "US-001.1",
+          "title": "解析 config.json 获取完整模型配置",
+          "description": "扩展 ReadHiddenSizeFromConfig() 解析所有模型参数 (num_layers, num_heads, vocab_size, etc)",
+          "files": ["src/turbomind/capi/turbomind_c.cc"]
+        },
+        {
+          "id": "US-001.2",
+          "title": "扩展 ModelWeightConfig 包含所有必需参数",
+          "description": "修改 turbomind::core::ModelWeightConfig 结构体，添加 num_layers, num_heads 等",
+          "files": ["src/turbomind/core/model_weight.h"]
+        },
+        {
+          "id": "US-001.3",
+          "title": "实现 safetensors 权重加载",
+          "description": "使用已存在的 TM_Safetensors_* API 加载权重到 GPU",
+          "files": ["src/turbomind/capi/turbomind_c.cc"]
+        },
+        {
+          "id": "US-001.4",
+          "title": "创建完整的 ModelWeight 层级结构",
+          "description": "创建 40 层 decoder，每层包含 attention, ffn, linear_attn (MoE)",
+          "files": ["src/turbomind/capi/turbomind_c.cc"]
+        },
+        {
+          "id": "US-001.5",
+          "title": "支持 AWQ 量化参数",
+          "description": "从 quantization_config 读取并应用 AWQ 参数",
+          "files": ["src/turbomind/capi/turbomind_c.cc"]
+        },
+        {
+          "id": "US-001.6",
+          "title": "测试 InitFromPath 成功初始化",
+          "description": "编译并运行测试，验证 ProcessWeights() 和 CreateEngine() 成功",
+          "files": ["src/turbomind/capi/turbomind_c.cc"]
+        }
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Rust FFI 绑定",
+      "description": "完善 Rust 的 turbomind_c.rs FFI 绑定",
+      "acceptanceCriteria": [
+        "绑定 TM_Safetensors_* API",
+        "实现 generate() 调用 C API",
+        "实现 generate_stream() 调用 C API"
+      ],
+      "blockedBy": ["US-001"],
+      "beads": [
+        {
+          "id": "US-002.1",
+          "title": "绑定 safetensors API 到 Rust",
+          "description": "在 turbomind_c.rs 中添加 TM_Safetensors_Open/Close/GetTensor 等绑定",
+          "files": ["lmdeploy-rust-server/src/turbomind_c.rs"]
+        },
+        {
+          "id": "US-002.2",
+          "title": "实现 generate() 调用 C API",
+          "description": "修改 engine.rs 的 generate() 函数使用 TM_ModelRequest_Forward",
+          "files": ["lmdeploy-rust-server/src/model/engine.rs"]
+        },
+        {
+          "id": "US-002.3",
+          "title": "实现 generate_stream() 调用 C API",
+          "description": "修改 engine.rs 的 generate_stream() 使用流式推理",
+          "files": ["lmdeploy-rust-server/src/model/engine.rs"]
+        },
+        {
+          "id": "US-002.4",
+          "title": "添加推理结果解码",
+          "description": "使用 tokenizer 解码 output_ids 为文本",
+          "files": ["lmdeploy-rust-server/src/model/engine.rs", "lmdeploy-rust-server/src/tokenizer.rs"]
+        }
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "HTTP Server 修复",
+      "description": "修复 Rust server 的 HTTP/gRPC 端点",
+      "acceptanceCriteria": [
+        "/v1/chat/completions 正确调用推理",
+        "流式响应正确",
+        "模型名称匹配正确"
+      ],
+      "blockedBy": ["US-002"],
+      "beads": [
+        {
+          "id": "US-003.1",
+          "title": "修复模型名称匹配",
+          "description": "确保请求的 model 参数能正确匹配到加载的模型",
+          "files": ["lmdeploy-rust-server/src/model/manager.rs"]
+        },
+        {
+          "id": "US-003.2",
+          "title": "实现 chat completions 非流式",
+          "description": "实现 fallback_chat_completion() 调用 generate()",
+          "files": ["lmdeploy-rust-server/src/handlers/http.rs"]
+        },
+        {
+          "id": "US-003.3",
+          "title": "实现 chat completions 流式",
+          "description": "实现 chat_completions_stream_impl() 调用 generate_stream()",
+          "files": ["lmdeploy-rust-server/src/handlers/http.rs"]
+        },
+        {
+          "id": "US-003.4",
+          "title": "验证 SSE 格式",
+          "description": "确保流式响应符合 OpenAI API 规范",
+          "files": ["lmdeploy-rust-server/src/handlers/http.rs"]
+        }
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Benchmark 验证",
+      "description": "使用 cmd/benchmark-tool/ 验证 Rust server 性能",
+      "acceptanceCriteria": [
+        "编译成功",
+        "启动无错误",
+        "Benchmark 测试通过"
+      ],
+      "blockedBy": ["US-003"],
+      "beads": [
+        {
+          "id": "US-004.1",
+          "title": "编译 Rust server",
+          "description": "cargo build --release",
+          "files": ["lmdeploy-rust-server/"]
+        },
+        {
+          "id": "US-004.2",
+          "title": "启动并测试服务器",
+          "description": "LD_LIBRARY_PATH=build/lib ./target/release/lmdeploy-server",
+          "files": ["lmdeploy-rust-server/"]
+        },
+        {
+          "id": "US-004.3",
+          "title": "运行 benchmark tool",
+          "description": "go run main.go -config config_rust_server.jsonc",
+          "files": ["cmd/benchmark-tool/"]
+        },
+        {
+          "id": "US-004.4",
+          "title": "收集性能指标",
+          "description": "分析 prefill tps, decode tps, ttft",
+          "files": ["benchmark_results.json"]
+        }
+      ]
+    }
+  ]
+}

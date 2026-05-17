@@ -100,12 +100,14 @@ pub fn ModelMetadata::default() -> ModelMetadata {
 }
 
 pub fn ModelMetadata::from_config(cfg: config.model.ModelConfig) -> ModelMetadata {
+  let cfg_vocab_size = cfg.vocab_size()
+  let vocab_size = if cfg_vocab_size > 0 { cfg_vocab_size } else { 152064 }
   {
     id: generate_model_id(cfg.model_path()),
     name: cfg.model_name(),
     path: cfg.model_path(),
     max_context_length: cfg.max_context_length(),
-    vocab_size: 152064,  // Default, would be detected from model
+    vocab_size: vocab_size,
     supports_streaming: true,
     capabilities: ["chat", "completion", "embeddings"],
     model_type: detect_model_type(cfg.model_path()),

@@ -8,3 +8,5 @@ pub mod metrics;
 pub mod model;
 pub mod rate_limiter;
 pub mod server;
+pub mod tokenizer;
+pub mod turbomind_c;

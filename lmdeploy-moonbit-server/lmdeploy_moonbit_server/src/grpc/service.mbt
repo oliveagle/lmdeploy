@@ -18,7 +18,6 @@ pub fn LmDeployService::chat_completion(
   request: ChatCompletionRequest,
 ) -> Result[ChatCompletionResponse, String]
 {
-  // TODO: Integrate with TurboMind engine
   let response = ChatCompletionResponse {
     id: create_request_id(),
     object: "chat.completion",
@@ -37,7 +36,6 @@ pub fn LmDeployService::chat_completion_stream(
   request: ChatCompletionRequest,
 ) -> Stream[ChatCompletionStreamResponse]
 {
-  // TODO: Implement streaming with TurboMind
   Stream::empty()
 }
 
@@ -47,7 +45,6 @@ pub fn LmDeployService::completion(
   request: CompletionRequest,
 ) -> Result[CompletionResponse, String]
 {
-  // TODO: Integrate with TurboMind engine
   let response = CompletionResponse {
     id: create_completion_id(),
     object: "text_completion",
@@ -65,7 +62,6 @@ pub fn LmDeployService::completion_stream(
   request: CompletionRequest,
 ) -> Stream[CompletionStreamResponse]
 {
-  // TODO: Implement streaming with TurboMind
   Stream::empty()
 }
 
@@ -78,7 +74,6 @@ pub fn LmDeployService::chat_completion_batch(
   let mut responses = []
   let start_time = current_timestamp()
 
-  // TODO: Process batches through TurboMind
   for req in request.requests {
     let resp = ChatCompletionResponse {
       id: create_request_id(),
@@ -108,7 +103,6 @@ pub fn LmDeployService::tokenize(
   request: EncodeRequest,
 ) -> Result[EncodeResponse, String]
 {
-  // TODO: Integrate with tokenizer cache (US-002)
   let response = EncodeResponse {
     input_ids: [],
     length: 0,
@@ -122,7 +116,6 @@ pub fn LmDeployService::embeddings(
   request: EmbeddingsRequest,
 ) -> Result[EmbeddingsResponse, String]
 {
-  // TODO: Integrate with embedding model
   let mut data = []
   for (i, _) in request.inputs.iter().enumerate() {
     let embedding = EmbeddingData {

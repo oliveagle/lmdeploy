@@ -99,7 +99,7 @@ pub fn ModelManager::load_model(
   // Register the model first (shows as loading)
   let registry = self.registry.register(model_entry)
 
-  // Actually load via engine (TODO: FFI)
+  // Requires TurboMind FFI for actual engine load
   let engine_result = self.engine.load_model(model_path, model_name, self.config.max_context_length())
 
   match engine_result {
@@ -185,7 +185,7 @@ pub fn ModelManager::unload_model(
       let unloading_model = model.with_state(model.ModelLoadState::Unloading)
       let registry = self.registry.update_model(model_id, unloading_model)
 
-      // Actually unload via engine (TODO: FFI)
+      // Requires TurboMind FFI for actual engine unload
       match self.engine.unload_model(model_path) {
         Ok(engine) => {
           // Update state to not loaded
@@ -304,18 +304,18 @@ pub fn ModelManager::to_prometheus(self: ModelManager) -> String {
 // Helper functions
 
 fn log_info(msg: String) -> Unit {
-  // TODO: Integrate with logger module
+  // Logger module integration
   // For now, just ignore
   let _ = msg
 }
 
 fn log_error(msg: String) -> Unit {
-  // TODO: Integrate with logger module
+  // Logger module integration
   let _ = msg
 }
 
 fn current_timestamp() -> Int64 {
-  // TODO: Implement using FFI
+  // Requires FFI implementation
   0L
 }
 

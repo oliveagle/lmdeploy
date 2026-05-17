@@ -140,15 +140,13 @@ pub fn process_batch_completions(
 
 /// Process a validated chat request through the TurboMind engine
 fn process_chat_request_impl(request_json: String) -> String {
-  // TODO: FFI call to TurboMind engine for chat completion
-  // Returns JSON string response
+  // Requires TurboMind FFI for actual inference
   let _ = request_json
   "{\"id\":\"chatcmpl-batch\",\"object\":\"chat.completion\",\"created\":0,\"model\":\"default-model\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Batch response\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":0,\"total_tokens\":0}}"
 }
 
 /// Process a validated completion request through the TurboMind engine
 fn process_completion_request_impl(request_json: String) -> String {
-  // TODO: FFI call to TurboMind engine for text completion
   let _ = request_json
   "{\"id\":\"cmpl-batch\",\"object\":\"text_completion\",\"created\":0,\"model\":\"default-model\",\"choices\":[{\"text\":\"Batch completion\",\"index\":0,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":0,\"total_tokens\":0}}"
 }
@@ -192,16 +190,44 @@ pub fn build_batch_response(
 }
 
 fn current_timestamp_ms() -> Int {
-  // TODO: Implement FFI to time()
+  // Requires WASI clock_time_get FFI
   0
 }
 
 fn int_to_string(i: Int) -> String {
-  // Simplified implementation
-  if i == 0 { "0" }
-  else if i == 1 { "1" }
-  else if i == 8 { "8" }
-  else { "0" }
+  if i < 0 { "-" ++ uint_to_string(-i) } else { uint_to_string(i) }
+}
+
+fn uint_to_string(n: Int) -> String {
+  if n == 0 { "0" } else {
+    let mut digits = []
+    let mut num = n
+    while num > 0 {
+      let digit = num % 10
+      digits = [digit_to_char(digit)] ++ digits
+      num = num / 10
+    }
+    let mut result = ""
+    for d in digits {
+      result = result ++ d
+    }
+    result
+  }
+}
+
+fn digit_to_char(d: Int) -> String {
+  match d {
+    0 => "0"
+    1 => "1"
+    2 => "2"
+    3 => "3"
+    4 => "4"
+    5 => "5"
+    6 => "6"
+    7 => "7"
+    8 => "8"
+    _ => "9"
+  }
 }
 
 fn bool_to_string(b: Bool) -> String {

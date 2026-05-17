@@ -24,6 +24,10 @@ if(BUILD_PY_FFI)
     add_subdirectory(python)
 endif()
 
+if(BUILD_C_FFI)
+    add_subdirectory(capi)
+endif()
+
 add_library(turbomind STATIC turbomind.cc)
 set_property(TARGET turbomind PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(turbomind PUBLIC

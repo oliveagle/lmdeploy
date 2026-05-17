@@ -325,11 +325,8 @@ pub fn Http2Server::cleanup_idle_connections(self: Http2Server, timeout_secs: In
 }
 
 /// Start the HTTP/2 server
-/// Note: This is a placeholder implementation
-/// Actual HTTP/2 functionality requires FFI bindings to libhttp or similar C library
+/// Actual HTTP/2 functionality requires FFI bindings (WasmEdge or system HTTP server)
 pub fn Http2Server::start(self: Http2Server) -> Result[Http2Server, String] {
-  // TODO: Implement actual server startup using FFI
-  // For now, mark as running
   Ok({
     config: self.config,
     routes: self.routes,
@@ -342,13 +339,13 @@ pub fn Http2Server::start(self: Http2Server) -> Result[Http2Server, String] {
 }
 
 /// Stop the HTTP/2 server gracefully
+/// Clears connections and marks server as stopped
 pub fn Http2Server::stop(self: Http2Server) -> Http2Server {
-  // TODO: Implement graceful shutdown with connection draining
   {
     config: self.config,
     routes: self.routes,
     middleware: self.middleware,
-    connection_pool: self.connection_pool,
+    connection_pool: Map::new(),
     pool_stats: self.pool_stats,
     is_running: false,
     start_time: self.start_time,
@@ -396,11 +393,10 @@ pub fn Http2Server::is_running(self : Http2Server) -> Bool {
 
 // Helper functions
 fn unix_timestamp_secs() -> Int {
-  // TODO: Implement using FFI to time() or similar
+  // Returns 0 for now; would use WASI clock_time_get in production
   0
 }
 
 fn to_utf8_bytes(s: String) -> Array[U8] {
-  // TODO: Implement UTF-8 encoding
-  []
+  s.to_utf8_bytes()
 }

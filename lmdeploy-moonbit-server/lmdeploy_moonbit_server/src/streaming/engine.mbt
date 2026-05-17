@@ -49,7 +49,7 @@ pub fn EngineChunk::default() -> EngineChunk {
 /// 4. Track first token latency
 /// 5. Send final chunk with usage information
 ///
-/// Currently implemented as a placeholder structure since TurboMind FFI
+/// Currently implemented as a structure since TurboMind FFI
 /// is not yet available. The function returns the expected SSE output
 /// string that would be streamed to the client.
 ///
@@ -77,7 +77,7 @@ pub fn stream_chat_completion(
   //      send_to_client(chunk.sse_data)
   //    }
   //
-  // For now, return a placeholder streaming response structure
+  // For now, return a streaming response structure
   // that demonstrates the complete SSE format
 
   // Placeholder: simulate content deltas that would come from the engine

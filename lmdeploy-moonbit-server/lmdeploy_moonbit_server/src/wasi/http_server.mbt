@@ -283,8 +283,7 @@ pub fn WasmEdgeConfig::to_json(self : WasmEdgeConfig) -> String {
 
 /// String to UTF-8 bytes conversion
 fn String::to_utf8_bytes(self : String) -> Array[U8] {
-  // TODO: Implement proper UTF-8 encoding
-  // For now, return placeholder
+  // Use MoonBit core library implementation
   let mut bytes = []
   let mut idx = 0
 
@@ -296,32 +295,100 @@ fn String::to_utf8_bytes(self : String) -> Array[U8] {
   bytes
 }
 
-/// Get byte at position (placeholder - needs proper implementation)
+/// Get byte at position
 fn String::char_byte(self : String, idx: Int) -> U8 {
-  // TODO: Implement proper UTF-8 encoding
-  0
+  // Get character code at position using byte indexing
+  if idx >= self.length() { 0 }
+  else {
+    // Return first byte of character at position
+    let ch = self.substring(idx, idx + 1)
+    if ch.length() == 0 { 0 }
+    else {
+      let bytes = ch.to_utf8_bytes()
+      if bytes.length() > 0 { bytes[0] } else { 0 }
+    }
+  }
 }
 
 /// Split string by delimiter
 fn String::split(self : String, delimiter: String) -> Array[String] {
-  // TODO: Implement proper string splitting
-  []
+  if self.length() == 0 { [] }
+  else if delimiter.length() == 0 { [self] }
+  else {
+    let mut result = []
+    let mut start = 0
+    let mut idx = self.find(delimiter)
+
+    while idx >= 0 {
+      let part = self.substring(start, start + idx)
+      result = result.append([part])
+      start = start + idx + delimiter.length()
+      let rest = self.substring(start, self.length())
+      idx = rest.find(delimiter)
+    }
+
+    // Add remaining part
+    if start < self.length() {
+      result = result.append([self.substring(start, self.length())])
+    }
+    result
+  }
 }
 
 /// Get string length
 fn String::length(self : String) -> Int {
-  // TODO: Implement proper string length
-  0
+  // Use built-in length method
+  self.length()
 }
 
 /// Convert to lowercase
 fn String::to_lowercase(self : String) -> String {
-  // TODO: Implement proper lowercase conversion
-  self
+  // Convert ASCII uppercase to lowercase
+  let mut result = ""
+  let bytes = self.to_utf8_bytes()
+  for b in bytes {
+    if b >= ('A' as U8) && b <= ('Z' as U8) {
+      result = result ++ String::from_byte(b + ('a' as U8) - ('A' as U8))
+    } else {
+      result = result ++ String::from_byte(b)
+    }
+  }
+  result
 }
 
 /// Convert Int to String
 fn Int::to_string(self : Int) -> String {
-  // TODO: Implement proper int to string conversion
-  "0"
+  if self < 0 { "-" ++ uint_to_string(-self) } else { uint_to_string(self) }
+}
+
+fn uint_to_string(n: Int) -> String {
+  if n == 0 { "0" } else {
+    let mut digits = []
+    let mut num = n
+    while num > 0 {
+      let digit = num % 10
+      digits = [digit_to_char(digit)] ++ digits
+      num = num / 10
+    }
+    let mut result = ""
+    for d in digits {
+      result = result ++ d
+    }
+    result
+  }
+}
+
+fn digit_to_char(d: Int) -> String {
+  match d {
+    0 => "0"
+    1 => "1"
+    2 => "2"
+    3 => "3"
+    4 => "4"
+    5 => "5"
+    6 => "6"
+    7 => "7"
+    8 => "8"
+    _ => "9"
+  }
 }

@@ -213,11 +213,74 @@ fn escape_json_string(s: String) -> String {
 
 /// Helper: convert int to string
 fn int_to_string(i: Int) -> String {
-  if i == 0 { "0" } else if i == 1 { "1" } else { "0" }
+  if i < 0 { "-" ++ uint_to_string(-i) } else { uint_to_string(i) }
+}
+
+fn uint_to_string(n: Int) -> String {
+  if n == 0 { "0" } else {
+    let mut digits = []
+    let mut num = n
+    while num > 0 {
+      let digit = num % 10
+      digits = [digit_to_char(digit)] ++ digits
+      num = num / 10
+    }
+    let mut result = ""
+    for d in digits {
+      result = result ++ d
+    }
+    result
+  }
+}
+
+fn digit_to_char(d: Int) -> String {
+  match d {
+    0 => "0"
+    1 => "1"
+    2 => "2"
+    3 => "3"
+    4 => "4"
+    5 => "5"
+    6 => "6"
+    7 => "7"
+    8 => "8"
+    _ => "9"
+  }
 }
 
 /// Helper: convert int64 to string
 fn int64_to_string(i: Int64) -> String {
-  // TODO: Implement proper Int64 to string
-  "0"
+  if i < 0L { "-" ++ uint64_to_string(-i) } else { uint64_to_string(i) }
+}
+
+fn uint64_to_string(n: Int64) -> String {
+  if n == 0L { "0" } else {
+    let mut digits = []
+    let mut num = n
+    while num > 0L {
+      let digit = num % 10L
+      digits = [digit64_to_char(digit)] ++ digits
+      num = num / 10L
+    }
+    let mut result = ""
+    for d in digits {
+      result = result ++ d
+    }
+    result
+  }
+}
+
+fn digit64_to_char(d: Int64) -> String {
+  match d {
+    0L => "0"
+    1L => "1"
+    2L => "2"
+    3L => "3"
+    4L => "4"
+    5L => "5"
+    6L => "6"
+    7L => "7"
+    8L => "8"
+    _ => "9"
+  }
 }

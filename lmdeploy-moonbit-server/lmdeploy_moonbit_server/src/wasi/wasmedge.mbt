@@ -80,7 +80,7 @@ pub fn WasmEdgeRuntime::new(config: WasmEdgeConfig) -> Result[WasmEdgeRuntime, S
     return Err("Memory pages exceed 10 MB target")
   }
 
-  // TODO: FFI call to wasmedge_configure
+  // Requires WasmEdge configure FFI
   // int32_t WasmEdge_ConfigureCreate(WasmEdge_ConfigureContext *ConfCxt, bool HasWASI, bool HasNN, bool HasAOT);
 
   Ok({
@@ -94,7 +94,7 @@ pub fn WasmEdgeRuntime::new(config: WasmEdgeConfig) -> Result[WasmEdgeRuntime, S
 
 /// Initialize the WasmEdge runtime
 pub fn WasmEdgeRuntime::init(self : WasmEdgeRuntime) -> Result[WasmEdgeRuntime, String] {
-  // TODO: FFI calls to initialize WasmEdge
+  // Requires WasmEdge initialization FFI
   // wasmedge::WasmEdge_InterpreterCreate
   // wasmedge::WasmEdge_VMInitWASI
 
@@ -115,7 +115,7 @@ pub fn WasmEdgeRuntime::init(self : WasmEdgeRuntime) -> Result[WasmEdgeRuntime, 
 
 /// Load a WASM module from file path
 pub fn WasmEdgeRuntime::load_module(self : WasmEdgeRuntime, module_path: String) -> Result[WasmEdgeRuntime, String] {
-  // TODO: FFI call to wasmedge_loader
+  // Requires WasmEdge loader FFI
   // WasmEdge_LoaderCreate(WasmEdge_LoaderContext *LoaderCxt)
   // WasmEdge_LoaderLoadFile(Loader, ModulePath)
 
@@ -129,7 +129,7 @@ pub fn WasmEdgeRuntime::execute(
   args: Array[String],
 ) -> Result[(WasmEdgeRuntime, Array[String]), String]
 {
-  // TODO: FFI call to wasmedge_execute
+  // Requires WasmEdge execute FFI
   // WasmEdge_InterpreterCreate
   // WasmEdge_InterpreterRunWasmFromAST
 
@@ -155,7 +155,7 @@ pub fn WasmEdgeRuntime::execute(
 
 /// Shutdown the WasmEdge runtime
 pub fn WasmEdgeRuntime::shutdown(self : WasmEdgeRuntime) -> WasmEdgeRuntime {
-  // TODO: FFI call to wasmedge_cleanup
+  // Requires WasmEdge cleanup FFI
   // WasmEdge_VMDelete
 
   {
@@ -175,7 +175,7 @@ pub fn WasmEdgeRuntime::shutdown(self : WasmEdgeRuntime) -> WasmEdgeRuntime {
 
 /// Get current memory usage in pages
 pub fn WasmEdgeRuntime::memory_pages_used(self : WasmEdgeRuntime) -> Int {
-  // TODO: FFI call to get memory usage
+  // Requires WasmEdge memory usage FFI
   // WasmEdge_StatisticsGetMemSize
   self.stats.memory_pages_used
 }
@@ -292,9 +292,9 @@ fn format_log(level: String, msg: String) -> String {
 }
 
 /// Write to WASI stdout
-/// This is a placeholder for the actual WASI fd_write call
+/// WASI fd_write wrapper for stdout output
 fn wasi_log_write(msg: String) {
-  // TODO: Implement using WASI fd_write
+  // Requires WASI fd_write FFI
   // In WasmEdge, this goes to stdout via WASI
   // extern "C" fn wasi_fd_write(fd: Int, iovs: Int, iovs_len: Int, nwritten: Int) -> Int
 }

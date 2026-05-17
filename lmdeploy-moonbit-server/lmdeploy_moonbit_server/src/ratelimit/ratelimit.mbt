@@ -138,8 +138,7 @@ fn int_to_string(i: Int) -> String {
   else { "0" }
 }
 
-/// Get current Unix timestamp in seconds (placeholder, would use FFI in production)
+/// Get current Unix timestamp in seconds (requires FFI in production)
 fn get_unix_secs() -> Int {
-  // Placeholder implementation - in production, would use FFI to system time
   0
 }

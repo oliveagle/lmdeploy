@@ -180,35 +180,125 @@ fn extract_array_content(text : String) -> String {
   result
 }
 
-/// Helper: convert string to int (handles basic cases)
+/// Convert string to Int - handles arbitrary integers (positive, negative, zero)
 fn string_to_int(s : String) -> Int {
-  // Basic conversion for common values
-  if s == "0" { 0 }
-  else if s == "1" { 1 }
-  else if s == "-1" { -1 }
-  else if s == "40" { 40 }
-  else if s == "128" { 128 }
-  else if s == "256" { 256 }
-  else if s == "512" { 512 }
-  else if s == "1024" { 1024 }
-  else if s == "2048" { 2048 }
-  else if s == "4096" { 4096 }
-  else if s == "8192" { 8192 }
-  else if s == "100" { 100 }
-  else if s == "1000" { 1000 }
-  else { 0 }
+  if s == "" { 0 } else {
+    let chars = s.to_utf8_bytes()
+    let mut i = 0
+    let is_negative = if chars[0] == ('-' as U8) {
+      i = 1
+      true
+    } else {
+      false
+    }
+    let mut result = 0
+    while i < chars.length() {
+      let c = chars[i]
+      if c >= ('0' as U8) && c <= ('9' as U8) {
+        let digit = c - ('0' as U8)
+        result = result * 10 + (digit as Int)
+      }
+      i = i + 1
+    }
+    if is_negative { -result } else { result }
+  }
 }
 
-/// Helper: convert string to float (handles basic cases)
+/// Convert string to Float - handles arbitrary floats (including negative, decimal points, scientific notation)
 fn string_to_float(s : String) -> Float {
-  if s == "0.0" || s == "0" { 0.0 }
-  else if s == "1.0" || s == "1" { 1.0 }
-  else if s == "0.7" { 0.7 }
-  else if s == "0.5" { 0.5 }
-  else if s == "0.1" { 0.1 }
-  else if s == "0.9" { 0.9 }
-  else if s == "0.8" { 0.8 }
-  else if s == "0.3" { 0.3 }
-  else if s == "0.2" { 0.2 }
-  else { 0.0 }
+  if s == "" { 0.0 } else {
+    let chars = s.to_utf8_bytes()
+    let mut i = 0
+    let is_negative = if chars[0] == ('-' as U8) {
+      i = 1
+      true
+    } else {
+      false
+    }
+
+    // Parse integer part
+    let mut integer_part = 0.0
+    while i < chars.length() {
+      let c = chars[i]
+      if c >= ('0' as U8) && c <= ('9' as U8) {
+        let digit = c - ('0' as U8)
+        integer_part = integer_part *. 10.0 +. (digit as Float)
+      } else if c == ('.' as U8) || c == ('e' as U8) || c == ('E' as U8) {
+        break
+      } else {
+        break
+      }
+      i = i + 1
+    }
+
+    // Parse fractional part
+    let mut fractional_part = 0.0
+    let mut fractional_multiplier = 1.0
+    if i < chars.length() && chars[i] == ('.' as U8) {
+      i = i + 1
+      while i < chars.length() {
+        let c = chars[i]
+        if c >= ('0' as U8) && c <= ('9' as U8) {
+          let digit = c - ('0' as U8)
+          fractional_multiplier = fractional_multiplier *. 10.0
+          fractional_part = fractional_part +. (digit as Float) /. fractional_multiplier
+        } else {
+          break
+        }
+        i = i + 1
+      }
+    }
+
+    // Parse exponent
+    let mut exponent = 0.0
+    if i < chars.length() && (chars[i] == ('e' as U8) || chars[i] == ('E' as U8)) {
+      i = i + 1
+      let exp_negative = if i < chars.length() && chars[i] == ('+' as U8) || chars[i] == ('-' as U8) {
+        if chars[i] == ('-' as U8) {
+          i = i + 1
+          true
+        } else {
+          i = i + 1
+          false
+        }
+      } else {
+        false
+      }
+      let mut exp_value = 0
+      while i < chars.length() {
+        let c = chars[i]
+        if c >= ('0' as U8) && c <= ('9' as U8) {
+          let digit = c - ('0' as U8)
+          exp_value = exp_value * 10 + (digit as Int)
+        } else {
+          break
+        }
+        i = i + 1
+      }
+      // Simple exponent approximation (for common cases)
+      if exp_negative {
+        // 10^(-n) approximation
+        let mut inv = 1.0
+        for _i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter(fn(x) { x < exp_value }) {
+          inv = inv *. 0.1
+          let _ = _i
+        }
+        exponent = inv
+      } else if exp_value <= 10 {
+        let mut mult = 1.0
+        for _i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter(fn(x) { x < exp_value }) {
+          mult = mult *. 10.0
+          let _ = _i
+        }
+        exponent = mult
+      } else {
+        exponent = 1.0e10 // cap at reasonable max
+      }
+    } else {
+      exponent = 1.0
+    }
+
+    let value = (integer_part +. fractional_part) *. exponent
+    if is_negative { -.value } else { value }
+  }
 }

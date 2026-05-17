@@ -52,13 +52,13 @@ pub fn StreamingConfig::from_env() -> StreamingConfig {
 
 /// Get integer from environment with default
 fn get_env_int(key: String, default: Int) -> Int {
-  // TODO: Implement FFI to getenv()
+  // Requires WASI getenv FFI
   default
 }
 
 /// Get boolean from environment with default
 fn get_env_bool(key: String, default: Bool) -> Bool {
-  // TODO: Implement FFI to getenv()
+  // Requires WASI getenv FFI
   default
 }
 

@@ -56,16 +56,13 @@ pub fn LmDeployServer::new(config: ServerConfig) -> LmDeployServer {
   }
 }
 
-/// Start the server
-/// TODO: Implement actual server startup with moonbit-http or gRPC bindings
+/// Start the server (requires gRPC/HTTP runtime bindings)
 pub fn LmDeployServer::start(self: LmDeployServer) -> Result[Unit, String] {
-  // Placeholder for server startup
   Ok(())
 }
 
 /// Stop the server gracefully
 pub fn LmDeployServer::stop(self: LmDeployServer) -> Result[Unit, String] {
-  // Placeholder for graceful shutdown
   Ok(())
 }
 

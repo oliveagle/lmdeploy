@@ -391,11 +391,36 @@ fn int_to_string(i: Int) -> String {
 }
 
 fn float_to_string(f: Float) -> String {
-  // TODO: Implement proper float to string conversion
-  if f == +Inf {
-    "+Inf"
+  if f == +Inf { "+Inf" }
+  else if f == 0.0 { "0.0" }
+  else if f == 1.0 { "1.0" }
+  else if f < 0.0 { "-" ++ float_to_string_positive(-.f) }
+  else { float_to_string_positive(f) }
+}
+
+fn float_to_string_positive(f: Float) -> String {
+  // Extract integer part
+  let int_part = float_to_int(f)
+  let frac_part = float_to_int((f -. (int_part as Float)) *. 1000000.0)
+
+  if frac_part == 0 {
+    int_to_string(int_part) ++ ".0"
   } else {
-    "0.0"
+    let mut frac_str = int_to_string(frac_part)
+    while frac_str != "" && frac_str[frac_str.length() - 1] == '0' {
+      frac_str = frac_str.substring(0, frac_str.length() - 1)
+    }
+    int_to_string(int_part) ++ "." ++ (if frac_str == "" { "0" } else { frac_str })
+  }
+}
+
+fn float_to_int(f: Float) -> Int {
+  if f < 0.0 { 0 } else {
+    let mut result = 0
+    while (result as Float) <= f {
+      result = result + 1
+    }
+    result - 1
   }
 }
 

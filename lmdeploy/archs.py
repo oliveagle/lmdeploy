@@ -169,6 +169,12 @@ def get_model_arch(model_path: str, trust_remote_code: bool = False):
             for _, v in _cfg['auto_map'].items():
                 if 'InternLMXComposer2ForCausalLM' in v:
                     arch = 'InternLMXComposer2ForCausalLM'
+    elif _cfg.get('text_config', None) and _cfg['text_config'].get('architectures', None):
+        arch = _cfg['text_config']['architectures'][0]
+        if _cfg.get('auto_map'):
+            for _, v in _cfg['auto_map'].items():
+                if 'InternLMXComposer2ForCausalLM' in v:
+                    arch = 'InternLMXComposer2ForCausalLM'
     elif _cfg.get('auto_map', None) and 'AutoModelForCausalLM' in _cfg['auto_map']:
         arch = _cfg['auto_map']['AutoModelForCausalLM'].split('.')[-1]
     elif _cfg.get('language_config', None) and _cfg['language_config'].get(

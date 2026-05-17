@@ -3,6 +3,27 @@
 This file tracks progress across iterations. Agents update this file
 after each iteration and it's included in prompts for context.
 
+## 2026-05-17 - US-001.5 (lmdeploy-jog.1.5)
+- 实现了 AWQ 4-bit 量化参数支持
+- 新建文件：
+  - `src/config/quantization.mbt` - 完整的量化配置配置和解析模块，包括：
+    - `AwqConfig` 结构体：bits, group_size, version, symmetric, zero_point, pack, weight_dtype
+    - `GptqConfig` 结构体：bits, group_size, symmetric, description
+    - `QuantizationConfig` 枚举：None / Awq(AwqConfig) / Gptq(GptqConfig) / Other(String)
+    - `parse_quantization_config()` 函数：从 config.json 解析 quantization_config 块
+    - `parse_awq_config()` 函数：解析 AWQ 特定参数
+    - `parse_gptq_config()` 函数：解析 GPTQ 特定参数
+- 修改文件：
+  - `src/config/model.mbt` - ModelConfig 结构体增加 `quantization` 字段，集成 quantization 模块
+    - `is_quantized()` 方法检查模型是否量化
+    - `quantization_method()` 方法返回量化类型（awq/gptq/none）
+    - `parse_quantization_from_path()` 函数从 config.json 读取量化配置
+    - `to_debug_string()` 显示量化信息
+- **Learnings:**
+  - MoonBit config 模块使用 `use` 语句引入子模块（如 `use username/lmdeploy_moonbit_server.config.quantization`）
+  - 量化参数通过 `quantization_config` JSON 块在 HuggingFace config.json 中定义
+  - AWQ 标准配置：`"quant_method": "awq", "bits": 4, "group_size": 128, "version": "gemm", "zero_point": true`
+
 ## 2026-05-16 - US-002
 - Tokenize Cache 缓存系统已实现（来自之前迭代）
 - 文件：`src/cache/tokenize_cache.mbt` (LRU+TTL 缓存), `src/cache/hash.mbt` (hash 工具), `src/cache/time.mbt` (时间工具)

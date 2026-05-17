@@ -3,7 +3,7 @@
 # See: ralph-tui config help
 
 configVersion = "2.1"
-tracker = "json"
+tracker = "beads-rust"
 agent = "claude"
 maxIterations = 50
 autoCommit = true

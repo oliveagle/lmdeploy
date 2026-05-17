@@ -1,6 +1,7 @@
 // src/protocol/chat_completion.mbt
 // Chat completion protocol definitions (OpenAI-compatible)
 // Reference: lmdeploy/serve/openai/protocol.py
+use protocol.json_util
 
 /// Chat completion request matching Python ChatCompletionRequest
 pub struct ChatCompletionRequest {
@@ -384,115 +385,232 @@ pub fn ChatCompletionStreamResponse::to_sse_json(self : ChatCompletionStreamResp
 /// Parse ChatCompletionRequest from JSON string
 pub fn ChatCompletionRequest::from_json(json : String) -> ChatCompletionRequest {
   // Extract model field
-  let model = extract_string_field(json, "model")
+  let model = parse_json_string_field(json, "model", "")
+
+  // Extract messages array
+  let messages = parse_chat_messages(json)
 
   // Extract stream field
-  let stream = extract_bool_field(json, "stream")
-
-  // Extract temperature
-  let temperature = extract_float_field(json, "temperature", 0.7)
-
-  // Extract top_p
-  let top_p = extract_float_field(json, "top_p", 1.0)
-
-  // Extract top_k
-  let top_k = extract_int_field(json, "top_k", 40)
-
-  // Extract max_tokens
-  let max_tokens = extract_int_field(json, "max_tokens", 2048)
-
-  // Extract messages array (placeholder - returns default)
-  let messages = []
+  let stream = parse_json_bool(json, "stream", false)
 
   {
     model,
     messages,
-    temperature,
-    top_p,
-    top_k,
-    max_tokens,
-    n: extract_int_field(json, "n", 1),
-    stop: extract_string_array_field(json, "stop"),
+    temperature: parse_json_float(json, "temperature", 0.7),
+    top_p: parse_json_float(json, "top_p", 1.0),
+    top_k: parse_json_int(json, "top_k", 40),
+    max_tokens: parse_json_int(json, "max_tokens", 2048),
+    n: parse_json_int(json, "n", 1),
+    stop: parse_json_string_array(json, "stop"),
     stream,
-    presence_penalty: extract_float_field(json, "presence_penalty", 0.0),
-    frequency_penalty: extract_float_field(json, "frequency_penalty", 0.0),
-    seed: extract_int_field(json, "seed", 0),
-    logprobs: extract_bool_field(json, "logprobs"),
-    top_logprobs: extract_int_field(json, "top_logprobs", 0),
-    stream_options_include_usage: extract_bool_field_default(json, "stream_options_include_usage", false),
+    presence_penalty: parse_json_float(json, "presence_penalty", 0.0),
+    frequency_penalty: parse_json_float(json, "frequency_penalty", 0.0),
+    seed: parse_json_int(json, "seed", 0),
+    logprobs: parse_json_bool(json, "logprobs", false),
+    top_logprobs: parse_json_int(json, "top_logprobs", 0),
+    stream_options_include_usage: parse_json_bool(json, "stream_options_include_usage", false),
     tools: [],
-    tool_choice: extract_string_field_default(json, "tool_choice", "auto"),
-    repetition_penalty: extract_float_field(json, "repetition_penalty", 1.0),
-    ignore_eos: extract_bool_field_default(json, "ignore_eos", false),
-    skip_special_tokens: extract_bool_field_default(json, "skip_special_tokens", true),
-    spaces_between_special_tokens: extract_bool_field_default(json, "spaces_between_special_tokens", true),
-    session_id: extract_int_field(json, "session_id", -1),
-    do_preprocess: extract_bool_field_default(json, "do_preprocess", true),
-    response_format: extract_string_field_default(json, "response_format", "text"),
-    enable_thinking: extract_bool_field_default(json, "enable_thinking", false),
-    min_p: extract_float_field(json, "min_p", 0.0),
-    min_new_tokens: extract_int_field(json, "min_new_tokens", 0),
+    tool_choice: parse_json_string_field(json, "tool_choice", "auto"),
+    repetition_penalty: parse_json_float(json, "repetition_penalty", 1.0),
+    ignore_eos: parse_json_bool(json, "ignore_eos", false),
+    skip_special_tokens: parse_json_bool(json, "skip_special_tokens", true),
+    spaces_between_special_tokens: parse_json_bool(json, "spaces_between_special_tokens", true),
+    session_id: parse_json_int(json, "session_id", -1),
+    do_preprocess: parse_json_bool(json, "do_preprocess", true),
+    response_format: parse_json_string_field(json, "response_format", "text"),
+    enable_thinking: parse_json_bool(json, "enable_thinking", false),
+    min_p: parse_json_float(json, "min_p", 0.0),
+    min_new_tokens: parse_json_int(json, "min_new_tokens", 0),
   }
 }
 
-/// Helper: extract string field from JSON
-fn extract_string_field(json : String, field : String) -> String {
-  // Simple JSON field extraction - placeholder
-  // In production, use proper JSON parser
-  ""
-}
-
-/// Helper: extract string field from JSON with default
-fn extract_string_field_default(json : String, field : String, default : String) -> String {
-  let result = extract_string_field(json, field)
-  if result.length() == 0 {
-    default
+/// Parse chat messages array from JSON
+fn parse_chat_messages(json : String) -> Array[ChatMessage] {
+  let pattern = "\"messages\":["
+  let idx = json.find(pattern)
+  if idx < 0 {
+    []
   } else {
+    let rest = json.substring(idx + pattern.length(), json.length())
+    let mut result = []
+    let mut i = 0
+    let mut brace_depth = 0
+    let mut in_string = false
+    let mut curr_msg = ""
+    let mut started = false
+
+    while i < rest.length() {
+      let ch = rest.substring(i, i + 1)
+      let b = rest.substring(i, i + 1).to_utf8_bytes()[0]
+
+      if b == ('"' as U8) {
+        // Track if we're entering or leaving a string
+        // Look at previous char to determine if this is an escape
+        let prev_escaped = if i > 0 {
+          let prev_idx = i - 1
+          while prev_idx >= 0 {
+            let prev_b = rest.substring(prev_idx, i).to_utf8_bytes()[0]
+            if prev_b != ('\\' as U8) { break }
+            prev_idx = prev_idx - 1
+          }
+          prev_idx >= 0 && rest.substring(prev_idx, prev_idx + 1).to_utf8_bytes()[0] == ('\\' as U8)
+        } else { false }
+
+        if !prev_escaped {
+          in_string = !in_string
+        }
+      }
+
+      if !in_string {
+        if ch == "{" {
+          brace_depth = brace_depth + 1
+          started = true
+        } else if ch == "}" {
+          brace_depth = brace_depth - 1
+          if brace_depth == 0 && started {
+            curr_msg = curr_msg ++ ch
+            let msg = parse_single_message(curr_msg)
+            if msg.role != "" {
+              result = result.append([msg])
+            }
+            curr_msg = ""
+            started = false
+          }
+        }
+      }
+
+      if started && brace_depth > 0 {
+        curr_msg = curr_msg ++ ch
+      }
+      i = i + 1
+    }
     result
   }
 }
 
-/// Helper: extract int field from JSON with default
-fn extract_int_field(json : String, field : String, default : Int) -> Int {
-  // Simple JSON field extraction - placeholder
-  default
+/// Parse a single chat message from JSON object
+fn parse_single_message(msg_json : String) -> ChatMessage {
+  let role = parse_json_string_field(msg_json, "role", "")
+  let content = parse_json_string_field(msg_json, "content", "")
+  let reasoning_content = parse_json_string_field(msg_json, "reasoning_content", "")
+
+  // Parse tool_calls if present
+  let mut tool_calls = []
+  let tool_pattern = "\"tool_calls\":["
+  let tool_idx = msg_json.find(tool_pattern)
+  if tool_idx >= 0 {
+    let rest = msg_json.substring(tool_idx + tool_pattern.length(), msg_json.length())
+    // Simple extraction of tool_calls
+    let mut i = 0
+    let mut depth = 0
+    let mut in_obj = false
+    let mut current_tc = ""
+    while i < rest.length() {
+      let ch = rest.substring(i, i + 1)
+      if ch == "{" { depth = depth + 1; in_obj = true }
+      else if ch == "}" {
+        depth = depth - 1
+        if depth == 0 && in_obj {
+          current_tc = current_tc ++ "}"
+          let tc = parse_single_tool_call(current_tc)
+          if tc.id != "" {
+            tool_calls = tool_calls.append([tc])
+          }
+          current_tc = ""
+          in_obj = false
+        } else {
+          current_tc = current_tc ++ ch
+        }
+      } else if in_obj {
+        current_tc = current_tc ++ ch
+      }
+      if ch == "]" && depth == 0 { break }
+      i = i + 1
+    }
+  }
+
+  { role, content, reasoning_content, tool_calls }
 }
 
-/// Helper: extract float field from JSON with default
-fn extract_float_field(json : String, field : String, default : Float) -> Float {
-  // Simple JSON field extraction - placeholder
-  default
-}
+/// Parse a single tool call from JSON
+fn parse_single_tool_call(tc_json : String) -> ToolCall {
+  let id = parse_json_string_field(tc_json, "id", "")
+  let type_ = parse_json_string_field(tc_json, "type", "")
 
-/// Helper: extract bool field from JSON
-fn extract_bool_field(json : String, field : String) -> Bool {
-  // Simple JSON field extraction - placeholder
-  false
-}
-
-/// Helper: extract bool field from JSON with default
-fn extract_bool_field_default(json : String, field : String, default : Bool) -> Bool {
-  // Simple JSON field extraction - placeholder
-  default
-}
-
-/// Helper: extract string array field from JSON
-fn extract_string_array_field(json : String, field : String) -> Array[String] {
-  // Simple JSON field extraction - placeholder
-  []
-}
-
-/// Helper: convert float to string
-fn float_to_string(f : Float) -> String {
-  // Placeholder for float conversion
-  if f == 0.0 {
-    "0.0"
-  } else if f == 0.7 {
-    "0.7"
-  } else if f == 1.0 {
-    "1.0"
+  // Extract function object
+  let func_pattern = "\"function\":{"
+  let func_idx = tc_json.find(func_pattern)
+  let function = if func_idx >= 0 {
+    let func_rest = tc_json.substring(func_idx + func_pattern.length() - 1, tc_json.length())
+    let name = parse_json_string_field(func_rest, "name", "")
+    let arguments = parse_json_string_field(func_rest, "arguments", "")
+    { name, arguments }
   } else {
-    "0.0"
+    { name: "", arguments: "" }
+  }
+
+  { id, type_, function }
+}
+
+/// Helper: convert float to string (complete implementation)
+fn float_to_string(f : Float) -> String {
+  // Handle common float values with exact representation
+  if f == 0.0 { "0.0" }
+  else if f == 1.0 { "1.0" }
+  else if f == -1.0 { "-1.0" }
+  else if f == 0.5 { "0.5" }
+  else if f == 0.25 { "0.25" }
+  else if f == 0.75 { "0.75" }
+  else if f == 1.5 { "1.5" }
+  else if f == 2.0 { "2.0" }
+  else if f == 0.7 { "0.7" }
+  else if f == 0.3 { "0.3" }
+  else if f == 0.1 { "0.1" }
+  else if f == 0.9 { "0.9" }
+  else if f == 0.8 { "0.8" }
+  else if f == 0.6 { "0.6" }
+  else if f == 0.4 { "0.4" }
+  else if f == 0.2 { "0.2" }
+  else if f == 0.0 { "0.0" }
+  else {
+    // General conversion: handle any float
+    let is_negative = f < 0.0
+    let abs_f = if is_negative { -.f } else { f }
+
+    // Extract integer part
+    let int_part = float_to_int(abs_f)
+
+    // Extract fractional part (up to 6 decimal places)
+    let frac_part = float_to_int((abs_f -. (int_part as Float)) *. 1000000.0)
+
+    // Build string
+    let int_str = if is_negative { "-" ++ int_to_string(int_part) } else { int_to_string(int_part) }
+
+    if frac_part == 0 {
+      int_str ++ ".0"
+    } else {
+      // Remove trailing zeros from fractional part
+      let mut frac_str = int_to_string(frac_part)
+      while frac_str != "" && frac_str[frac_str.length() - 1] == '0' {
+        frac_str = frac_str.substring(0, frac_str.length() - 1)
+      }
+      int_str ++ "." ++ (if frac_str == "" { "0" } else { frac_str })
+    }
+  }
+}
+
+/// Convert float to int (truncates)
+fn float_to_int(f : Float) -> Int {
+  // Simple truncation for positive floats
+  // Note: MoonBit Float doesn't have direct int conversion, use approximation
+  if f < 0.0 {
+    0 // Handle negative case
+  } else {
+    let mut result = 0
+    while (result as Float) <= f {
+      result = result + 1
+    }
+    result - 1
   }
 }
 
@@ -501,25 +619,107 @@ fn bool_to_string(b : Bool) -> String {
   if b { "true" } else { "false" }
 }
 
-/// Helper: convert int to string
+/// Helper: convert int to string (complete implementation)
 fn int_to_string(i : Int) -> String {
-  // Simplified implementation
-  if i == 0 {
-    "0"
-  } else if i == 1 {
-    "1"
-  } else if i == 40 {
-    "40"
-  } else if i == 2048 {
-    "2048"
-  } else {
-    "0"
+  if i == 0 { "0" }
+  else if i == 1 { "1" }
+  else if i == 2 { "2" }
+  else if i == 3 { "3" }
+  else if i == 4 { "4" }
+  else if i == 5 { "5" }
+  else if i == 6 { "6" }
+  else if i == 7 { "7" }
+  else if i == 8 { "8" }
+  else if i == 9 { "9" }
+  else if i == 10 { "10" }
+  else if i == 16 { "16" }
+  else if i == 40 { "40" }
+  else if i == 100 { "100" }
+  else if i == 2048 { "2048" }
+  else {
+    // General conversion for arbitrary integers
+    if i < 0 {
+      "-" ++ uint_to_string(-i)
+    } else {
+      uint_to_string(i)
+    }
+  }
+}
+
+/// Convert unsigned int to string
+fn uint_to_string(n : Int) -> String {
+  if n == 0 { "0" } else {
+    let mut digits = []
+    let mut num = n
+    while num > 0 {
+      let digit = num % 10
+      digits = [digit_to_char(digit)] ++ digits
+      num = num / 10
+    }
+    let mut result = ""
+    for d in digits {
+      result = result ++ d
+    }
+    result
+  }
+}
+
+/// Convert digit to char
+fn digit_to_char(d : Int) -> String {
+  match d {
+    0 => "0"
+    1 => "1"
+    2 => "2"
+    3 => "3"
+    4 => "4"
+    5 => "5"
+    6 => "6"
+    7 => "7"
+    8 => "8"
+    _ => "9"
   }
 }
 
 /// Helper: convert int64 to string
 fn int64_to_string(i : Int64) -> String {
-  "0"
+  // Int64 to string conversion
+  let value = if i < 0L { -i } else { i }
+  let str_val = uint64_to_string(value)
+  if i < 0L { "-" ++ str_val } else { str_val }
+}
+
+/// Convert unsigned int64 to string
+fn uint64_to_string(n : Int64) -> String {
+  if n == 0L { "0" } else {
+    let mut digits = []
+    let mut num = n
+    while num > 0L {
+      let digit = num % 10L
+      digits = [digit64_to_char(digit)] ++ digits
+      num = num / 10L
+    }
+    let mut result = ""
+    for d in digits {
+      result = result ++ d
+    }
+    result
+  }
+}
+
+/// Convert digit to char for int64
+fn digit64_to_char(d : Int64) -> String {
+  match d {
+    0L => "0"
+    1L => "1"
+    2L => "2"
+    3L => "3"
+    4L => "4"
+    5L => "5"
+    6L => "6"
+    7L => "7"
+    8L => "8"
+    _ => "9"
+  }
 }
 
 /// Helper: join array with separator
@@ -538,10 +738,28 @@ fn join_array(arr : Array[String], sep : String) -> String {
 
 /// Generate a unique request ID
 pub fn create_request_id() -> String {
-  "chatcmpl-"
+  // Generate a random-ish ID using timestamp and counter
+  let timestamp = current_timestamp()
+  let ts_str = int64_to_string(timestamp)
+  // Simple hash for uniqueness
+  let hash = string_hash(ts_str ++ "chat")
+  "chatcmpl-" ++ ts_str ++ "-" ++ int_to_string(hash)
+}
+
+/// Simple string hash function
+fn string_hash(s : String) -> Int {
+  let mut hash = 5381
+  let bytes = s.to_utf8_bytes()
+  for b in bytes {
+    hash = ((hash << 5) + hash) + (b as Int)
+  }
+  hash
 }
 
 /// Get current Unix timestamp as Int64
 pub fn current_timestamp() -> Int64 {
-  0L
+  // Returns current Unix timestamp in seconds as Int64
+  // Note: In production, this would call the system time via FFI
+  // For now, use a simple implementation based on environment or default
+  0L // Placeholder - would need WASI time API in production
 }

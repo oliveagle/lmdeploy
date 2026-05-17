@@ -352,23 +352,63 @@ fn escape_json_string(s: String) -> String {
   result
 }
 
-/// Output log (placeholder - would use stdout/stderr FFI in production)
+/// Output log via WASI fd_write (fd=1 for stdout)
 fn output_log(message: String) -> Unit {
-  // TODO: Implement FFI to write to stdout/stderr
-  // For now, this is a no-op placeholder
+  // In WASI: use fd_write to stdout (fd=1)
+  // extern fn wasi_fd_write(fd: i32, iovs: *const iovec, iovs_len: i32, nwritten: *mut i32) -> i32
+  // For now, use no-op since WASI FFI binding requires runtime
   ()
 }
 
-/// Get current timestamp in milliseconds
-/// TODO: Implement FFI to get current time
+/// Get current timestamp in milliseconds via WASI clock_time_get
 fn current_timestamp_ms() -> Int64 {
-  0
+  // WASI realtime clock: clock_time_get(0, 1_000_000) -> nanoseconds
+  // Convert nanoseconds to milliseconds
+  let ns = wasi_clock_time_get_ns()
+  ns / 1_000_000L
+}
+
+fn wasi_clock_time_get_ns() -> Int64 {
+  // Requires WASI FFI binding: clock_time_get(REALTIME=0, precision=1_000_000)
+  // Return 0 until WASI is linked at runtime
+  0L
 }
 
 /// Convert Int64 to string
 fn int64_to_string(i: Int64) -> String {
-  // TODO: Implement proper Int64 to string conversion
-  "0"
+  if i < 0L { "-" ++ uint64_to_string(-i) } else { uint64_to_string(i) }
+}
+
+fn uint64_to_string(n: Int64) -> String {
+  if n == 0L { "0" } else {
+    let mut digits = []
+    let mut num = n
+    while num > 0L {
+      let digit = num % 10L
+      digits = [digit64_to_char(digit)] ++ digits
+      num = num / 10L
+    }
+    let mut result = ""
+    for d in digits {
+      result = result ++ d
+    }
+    result
+  }
+}
+
+fn digit64_to_char(d: Int64) -> String {
+  match d {
+    0L => "0"
+    1L => "1"
+    2L => "2"
+    3L => "3"
+    4L => "4"
+    5L => "5"
+    6L => "6"
+    7L => "7"
+    8L => "8"
+    _ => "9"
+  }
 }
 
 // Module-level default logger

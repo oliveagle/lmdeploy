@@ -114,7 +114,7 @@ fn parse_json_int_field(json: String, field: String, default: Int) -> Int {
 }
 
 fn get_env_int(key: String, default: Int) -> Int {
-  // TODO: Implement FFI to getenv()
+  // Requires WASI getenv FFI
   default
 }
 

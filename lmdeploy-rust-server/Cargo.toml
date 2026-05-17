@@ -36,6 +36,9 @@ anyhow = "1.0"
 metrics = "0.23"
 metrics-exporter-prometheus = "0.15"
 
+# Tokenizers (HuggingFace)
+tokenizers = "0.21"
+
 # Utilities
 uuid = { version = "1.10", features = ["v4"] }
 sha2 = "0.10"
