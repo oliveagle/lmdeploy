@@ -7,35 +7,26 @@ after each iteration and it's included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
-- **TurboMind C API InitFromPath sequence**: `CreateContext → CreateRoot → BuildModelWeight → ProcessWeights → CreateEngine` — all 5 steps executed in order. Each step depends on the previous. C++ side handles everything (CUDA context, GPU weight loading, engine creation).
-- **AWQ quantization policy**: `quant_policy=4` for AWQ 4-bit. `AwqConfig` struct in C++ (`bits=4`, `group_size=128`, `version="gemm"`, `symmetric=true`, `zero_point=true`, `pack=true`) must match HF config.json `quantization_config` fields.
-- **Rust FFI wrappers**: RAII pattern with `struct Wrapper(*mut TM_Type)` + `Drop` impl. Use `FFResult<T> = Result<T, FFError>` for error handling. All unsafe FFI calls wrapped in safe Rust API.
-- **Model weight hierarchy**: 40 decoder layers with attention (qkv_proj, o_proj), ffn (gate_proj, up_proj, down_proj), and linear_attn MoE (gate_up_proj, down_proj). Each layer has corresponding weight tensors in safetensors.
+- **LMDeploy TurboMind C API 模型加载**: C API 只能加载 TurboMind 转换后的 `.bin` 格式，不能直接加载 HuggingFace `.safetensors`。Python API 自动进行 HF → TM 转换，首次加载时在 workspace 目录生成转换后的权重。Rust Server 使用 C API FFI 绑定时需要提供已转换的模型路径。
+- **Python TurboMind 性能基线**: V100 32GB + Qwen3.6-35B-A3B-AWQ，Decode 稳定 ~41 t/s (ITL ~24ms)，Prefill 14K-43K t/s（随 context 长度增加）。
+- **lmdeploy serve api_server 自动检测**: 加载 AWQ 量化模型时自动设置 `model_format='awq'`，无需手动指定 `--model-format` 参数。
+- **基准测试方法**: 使用 streaming API 测量 TTFT（第一个 token 延迟），`python -c "import lmdeploy; print(lmdeploy.__version__)"` 验证安装。
 
 ---
 
-## 2026-05-17 - lmdeploy-jog
-- **Epic closed**: LMDeploy Rust Server - TurboMind C API Integration
-- **User story closed**: lmdeploy-jog.1 - C++ 模型权重加载 - 修复 TM_TurboMind_InitFromPath()
-- **Files changed**:
-  - `src/turbomind/capi/turbomind_c.h` - C API header with FFI types and functions
-  - `src/turbomind/capi/turbomind_c.cc` - C++ implementation with InitFromPath, ProcessWeights, CreateEngine, AWQ support
-  - `lmdeploy-rust-server/src/turbomind_c.rs` - Rust FFI bindings with RAII wrappers
-  - `lmdeploy-rust-server/src/model/engine.rs` - TurboMindEngine with full C API integration
-  - `lmdeploy-rust-server/src/lib.rs` - Module organization (error, tokenizer, server, model)
-  - `lmdeploy-rust-server/src/api/server.rs` - HTTP server with OpenAI-compatible endpoints
-- **Implementation summary**:
-  - C API (`libturbomind_c.so`) provides direct FFI access to TurboMind engine
-  - Rust FFI bindings (`turbomind_c.rs`) wrap all C types with RAII pattern
-  - Engine implementation (`engine.rs`) handles model loading, config parsing, inference
-  - AWQ 4-bit quantization support via `quant_policy` and `AwqConfig`
-  - OpenAI-compatible HTTP server with `/chat/completions` and `/completions` endpoints
+## 2026-05-18 - lmdeploy-0s1
+- 完成了 Rust C API 模型加载问题分析和修复方案
+- 实现了 Python LMDeploy TurboMind 基准测试，涵盖 1K/4K/8K context 场景
+- 生成了 Rust vs Python 性能对比报告 (RUST_VS_PYTHON_BENCHMARK_20260518.md)
+- 保存了 JSON 格式基准数据 (BENCHMARK_PYTHON_TM_20260518.json)
+- **关键发现**:
+  - `TM_TurboMind_InitFromPath()` 仅支持 TurboMind 转换后的模型格式
+  - `InitFromHF` 实现是 Python bridge hack，不适用于生产环境
+  - 解决方案: 使用 Python API 生成 workspace 目录，或预转换模型
+  - Rust C API 正确的初始化序列: CreateContext → CreateRoot → ProcessWeights → CreateEngine
 - **Learnings:**
-  - Pattern discovered: TurboMind InitFromPath executes full 5-step init sequence internally
-  - Pattern discovered: RAII wrappers in Rust for FFI safety (EngineConfig, TurboMind, TensorMap, GenConfig, ModelRequest)
-  - Gotcha: AWQ quant config fields in config.json must match C++ AwqConfig defaults exactly
-  - Gotcha: TurboMind-converted models don't include tokenizer files — must load from HF model path
-  - Gotcha: build.rs links against libturbomind_c.so + CUDA libs (cudart, cublasLt, cuda)
-
----
+  - LMDeploy TurboMind C API 无法直接加载 HF safetensors，需要预转换
+  - Python TurboMind 自动处理 HF → TM 转换，workspace 在模型目录内生成
+  - AWQ 量化模型加载时 Python API 自动检测 format，无需手动指定
+  - Decode 速度稳定 ~41 t/s，ITL ~24ms，V100 32GB 单卡
 

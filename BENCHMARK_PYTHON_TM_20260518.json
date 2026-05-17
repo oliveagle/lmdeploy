@@ -1,0 +1,40 @@
+{
+  "engine": "LMDeploy Python TurboMind",
+  "model": "Qwen3.6-35B-A3B-AWQ",
+  "model_path": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ",
+  "quantization": "AWQ 4-bit",
+  "gpu": "Tesla V100 32GB (PG503-216)",
+  "cuda": "12.5",
+  "date": "2026-05-18",
+  "lmdeploy_version": "0.13.0",
+  "results": {
+    "short_context": {
+      "context_length": 1024,
+      "output_tokens": 512,
+      "ttft_ms_avg": 69.62,
+      "total_time_ms_avg": 12487.06,
+      "prefill_speed_tps_avg": 14827.2,
+      "decode_speed_tps_avg": 41.2,
+      "avg_itl_ms_avg": 24.3
+    },
+    "medium_context": {
+      "context_length": 4096,
+      "output_tokens": 512,
+      "ttft_ms_avg": 122.06,
+      "total_time_ms_avg": 12615.52,
+      "prefill_speed_tps_avg": 33727.5,
+      "decode_speed_tps_avg": 41.0,
+      "avg_itl_ms_avg": 24.45
+    },
+    "long_context": {
+      "context_length": 8192,
+      "output_tokens": 512,
+      "ttft_ms_avg": 191.37,
+      "total_time_ms_avg": 12810.11,
+      "prefill_speed_tps_avg": 42875.0,
+      "decode_speed_tps_avg": 40.6,
+      "avg_itl_ms_avg": 24.69
+    }
+  },
+  "methodology": "3 runs per scenario, averaged. TTFT measured via streaming API first token latency. Inter-token latency (ITL) measured between consecutive tokens."
+}
