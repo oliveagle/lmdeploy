@@ -3,10 +3,10 @@
   "sessionId": "711b3bda-8ecc-41e5-a3c1-6001fb36d767",
   "status": "running",
   "startedAt": "2026-05-18T03:12:04.690Z",
-  "updatedAt": "2026-05-18T05:31:27.978Z",
-  "currentIteration": 4,
+  "updatedAt": "2026-05-18T05:38:47.105Z",
+  "currentIteration": 5,
   "maxIterations": 50,
-  "tasksCompleted": 2,
+  "tasksCompleted": 3,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -23,8 +23,8 @@
       {
         "id": "lmdeploy-v8o",
         "title": "执行 Python LMDeploy 同口径性能基准测试",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "lmdeploy-xt9",
@@ -146,6 +146,16 @@
       "durationMs": 3530680,
       "startedAt": "2026-05-18T04:15:54.734Z",
       "endedAt": "2026-05-18T05:14:45.414Z"
+    },
+    {
+      "iteration": 5,
+      "status": "completed",
+      "taskId": "lmdeploy-v8o",
+      "taskTitle": "执行 Python LMDeploy 同口径性能基准测试",
+      "taskCompleted": true,
+      "durationMs": 991962,
+      "startedAt": "2026-05-18T05:14:56.004Z",
+      "endedAt": "2026-05-18T05:31:27.966Z"
     }
   ],
   "skippedTaskIds": [],

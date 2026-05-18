@@ -7,6 +7,25 @@
 - **Cargo 编译极慢**: 本地 cargo 检查需要很长时间（>2分钟），原因是网络慢或缓存问题。建议预留 3-5 分钟编译时间，或使用 `cargo check --lib` 而非全量编译
 - **模型路径**: Qwen3.6-35B-A3B-AWQ 位于 `/mnt/eaget-4tb/modelscope_models/tclf90/` (不是 tclf00)
 
+## 2026-05-18 - lmdeploy-ghi
+- **生成 Rust vs Python 性能对比报告**: 汇总了 Python LMDeploy 的性能测试结果，分析 Rust Server 的阻塞原因
+- **修改的文件**:
+  - `BENCHMARK_RUST_VS_PYTHON_20260518.md`: 新增性能对比报告
+    - Python TurboMind 基准测试结果（1K/4K/8K context）
+    - Decode 速度稳定在 ~41 tokens/s
+    - Prefill 速度随 context 增长（14K → 42K tokens/s）
+    - TTFT 随 context 线性增长（70ms → 191ms）
+    - Rust Server 阻塞原因分析（C API 无法加载 HF 格式）
+    - 改进建议和下一步计划
+- **Learnings**:
+  - Python TurboMind 的 prefill 速度随 context 增长而提高（更好的 GPU 利用）
+  - Decode 速度受显存带宽限制，几乎不随 context 变化
+  - ITL (Inter-Token Latency) 稳定在 ~24ms，与 decode 速度一致
+  - 历史数据对比显示不同测试间差异 <2%，性能稳定
+  - Rust Server 需要预转换模型或完善 C API HF 支持才能执行基准测试
+
+---
+
 ## 2026-05-18 - lmdeploy-vh5
 - **创建 Rust 基准测试框架**: 实现了完整的性能基准测试工具，支持 TTFT、Prefill 速度、Decode 速度、多场景测试
 - **修改的文件**:
