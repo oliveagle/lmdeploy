@@ -57,6 +57,28 @@
 
 ---
 
+## 2026-05-18 - lmdeploy-v8o
+- **创建 Python LMDeploy 基准测试工具**: 实现了与 Rust 基准测试同口径的 Python 性能测试工具
+- **修改的文件**:
+  - `examples/python_benchmark.py`: 新增 Python 基准测试脚本
+    - 配置与 Rust benchmark 一致: 1K/4K/8K context lengths, 512 output tokens, 3 次迭代
+    - 支持 stream 和 non-stream 两种模式（stream 用于精确 TTFT 测量）
+    - 自动检测 AWQ 量化并设置 quant_policy=4
+    - 记录 TTFT、prefill 速度、decode 速度、GPU 内存占用
+    - 结果输出到 JSON 文件，格式与 Rust benchmark 兼容
+- **关键 API 发现**:
+  - `GenerationConfig` 使用 `max_new_tokens` 而非 `max_tokens`
+  - `async_engine.tokenizer` 用于准确 token 计数（而非 hf_tokenizer）
+  - `stream_infer` 返回迭代器，但具体行为取决于输入是单个 prompt 还是 prompt 列表
+  - `infer` 返回单个 Response 或 Response 列表
+- **Learnings**:
+  - Python LMDeploy pipeline 初始化时间约 53 秒（包含权重加载）
+  - stream_infer 返回类型复杂：可能是 Response 对象或 Response 迭代器，需要运行时判断
+  - 使用 `getattr(response, "text", "")` 安全访问 Response.text 属性
+  - 估算 TTFT：stream 模式可精确测量，非 stream 模式约为总时间的 20%
+
+---
+
 ## 2026-05-18 - lmdeploy-xt9
 - **完成 Rust 基准测试工具**: 创建了完整的性能基准测试 CLI 工具
 - **修改的文件**:
