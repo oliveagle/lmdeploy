@@ -500,166 +500,50 @@ static HfModelConfig ParseHfConfig(const std::string& model_dir)
 }  // anonymous namespace
 
 // ============================================================
-// Safetensors file handling (simple implementation)
+// Safetensors file handling (using header-only implementation)
 // ============================================================
 
-// #include <safetensors.h>  // Optional: use if available in _deps
+#include "src/turbomind/utils/safetensors_reader.h"
+
+// Wrapper to adapt turbomind::SafetensorsReader to the C API
+// The C API uses an opaque void* handle, so we wrap the C++ reader
 
 namespace {
 
-// Simple safetensors reader that doesn't depend on external library
-// Format: header (JSON) + tensor data
-
-struct SafetensorsHeader {
-    std::vector<std::string> names;
-    std::vector<std::vector<size_t>> shapes;
-    std::vector<size_t> offsets;
-    std::vector<size_t> sizes;
-    TM_DataType dtype;
-};
-
-struct SafetensorsReader {
-    std::string file_path;
-    std::ifstream stream;
-    size_t header_size;
-    std::vector<std::string> names;
-    std::vector<std::vector<size_t>> shapes;
-    std::vector<size_t> offsets;
-    std::vector<size_t> sizes;
-    TM_DataType dtype;
-
-    SafetensorsReader(const char* path) : file_path(path), stream(path, std::ios::binary), dtype(TM_DATATYPE_FP32) {
-        if (!stream.is_open()) {
-            throw std::runtime_error("Cannot open file");
-        }
-
-        // Read 8-byte header size (little-endian)
-        uint8_t size_bytes[8];
-        stream.read(reinterpret_cast<char*>(size_bytes), 8);
-        header_size = 0;
-        for (int i = 0; i < 8; ++i) {
-            header_size |= static_cast<size_t>(size_bytes[i]) << (i * 8);
-        }
-
-        // Read header JSON
-        std::vector<char> header_json(header_size);
-        stream.read(header_json.data(), header_size);
-
-        // Parse JSON to extract tensor metadata
-        std::string json_str(header_json.begin(), header_json.end());
-        ParseHeader(json_str);
+// Map turbomind::SafetensorsReader::TM_DataType to TM_DataType (C API)
+static TM_DataType ToCApiDtype(turbomind::SafetensorsReader::TM_DataType dt)
+{
+    using CppDT = turbomind::SafetensorsReader::TM_DataType;
+    switch (dt) {
+        case CppDT::kNull:        return TM_DATATYPE_INVALID;
+        case CppDT::kBool:        return TM_DATATYPE_BOOL;
+        case CppDT::kUint8:       return TM_DATATYPE_UINT8;
+        case CppDT::kUint16:      return TM_DATATYPE_UINT16;
+        case CppDT::kUint32:      return TM_DATATYPE_UINT32;
+        case CppDT::kUint64:      return TM_DATATYPE_UINT64;
+        case CppDT::kInt8:        return TM_DATATYPE_INT8;
+        case CppDT::kInt16:       return TM_DATATYPE_INT16;
+        case CppDT::kInt32:       return TM_DATATYPE_INT32;
+        case CppDT::kInt64:       return TM_DATATYPE_INT64;
+        case CppDT::kFloat16:     return TM_DATATYPE_FP16;
+        case CppDT::kFloat32:     return TM_DATATYPE_FP32;
+        case CppDT::kFloat64:     return TM_DATATYPE_FP64;
+        case CppDT::kBfloat16:    return TM_DATATYPE_BF16;
+        case CppDT::kFloat8_e4m3: return TM_DATATYPE_FP8_E4M3;
+        case CppDT::kFloat4_e2m1: return TM_DATATYPE_FP4_E2M1;
+        case CppDT::kUint4:       return TM_DATATYPE_UINT4;
+        default:                  return TM_DATATYPE_INVALID;
     }
-
-    void ParseHeader(const std::string& json) {
-        // Simple JSON parsing for safetensors format
-        // {"tensor_name": {"dtype": "F32", "shape": [1, 768], "data_offsets": [0, 3072]}}
-        size_t pos = 0;
-        while (pos < json.size()) {
-            // Find tensor name
-            size_t name_start = json.find('"', pos);
-            if (name_start == std::string::npos) break;
-            name_start += 1;
-            size_t name_end = json.find('"', name_start);
-            if (name_end == std::string::npos) break;
-
-            std::string tensor_name = json.substr(name_start, name_end - name_start);
-            names.push_back(tensor_name);
-
-            // Find dtype
-            size_t dtype_pos = json.find("\"dtype\"", name_end);
-            if (dtype_pos != std::string::npos) {
-                size_t dtype_start = json.find('"', dtype_pos + 6);
-                size_t dtype_end = json.find('"', dtype_start + 1);
-                std::string dtype_str = json.substr(dtype_start + 1, dtype_end - dtype_start - 1);
-
-                if (dtype_str == "F32") dtype = TM_DATATYPE_FP32;
-                else if (dtype_str == "F16" || dtype_str == "fp16") dtype = TM_DATATYPE_FP16;
-                else if (dtype_str == "BF16") dtype = TM_DATATYPE_BF16;
-                else if (dtype_str == "I64") dtype = TM_DATATYPE_INT64;
-                else if (dtype_str == "I32") dtype = TM_DATATYPE_INT32;
-                else if (dtype_str == "U8") dtype = TM_DATATYPE_UINT8;
-                else dtype = TM_DATATYPE_FP32;
-            }
-
-            // Find shape
-            std::vector<size_t> shape;
-            size_t shape_pos = json.find("\"shape\"", name_end);
-            if (shape_pos != std::string::npos) {
-                size_t bracket = json.find('[', shape_pos);
-                size_t bracket_end = json.find(']', bracket);
-                std::string shape_str = json.substr(bracket + 1, bracket_end - bracket - 1);
-
-                size_t num_start = 0;
-                while (num_start < shape_str.size()) {
-                    size_t comma = shape_str.find(',', num_start);
-                    if (comma == std::string::npos) comma = shape_str.size();
-                    std::string num_str = shape_str.substr(num_start, comma - num_start);
-                    // Trim whitespace
-                    size_t first = num_str.find_first_not_of(" \t\n\r");
-                    size_t last = num_str.find_last_not_of(" \t\n\r");
-                    if (first != std::string::npos) {
-                        shape.push_back(std::stoll(num_str.substr(first, last - first + 1)));
-                    }
-                    num_start = comma + 1;
-                }
-            }
-            shapes.push_back(shape);
-
-            // Find data_offsets
-            size_t offsets_pos = json.find("\"data_offsets\"", name_end);
-            std::vector<size_t> offsets;
-            if (offsets_pos != std::string::npos) {
-                size_t bracket = json.find('[', offsets_pos);
-                size_t bracket_end = json.find(']', bracket);
-                std::string offsets_str = json.substr(bracket + 1, bracket_end - bracket - 1);
-
-                size_t num_start = 0;
-                while (num_start < offsets_str.size()) {
-                    size_t comma = std::min(offsets_str.find(',', num_start), offsets_str.size());
-                    std::string num_str = offsets_str.substr(num_start, comma - num_start);
-                    size_t first = num_str.find_first_not_of(" \t\n\r");
-                    size_t last = num_str.find_last_not_of(" \t\n\r");
-                    if (first != std::string::npos) {
-                        offsets.push_back(std::stoll(num_str.substr(first, last - first + 1)));
-                    }
-                    if (comma == offsets_str.size()) break;
-                    num_start = comma + 1;
-                }
-            }
-            if (offsets.size() >= 2) {
-                this->offsets.push_back(offsets[0]);
-                this->sizes.push_back(offsets[1] - offsets[0]);
-            }
-
-            pos = json.find('{', name_end);
-        }
-    }
-
-    size_t GetDataOffset(const std::string& name) const {
-        for (size_t i = 0; i < names.size(); ++i) {
-            if (names[i] == name) {
-                return offsets[i];
-            }
-        }
-        return 0;
-    }
-
-    size_t GetDataSize(const std::string& name) const {
-        for (size_t i = 0; i < names.size(); ++i) {
-            if (names[i] == name) {
-                return sizes[i];
-            }
-        }
-        return 0;
-    }
-};
+}
 
 }  // anonymous namespace
 
 void* TM_Safetensors_Open(const char* file_path)
 {
     try {
-        return new SafetensorsReader(file_path);
+        // Return a pointer to a newly created SafetensorsReader
+        // Caller is responsible for calling TM_Safetensors_Close to delete
+        return new turbomind::SafetensorsReader(file_path);
     }
     catch (const std::exception& e) {
         SetError(TM_ERR_RUNTIME, e.what());
@@ -669,7 +553,9 @@ void* TM_Safetensors_Open(const char* file_path)
 
 void TM_Safetensors_Close(void* handle)
 {
-    delete static_cast<SafetensorsReader*>(handle);
+    if (handle) {
+        delete static_cast<turbomind::SafetensorsReader*>(handle);
+    }
 }
 
 int TM_Safetensors_GetTensor(
@@ -685,54 +571,34 @@ int TM_Safetensors_GetTensor(
         return TM_ERR_INVALID_ARG;
     }
 
-    auto* reader = static_cast<SafetensorsReader*>(handle);
+    auto* reader = static_cast<turbomind::SafetensorsReader*>(handle);
 
-    // Find tensor index
-    int tensor_idx = -1;
-    for (int i = 0; i < static_cast<int>(reader->names.size()); ++i) {
-        if (reader->names[i] == name) {
-            tensor_idx = i;
-            break;
-        }
-    }
-
-    if (tensor_idx < 0) {
+    // Get tensor metadata
+    const auto* meta = reader->get_tensor_meta(name);
+    if (!meta) {
         SetError(TM_ERR_NOT_FOUND, "Tensor not found");
         return -1;
     }
 
-    // Calculate offset: 8-byte header + header_size + tensor_data_offset
-    size_t data_offset = 8 + reader->header_size + reader->offsets[tensor_idx];
-    size_t data_size = reader->sizes[tensor_idx];
-
-    // Seek to tensor data
-    reader->stream.seekg(static_cast<std::streampos>(data_offset));
-    if (!reader->stream.good()) {
-        SetError(TM_ERR_RUNTIME, "Failed to seek to tensor data");
-        return -1;
-    }
-
-    // Allocate buffer and read
-    std::vector<char> buffer(data_size);
-    reader->stream.read(buffer.data(), data_size);
-    if (!reader->stream.good()) {
+    // Allocate buffer and read tensor data
+    std::vector<uint8_t> data = reader->read_tensor(name);
+    if (data.empty()) {
         SetError(TM_ERR_RUNTIME, "Failed to read tensor data");
         return -1;
     }
 
-    // Copy to new buffer (caller takes ownership)
-    char* data_copy = new char[data_size];
-    std::memcpy(data_copy, buffer.data(), data_size);
+    // Copy data to caller-owned buffer
+    char* data_copy = new char[data.size()];
+    std::memcpy(data_copy, data.data(), data.size());
     *out_data = data_copy;
-    *out_size = data_size;
+    *out_size = data.size();
 
     // Return shape info
-    const auto& shape = reader->shapes[tensor_idx];
-    *out_ndim = static_cast<int>(shape.size());
-    for (size_t i = 0; i < shape.size(); ++i) {
-        out_shape[i] = static_cast<int64_t>(shape[i]);
+    *out_ndim = static_cast<int>(meta->shape.size());
+    for (size_t i = 0; i < meta->shape.size(); ++i) {
+        out_shape[i] = static_cast<int64_t>(meta->shape[i]);
     }
-    *out_dtype = reader->dtype;
+    *out_dtype = ToCApiDtype(meta->dtype);
 
     return 0;
 }
@@ -740,18 +606,18 @@ int TM_Safetensors_GetTensor(
 int TM_Safetensors_NumTensors(void* handle)
 {
     if (!handle) return 0;
-    auto* reader = static_cast<SafetensorsReader*>(handle);
-    return static_cast<int>(reader->names.size());
+    auto* reader = static_cast<turbomind::SafetensorsReader*>(handle);
+    return static_cast<int>(reader->num_tensors());
 }
 
 const char* TM_Safetensors_GetTensorName(void* handle, int index)
 {
     if (!handle) return nullptr;
-    auto* reader = static_cast<SafetensorsReader*>(handle);
-    if (index < 0 || index >= static_cast<int>(reader->names.size())) return nullptr;
+    auto* reader = static_cast<turbomind::SafetensorsReader*>(handle);
+    if (index < 0 || index >= static_cast<int>(reader->num_tensors())) return nullptr;
     // Note: returned pointer is only valid until SafetensorsReader is destroyed
     static thread_local std::string last_name;
-    last_name = reader->names[index];
+    last_name = reader->tensor_name(static_cast<size_t>(index));
     return last_name.c_str();
 }
 
@@ -895,11 +761,11 @@ static void LoadWeightsFromSafetensors(
     const HfModelConfig& hf_config)
 {
     try {
-        SafetensorsReader reader(safetensors_path);
+        turbomind::SafetensorsReader reader(safetensors_path);
 
         // Iterate over all tensors in the file
-        for (size_t i = 0; i < reader.names.size(); ++i) {
-            const std::string& tensor_name = reader.names[i];
+        for (size_t i = 0; i < reader.num_tensors(); ++i) {
+            const std::string& tensor_name = reader.tensor_name(i);
 
             // Map HF weight names to TurboMind module paths
             // HF format: model.layers.0.self_attn.q_proj.weight
@@ -910,23 +776,15 @@ static void LoadWeightsFromSafetensors(
                 continue;  // Skip unmapped weights
             }
 
+            // Get tensor metadata
+            const auto* meta = reader.get_tensor_meta(tensor_name);
+            if (!meta) {
+                continue;  // Skip failed reads
+            }
+
             // Read tensor data
-            void* data = nullptr;
-            size_t data_size = 0;
-            int ndim = 0;
-            int64_t shape[8] = {0};
-            TM_DataType dtype = TM_DATATYPE_FP32;
-
-            int result = TM_Safetensors_GetTensor(
-                static_cast<void*>(&reader),
-                tensor_name.c_str(),
-                &data,
-                &data_size,
-                &ndim,
-                shape,
-                &dtype);
-
-            if (result != 0 || data == nullptr) {
+            std::vector<uint8_t> data = reader.read_tensor(tensor_name);
+            if (data.empty()) {
                 continue;  // Skip failed reads
             }
 
@@ -940,7 +798,6 @@ static void LoadWeightsFromSafetensors(
             }
 
             if (parts.empty()) {
-                delete[] static_cast<char*>(data);
                 continue;
             }
 
@@ -952,7 +809,6 @@ static void LoadWeightsFromSafetensors(
             }
 
             if (!current) {
-                delete[] static_cast<char*>(data);
                 continue;
             }
 
@@ -962,21 +818,23 @@ static void LoadWeightsFromSafetensors(
             // Allocate and copy the tensor
             auto param = current->param(param_name);
             if (param) {
-                std::vector<size_t> tensor_shape(shape, shape + ndim);
-                turbomind::DataType tm_dtype = FromCDataType(dtype);
+                // Convert shape from size_t to int64_t for compatibility
+                std::vector<int64_t> shape64;
+                for (const auto& dim : meta->shape) {
+                    shape64.push_back(static_cast<int64_t>(dim));
+                }
 
-                param.alloc(tensor_shape, tm_dtype);
+                turbomind::DataType tm_dtype = FromCDataType(ToCApiDtype(meta->dtype));
+
+                param.alloc(meta->shape, tm_dtype);
 
                 // Copy data (TODO: handle device placement)
                 auto tensor = param.get();
                 if (tensor && tensor.raw_data()) {
-                    size_t copy_size = std::min(data_size, static_cast<size_t>(tensor.byte_size()));
-                    std::memcpy(tensor.raw_data(), data, copy_size);
+                    size_t copy_size = std::min(data.size(), static_cast<size_t>(tensor.byte_size()));
+                    std::memcpy(tensor.raw_data(), data.data(), copy_size);
                 }
             }
-
-            // Clean up
-            delete[] static_cast<char*>(data);
         }
     }
     catch (const std::exception& e) {

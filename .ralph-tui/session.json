@@ -3,10 +3,10 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-18T17:02:44.377Z",
-  "currentIteration": 5,
+  "updatedAt": "2026-05-18T17:13:26.491Z",
+  "currentIteration": 6,
   "maxIterations": 50,
-  "tasksCompleted": 4,
+  "tasksCompleted": 5,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -216,6 +216,16 @@
       "durationMs": 398440,
       "startedAt": "2026-05-18T16:41:41.260Z",
       "endedAt": "2026-05-18T16:48:19.700Z"
+    },
+    {
+      "iteration": 6,
+      "status": "completed",
+      "taskId": "lmdeploy-uq0",
+      "taskTitle": "在 C++ 层实现 HuggingFace config.json 解析器",
+      "taskCompleted": true,
+      "durationMs": 863274,
+      "startedAt": "2026-05-18T16:48:21.088Z",
+      "endedAt": "2026-05-18T17:02:44.362Z"
     }
   ],
   "skippedTaskIds": [],

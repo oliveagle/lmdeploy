@@ -7,6 +7,43 @@ after each iteration and it's included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
+### SafetensorsReader Header-Only Pattern
+
+**问题**: 需要在 C++ 层读取 HuggingFace safetensors 格式文件，原有实现在 turbomind_c.cc 中是简单的内联实现。
+
+**解决方案**: 创建头文件-only safetensors 读取器 `src/turbomind/utils/safetensors_reader.h`
+
+**关键特性**:
+- Header-only 实现，无外部依赖
+- 标准 safetensors 格式支持（8字节 header 大小 + JSON + 二进制数据）
+- 支持多维 tensor shape 和各种 dtype（F32, F16, BF16, I32, I64, U8 等）
+- 提供 `get_tensor_meta()` 获取元数据，`read_tensor()` 读取数据
+- C API 包装通过 `TM_Safetensors_*` 函数系列暴露
+
+**使用方式**:
+```cpp
+#include "src/turbomind/utils/safetensors_reader.h"
+
+// 打开文件并解析 header
+auto reader = SafetensorsReader("/path/to/model.safetensors");
+
+// 获取 tensor 数量和名称
+size_t n = reader.num_tensors();
+const std::string& name = reader.tensor_name(0);
+
+// 获取 tensor 元数据
+const auto* meta = reader.get_tensor_meta("layer.weight");
+if (meta) {
+    std::cout << "dtype: " << (int)meta->dtype << "\n";
+    std::cout << "shape: " << meta->shape[0] << "x" << meta->shape[1] << "\n";
+}
+
+// 读取 tensor 数据
+std::vector<uint8_t> data = reader.read_tensor("layer.weight");
+```
+
+**C API 适配**: 通过 `ToCApiDtype()` 函数将内部 `TM_DataType` 转换为 C API 版本。
+
 ### HfConfigParser JSON Library Pattern
 
 **问题**: HuggingFace config.json 解析需要支持嵌套结构（text_config, quantization_config），旧的简单行解析无法处理。
@@ -215,3 +252,23 @@ ModelWeight
   - ParseHfConfig() 使用 helper lambda (get_int, get_string, get_bool) 简化代码
   - MoE 和 DeltaNet 配置从 config.json 自动检测（num_local_experts, use_linear_attn）
   - AWQ quantization 从 quantization_config.quant_method == "awq" 检测
+
+
+## 2026-05-19 - lmdeploy-6l2
+- **Implemented**: 在 C++ 层实现 safetensors 文件读取
+- **Files changed**:
+  - `src/turbomind/utils/safetensors_reader.h` - 新增 header-only safetensors 读取器
+  - `src/turbomind/capi/turbomind_c.cc` - 更新为使用新的 safetensors_reader.h
+  - `src/turbomind/utils/test_safetensors_reader.cc` - 单元测试
+- **Learnings**:
+  - Safetensors 格式：8字节 header 大小（小端序）+ JSON metadata + 二进制 tensor 数据
+  - JSON parsing 需要处理嵌套结构（tensor → dtype/shape/data_offsets）
+  - 使用 std::vector<uint8_t> 作为通用数据容器，避免内存泄漏
+  - C API 适配需要内部 TM_DataType 到外部 TM_DataType 的转换
+  - LoadWeightsFromSafetensors 直接使用 C++ API 避免 C API 分配/释放循环
+  - 移动语义（std::move）优化 vector 返回值
+  - Thread-local 存储 用于返回临时字符串指针
+  - __metadata__ 条目需要特殊处理（跳过）
+
+---
+
