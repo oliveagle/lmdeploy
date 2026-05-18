@@ -148,3 +148,25 @@ size_t copy_size = std::min(data_size, static_cast<size_t>(tensor.byte_size()));
   - std::min needs explicit type casting when mixing size_t with ssize_t
 - Verification: Build succeeds, 65 tests pass
 ---
+
+## 2026-05-18 - lmdeploy-207
+- Verified InitFromPath implementation completeness
+- **Status**: Implementation complete (from lmdeploy-zmu, lmdeploy-bor)
+- Files verified: `turbomind_c.cc` (lines 1226-1434), `model_weight.cc` (prepare method)
+- **Verified components**:
+  - Module tree construction: ModelWeight → layers[N] → {attention, feed_forward, attention_norm, ffn_norm}
+  - Safetensors loading: SafetensorsReader class with JSON header parsing
+  - Weight name mapping: MapHuggingFaceWeightToTurboMind() function
+  - AWQ config: AwqQuantConfig struct for quantization parameters
+- **Weight mapping verified**:
+  - `model.layers.0.self_attn.q_proj.weight` → `layers.0.attention.q_proj.weight`
+  - `model.layers.0.mlp.gate_proj.weight` → `layers.0.feed_forward.w1.weight`
+  - `model.layers.0.mlp.up_proj.weight` → `layers.0.feed_forward.w3.weight`
+  - `model.layers.0.mlp.down_proj.weight` → `layers.0.feed_forward.w2.weight`
+- **Learnings**:
+  - InitFromPath flow: CreateContext → CreateRoot → build tree + load weights → ProcessWeights → CreateEngine
+  - AttentionWeight children: w_qkv, wo, q_proj, k_proj, v_proj, q_a_proj, q_b_proj, kv_a_proj, q_norm, k_norm
+  - FfnWeight children: w1, w3, w2, w1w3
+  - Build status: Compiles successfully, turbomind_c.so built
+
+---

@@ -3,10 +3,10 @@
   "sessionId": "c4ec3dd5-4f56-408d-99b4-3a29940aedf7",
   "status": "running",
   "startedAt": "2026-05-18T09:42:53.505Z",
-  "updatedAt": "2026-05-18T11:56:19.662Z",
-  "currentIteration": 4,
+  "updatedAt": "2026-05-18T12:12:28.198Z",
+  "currentIteration": 5,
   "maxIterations": 50,
-  "tasksCompleted": 2,
+  "tasksCompleted": 3,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -200,6 +200,16 @@
       "durationMs": 93524,
       "startedAt": "2026-05-18T11:22:13.991Z",
       "endedAt": "2026-05-18T11:23:47.515Z"
+    },
+    {
+      "iteration": 5,
+      "status": "completed",
+      "taskId": "lmdeploy-zmu",
+      "taskTitle": "实现 C++ 权重加载：填充 ModelWeight 子模块树 (layers/attention/ffn/norm)",
+      "taskCompleted": true,
+      "durationMs": 1950941,
+      "startedAt": "2026-05-18T11:23:48.703Z",
+      "endedAt": "2026-05-18T11:56:19.644Z"
     }
   ],
   "skippedTaskIds": [],
