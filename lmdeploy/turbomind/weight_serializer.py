@@ -96,12 +96,20 @@ class WeightSerializer:
         with open(self.model_path / "config.json") as f:
             self.config = json.load(f)
 
+        # Handle nested config (e.g., Qwen3.5 MoE has text_config)
+        config_source = self.config
+        if "text_config" in self.config:
+            config_source = self.config["text_config"]
+        elif "model_config" in self.config:
+            config_source = self.config["model_config"]
+
         # Model parameters
-        self.hidden_size = self.config.get("hidden_size", 4096)
-        self.num_layers = self.config.get("num_hidden_layers", 32)
-        self.num_heads = self.config.get("num_attention_heads", 32)
-        self.num_kv_heads = self.config.get("num_key_value_heads", self.num_heads)
-        self.vocab_size = self.config.get("vocab_size", 32000)
+        self.hidden_size = config_source.get("hidden_size", self.config.get("hidden_size", 4096))
+        self.num_layers = config_source.get("num_hidden_layers", self.config.get("num_hidden_layers", 32))
+        self.num_heads = config_source.get("num_attention_heads", self.config.get("num_attention_heads", 32))
+        self.num_kv_heads = config_source.get("num_key_value_heads", self.config.get("num_key_value_heads", self.num_heads))
+        self.vocab_size = config_source.get("vocab_size", self.config.get("vocab_size", 32000))
+        self.intermediate_size = config_source.get("intermediate_size", self.config.get("intermediate_size", self.hidden_size * 4))
 
         # Check for AWQ quantization
         quant_config = self.config.get("quantization_config", {})
@@ -216,7 +224,7 @@ class WeightSerializer:
             "num_heads": self.num_heads,
             "num_kv_heads": self.num_kv_heads,
             "vocab_size": self.vocab_size,
-            "intermediate_size": self.config.get("intermediate_size", self.hidden_size * 4),
+            "intermediate_size": self.intermediate_size,
         }
 
         # AWQ quantization config
@@ -271,6 +279,8 @@ def main():
     parser.add_argument("model_path", help="Path to HuggingFace model (safetensors)")
     parser.add_argument("output_dir", help="Output directory for .bin files")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--num-shards", "-n", type=int, default=None,
+                        help="Number of output shards (default: same as input)")
 
     args = parser.parse_args()
 
