@@ -146,7 +146,8 @@ class TurboMindBridge:
                 sequence_end=True,
                 stream_output=False,
             ):
-                if output.status == 0:  # SUCCESS
+                # ResponseType: SUCCESS=1, FINISH=2 - both contain valid token_ids
+                if output.status.value in (1, 2):
                     output_ids.extend(output.token_ids)
 
             self._session_id += 1
@@ -162,6 +163,71 @@ class TurboMindBridge:
             import traceback
             traceback.print_exc(file=sys.stderr)
             return {"status": "error", "message": str(e)}
+
+    async def generate_stream(self, input_ids: list[int], max_new_tokens: int = 100,
+                             temperature: float = 0.7, top_p: float = 0.95,
+                             top_k: int = 50):
+        """Generate tokens from input_ids with streaming output."""
+        if not self.is_loaded or not self.instance:
+            yield {"error": "Model not loaded"}
+            return
+
+        try:
+            import time
+
+            # Create generation config
+            gen_config = GenerationConfig(
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+            )
+
+            # Convert input_ids to numpy array
+            input_ids_array = np.array(input_ids, dtype=np.int32)
+
+            # Track timing for TTFT
+            start_time = time.perf_counter()
+            first_token_time = None
+            token_count = 0
+
+            # Use async_stream_infer with stream_output=True for token-by-token output
+            async for output in self.instance.async_stream_infer(
+                session_id=self._session_id,
+                input_ids=input_ids,
+                gen_config=gen_config,
+                sequence_start=True,
+                sequence_end=True,
+                stream_output=True,
+            ):
+                # ResponseType: SUCCESS=1, FINISH=2
+                if output.status.value in (1, 2):
+                    elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                    if first_token_time is None:
+                        first_token_time = elapsed_ms
+
+                    # Get the token IDs from this output
+                    for token_id in output.token_ids:
+                        token_count += 1
+                        # Decode token to text
+                        token_text = self.tm.tokenizer.decode([token_id])
+
+                        yield {
+                            "token_id": int(token_id),
+                            "text": token_text,
+                            "is_first": (token_count == 1),
+                            "is_last": (output.status.value == 2),
+                            "ttft_ms": first_token_time,
+                            "elapsed_ms": elapsed_ms,
+                            "token_index": token_count,
+                        }
+
+            self._session_id += 1
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            yield {"error": str(e)}
 
     async def batch_generate(self, requests: list[dict]) -> dict:
         """Batch generate for multiple requests."""
@@ -270,6 +336,36 @@ async def main_async():
                 model_path = cmd.get("model_path")
                 engine_config = cmd.get("engine_config", {})
                 response = bridge.load_model(model_path, engine_config)
+            elif cmd_name == "generate_stream":
+                # Streaming generation: yield token-by-token via JSON lines
+                input_ids = cmd.get("input_ids", [])
+                max_new_tokens = cmd.get("max_new_tokens", 100)
+                temperature = cmd.get("temperature", 0.7)
+                top_p = cmd.get("top_p", 0.95)
+                top_k = cmd.get("top_k", 50)
+
+                try:
+                    async for chunk in bridge.generate_stream(
+                        input_ids=input_ids,
+                        max_new_tokens=max_new_tokens,
+                        temperature=temperature,
+                        top_p=top_p,
+                        top_k=top_k,
+                    ):
+                        if "error" in chunk:
+                            print(json.dumps({"status": "error", "message": chunk["error"]}), flush=True)
+                            break
+                        print(json.dumps({"status": "ok", **chunk}), flush=True)
+
+                    # Send final done message
+                    print(json.dumps({"status": "ok", "type": "done"}), flush=True)
+
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc(file=sys.stderr)
+                    print(json.dumps({"status": "error", "message": str(e)}), flush=True)
+
+                continue  # Skip the final response print for streaming
             elif cmd_name == "generate":
                 response = await bridge.generate(
                     input_ids=cmd.get("input_ids", []),

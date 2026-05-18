@@ -7,6 +7,11 @@
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use futures::{Stream, StreamExt};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
 use crate::error::Result;
 use serde::{Deserialize, Serialize};
@@ -25,6 +30,18 @@ enum BridgeCommand {
     },
     #[serde(rename = "generate")]
     Generate {
+        input_ids: Vec<u32>,
+        #[serde(default = "default_max_new_tokens")]
+        max_new_tokens: usize,
+        #[serde(default = "default_temperature")]
+        temperature: f32,
+        #[serde(default = "default_top_p")]
+        top_p: f32,
+        #[serde(default = "default_top_k")]
+        top_k: i32,
+    },
+    #[serde(rename = "generate_stream")]
+    GenerateStream {
         input_ids: Vec<u32>,
         #[serde(default = "default_max_new_tokens")]
         max_new_tokens: usize,
@@ -69,6 +86,51 @@ struct BridgeResponse {
     message: Option<String>,
     #[serde(default)]
     metrics: Option<ScheduleMetrics>,
+}
+
+/// Streaming response chunk from Python bridge
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct StreamChunkResponse {
+    status: String,
+    #[serde(default)]
+    token_id: u32,
+    #[serde(default)]
+    text: String,
+    #[serde(default)]
+    is_first: bool,
+    #[serde(default)]
+    is_last: bool,
+    #[serde(default)]
+    ttft_ms: Option<f64>,
+    #[serde(default)]
+    elapsed_ms: Option<f64>,
+    #[serde(default)]
+    token_index: Option<usize>,
+    #[serde(default)]
+    r#type: Option<String>,  // "chunk" or "done"
+    #[serde(default)]
+    error: Option<String>,
+}
+
+/// A single chunk of streaming output from the bridge
+#[derive(Debug, Clone)]
+pub struct BridgeStreamChunk {
+    pub token_id: u32,
+    pub text: String,
+    pub is_last: bool,
+    pub ttft_ms: Option<f64>,
+}
+
+impl From<StreamChunkResponse> for BridgeStreamChunk {
+    fn from(chunk: StreamChunkResponse) -> Self {
+        let is_done = chunk.r#type.as_deref() == Some("done") || chunk.is_last;
+        Self {
+            token_id: chunk.token_id,
+            text: chunk.text,
+            is_last: is_done,
+            ttft_ms: chunk.ttft_ms,
+        }
+    }
 }
 
 /// Schedule metrics from TurboMind
@@ -237,6 +299,94 @@ impl PythonBridge {
     pub fn get_metrics(&self) -> Result<ScheduleMetrics> {
         let response = self.send_command(&BridgeCommand::Metrics)?;
         Ok(response.metrics.unwrap_or_default())
+    }
+
+    /// Generate tokens from input_ids with streaming output
+    /// Returns a stream of (token_id, text, is_last, ttft_ms) chunks
+    pub fn generate_stream(
+        &self,
+        input_ids: Vec<u32>,
+        max_new_tokens: usize,
+        temperature: f32,
+        top_p: f32,
+        top_k: i32,
+    ) -> Result<Pin<Box<dyn Stream<Item = BridgeStreamChunk> + Send>>> {
+        // Send the generate_stream command
+        let cmd = BridgeCommand::GenerateStream {
+            input_ids,
+            max_new_tokens,
+            temperature,
+            top_p,
+            top_k,
+        };
+
+        let json = serde_json::to_string(&cmd)
+            .map_err(|e| crate::error::AppError::InferenceFailed(format!("JSON encode error: {}", e)))?;
+
+        let mut stdin = self.stdin.lock()
+            .map_err(|e| crate::error::AppError::InferenceFailed(format!("Lock error: {}", e)))?;
+        writeln!(stdin, "{}", json)
+            .map_err(|e| crate::error::AppError::InferenceFailed(format!("Write error: {}", e)))?;
+        stdin.flush()
+            .map_err(|e| crate::error::AppError::InferenceFailed(format!("Flush error: {}", e)))?;
+        drop(stdin);
+
+        // Spawn a task to read streaming responses
+        let (tx, rx) = mpsc::channel::<BridgeStreamChunk>(1024);
+        let stdout_clone = self.stdout.clone();
+        std::thread::spawn(move || {
+            let mut stdout = stdout_clone.lock().unwrap();
+            let mut line = String::new();
+            loop {
+                line.clear();
+                match stdout.read_line(&mut line) {
+                    Ok(0) => break, // EOF
+                    Ok(_) => {
+                        let line_trimmed = line.trim();
+                        if line_trimmed.is_empty() {
+                            continue;
+                        }
+                        match serde_json::from_str::<StreamChunkResponse>(line_trimmed) {
+                            Ok(chunk) => {
+                                let is_done = chunk.r#type.as_deref() == Some("done") || chunk.is_last;
+                                let stream_chunk = BridgeStreamChunk {
+                                    token_id: chunk.token_id,
+                                    text: chunk.text.clone(),
+                                    is_last: is_done,
+                                    ttft_ms: chunk.ttft_ms,
+                                };
+
+                                // Send the chunk; if receiver dropped, stop
+                                if tx.blocking_send(stream_chunk).is_err() {
+                                    tracing::debug!("Stream receiver dropped, stopping");
+                                    break;
+                                }
+
+                                if is_done {
+                                    break;
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, line = ?line_trimmed, "Failed to parse stream chunk");
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, "Error reading stream output");
+                        break;
+                    }
+                }
+            }
+        });
+
+        let stream = ReceiverStream::new(rx).map(|chunk| BridgeStreamChunk {
+            token_id: chunk.token_id,
+            text: chunk.text,
+            is_last: chunk.is_last,
+            ttft_ms: chunk.ttft_ms,
+        });
+
+        Ok(Box::pin(stream))
     }
 
     /// Shutdown the bridge

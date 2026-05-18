@@ -14,6 +14,7 @@
 //! from config.json and passed to the Python bridge with appropriate quant_policy.
 
 use std::sync::Arc;
+use futures::StreamExt;
 
 use crate::error::Result;
 use crate::model::python_bridge::PythonBridge;
@@ -245,10 +246,44 @@ impl TurboMindEngine {
         (text, output_ids.len(), elapsed_ms)
     }
 
-    /// Generate text with streaming (not implemented for Python bridge yet)
-    pub async fn generate_stream(&self, _prompt: &str) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
-        tracing::warn!("Streaming not implemented for Python bridge");
-        Box::pin(futures::stream::empty())
+    /// Generate text with streaming output
+    pub async fn generate_stream(&self, prompt: &str) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+        let bridge = self.bridge.as_ref().expect("Python bridge not initialized");
+
+        // Tokenize input
+        let input_ids = if let Some(tokenizer) = &self.tokenizer {
+            match tokenizer.encode(prompt, false, false) {
+                Ok(ids) => ids,
+                Err(e) => {
+                    tracing::error!(error = %e, "Tokenization failed");
+                    return Box::pin(futures::stream::empty());
+                }
+            }
+        } else {
+            tracing::error!("Tokenizer not available");
+            return Box::pin(futures::stream::empty());
+        };
+
+        tracing::debug!(input_len = input_ids.len(), "Tokenized prompt for streaming");
+
+        // Generate streaming tokens via Python bridge
+        let stream = match bridge.generate_stream(input_ids, 4096, 0.7, 0.95, 50) {
+            Ok(stream) => stream,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to start streaming");
+                return Box::pin(futures::stream::empty());
+            }
+        };
+
+        let output = stream.filter_map(|chunk| {
+            futures::future::ready(if chunk.text.is_empty() {
+                None
+            } else {
+                Some(chunk.text)
+            })
+        });
+
+        Box::pin(output)
     }
 
     /// Get the tokenizer
