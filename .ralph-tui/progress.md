@@ -1,4 +1,10 @@
 ## Codebase Patterns
+- **TurboMind 没有磁盘 .bin 权重序列化**: `ModelLoader.export()` 只将 safetensors 权重直接加载到 GPU 内存（通过 `self.model.model(Prefix(ckpt))`），从不写入磁盘 .bin 文件
+- **`lmdeploy convert` CLI 已不存在**: 文档字符串中引用（"converted by `lmdeploy convert`"），但 `cli.py` 中无此命令，无对应实现
+- **converter.py 不负责文件转换**: 仅做配置解析（`get_tm_config()`），无实际权重文件读写逻辑
+- **TurboMind 架构是纯内存管线**: safetensors → checkpoint.py 读取 → ModelBuilder 构建模型树 → ModelLoader.export() 加载到 GPU，全程无中间 .bin 文件产生
+- **C API `InitFromPath` 不加载权重**: 只创建空 `ModelWeight` 并 attach 到 `ModelRoot`，无任何权重加载逻辑，这是 Rust Server 无法加载 HF 模型的根本原因
+- **解决方案**: 使用 Python 桥接（`python_inference_bridge.py`）替代 C API，因为 Python 有完整的 HF→TM 模型构建逻辑
 - **TurboMind C API 不支持 HuggingFace safetensors**: `turbomind_c.cc` 中的 safetensors reader 缺少 AWQ 量化解包和反量化逻辑
 - **Python 自动 HF→TM 转换**: Python API 通过 `get_tm_config()` → `Qwen3_5Model.model()` → `ModelLoader.export()` 自动转换，但只加载到 GPU 内存，不写入磁盘 `.bin` 文件
 - **Rust 自动转换检测**: `engine.rs` 检测 HuggingFace safetensors 格式，自动调用 Python 脚本转换为 TurboMind 格式
@@ -25,6 +31,16 @@
   - ITL (Inter-Token Latency) 稳定在 ~24ms，与 decode 速度一致
   - 历史数据对比显示不同测试间差异 <2%，性能稳定
   - Rust Server 需要预转换模型或完善 C API HF 支持才能执行基准测试
+
+## 2026-05-18 - lmdeploy-1or
+- **调查 TurboMind .bin 权重文件生成方法**: 确认了 LMDeploy 架构中没有磁盘 .bin 文件序列化功能
+- **关键发现**:
+  - `ModelLoader.export()` 只加载到 GPU 内存，不写入磁盘
+  - `lmdeploy convert` CLI 命令不存在（文档引用但无实现）
+  - converter.py 只做配置解析，无权重文件转换
+  - C API `InitFromPath` 根本不加载权重，只创建空 ModelWeight
+- **结论**: TurboMind 是纯内存架构（safetensors → GPU），无中间 .bin 文件。C API 无法直接加载 HF 模型的根本原因是缺少 Python 中的模型树构建逻辑（`TextModelBuilder` + `ModelLoader.export()`）
+- **解决方案**: 使用 Python 桥接（`python_inference_bridge.py`）而非 C API，因为 Python 有完整的 HF→TM 模型构建流程
 
 ---
 
