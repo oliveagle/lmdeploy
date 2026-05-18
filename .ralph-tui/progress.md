@@ -38,3 +38,13 @@ after each iteration and it's included in prompts for context.
 - Option 2 recommended since Python `ModelLoader` already handles AWQ weight mapping correctly
 ---
 
+## 2026-05-18 - lmdeploy-k7d
+- Implemented Python bridge for TurboMind model loading to fix AWQ weight loading issue
+- Files created/modified:
+  - `lmdeploy/turbomind/python_bridge.py` - New Python subprocess bridge wrapping TurboMind API
+  - `lmdeploy-rust-server/src/model/python_bridge.rs` - New Rust module for subprocess communication
+  - `lmdeploy-rust-server/src/model/engine.rs` - Replaced C API engine with Python bridge
+- **Root cause**: C API's `TM_TurboMind_InitFromPath` creates empty ModelWeight without loading weight data
+- **Solution**: Use Python TurboMind API via subprocess bridge (stdin/stdout JSON protocol)
+- **Rust compilation**: Verified with `cargo check` - 0 errors, 45 warnings (style warnings only)
+

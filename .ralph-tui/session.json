@@ -3,10 +3,10 @@
   "sessionId": "c4ec3dd5-4f56-408d-99b4-3a29940aedf7",
   "status": "running",
   "startedAt": "2026-05-18T09:42:53.505Z",
-  "updatedAt": "2026-05-18T09:52:45.266Z",
-  "currentIteration": 0,
+  "updatedAt": "2026-05-18T10:35:12.266Z",
+  "currentIteration": 1,
   "maxIterations": 50,
-  "tasksCompleted": 0,
+  "tasksCompleted": 1,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -101,8 +101,8 @@
       {
         "id": "lmdeploy-7n4",
         "title": "分析 AWQ 模型加载失败原因与修复方案",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "lmdeploy-0s1",
@@ -160,7 +160,18 @@
       }
     ]
   },
-  "iterations": [],
+  "iterations": [
+    {
+      "iteration": 1,
+      "status": "completed",
+      "taskId": "lmdeploy-7n4",
+      "taskTitle": "分析 AWQ 模型加载失败原因与修复方案",
+      "taskCompleted": true,
+      "durationMs": 591417,
+      "startedAt": "2026-05-18T09:42:53.675Z",
+      "endedAt": "2026-05-18T09:52:45.092Z"
+    }
+  ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
   "activeTaskIds": [],
