@@ -7,6 +7,30 @@ after each iteration and it's included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
+### HfConfigParser JSON Library Pattern
+
+**问题**: HuggingFace config.json 解析需要支持嵌套结构（text_config, quantization_config），旧的简单行解析无法处理。
+
+**解决方案**: 创建头文件-only JSON 解析器 `src/turbomind/utils/hf_config_parser.h`
+
+**关键特性**:
+- 无外部依赖（header-only）
+- 支持嵌套对象路径查询（`get("text_config.hidden_size")`）
+- 支持数组、布尔值、null、浮点数
+- 完整的值类型（需要 copy/move 构造函数用于容器）
+
+**使用方式**:
+```cpp
+#include "src/turbomind/utils/hf_config_parser.h"
+
+auto root = turbomind::HfConfigParser::ParseFile("/path/to/config.json");
+int hidden = root.get("hidden_size").as_int(4096);           // 顶层字段
+int layers = root.get("text_config.num_hidden_layers").as_int(32);  // 嵌套字段
+std::string method = root.get("quantization_config.quant_method").as_string("");
+```
+
+**注意事项**: `Value` 类需要完整的 copy/move 构造函数，因为 std::map/std::vector 需要可复制/可移动的元素。
+
 ### TurboMind C API Initialization Sequence
 
 Pure C++ inference without Python uses this initialization sequence:
@@ -177,3 +201,17 @@ ModelWeight
 
 ---
 
+
+## 2026-05-19 - lmdeploy-uq0
+- **Implemented**: 在 C++ 层实现 HuggingFace config.json 解析器
+- **Files changed**:
+  - `src/turbomind/utils/hf_config_parser.h` - 新增 header-only JSON 解析器
+  - `src/turbomind/utils/test_hf_config_parser.cc` - 单元测试
+  - `src/turbomind/capi/turbomind_c.cc` - 使用新解析器替换旧的行解析
+- **Learnings**:
+  - `Value` 类需要完整的 copy/move 构造函数，因为 std::vector 需要可复制元素
+  - 嵌套 config 支持（text_config, model_config）通过 lambda + 引用返回实现
+  - HfModelConfig 结构统一管理所有模型配置字段
+  - ParseHfConfig() 使用 helper lambda (get_int, get_string, get_bool) 简化代码
+  - MoE 和 DeltaNet 配置从 config.json 自动检测（num_local_experts, use_linear_attn）
+  - AWQ quantization 从 quantization_config.quant_method == "awq" 检测

@@ -24,6 +24,7 @@
 #include "src/turbomind/models/linear_weight.h"
 #include "src/turbomind/turbomind.h"
 #include "src/turbomind/utils/weight_serializer.h"
+#include "src/turbomind/utils/hf_config_parser.h"
 
 namespace {
 
@@ -368,197 +369,130 @@ int TM_TurboMind_GetModelTpRank(TM_TurboMind* tm, int index)
 
 namespace {
 
-// Helper to read config.json and extract hidden_size
-// Returns hidden_size on success, -1 on failure
-int ReadHiddenSizeFromConfig(const std::string& model_dir)
-{
-    std::string config_path = model_dir;
-    if (!config_path.empty() && config_path.back() != '/') {
-        config_path += '/';
-    }
-    config_path += "config.json";
+// HuggingFace config.json structure
+struct HfModelConfig {
+    // Basic model parameters
+    int hidden_size = 4096;
+    int num_hidden_layers = 32;
+    int num_attention_heads = 32;
+    int num_key_value_heads = -1;  // -1 means same as num_attention_heads
+    int vocab_size = 32000;
+    int intermediate_size = 0;  // Will default to hidden_size * 4
+    int max_position_embeddings = 8192;
 
-    std::ifstream f(config_path);
-    if (!f.is_open()) {
-        return -1;
-    }
+    // Model architecture
+    std::string model_type = "llama";
+    std::string arch = "Transformer";
 
-    // Simple JSON parser to extract "hidden_size"
-    std::string line;
-    while (std::getline(f, line)) {
-        // Look for "hidden_size": <number>
-        size_t pos = line.find("\"hidden_size\"");
-        if (pos != std::string::npos) {
-            size_t colon = line.find(':', pos);
-            if (colon != std::string::npos) {
-                size_t start = colon + 1;
-                // Skip whitespace
-                while (start < line.size() && (line[start] == ' ' || line[start] == '\t')) {
-                    ++start;
-                }
-                // Extract number
-                size_t end = start;
-                while (end < line.size() && (isdigit(line[end]) || line[end] == '-')) {
-                    ++end;
-                }
-                if (end > start) {
-                    return std::stoi(line.substr(start, end - start));
-                }
-            }
-        }
-    }
-    return -1;
-}
+    // MoE configuration
+    int num_local_experts = 0;
+    int num_experts_per_tok = 0;
 
-// AWQ Quantization configuration
-struct AwqQuantConfig {
-    bool     is_enabled = false;
-    int      bits = 4;
-    int      group_size = 128;
-    std::string quant_method = "awq";
-    std::string version = "gemm";
-    bool     symmetric = true;
-    bool     zero_point = true;
-    bool     pack = true;
+    // DeltaNet / Linear Attention
+    bool use_linear_attn = false;
+
+    // RoPE configuration
+    int rope_dim = 0;
+    float rope_scaling_factor = 1.0f;
+
+    // Quantization
+    bool is_awq = false;
+    int awq_bits = 4;
+    int awq_group_size = 128;
+    std::string awq_version = "gemm";
+
+    // Nested config support (Qwen3.5 MoE, multimodal models)
+    bool has_text_config = false;
+    bool has_model_config = false;
 };
 
-// Helper to read quantization_config from config.json
-// Returns AwqQuantConfig with is_enabled=true if AWQ quantization is detected
-AwqQuantConfig ReadAwqQuantConfig(const std::string& model_dir)
+// Parse HuggingFace config.json using the HfConfigParser
+static HfModelConfig ParseHfConfig(const std::string& model_dir)
 {
-    AwqQuantConfig config;
+    HfModelConfig config;
+
     std::string config_path = model_dir;
     if (!config_path.empty() && config_path.back() != '/') {
         config_path += '/';
     }
     config_path += "config.json";
 
-    std::ifstream f(config_path);
-    if (!f.is_open()) {
-        return config;  // is_enabled = false
+    auto root = turbomind::HfConfigParser::ParseFile(config_path);
+    if (root.is_null()) {
+        return config;  // Return defaults on parse failure
     }
 
-    // Read entire file into string for easier parsing
-    std::string content((std::istreambuf_iterator<char>(f)),
-                         std::istreambuf_iterator<char>());
-
-    // Look for quantization_config block
-    size_t quant_start = content.find("\"quantization_config\":");
-    if (quant_start == std::string::npos) {
-        return config;  // No quantization config
-    }
-
-    // Find the opening brace of quantization_config
-    size_t obj_start = content.find('{', quant_start);
-    if (obj_start == std::string::npos) {
-        return config;
-    }
-
-    // Find matching closing brace (simple depth counter)
-    int depth = 1;
-    size_t obj_end = obj_start + 1;
-    while (obj_end < content.size() && depth > 0) {
-        if (content[obj_end] == '{') depth++;
-        else if (content[obj_end] == '}') depth--;
-        obj_end++;
-    }
-
-    if (depth != 0) {
-        return config;  // Malformed JSON
-    }
-
-    std::string quant_json = content.substr(obj_start, obj_end - obj_start);
-
-    // Check quantization method
-    size_t method_pos = quant_json.find("\"quant_method\":");
-    if (method_pos != std::string::npos) {
-        size_t colon = quant_json.find(':', method_pos);
-        size_t quote_start = quant_json.find('"', colon);
-        if (quote_start != std::string::npos) {
-            size_t quote_end = quant_json.find('"', quote_start + 1);
-            if (quote_end != std::string::npos) {
-                std::string method = quant_json.substr(quote_start + 1, quote_end - quote_start - 1);
-                if (method == "awq") {
-                    config.is_enabled = true;
-                    config.quant_method = method;
-                }
-            }
+    // Determine config source (handle nested configs)
+    const auto& config_source = [&]() -> const turbomind::HfConfigParser::Value& {
+        if (root.has("text_config")) {
+            config.has_text_config = true;
+            return root.get("text_config");
+        } else if (root.has("model_config")) {
+            config.has_model_config = true;
+            return root.get("model_config");
         }
-    }
+        return root;
+    }();
 
-    if (!config.is_enabled) {
-        return config;
-    }
-
-    // Parse AWQ parameters
-    auto parse_int = [&](const std::string& key, int default_val) -> int {
-        size_t pos = quant_json.find("\"" + key + "\":");
-        if (pos != std::string::npos) {
-            size_t colon = quant_json.find(':', pos);
-            size_t start = colon + 1;
-            while (start < quant_json.size() && (quant_json[start] == ' ' || quant_json[start] == '\t' || quant_json[start] == '\n')) {
-                start++;
-            }
-            size_t end = start;
-            while (end < quant_json.size() && (isdigit(quant_json[end]) || quant_json[end] == '-')) {
-                end++;
-            }
-            if (end > start) {
-                return std::stoi(quant_json.substr(start, end - start));
-            }
-        }
+    // Helper to get int value with fallback
+    auto get_int = [&](const std::string& key, int default_val) -> int {
+        auto val = config_source.get(key);
+        if (val.is_int()) return static_cast<int>(val.as_int());
+        if (val.is_float()) return static_cast<int>(val.as_float());
         return default_val;
     };
 
-    auto parse_bool = [&](const std::string& key, bool default_val) -> bool {
-        size_t pos = quant_json.find("\"" + key + "\":");
-        if (pos != std::string::npos) {
-            size_t colon = quant_json.find(':', pos);
-            size_t start = colon + 1;
-            while (start < quant_json.size() && (quant_json[start] == ' ' || quant_json[start] == '\t' || quant_json[start] == '\n')) {
-                start++;
-            }
-            size_t end = start;
-            while (end < quant_json.size() && (quant_json[end] != ',' && quant_json[end] != '}')) {
-                end++;
-            }
-            std::string value = quant_json.substr(start, end - start);
-            // Trim whitespace
-            size_t value_start = 0;
-            size_t value_end = value.size();
-            while (value_start < value_end && (value[value_start] == ' ' || value[value_start] == '\t' || value[value_start] == '\n')) {
-                value_start++;
-            }
-            while (value_end > value_start && (value[value_end - 1] == ' ' || value[value_end - 1] == '\t' || value[value_end - 1] == '\n')) {
-                value_end--;
-            }
-            value = value.substr(value_start, value_end - value_start);
-            return value == "true";
-        }
-        return default_val;
+    // Helper to get string value
+    auto get_string = [&](const std::string& key, const std::string& default_val) -> std::string {
+        auto val = config_source.get(key);
+        return val.is_string() ? val.as_string() : default_val;
     };
 
-    auto parse_string = [&](const std::string& key, const std::string& default_val) -> std::string {
-        size_t pos = quant_json.find("\"" + key + "\":");
-        if (pos != std::string::npos) {
-            size_t colon = quant_json.find(':', pos);
-            size_t quote_start = quant_json.find('"', colon);
-            if (quote_start != std::string::npos) {
-                size_t quote_end = quant_json.find('"', quote_start + 1);
-                if (quote_end != std::string::npos) {
-                    return quant_json.substr(quote_start + 1, quote_end - quote_start - 1);
-                }
-            }
-        }
-        return default_val;
+    // Helper to get bool value
+    auto get_bool = [&](const std::string& key, bool default_val) -> bool {
+        auto val = config_source.get(key);
+        return val.is_bool() ? val.as_bool() : default_val;
     };
 
-    config.bits = parse_int("bits", 4);
-    config.group_size = parse_int("group_size", 128);
-    config.version = parse_string("version", "gemm");
-    config.symmetric = parse_bool("symmetric", true);
-    config.zero_point = parse_bool("zero_point", true);
-    config.pack = parse_bool("pack", true);
+    // Parse basic model parameters
+    config.hidden_size = get_int("hidden_size", config.hidden_size);
+    config.num_hidden_layers = get_int("num_hidden_layers", config.num_hidden_layers);
+    config.num_attention_heads = get_int("num_attention_heads", config.num_attention_heads);
+    config.num_key_value_heads = get_int("num_key_value_heads", config.num_attention_heads);
+    config.vocab_size = get_int("vocab_size", config.vocab_size);
+    config.max_position_embeddings = get_int("max_position_embeddings", config.max_position_embeddings);
+
+    // Intermediate size (default to 4x hidden_size if not specified)
+    config.intermediate_size = get_int("intermediate_size", config.hidden_size * 4);
+
+    // Model type
+    config.model_type = get_string("model_type", "llama");
+    config.arch = get_string("arch", config.arch);
+
+    // MoE configuration
+    config.num_local_experts = get_int("num_local_experts", 0);
+    config.num_experts_per_tok = get_int("num_experts_per_tok", 0);
+
+    // DeltaNet / Linear Attention
+    config.use_linear_attn = get_bool("use_linear_attn", false);
+
+    // RoPE configuration
+    config.rope_dim = get_int("rope_dim", 0);
+    config.rope_scaling_factor = static_cast<float>(
+        config_source.get("rope_scaling").get("factor").as_float(1.0)
+    );
+
+    // Parse quantization_config for AWQ
+    const auto& quant_config = root.get("quantization_config");
+    if (!quant_config.is_null()) {
+        std::string quant_method = quant_config.get("quant_method").as_string("");
+        if (quant_method == "awq") {
+            config.is_awq = true;
+            config.awq_bits = static_cast<int>(quant_config.get("bits").as_int(4));
+            config.awq_group_size = static_cast<int>(quant_config.get("group_size").as_int(128));
+            config.awq_version = quant_config.get("version").as_string("gemm");
+        }
+    }
 
     return config;
 }
@@ -830,9 +764,9 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name);
 static void LoadWeightsFromSafetensors(
     turbomind::ModelWeight* model_weight,
     const char* safetensors_path,
-    const AwqQuantConfig& awq_config);
+    const HfModelConfig& hf_config);
 
-// Read an integer value from config.json
+// Read an integer value from config.json (kept for backward compatibility with non-critical reads)
 static int ReadIntFromConfig(const std::string& model_dir, const std::string& key, int default_val)
 {
     std::string config_path = model_dir;
@@ -841,32 +775,12 @@ static int ReadIntFromConfig(const std::string& model_dir, const std::string& ke
     }
     config_path += "config.json";
 
-    std::ifstream f(config_path);
-    if (!f.is_open()) {
-        return default_val;
-    }
+    auto root = turbomind::HfConfigParser::ParseFile(config_path);
+    if (root.is_null()) return default_val;
 
-    // Simple JSON parser to extract the key
-    std::string line;
-    while (std::getline(f, line)) {
-        size_t pos = line.find("\"" + key + "\"");
-        if (pos != std::string::npos) {
-            size_t colon = line.find(':', pos);
-            if (colon != std::string::npos) {
-                size_t start = colon + 1;
-                while (start < line.size() && (line[start] == ' ' || line[start] == '\t')) {
-                    ++start;
-                }
-                size_t end = start;
-                while (end < line.size() && (isdigit(line[end]) || line[end] == '-')) {
-                    ++end;
-                }
-                if (end > start) {
-                    return std::stoi(line.substr(start, end - start));
-                }
-            }
-        }
-    }
+    auto val = root.get(key);
+    if (val.is_int()) return static_cast<int>(val.as_int());
+    if (val.is_float()) return static_cast<int>(val.as_float());
     return default_val;
 }
 
@@ -978,7 +892,7 @@ static std::vector<std::string> FindSafetensorsFiles(const std::string& model_di
 static void LoadWeightsFromSafetensors(
     turbomind::ModelWeight* model_weight,
     const char* safetensors_path,
-    const AwqQuantConfig& awq_config)
+    const HfModelConfig& hf_config)
 {
     try {
         SafetensorsReader reader(safetensors_path);
@@ -1243,34 +1157,17 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             return TM_ERR_RUNTIME;
         }
 
-        // Step 3: Build and attach ModelWeight with full weight tree
-        // This is the key fix: we need to build the complete module tree
-        // and load weights from safetensors files
-
-        // Read model configuration
-        int hidden_size = ReadHiddenSizeFromConfig(model_dir);
-        if (hidden_size <= 0) {
-            hidden_size = 4096;  // Default fallback
-        }
-
-        // Read additional config values needed for model construction
-        int num_layers = ReadIntFromConfig(model_dir, "num_hidden_layers", 32);
-        int num_heads = ReadIntFromConfig(model_dir, "num_attention_heads", 32);
-        int num_kv_heads = ReadIntFromConfig(model_dir, "num_key_value_heads", num_heads);
-        int vocab_size = ReadIntFromConfig(model_dir, "vocab_size", 32000);
-        int intermediate_size = ReadIntFromConfig(model_dir, "intermediate_size", hidden_size * 4);
-
-        // Read AWQ quantization configuration
-        AwqQuantConfig awq_config = ReadAwqQuantConfig(model_dir);
+        // Step 3: Parse HuggingFace config.json
+        HfModelConfig hf_config = ParseHfConfig(std::string(model_dir));
 
         // Create ModelWeightConfig with appropriate settings
         turbomind::core::ModelWeightConfig weight_cfg;
-        weight_cfg.hidden_units = hidden_size;
+        weight_cfg.hidden_units = hf_config.hidden_size;
         weight_cfg.tp_size = 1;
         weight_cfg.tp_rank = 0;
 
         // Determine data type based on quantization
-        if (awq_config.is_enabled) {
+        if (hf_config.is_awq) {
             weight_cfg.data_type = turbomind::DataType::kFloat16;
         } else {
             weight_cfg.data_type = turbomind::DataType::kFloat16;
@@ -1284,12 +1181,11 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
         }
 
         // Build the complete module tree
-        // This is the critical part: we need to add all children and params
         auto* model_weight = static_cast<turbomind::ModelWeight*>(weight_module.get());
 
         // 1. Create and add tok_embeddings param
         // Shape: [vocab_size, hidden_size]
-        std::vector<size_t> tok_emb_shape = {(size_t)vocab_size, (size_t)hidden_size};
+        std::vector<size_t> tok_emb_shape = {(size_t)hf_config.vocab_size, (size_t)hf_config.hidden_size};
         auto tok_emb_param = model_weight->param("tok_embeddings");
         if (tok_emb_param) {
             tok_emb_param.alloc(tok_emb_shape, weight_cfg.data_type);
@@ -1297,7 +1193,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
         // 2. Create and add norm child (NormWeight)
         turbomind::core::NormConfig norm_cfg;
-        norm_cfg.dim = hidden_size;
+        norm_cfg.dim = hf_config.hidden_size;
         norm_cfg.data_type = weight_cfg.data_type;
         norm_cfg.norm_eps = 1e-6f;  // Default RMS norm eps
         auto norm_module = turbomind::core::Module::create(norm_cfg);
@@ -1307,8 +1203,8 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
         // 3. Create and add output child (LinearWeight)
         turbomind::core::LinearConfig output_cfg;
-        output_cfg.input_dim = hidden_size;
-        output_cfg.output_dim = vocab_size;
+        output_cfg.input_dim = hf_config.hidden_size;
+        output_cfg.output_dim = hf_config.vocab_size;
         output_cfg.data_type = weight_cfg.data_type;
         output_cfg.format = turbomind::DataFormat{};  // Default = plain row-major
         output_cfg.has_bias = false;
@@ -1322,8 +1218,11 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
         auto layers_list_unique = turbomind::core::Module::create(layers_cfg);
         auto* layers_list = static_cast<turbomind::core::ModuleList*>(layers_list_unique.get());
 
+        // Calculate head dimensions
+        int head_dim = hf_config.hidden_size / hf_config.num_attention_heads;
+
         // Create each decoder layer
-        for (int layer_idx = 0; layer_idx < num_layers; ++layer_idx) {
+        for (int layer_idx = 0; layer_idx < hf_config.num_hidden_layers; ++layer_idx) {
             // Create DecoderLayerWeight
             turbomind::core::DecoderLayerConfig layer_cfg;
             auto layer_module = turbomind::core::Module::create(layer_cfg);
@@ -1335,7 +1234,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
             // 4a. Create attention_norm (NormWeight)
             turbomind::core::NormConfig attn_norm_cfg;
-            attn_norm_cfg.dim = hidden_size;
+            attn_norm_cfg.dim = hf_config.hidden_size;
             attn_norm_cfg.data_type = weight_cfg.data_type;
             attn_norm_cfg.norm_eps = 1e-6f;
             auto attn_norm_module = turbomind::core::Module::create(attn_norm_cfg);
@@ -1345,7 +1244,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
             // 4b. Create ffn_norm (NormWeight)
             turbomind::core::NormConfig ffn_norm_cfg;
-            ffn_norm_cfg.dim = hidden_size;
+            ffn_norm_cfg.dim = hf_config.hidden_size;
             ffn_norm_cfg.data_type = weight_cfg.data_type;
             ffn_norm_cfg.norm_eps = 1e-6f;
             auto ffn_norm_module = turbomind::core::Module::create(ffn_norm_cfg);
@@ -1355,10 +1254,10 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
             // 4c. Create attention (AttentionWeight)
             turbomind::core::AttentionConfig attn_cfg;
-            attn_cfg.hidden_dim = hidden_size;
-            attn_cfg.head_dim = hidden_size / num_heads;
-            attn_cfg.head_num = num_heads;
-            attn_cfg.kv_head_num = num_kv_heads;
+            attn_cfg.hidden_dim = hf_config.hidden_size;
+            attn_cfg.head_dim = head_dim;
+            attn_cfg.head_num = hf_config.num_attention_heads;
+            attn_cfg.kv_head_num = hf_config.num_key_value_heads;
             attn_cfg.kv_lora_rank = 0;
             attn_cfg.q_lora_rank = 0;
             attn_cfg.qk_rope_dim = 0;
@@ -1378,17 +1277,44 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
             // 4d. Create feed_forward (FfnWeight)
             turbomind::core::FfnConfig ffn_cfg;
-            ffn_cfg.hidden_dim = hidden_size;
-            ffn_cfg.inter_size = intermediate_size;
+            ffn_cfg.hidden_dim = hf_config.hidden_size;
+            ffn_cfg.inter_size = hf_config.intermediate_size;
             ffn_cfg.act_type = 0;  // SiLU
             ffn_cfg.fuse_silu = true;
-            ffn_cfg.is_expert = false;
+            ffn_cfg.is_expert = hf_config.num_local_experts > 0;
             ffn_cfg.data_type = weight_cfg.data_type;
             ffn_cfg.tp_size = 1;
             ffn_cfg.tp_rank = 0;
             auto ffn_module = turbomind::core::Module::create(ffn_cfg);
             if (ffn_module) {
                 decoder_layer->add_child("feed_forward", std::move(ffn_module));
+            }
+
+            // 4e. Create moe_ffn (MoeWeight) if this is a MoE model
+            if (hf_config.num_local_experts > 0) {
+                turbomind::core::MoeConfig moe_cfg;
+                moe_cfg.hidden_dim = hf_config.hidden_size;
+                moe_cfg.inter_size = hf_config.intermediate_size;
+                moe_cfg.num_experts = hf_config.num_local_experts;
+                moe_cfg.num_experts_per_tok = hf_config.num_experts_per_tok;
+                moe_cfg.data_type = weight_cfg.data_type;
+                moe_cfg.tp_size = 1;
+                moe_cfg.tp_rank = 0;
+                auto moe_module = turbomind::core::Module::create(moe_cfg);
+                if (moe_module) {
+                    decoder_layer->add_child("moe_ffn", std::move(moe_module));
+                }
+            }
+
+            // 4f. Create linear_attn (DeltaNetWeight) if this model has linear attention
+            if (hf_config.use_linear_attn) {
+                turbomind::core::DeltaNetConfig delta_cfg;
+                delta_cfg.hidden_dim = hf_config.hidden_size;
+                delta_cfg.data_type = weight_cfg.data_type;
+                auto delta_module = turbomind::core::Module::create(delta_cfg);
+                if (delta_module) {
+                    decoder_layer->add_child("linear_attn", std::move(delta_module));
+                }
             }
 
             // Add layer to ModuleList
@@ -1416,7 +1342,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
         // Load weights from each safetensors file
         for (const auto& st_file : safetensors_files) {
-            LoadWeightsFromSafetensors(model_weight, st_file.c_str(), awq_config);
+            LoadWeightsFromSafetensors(model_weight, st_file.c_str(), hf_config);
         }
 
         // Step 5: Process weights (moves weights to GPU and calls prepare)

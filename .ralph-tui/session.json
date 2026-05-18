@@ -3,10 +3,10 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-18T16:48:19.718Z",
-  "currentIteration": 4,
+  "updatedAt": "2026-05-18T17:02:44.377Z",
+  "currentIteration": 5,
   "maxIterations": 50,
-  "tasksCompleted": 3,
+  "tasksCompleted": 4,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -206,6 +206,16 @@
       "durationMs": 1400573,
       "startedAt": "2026-05-18T16:18:12.476Z",
       "endedAt": "2026-05-18T16:41:33.049Z"
+    },
+    {
+      "iteration": 5,
+      "status": "completed",
+      "taskId": "lmdeploy-pld",
+      "taskTitle": "分析 C API InitFromPath 限制，找出 HF 加载障碍",
+      "taskCompleted": true,
+      "durationMs": 398440,
+      "startedAt": "2026-05-18T16:41:41.260Z",
+      "endedAt": "2026-05-18T16:48:19.700Z"
     }
   ],
   "skippedTaskIds": [],
