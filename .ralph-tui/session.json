@@ -3,10 +3,10 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-18T16:18:03.352Z",
-  "currentIteration": 2,
+  "updatedAt": "2026-05-18T16:41:33.064Z",
+  "currentIteration": 3,
   "maxIterations": 50,
-  "tasksCompleted": 1,
+  "tasksCompleted": 2,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -186,6 +186,16 @@
       "durationMs": 827003,
       "startedAt": "2026-05-18T14:30:46.291Z",
       "endedAt": "2026-05-18T14:44:33.294Z"
+    },
+    {
+      "iteration": 3,
+      "status": "completed",
+      "taskId": "lmdeploy-qp8",
+      "taskTitle": "实现 Rust Server SSE Streaming 支持",
+      "taskCompleted": true,
+      "durationMs": 993224,
+      "startedAt": "2026-05-18T16:01:30.045Z",
+      "endedAt": "2026-05-18T16:18:03.269Z"
     }
   ],
   "skippedTaskIds": [],

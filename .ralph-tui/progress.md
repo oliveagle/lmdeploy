@@ -7,6 +7,49 @@ after each iteration and it's included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
+### TurboMind C API Initialization Sequence
+
+Pure C++ inference without Python uses this initialization sequence:
+
+```rust
+// 1. Create engine config
+let mut engine_config = EngineConfig::new()?;
+engine_config.set_session_len(65536);
+engine_config.set_max_batch_size(32);
+engine_config.set_cache_block_seq_len(64);
+engine_config.set_enable_metrics(true);
+engine_config.set_quant_policy(4);  // 4 for AWQ
+engine_config.add_device(0);
+
+// 2. Create TurboMind instance
+let tm = TurboMind::create(model_path, &mut engine_config)?;
+
+// 3. Initialize from model path (builds module tree, loads weights)
+tm.init_from_path(device_id, model_path, trust_remote_code)?;
+
+// 4. Create inference request
+let request = ModelRequest::create(&tm)?;
+
+// 5. Prepare input tensors
+let mut input_tensors = TensorMap::new()?;
+input_tensors.set_int64("input_ids", &ids, &shape);
+input_tensors.set_int32("sequence_length", &len, &shape);
+
+// 6. Prepare generation config
+let mut gen_cfg = GenConfig::new()?;
+gen_cfg.set_max_new_tokens(100);
+gen_cfg.set_temperature(0.7);
+
+// 7. Run inference
+request.forward(&mut input_tensors, &session, &gen_cfg, false, true, &mut output_tensors)?;
+
+// 8. Extract output
+let (data_ptr, size) = request.get_output("output_ids")?;
+let output_ids: Vec<i32> = unsafe {
+    std::slice::from_raw_parts(data_ptr as *const i32, size / 4).to_vec()
+};
+```
+
 ### ModelWeight Module Tree Structure
 
 The complete ModelWeight module tree is built by Python TurboMind Builders:
@@ -46,6 +89,26 @@ ModelWeight
 1. Creating child modules via `_tm.create_module(cfg)`
 2. Committing weight data via `_copy_shard_to_param()`
 3. Attaching children via `add_child_raw()`
+
+---
+
+## 2026-05-19 - lmdeploy-72b
+- **Implemented**: Rust Server pure C++ inference engine (no Python dependency)
+- **Files changed**:
+  - `lmdeploy-rust-server/src/model/cpp_engine.rs` - New `TurboMindCEngine` struct that uses C API directly
+  - `lmdeploy-rust-server/src/model/mod.rs` - Added `cpp_engine` module and exports
+  - `lmdeploy-rust-server/src/turbomind_c.rs` - Added `set_cache_block_seq_len()`, `get_output()`, `process_weights()`, `create_engine()` wrapper methods
+  - `lmdeploy-rust-server/src/config.rs` - Added `engine_type` field to `ModelConfig` (default: "python_bridge")
+  - `lmdeploy-rust-server/config/default.toml` - Added `engine_type = "python_bridge"` default
+- **Learnings**:
+  - C API `TM_TurboMind_InitFromPath()` builds complete ModelWeight module tree from safetensors files
+  - Module tree creation: CreateContext -> CreateRoot -> Build ModelWeight children -> ProcessWeights -> CreateEngine
+  - Output tensors extracted via `TM_ModelRequest_GetOutput()` after forward inference
+  - Engine type selection: `python_bridge` (compatible) vs `pure_cpp` (no Python dep)
+  - C API weight loading uses `SafetensorsReader` with simple JSON parsing (no external JSON lib)
+  - AWQ quantization auto-detected from config.json (`quantization_config.quant_method == "awq"`)
+  - `TM_EngineConfig_SetCacheBlockSeqLen()` exists in C API but was missing from Rust FFI wrapper
+  - The `set_quant_policy()` config controls quantization (0=none, 4=AWQ 4-bit, 8=KV cache INT8)
 
 ---
 

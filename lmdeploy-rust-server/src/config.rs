@@ -142,6 +142,14 @@ pub struct ModelConfig {
     pub model_name: String,
     pub max_context_length: usize,
     pub max_batch_size: usize,
+    /// Engine type: "python_bridge" (default) or "pure_cpp"
+    /// Python bridge is more compatible, pure_cpp has no Python dependency
+    #[serde(default = "default_engine_type")]
+    pub engine_type: String,
+}
+
+fn default_engine_type() -> String {
+    "python_bridge".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -175,6 +183,13 @@ fn default_metrics_port() -> u16 { 9090 }
 pub struct ModelEntry {
     pub name: String,
     pub path: String,
+    /// Engine type: "python_bridge" (default) or "pure_cpp"
+    #[serde(default = "default_model_engine_type")]
+    pub engine_type: String,
+}
+
+fn default_model_engine_type() -> String {
+    "python_bridge".to_string()
 }
 
 /// Multi-model deployment configuration
@@ -216,6 +231,7 @@ impl Default for AppConfig {
                 model_name: "default".into(),
                 max_context_length: 8192,
                 max_batch_size: 8,
+                engine_type: default_engine_type(),
             },
             cache: CacheConfig {
                 tokenizer_cache_size: 1000,

@@ -297,6 +297,11 @@ impl EngineConfig {
     }
 
     #[inline]
+    pub fn set_cache_block_seq_len(&mut self, len: c_int) {
+        unsafe { TM_EngineConfig_SetCacheBlockSeqLen(self.0, len) }
+    }
+
+    #[inline]
     pub fn set_max_batch_size(&mut self, size: c_int) {
         unsafe { TM_EngineConfig_SetMaxBatchSize(self.0, size) }
     }
@@ -667,6 +672,28 @@ impl ModelRequest {
 
     pub fn cancel(&mut self) {
         unsafe { TM_ModelRequest_Cancel(self.0) }
+    }
+
+    /// Get output tensor by name after forward completes
+    /// Returns (data_ptr, size) where data_ptr is a pointer to the data
+    /// The data is owned by the request and is valid until the request is destroyed
+    pub fn get_output(&self, name: &str) -> FFResult<(*const u8, usize)> {
+        let name_c = std::ffi::CString::new(name).unwrap();
+        let mut out_data: *mut c_void = std::ptr::null_mut();
+        let mut out_size: usize = 0;
+
+        let ret = unsafe {
+            TM_ModelRequest_GetOutput(self.0, name_c.as_ptr(), &mut out_data, &mut out_size)
+        };
+
+        if ret != 0 {
+            return Err(FFError::from_last_error().unwrap_or(FFError {
+                code: TM_ErrorCode::TM_ERR_RUNTIME,
+                message: format!("Failed to get output '{}'", name),
+            }));
+        }
+
+        Ok((out_data as *const u8, out_size))
     }
 }
 

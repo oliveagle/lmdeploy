@@ -35,6 +35,7 @@ model_path = "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ"
 model_name = "qwen3.6-35B-A3B-AWQ"
 max_context_length = 8192
 max_batch_size = 8
+engine_type = "python_bridge"  # "python_bridge" or "pure_cpp"
 
 [cache]
 tokenizer_cache_size = 1000
