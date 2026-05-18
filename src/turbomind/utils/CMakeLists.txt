@@ -43,3 +43,7 @@ target_link_libraries(anomaly_handler PUBLIC cuda_utils)
 
 add_library(parser STATIC parser.cc)
 set_property(TARGET parser PROPERTY POSITION_INDEPENDENT_CODE  ON)
+
+add_library(weight_serializer STATIC weight_serializer.cc)
+set_property(TARGET weight_serializer PROPERTY POSITION_INDEPENDENT_CODE  ON)
+target_link_libraries(weight_serializer PUBLIC core models)

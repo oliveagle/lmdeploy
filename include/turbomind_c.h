@@ -311,6 +311,25 @@ int TM_ModelRequest_GetOutput(
     void** out_data,
     size_t* out_size);
 
+// ============================================================
+// Weight Export / Import
+// ============================================================
+
+// Export HuggingFace safetensors to TurboMind .bin format
+// model_path: Path to HF model (with config.json and *.safetensors)
+// output_dir: Directory to write .bin files, config.yaml, weight_index.json
+// data_type: TM_DATATYPE_FP16 or TM_DATATYPE_BF16
+// Returns 0 on success, negative on error
+int TM_ExportWeightsToBin(
+    const char* model_path,
+    const char* output_dir,
+    int data_type,
+    int hidden_size,
+    int num_layers,
+    int num_heads,
+    int num_kv_heads,
+    int vocab_size);
+
 #ifdef __cplusplus
 }
 #endif
