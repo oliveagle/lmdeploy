@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::model::engine::TurboMindEngine;
 
 /// Benchmark configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BenchmarkConfig {
     /// Context lengths to test (in tokens)
     pub context_lengths: Vec<usize>,
@@ -119,7 +119,7 @@ impl BenchmarkRunner {
             }
 
             // Measured runs
-            for iter in 1..=self.config.iterations {
+            for _iter in 1..=self.config.iterations {
                 let result = self.run_single_benchmark(context_length, self.config.output_length).await?;
                 all_results.push(result);
             }
@@ -229,122 +229,6 @@ impl BenchmarkRunner {
         }
 
         summaries
-    }
-}
-
-/// Simple HTTP API benchmark
-pub struct HttpBenchmarkRunner {
-    /// API endpoint URL
-    pub endpoint: String,
-    /// Model name
-    pub model: String,
-    /// Config
-    pub config: BenchmarkConfig,
-}
-
-impl HttpBenchmarkRunner {
-    /// Run benchmarks via HTTP API
-    pub async fn run(&self) -> Result<BenchmarkReport, String> {
-        let client = reqwest::Client::new();
-        let mut all_results = Vec::new();
-
-        for &context_length in &self.config.context_lengths {
-            for iter in 1..=self.config.iterations {
-                let result = self.run_http_benchmark(&client, context_length, iter).await?;
-                all_results.push(result);
-            }
-        }
-
-        Ok(BenchmarkReport {
-            engine_name: "LMDeploy Rust Server (HTTP)".to_string(),
-            model_path: self.model.clone(),
-            config: self.config.clone(),
-            results: all_results,
-            summaries: Vec::new(), // Will be filled by caller
-            timestamp: unix_timestamp(),
-        })
-    }
-
-    /// Run a single HTTP benchmark
-    async fn run_http_benchmark(&self, client: &reqwest::Client, context_length: usize, iteration: usize) -> Result<BenchmarkResult, String> {
-        use crate::handlers::http::{ChatCompletionsRequest, Message};
-
-        let prompt = generate_prompt(context_length * 4);
-
-        let start = Instant::now();
-
-        let req = ChatCompletionsRequest {
-            model: self.model.clone(),
-            messages: vec![Message {
-                role: "user".to_string(),
-                content: prompt.clone(),
-            }],
-            temperature: Some(0.7),
-            top_p: Some(0.95),
-            max_tokens: Some(self.config.output_length as i32),
-            stream: Some(false),
-            stop: None,
-            seed: None,
-            presence_penalty: None,
-            frequency_penalty: None,
-            n: None,
-            logit_bias: None,
-            logprobs: None,
-            top_logprobs: None,
-            user: None,
-        };
-
-        let prefill_start = Instant::now();
-
-        let response = client
-            .post(&self.endpoint)
-            .json(&req)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP request failed: {}", e))?;
-
-        let prefill_end = Instant::now();
-
-        if !response.status().is_success() {
-            return Err(format!("HTTP error: {}", response.status()));
-        }
-
-        let _json: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| format!("JSON parsing failed: {}", e))?;
-
-        let total_end = Instant::now();
-
-        let prefill_time = prefill_end.duration_since(prefill_start);
-        let total_time = total_end.duration_since(start);
-        let decode_time = total_end.duration_since(prefill_end);
-
-        let ttft = prefill_time.as_millis() as f64 * 0.2;
-
-        let prefill_speed_tps = if prefill_time.as_millis() > 0 {
-            (context_length as f64 * 1000.0) / prefill_time.as_millis() as f64
-        } else {
-            0.0
-        };
-
-        let decode_speed_tps = if decode_time.as_millis() > 0 {
-            (self.config.output_length as f64 * 1000.0) / decode_time.as_millis() as f64
-        } else {
-            0.0
-        };
-
-        Ok(BenchmarkResult {
-            context_length,
-            output_length: self.config.output_length,
-            iteration,
-            ttft_ms: ttft,
-            prefill_time_ms: prefill_time.as_millis() as f64,
-            prefill_speed_tps,
-            decode_time_ms: decode_time.as_millis() as f64,
-            decode_speed_tps,
-            total_time_ms: total_time.as_millis() as f64,
-        })
     }
 }
 

@@ -9,7 +9,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BENCH_DIR="$PROJECT_DIR/benches"
 
 # Default model path
-MODEL_PATH="${1:-/mnt/eaget-4tb/modelscope_models/tclf00/Qwen3___6-35B-A3B-AWQ}"
+MODEL_PATH="${1:-/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ}"
 
 echo "=== LMDeploy Rust Server Benchmark ==="
 echo "Model: $MODEL_PATH"

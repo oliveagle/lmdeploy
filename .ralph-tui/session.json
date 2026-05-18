@@ -3,10 +3,10 @@
   "sessionId": "711b3bda-8ecc-41e5-a3c1-6001fb36d767",
   "status": "running",
   "startedAt": "2026-05-18T03:12:04.690Z",
-  "updatedAt": "2026-05-18T04:15:53.283Z",
-  "currentIteration": 2,
+  "updatedAt": "2026-05-18T05:14:45.424Z",
+  "currentIteration": 3,
   "maxIterations": 50,
-  "tasksCompleted": 0,
+  "tasksCompleted": 1,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -35,8 +35,8 @@
       {
         "id": "lmdeploy-vh5",
         "title": "创建 Rust 基准测试框架 (TTFT + Decode + 多场景)",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "lmdeploy-k7d",
@@ -126,6 +126,16 @@
       "durationMs": 900600,
       "startedAt": "2026-05-18T03:16:52.336Z",
       "endedAt": "2026-05-18T03:31:52.936Z"
+    },
+    {
+      "iteration": 3,
+      "status": "completed",
+      "taskId": "lmdeploy-vh5",
+      "taskTitle": "创建 Rust 基准测试框架 (TTFT + Decode + 多场景)",
+      "taskCompleted": true,
+      "durationMs": 2639211,
+      "startedAt": "2026-05-18T03:31:54.061Z",
+      "endedAt": "2026-05-18T04:15:53.272Z"
     }
   ],
   "skippedTaskIds": [],

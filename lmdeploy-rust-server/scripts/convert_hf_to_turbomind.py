@@ -44,9 +44,6 @@ def convert_model(model_path: str, workspace_path: str) -> int:
         engine_config = TurbomindEngineConfig(
             session_len=4096,
             max_batch_size=32,
-            # AWQ 量化模型需要这些配置
-            cache_max_entry_count=0.0,
-            cache_block_seq_len=64,
             quant_policy=4,  # AWQ 4-bit
         )
 

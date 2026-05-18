@@ -3,7 +3,9 @@
 - **Python 自动 HF→TM 转换**: Python API 在首次加载时自动完成转换（converter.py → AWQFormat → export），但 C API 的 `InitFromPath` 跳过这些步骤
 - **Rust 自动转换检测**: `engine.rs` 现在会检测 HuggingFace safetensors 格式，自动调用 Python 脚本转换为 TurboMind 格式
 - **AWQ 自动检测**: 从 config.json 检测 `quantization_config.quant_method == "awq"` 并设置 `quant_policy=4`
-- **Cargo 编译极慢**: 本地 cargo 检查需要很长时间（>2分钟），原因是网络慢或缓存问题。建议预留 3-5 分钟编译时间，或使用 `cargo check --lib` 而非全量编译。
+- **Python 转换只加载到内存**: `TurboMind.__init__()` 调用 `ModelLoader.export()` 加载权重到 GPU 内存，但不会写入磁盘 `.bin` 文件
+- **Cargo 编译极慢**: 本地 cargo 检查需要很长时间（>2分钟），原因是网络慢或缓存问题。建议预留 3-5 分钟编译时间，或使用 `cargo check --lib` 而非全量编译
+- **模型路径**: Qwen3.6-35B-A3B-AWQ 位于 `/mnt/eaget-4tb/modelscope_models/tclf90/` (不是 tclf00)
 
 ## 2026-05-18 - lmdeploy-vh5
 - **创建 Rust 基准测试框架**: 实现了完整的性能基准测试工具，支持 TTFT、Prefill 速度、Decode 速度、多场景测试
@@ -52,6 +54,27 @@
   - Python TurboMind API 的转换逻辑封装在 `TurboMind.__init__()` → `_from_hf()` → `ModelLoader.export()` 中
   - C API 的 `InitFromPath` 期望 TurboMind 格式，不能直接加载 HF safetensors
   - AWQ 模型需要设置 `quant_policy=4` 才能正确加载
+
+---
+
+## 2026-05-18 - lmdeploy-xt9
+- **完成 Rust 基准测试工具**: 创建了完整的性能基准测试 CLI 工具
+- **修改的文件**:
+  - `lmdeploy-rust-server/examples/benchmark.rs`: 新增基准测试示例程序
+    - 使用 `BenchmarkRunner` 执行 1K/4K/8K context 场景测试
+    - 每次场景运行 3 次迭代取平均
+    - 记录 TTFT、prefill 速度、decode 速度、GPU 内存占用
+    - 结果输出到 JSON 文件
+  - `lmdeploy-rust-server/Cargo.toml`: 添加 chrono 依赖用于时间戳
+  - `lmdeploy-rust-server/scripts/run_benchmark.sh`: 修正模型路径为 tclf90
+  - `lmdeploy-rust-server/scripts/convert_hf_to_turbomind.py`: 修复无效的 cache_max_entry_count=0.0
+  - `lmdeploy-rust-server/src/model/benchmark.rs`: 修复 Serialize/Deserialize derives
+- **Learnings**:
+  - 模型路径修正: `/mnt/eaget-4tb/modelscope_models/tclf00/` → `/mnt/eaget-4tb/modelscope_models/tclf90/`
+  - C API `InitFromPath` 无法直接加载 HuggingFace safetensors，期望 TurboMind 格式的 `.bin` 文件
+  - Python `TurboMind.__init__()` 虽然能做 HF→TM 转换，但只加载到内存，不写入磁盘
+  - Rust Server 需要预转换模型或等待 C API HF 支持完善
+  - 基准测试工具已就绪，但模型转换问题是阻塞项
 
 ---
 
