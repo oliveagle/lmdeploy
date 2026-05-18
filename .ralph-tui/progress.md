@@ -1,4 +1,10 @@
 ## Codebase Patterns
+- **TurboMind 设计目标是零拷贝**: safetensors → GPU 直接加载，无任何磁盘中间文件（`.bin`），这是架构设计而非缺陷
+- **C++ Module 树无法序列化**: `serdes.h` 的 `BinaryOutputArchive` 仅用于 C++ 结构间的内存序列化（配置参数），不包含 Tensor 数据的磁盘持久化
+- **AWQ 量化权重在 safetensors 中的格式**: `qweight` 为 int32 [K, N/8]，`scales` 为 float16 [K/g, N]，`qzeros` 为 int32 [K/g, N/8]，需通过 `_unpack_awq_gemm()` 解包
+- **C API 无 safetensors 加载**: `turbomind_c.cc` 的 `SafetensorsReader` 只读取 safetensors 文件头，缺少 AWQ 量化解包逻辑，无法加载量化权重
+- **Python TurboMind 完整模型树构建**: 路径为 `get_tm_config()` → `Qwen3_5Model.model()` → `TextModelBuilder` → `_add_linear()` → `_copy_shard_to_param()` → GPU
+- **`_copy_shard_to_param()` 加载机制**: 调用 C++ `Param.alloc(shape, dtype)` + `Tensor.copy_from(shard)` 直接拷贝到 GPU 内存
 - **TurboMind 没有磁盘 .bin 权重序列化**: `ModelLoader.export()` 只将 safetensors 权重直接加载到 GPU 内存（通过 `self.model.model(Prefix(ckpt))`），从不写入磁盘 .bin 文件
 - **`lmdeploy convert` CLI 已不存在**: 文档字符串中引用（"converted by `lmdeploy convert`"），但 `cli.py` 中无此命令，无对应实现
 - **converter.py 不负责文件转换**: 仅做配置解析（`get_tm_config()`），无实际权重文件读写逻辑
@@ -174,3 +180,28 @@
   - C: 扩展 C API 原生支持 AWQ safetensors（长期）
 
 ---
+
+## 2026-05-18 - lmdeploy-jpv
+- **研究 TurboMind 权重序列化**: 深入分析了 C++ Module 架构和 Python 模型加载流程，确认了 TurboMind 架构中不存在磁盘 .bin 序列化功能
+- **关键发现**:
+  - C++ `Module::for_each_param()` 遍历参数，但无序列化方法
+  - `serdes.h` 只定义了内存序列化框架（`BinaryOutputArchive`），未用于磁盘 I/O
+  - Python `_copy_shard_to_param()` 调用 C++ `Param.alloc()` + `Tensor.copy_from()` 直接加载到 GPU
+  - C API 的 `SafetensorsReader` 缺少 AWQ 解包逻辑（`_unpack_awq_gemm` 在 Python）
+  - `ModelLoader.export()` 路径: safetensors → checkpoint.py → WeightFormatResolver → Linear → `_add_linear()` → `_tm.create_module()` → `_copy_shard_to_param()` → GPU
+  - 整个流程纯内存操作，无中间磁盘文件
+- **修改的文件**:
+  - `scripts/export_turbomind_weights.py`: 新增权重导出脚本框架
+    - 使用 Python TurboMind API 加载模型
+    - 生成 config.yaml
+    - 预留 .bin 序列化接口
+- **Learnings**:
+  - TurboMind 设计目标是零拷贝：safetensors → GPU 直接映射，无需中间文件
+  - C API `InitFromPath` 期望已加载的 GPU 权重，不是磁盘文件
+  - 序列化需要重新实现完整的 C++ Module 树遍历 + Tensor 拷贝逻辑
+  - 更实际的方案：使用 Python 桥接或在 Rust 中直接调用 Python 推理 API
+- **下一步**: 实现 Python 桥接方案（已验证可用的 `python_inference_bridge.py`）而非实现复杂的 .bin 序列化
+
+
+**注**: lmdeploy-jpv 被 lmdeploy-qvd 阻塞，无法独立完成。需要先完成 C API InitFromPath 的修复。
+
