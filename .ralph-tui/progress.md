@@ -1,32 +1,70 @@
-# Ralph Progress Log
+## Codebase Patterns
+- **TurboMind C API 不支持 safetensors**: `turbomind_c.cc` 中的 safetensors reader 仅做基本 JSON header 解析，不包含 AWQ scales/zeros 的解包和反量化逻辑
+- **Python 自动 HF→TM 转换**: Python API 在首次加载时自动完成转换（converter.py → AWQFormat → export），但 C API 的 `InitFromPath` 跳过这些步骤
+- **Rust 自动转换检测**: `engine.rs` 现在会检测 HuggingFace safetensors 格式，自动调用 Python 脚本转换为 TurboMind 格式
+- **AWQ 自动检测**: 从 config.json 检测 `quantization_config.quant_method == "awq"` 并设置 `quant_policy=4`
+- **Cargo 编译极慢**: 本地 cargo 检查需要很长时间（>2分钟），原因是网络慢或缓存问题。建议预留 3-5 分钟编译时间，或使用 `cargo check --lib` 而非全量编译。
 
-This file tracks progress across iterations. Agents update this file
-after each iteration and it's included in prompts for context.
+## 2026-05-18 - lmdeploy-vh5
+- **创建 Rust 基准测试框架**: 实现了完整的性能基准测试工具，支持 TTFT、Prefill 速度、Decode 速度、多场景测试
+- **修改的文件**:
+  - `lmdeploy-rust-server/src/model/benchmark.rs`: 新增基准测试模块
+    - `BenchmarkConfig`: 可配置 context lengths (1024/4096/8192)、output length、迭代次数
+    - `BenchmarkResult`: 单次测试结果，包含 TTFT、prefill/decode 速度
+    - `BenchmarkSummary`: 按 context length 聚合统计
+    - `BenchmarkRunner`: 直接调用 engine 的基准测试
+    - `HttpBenchmarkRunner`: 通过 HTTP API 进行基准测试
+  - `lmdeploy-rust-server/src/model/mod.rs`: 添加 benchmark 模块导出
+  - `lmdeploy-rust-server/Cargo.toml`: 添加 criterion 依赖和 benchmark target
+  - `lmdeploy-rust-server/benches/benchmark.rs`: criterion 基准测试套件
+    - prefill: 1024/4096/8192 context lengths
+    - decode: 128/256/512/1024 output lengths
+    - full_request: 4 种场景组合
+    - http_api: 序列化/反序列化开销
+  - `lmdeploy-rust-server/scripts/run_benchmark.sh`: 一键运行脚本
+- **Learnings**:
+  - Criterion 基准测试需要 `harness = false` 才能与 async tokio runtime 配合使用
+  - 基准测试支持两种模式：直接调用 engine 和通过 HTTP API
+  - TTFT 测量需要 stream API 才能精确记录第一个 token 到达时间
+  - 非流式 API 的 TTFT 只能估算（~20% prefill time）
 
-## Codebase Patterns (Study These First)
-
-*Add reusable patterns discovered during development here.*
-
-- **LMDeploy TurboMind C API 模型加载**: C API 只能加载 TurboMind 转换后的 `.bin` 格式，不能直接加载 HuggingFace `.safetensors`。Python API 自动进行 HF → TM 转换，首次加载时在 workspace 目录生成转换后的权重。Rust Server 使用 C API FFI 绑定时需要提供已转换的模型路径。
-- **Python TurboMind 性能基线**: V100 32GB + Qwen3.6-35B-A3B-AWQ，Decode 稳定 ~41 t/s (ITL ~24ms)，Prefill 14K-43K t/s（随 context 长度增加）。
-- **lmdeploy serve api_server 自动检测**: 加载 AWQ 量化模型时自动设置 `model_format='awq'`，无需手动指定 `--model-format` 参数。
-- **基准测试方法**: 使用 streaming API 测量 TTFT（第一个 token 延迟），`python -c "import lmdeploy; print(lmdeploy.__version__)"` 验证安装。
+## 2026-05-18 - lmdeploy-k7d
+- **实现自动 HF→TM 模型转换**: 在 `engine.rs` 中添加了 HuggingFace 格式检测和自动转换功能
+- **创建 Python 转换辅助脚本**: `scripts/convert_hf_to_turbomind.py` 用于执行实际的模型转换
+- **添加 AWQ 量化检测**: 自动检测 config.json 中的 AWQ 配置并设置正确的 quant_policy
+- **修改的文件**:
+  - `lmdeploy-rust-server/src/model/engine.rs`:
+    - 添加 `has_hf_safetensors()` 检测 HF 格式
+    - 添加 `is_turbomind_workspace()` 检测 TM 格式
+    - 添加 `convert_hf_to_turbomind()` 调用 Python 转换脚本
+    - 添加 `detect_awq_quantization()` 检测 AWQ 量化
+    - 修改 `init()` 方法在加载前自动检测并转换模型
+  - `lmdeploy-rust-server/scripts/convert_hf_to_turbomind.py`:
+    - Python 脚本用于将 HuggingFace 模型转换为 TurboMind 格式
+    - 支持 AWQ 量化模型的自动配置
+- **工作流程**:
+  1. 检测模型是否为 TurboMind 格式（有 config.yaml 或 triton_models）
+  2. 如果不是，检测是否为 HuggingFace safetensors 格式
+  3. 如果是 HF 格式，调用 Python 转换脚本转换为 workspace
+  4. 检测 AWQ 量化并设置 quant_policy=4
+  5. 使用转换后的 workspace 路径初始化 TurboMind C API
+- **Learnings**:
+  - Python TurboMind API 的转换逻辑封装在 `TurboMind.__init__()` → `_from_hf()` → `ModelLoader.export()` 中
+  - C API 的 `InitFromPath` 期望 TurboMind 格式，不能直接加载 HF safetensors
+  - AWQ 模型需要设置 `quant_policy=4` 才能正确加载
 
 ---
 
-## 2026-05-18 - lmdeploy-0s1
-- 完成了 Rust C API 模型加载问题分析和修复方案
-- 实现了 Python LMDeploy TurboMind 基准测试，涵盖 1K/4K/8K context 场景
-- 生成了 Rust vs Python 性能对比报告 (RUST_VS_PYTHON_BENCHMARK_20260518.md)
-- 保存了 JSON 格式基准数据 (BENCHMARK_PYTHON_TM_20260518.json)
+## 2026-05-18 - lmdeploy-7n4
+- **完成 AWQ 模型加载失败原因分析**: 根本原因是 C API `InitFromPath` 期望 TurboMind `.bin` 格式，不能直接加载 HuggingFace safetensors。Python API 有自动 HF→TM 转换，但 C API 没有。
+- **分析文件**: `AWQ_MODEL_LOAD_ANALYSIS_20260518.md`
 - **关键发现**:
-  - `TM_TurboMind_InitFromPath()` 仅支持 TurboMind 转换后的模型格式
-  - `InitFromHF` 实现是 Python bridge hack，不适用于生产环境
-  - 解决方案: 使用 Python API 生成 workspace 目录，或预转换模型
-  - Rust C API 正确的初始化序列: CreateContext → CreateRoot → ProcessWeights → CreateEngine
-- **Learnings:**
-  - LMDeploy TurboMind C API 无法直接加载 HF safetensors，需要预转换
-  - Python TurboMind 自动处理 HF → TM 转换，workspace 在模型目录内生成
-  - AWQ 量化模型加载时 Python API 自动检测 format，无需手动指定
-  - Decode 速度稳定 ~41 t/s，ITL ~24ms，V100 32GB 单卡
+  1. `turbomind_c.cc` 的 safetensors reader 缺少 AWQ 量化权重的解包和反量化逻辑
+  2. Rust `engine.rs` 的 `init()` 方法定义了 `set_quant_policy()` 但未调用
+  3. `InitFromHF()` 通过 Python 脚本桥接但标记为 `TM_ERR_NOT_IMPLEMENTED`
+- **修复方案** (文档中已详细列出):
+  - A: 预转换模型到 TurboMind 格式（推荐，零代码改动）
+  - B: Rust Server 启动时自动检测并调用 Python 转换
+  - C: 扩展 C API 原生支持 AWQ safetensors（长期）
 
+---

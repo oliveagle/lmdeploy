@@ -4,20 +4,18 @@
 //!
 //! # Model Format Support
 //!
-//! The C API currently supports **TurboMind-converted models** (.bin files).
-//! For HuggingFace safetensors models (.safetensors), use:
-//! - PyTorch backend: fully supports HF safetensors with AWQ/GPTQ quantization
-//! - Python TurboMind API: automatic HF→TM conversion during load
+//! The C API supports both TurboMind-converted models (.bin files) and
+//! HuggingFace safetensors models. When a HuggingFace model is detected,
+//! the engine automatically converts it to TurboMind format.
 //!
-//! # Converting HF Models to TurboMind Format
+//! # AWQ Quantization Support
 //!
-//! ```bash
-//! # The Python API automatically converts HF models during first load
-//! python -c "
-//! from lmdeploy.turbomind import TurboMind
-//! tm = TurboMind('/path/to/hf/model')
-//! "
-//! ```
+//! AWQ (Activation-Aware Weight Quantization) models are automatically detected
+//! from config.json and appropriate quant_policy is set. The conversion script
+//! handles the complex AWQ weight unpacking and dequantization.
+
+// Built-in Rust commands for process management
+use std::process::Command;
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,6 +52,108 @@ impl Default for ModelInfo {
             loaded_at: None,
         }
     }
+}
+
+/// Check if the model directory contains HuggingFace safetensors
+fn has_hf_safetensors(model_path: &std::path::Path) -> bool {
+    let config_json = model_path.join("config.json");
+    if !config_json.exists() {
+        return false;
+    }
+
+    // Check for safetensors files
+    let has_safetensors = std::fs::read_dir(model_path)
+        .ok()
+        .and_then(|entries| {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                if let Some(name_str) = name.to_str() {
+                    if name_str.contains("safetensors") && !name_str.ends_with(".index.json") {
+                        return Some(true);
+                    }
+                }
+            }
+            Some(false)
+        })
+        .unwrap_or(false);
+
+    has_safetensors
+}
+
+/// Check if the model directory is already a TurboMind workspace
+fn is_turbomind_workspace(model_path: &std::path::Path) -> bool {
+    let config_yaml = model_path.join("config.yaml");
+    let triton_models = model_path.join("triton_models");
+    config_yaml.exists() || triton_models.exists()
+}
+
+/// Get the workspace path for a HuggingFace model
+fn get_workspace_path(model_path: &str) -> String {
+    std::path::PathBuf::from(model_path)
+        .join("workspace")
+        .to_string_lossy()
+        .to_string()
+}
+
+/// Convert HuggingFace model to TurboMind format using Python script
+fn convert_hf_to_turbomind(model_path: &str, workspace_path: &str) -> Result<()> {
+    tracing::info!(
+        model_path = %model_path,
+        workspace_path = %workspace_path,
+        "Converting HuggingFace model to TurboMind format"
+    );
+
+    // Get the script path relative to the binary
+    let script_path = std::path::PathBuf::from("scripts/convert_hf_to_turbomind.py");
+
+    // If script doesn't exist relative to binary, try relative to current dir
+    let script_path = if !script_path.exists() {
+        std::path::PathBuf::from("./lmdeploy-rust-server/scripts/convert_hf_to_turbomind.py")
+    } else {
+        script_path
+    };
+
+    if !script_path.exists() {
+        return Err(crate::error::AppError::ModelLoadFailed(
+            format!("Conversion script not found: {:?}", script_path)
+        ));
+    }
+
+    // Execute the Python conversion script
+    let output = Command::new("python3")
+        .arg(&script_path)
+        .arg(model_path)
+        .arg(workspace_path)
+        .output()
+        .map_err(|e| crate::error::AppError::ModelLoadFailed(
+            format!("Failed to execute conversion script: {}", e)
+        ))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(crate::error::AppError::ModelLoadFailed(
+            format!("Conversion script failed: {}", stderr)
+        ));
+    }
+
+    tracing::info!("HuggingFace model converted successfully");
+    Ok(())
+}
+
+/// Detect AWQ quantization from config.json
+fn detect_awq_quantization(model_path: &std::path::Path) -> bool {
+    let config_path = model_path.join("config.json");
+    if !config_path.exists() {
+        return false;
+    }
+
+    std::fs::read_to_string(&config_path)
+        .ok()
+        .map(|content| {
+            let content_lower = content.to_lowercase();
+            content_lower.contains("\"quant_method\"") && content_lower.contains("\"awq\"")
+        })
+        .unwrap_or(false)
 }
 
 /// TurboMind engine using C API
@@ -103,15 +203,40 @@ impl TurboMindEngine {
         self.state = ModelState::Loading;
         tracing::info!(model_path = %self.model_path, "Loading model via TurboMind C API");
 
-        // Check if model path exists
-        let config_path = std::path::PathBuf::from(&self.model_path).join("config.yaml");
-        let config_json = std::path::PathBuf::from(&self.model_path).join("config.json");
+        let model_path = std::path::PathBuf::from(&self.model_path);
+        let config_yaml = model_path.join("config.yaml");
+        let config_json = model_path.join("config.json");
 
-        if !config_path.exists() && !config_json.exists() {
+        if !config_yaml.exists() && !config_json.exists() {
             tracing::error!(model_path = %self.model_path, "config.yaml/config.json not found in model path");
             return Err(crate::error::AppError::ModelLoadFailed(
                 format!("Neither config.yaml nor config.json found at {}", self.model_path)
             ));
+        }
+
+        // Detect model format and convert if needed
+        let effective_model_path = if !is_turbomind_workspace(&model_path) && has_hf_safetensors(&model_path) {
+            tracing::info!("Detected HuggingFace safetensors model, will convert to TurboMind format");
+
+            let workspace_path = get_workspace_path(&self.model_path);
+            let workspace_dir = std::path::PathBuf::from(&workspace_path);
+
+            // Convert if workspace doesn't already exist
+            if !is_turbomind_workspace(&workspace_dir) {
+                convert_hf_to_turbomind(&self.model_path, &workspace_path)?;
+            }
+
+            // After conversion, use the workspace path
+            workspace_path
+        } else {
+            // Already TurboMind format or no conversion needed
+            self.model_path.clone()
+        };
+
+        // Detect AWQ quantization
+        let is_awq = detect_awq_quantization(&model_path);
+        if is_awq {
+            tracing::info!("Detected AWQ quantized model, enabling quant_policy=4");
         }
 
         // Load tokenizer
@@ -154,6 +279,11 @@ impl TurboMindEngine {
         config.set_enable_prefix_caching(true);
         config.set_enable_metrics(true);
 
+        // AWQ quantization policy
+        if is_awq {
+            config.set_quant_policy(4);
+        }
+
         // Parallel config for single GPU
         config.set_attn_tp_size(1);
         config.set_attn_cp_size(1);
@@ -165,11 +295,11 @@ impl TurboMindEngine {
         config.add_device(self.device_id);
 
         tracing::info!("Creating TurboMind instance...");
-        let tm = tm::TurboMind::create(&self.model_path, &mut config)
+        let tm = tm::TurboMind::create(&effective_model_path, &mut config)
             .map_err(|e| crate::error::AppError::ModelLoadFailed(e.to_string()))?;
 
         tracing::info!("Initializing TurboMind from model path (InitFromPath)...");
-        tm.init_from_path(self.device_id, &self.model_path, false)
+        tm.init_from_path(self.device_id, &effective_model_path, false)
             .map_err(|e| crate::error::AppError::ModelLoadFailed(e.to_string()))?;
 
         tracing::info!("TurboMind engine initialized successfully");

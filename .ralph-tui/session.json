@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "sessionId": "304e2ec7-8d67-4354-b88f-37754bc614d5",
+  "sessionId": "711b3bda-8ecc-41e5-a3c1-6001fb36d767",
   "status": "running",
-  "startedAt": "2026-05-17T16:48:32.691Z",
-  "updatedAt": "2026-05-17T17:22:02.939Z",
-  "currentIteration": 0,
+  "startedAt": "2026-05-18T03:12:04.690Z",
+  "updatedAt": "2026-05-18T04:15:53.283Z",
+  "currentIteration": 2,
   "maxIterations": 50,
   "tasksCompleted": 0,
   "isPaused": false,
@@ -12,8 +12,50 @@
   "trackerState": {
     "plugin": "beads-rust",
     "executionScopes": [],
-    "totalTasks": 8,
+    "totalTasks": 15,
     "tasks": [
+      {
+        "id": "lmdeploy-ghi",
+        "title": "生成 Rust vs Python 性能对比报告",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "lmdeploy-v8o",
+        "title": "执行 Python LMDeploy 同口径性能基准测试",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "lmdeploy-xt9",
+        "title": "执行 Rust Server 多场景性能测试 (1K/4K/8K context)",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "lmdeploy-vh5",
+        "title": "创建 Rust 基准测试框架 (TTFT + Decode + 多场景)",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "lmdeploy-k7d",
+        "title": "实现 TurboMind 模型转换或修复直接加载 safetensors",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "lmdeploy-7n4",
+        "title": "分析 AWQ 模型加载失败原因与修复方案",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "lmdeploy-0s1",
+        "title": "LMDeploy Rust Server - 运行修复与性能基准测试",
+        "status": "completed",
+        "completedInSession": false
+      },
       {
         "id": "lmdeploy-jog.1",
         "title": "C++ 模型权重加载 - 修复 TM_TurboMind_InitFromPath()",
@@ -64,9 +106,33 @@
       }
     ]
   },
-  "iterations": [],
+  "iterations": [
+    {
+      "iteration": 1,
+      "status": "completed",
+      "taskId": "lmdeploy-7n4",
+      "taskTitle": "分析 AWQ 模型加载失败原因与修复方案",
+      "taskCompleted": false,
+      "durationMs": 286442,
+      "startedAt": "2026-05-18T03:12:04.765Z",
+      "endedAt": "2026-05-18T03:16:51.207Z"
+    },
+    {
+      "iteration": 2,
+      "status": "completed",
+      "taskId": "lmdeploy-k7d",
+      "taskTitle": "实现 TurboMind 模型转换或修复直接加载 safetensors",
+      "taskCompleted": false,
+      "durationMs": 900600,
+      "startedAt": "2026-05-18T03:16:52.336Z",
+      "endedAt": "2026-05-18T03:31:52.936Z"
+    }
+  ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
-  "activeTaskIds": [],
+  "activeTaskIds": [
+    "lmdeploy-7n4",
+    "lmdeploy-k7d"
+  ],
   "subagentPanelVisible": false
 }

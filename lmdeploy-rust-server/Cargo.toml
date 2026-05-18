@@ -53,6 +53,11 @@ lru = "0.12"
 tokio-test = "0.4"
 reqwest = { version = "0.12", features = ["json", "stream"] }
 assert-json-diff = "2.0"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "benchmark"
+harness = false
 
 [build-dependencies]
 tonic-build = "0.12"
