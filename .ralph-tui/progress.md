@@ -1,11 +1,13 @@
 ## Codebase Patterns
-- **TurboMind C API 不支持 safetensors**: `turbomind_c.cc` 中的 safetensors reader 仅做基本 JSON header 解析，不包含 AWQ scales/zeros 的解包和反量化逻辑
-- **Python 自动 HF→TM 转换**: Python API 在首次加载时自动完成转换（converter.py → AWQFormat → export），但 C API 的 `InitFromPath` 跳过这些步骤
-- **Rust 自动转换检测**: `engine.rs` 现在会检测 HuggingFace safetensors 格式，自动调用 Python 脚本转换为 TurboMind 格式
+- **TurboMind C API 不支持 HuggingFace safetensors**: `turbomind_c.cc` 中的 safetensors reader 缺少 AWQ 量化解包和反量化逻辑
+- **Python 自动 HF→TM 转换**: Python API 通过 `get_tm_config()` → `Qwen3_5Model.model()` → `ModelLoader.export()` 自动转换，但只加载到 GPU 内存，不写入磁盘 `.bin` 文件
+- **Rust 自动转换检测**: `engine.rs` 检测 HuggingFace safetensors 格式，自动调用 Python 脚本转换为 TurboMind 格式
 - **AWQ 自动检测**: 从 config.json 检测 `quantization_config.quant_method == "awq"` 并设置 `quant_policy=4`
-- **Python 转换只加载到内存**: `TurboMind.__init__()` 调用 `ModelLoader.export()` 加载权重到 GPU 内存，但不会写入磁盘 `.bin` 文件
-- **Cargo 编译极慢**: 本地 cargo 检查需要很长时间（>2分钟），原因是网络慢或缓存问题。建议预留 3-5 分钟编译时间，或使用 `cargo check --lib` 而非全量编译
+- **Python 推理桥接**: `python_inference_bridge.py` 使用 LMDeploy `Pipeline` API 提供 stdin/stdout JSON 接口，支持 HuggingFace 格式模型
+- **C API 模型树构建问题**: `InitFromPath` 只创建空 `ModelWeight`，没有 Python 中的 `TextModelBuilder` 等模型树构建逻辑
+- **GPU 内存限制**: Qwen3.6-35B-A3B-AWQ 在 32GB V100 上 session_len=2048 可行，4096 OOM
 - **模型路径**: Qwen3.6-35B-A3B-AWQ 位于 `/mnt/eaget-4tb/modelscope_models/tclf90/` (不是 tclf00)
+- **Cargo 编译极慢**: 本地 cargo 检查需要很长时间（>2分钟），预留 3-5 分钟编译时间
 
 ## 2026-05-18 - lmdeploy-ghi
 - **生成 Rust vs Python 性能对比报告**: 汇总了 Python LMDeploy 的性能测试结果，分析 Rust Server 的阻塞原因
@@ -119,7 +121,31 @@
 
 ---
 
-## 2026-05-18 - lmdeploy-7n4
+## 2026-05-18 - lmdeploy-ah9
+- **实现 Python 推理桥接**: 创建了基于 LMDeploy Pipeline API 的 Python 子进程桥接，支持 HuggingFace 格式模型的真实加载和推理
+- **修改的文件**:
+  - `lmdeploy-rust-server/scripts/python_inference_bridge.py`: 新增 Python 推理桥接脚本
+    - 使用 `Pipeline` API 代替直接调用 TurboMind C API
+    - 支持 stdin/stdout JSON 协议与 Rust 通信
+    - 自动检测 AWQ 量化并配置 quant_policy=4
+    - 成功加载 Qwen3.6-35B-A3B-AWQ 模型并生成文本
+  - `lmdeploy-rust-server/scripts/convert_hf_to_turbomind.py`: 原转换脚本保留但不再使用（OOM 问题）
+  - `test_bridge.py`: 直接测试脚本（验证 Pipeline API 可用性）
+- **关键发现**:
+  - **C API 的根本问题**: TurboMind C API 的 `InitFromPath` 只创建空的 `ModelWeight`，没有构建模型树
+  - **Python API 的优势**: Python 中的 `Qwen3_5Model.model()` 方法通过 `TextModelBuilder` 构建完整的 C++ 模型树，然后通过 `ModelLoader.export()` 从 safetensors 加载权重到 GPU 内存
+  - **AWQ 量化**: Qwen3.6-35B-A3B-AWQ 使用 4-bit AWQ 量化，需要在 `TurbomindEngineConfig` 中设置 `quant_policy=4`
+  - **GPU 内存限制**: session_len=4096 时 OOM，session_len=2048 可正常工作（约 40 秒加载时间）
+  - **Pipeline.infer() API**: 非流式 API 返回 `Response` 对象，直接访问 `response.text` 获取生成文本
+- **Python 桥接验证成功**:
+  - 模型加载: ~40 秒（40 个层，每层 ~1 秒）
+  - 推理成功: 输入 "Hello, what is 2+2?" 成功生成回答
+  - 协议验证: stdin/stdout JSON 通信正常工作
+- **下一步**:
+  - 修改 Rust engine.rs 使用 Python 桥接替代 C API
+  - 或者直接使用 Python LMDeploy 作为推理后端（Rust 只负责 HTTP 服务）
+
+---
 - **完成 AWQ 模型加载失败原因分析**: 根本原因是 C API `InitFromPath` 期望 TurboMind `.bin` 格式，不能直接加载 HuggingFace safetensors。Python API 有自动 HF→TM 转换，但 C API 没有。
 - **分析文件**: `AWQ_MODEL_LOAD_ANALYSIS_20260518.md`
 - **关键发现**:

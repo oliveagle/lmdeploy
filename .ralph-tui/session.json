@@ -3,10 +3,10 @@
   "sessionId": "711b3bda-8ecc-41e5-a3c1-6001fb36d767",
   "status": "running",
   "startedAt": "2026-05-18T03:12:04.690Z",
-  "updatedAt": "2026-05-18T05:38:47.105Z",
-  "currentIteration": 5,
+  "updatedAt": "2026-05-18T06:49:09.466Z",
+  "currentIteration": 6,
   "maxIterations": 50,
-  "tasksCompleted": 3,
+  "tasksCompleted": 4,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -17,8 +17,8 @@
       {
         "id": "lmdeploy-ghi",
         "title": "生成 Rust vs Python 性能对比报告",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "lmdeploy-v8o",
@@ -156,6 +156,16 @@
       "durationMs": 991962,
       "startedAt": "2026-05-18T05:14:56.004Z",
       "endedAt": "2026-05-18T05:31:27.966Z"
+    },
+    {
+      "iteration": 6,
+      "status": "completed",
+      "taskId": "lmdeploy-ghi",
+      "taskTitle": "生成 Rust vs Python 性能对比报告",
+      "taskCompleted": true,
+      "durationMs": 437719,
+      "startedAt": "2026-05-18T05:31:29.375Z",
+      "endedAt": "2026-05-18T05:38:47.094Z"
     }
   ],
   "skippedTaskIds": [],
