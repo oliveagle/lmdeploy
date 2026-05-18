@@ -3,10 +3,10 @@
   "sessionId": "c4ec3dd5-4f56-408d-99b4-3a29940aedf7",
   "status": "running",
   "startedAt": "2026-05-18T09:42:53.505Z",
-  "updatedAt": "2026-05-18T12:12:28.198Z",
-  "currentIteration": 5,
+  "updatedAt": "2026-05-18T13:09:47.683Z",
+  "currentIteration": 6,
   "maxIterations": 50,
-  "tasksCompleted": 3,
+  "tasksCompleted": 4,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -17,8 +17,8 @@
       {
         "id": "lmdeploy-207",
         "title": "修复 InitFromPath: 集成 safetensors 加载，修复 prepare() 崩溃",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "lmdeploy-bor",
@@ -210,6 +210,16 @@
       "durationMs": 1950941,
       "startedAt": "2026-05-18T11:23:48.703Z",
       "endedAt": "2026-05-18T11:56:19.644Z"
+    },
+    {
+      "iteration": 6,
+      "status": "completed",
+      "taskId": "lmdeploy-207",
+      "taskTitle": "修复 InitFromPath: 集成 safetensors 加载，修复 prepare() 崩溃",
+      "taskCompleted": true,
+      "durationMs": 967127,
+      "startedAt": "2026-05-18T11:56:21.054Z",
+      "endedAt": "2026-05-18T12:12:28.181Z"
     }
   ],
   "skippedTaskIds": [],

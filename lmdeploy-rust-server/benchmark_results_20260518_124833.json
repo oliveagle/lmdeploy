@@ -1,0 +1,108 @@
+{
+  "all_results": [
+    {
+      "context_length": 921,
+      "decode_speed_tps": 59.356484673421086,
+      "decode_time_ms": 8625.84775390625,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 249.13493274058968,
+      "prefill_time_ms": 3696.79189453125,
+      "total_time_ms": 12322.6396484375,
+      "ttft_ms": 1478.7167578125
+    },
+    {
+      "context_length": 921,
+      "decode_speed_tps": 59.31484614436813,
+      "decode_time_ms": 8631.90302734375,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 248.96016477392016,
+      "prefill_time_ms": 3699.38701171875,
+      "total_time_ms": 12331.2900390625,
+      "ttft_ms": 1479.7548046875
+    },
+    {
+      "context_length": 921,
+      "decode_speed_tps": 59.351329570963834,
+      "decode_time_ms": 8626.59697265625,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 249.11329540625252,
+      "prefill_time_ms": 3697.1129882812497,
+      "total_time_ms": 12323.7099609375,
+      "ttft_ms": 1478.8451953125
+    },
+    {
+      "context_length": 3651,
+      "decode_speed_tps": 56.72266489200615,
+      "decode_time_ms": 9026.37421875,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 943.7898090136725,
+      "prefill_time_ms": 3868.44609375,
+      "total_time_ms": 12894.8203125,
+      "ttft_ms": 1547.3784375
+    },
+    {
+      "context_length": 3651,
+      "decode_speed_tps": 56.77219541534376,
+      "decode_time_ms": 9018.49921875,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 944.6139311392842,
+      "prefill_time_ms": 3865.07109375,
+      "total_time_ms": 12883.5703125,
+      "ttft_ms": 1546.0284375
+    },
+    {
+      "context_length": 3651,
+      "decode_speed_tps": 56.69364890514088,
+      "decode_time_ms": 9030.9939453125,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 943.3070215290923,
+      "prefill_time_ms": 3870.4259765624997,
+      "total_time_ms": 12901.419921875,
+      "ttft_ms": 1548.170390625
+    },
+    {
+      "context_length": 7291,
+      "decode_speed_tps": 53.02362700124401,
+      "decode_time_ms": 9656.07275390625,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 1761.8273771240172,
+      "prefill_time_ms": 4138.31689453125,
+      "total_time_ms": 13794.3896484375,
+      "ttft_ms": 1655.3267578125
+    },
+    {
+      "context_length": 7291,
+      "decode_speed_tps": 53.00264800941538,
+      "decode_time_ms": 9659.8947265625,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 1761.1303036826384,
+      "prefill_time_ms": 4139.9548828125,
+      "total_time_ms": 13799.849609375,
+      "ttft_ms": 1655.981953125
+    },
+    {
+      "context_length": 7291,
+      "decode_speed_tps": 52.952610934042305,
+      "decode_time_ms": 9669.02275390625,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 1759.467711094217,
+      "prefill_time_ms": 4143.86689453125,
+      "total_time_ms": 13812.8896484375,
+      "ttft_ms": 1657.5467578125001
+    }
+  ],
+  "engine": "LMDeploy TurboMind",
+  "gpu_memory_used_gb": 0.03125,
+  "model": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ",
+  "summary": [],
+  "timestamp": "2026-05-18T12:48:33.945033534+00:00"
+}

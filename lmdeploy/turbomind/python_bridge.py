@@ -35,6 +35,15 @@ def setup_paths():
 
 setup_paths()
 
+import logging
+import tempfile
+
+# Redirect lmdeploy logs to stderr instead of stdout
+_logger = logging.getLogger('lmdeploy')
+for handler in _logger.handlers:
+    if isinstance(handler, logging.StreamHandler) and handler.stream is sys.stdout:
+        handler.stream = sys.stderr
+
 import numpy as np
 from lmdeploy.messages import GenerationConfig, TurbomindEngineConfig
 from lmdeploy.turbomind import TurboMind
@@ -59,17 +68,20 @@ class TurboMindBridge:
         try:
             print(f"[Bridge] Loading model from {model_path}", file=sys.stderr)
 
-            # Build engine config
+            # Build engine config - set tp explicitly, let Pydantic defaults handle the rest
+            tp = engine_config.get("tp", 1) if engine_config else 1
             ec = TurbomindEngineConfig(
                 session_len=engine_config.get("session_len", 2048) if engine_config else 2048,
                 max_batch_size=engine_config.get("max_batch_size", 32) if engine_config else 32,
                 cache_block_seq_len=engine_config.get("cache_block_seq_len", 64) if engine_config else 64,
-                cache_max_entry_count=engine_config.get("cache_max_entry_count", 0.0) if engine_config else 0.0,
-                attn_tp_size=engine_config.get("tp", 1) if engine_config else 1,
-                enable_prefix_caching=engine_config.get("enable_prefix_caching", True) if engine_config else True,
+                cache_max_entry_count=engine_config.get("cache_max_entry_count", 0.8) if engine_config else 0.8,
+                tp=tp,
+                dp=1,
+                cp=1,
+                enable_prefix_caching=False,  # Disable prefix caching for linear attention models
                 enable_metrics=True,
+                # quant_policy is set after creation due to Pydantic constraints
             )
-
             if engine_config and engine_config.get("quant_policy"):
                 ec.quant_policy = engine_config["quant_policy"]
 
@@ -128,7 +140,7 @@ class TurboMindBridge:
             # Use async_stream_infer and collect all output
             async for output in self.instance.async_stream_infer(
                 session_id=self._session_id,
-                input_ids=input_ids_array,
+                input_ids=input_ids,
                 gen_config=gen_config,
                 sequence_start=True,
                 sequence_end=True,

@@ -120,7 +120,7 @@ impl TurboMindEngine {
         tracing::info!("Starting Python bridge subprocess...");
         let bridge = PythonBridge::new(
             model_path,
-            2048,  // session_len
+            65536,  // session_len (supports up to 8K+ context)
             1,     // tp
             quant_policy,
         )?;
@@ -196,6 +196,12 @@ impl TurboMindEngine {
 
     /// Generate text with TurboMind
     pub async fn generate(&self, prompt: &str, max_tokens: usize) -> String {
+        let (text, _, _) = self.generate_with_metrics(prompt, max_tokens).await;
+        text
+    }
+
+    /// Generate text with TurboMind, returning (text, num_tokens, elapsed_ms)
+    pub async fn generate_with_metrics(&self, prompt: &str, max_tokens: usize) -> (String, usize, f64) {
         let bridge = self.bridge.as_ref().expect("Python bridge not initialized");
 
         // Tokenize input
@@ -204,27 +210,27 @@ impl TurboMindEngine {
                 Ok(ids) => ids,
                 Err(e) => {
                     tracing::error!(error = %e, "Tokenization failed");
-                    return String::new();
+                    return (String::new(), 0, 0.0);
                 }
             }
         } else {
             tracing::error!("Tokenizer not available");
-            return String::new();
+            return (String::new(), 0, 0.0);
         };
 
         tracing::debug!(input_len = input_ids.len(), "Tokenized prompt");
 
         // Generate via Python bridge
-        let output_ids = match bridge.generate(input_ids, max_tokens) {
-            Ok(ids) => ids,
+        let (output_ids, elapsed_ms) = match bridge.generate_with_metrics(input_ids, max_tokens) {
+            Ok(result) => result,
             Err(e) => {
                 tracing::error!(error = %e, "Generation failed");
-                return String::new();
+                return (String::new(), 0, 0.0);
             }
         };
 
         // Decode output
-        if let Some(tokenizer) = &self.tokenizer {
+        let text = if let Some(tokenizer) = &self.tokenizer {
             match tokenizer.decode(&output_ids, true) {
                 Ok(text) => text,
                 Err(e) => {
@@ -234,13 +240,20 @@ impl TurboMindEngine {
             }
         } else {
             String::new()
-        }
+        };
+
+        (text, output_ids.len(), elapsed_ms)
     }
 
     /// Generate text with streaming (not implemented for Python bridge yet)
     pub async fn generate_stream(&self, _prompt: &str) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
         tracing::warn!("Streaming not implemented for Python bridge");
         Box::pin(futures::stream::empty())
+    }
+
+    /// Get the tokenizer
+    pub fn tokenizer(&self) -> Option<&LMTokenizer> {
+        self.tokenizer.as_ref()
     }
 
     /// Generate embeddings (not supported)

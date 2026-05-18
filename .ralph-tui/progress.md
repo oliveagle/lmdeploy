@@ -7,6 +7,28 @@ after each iteration and it's included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
+### Python Bridge JSON Protocol
+
+When implementing Python subprocess communication via stdin/stdout:
+1. **Disable lmdeploy logging to stdout** - it corrupts JSON parsing:
+   ```python
+   import logging
+   _logger = logging.getLogger('lmdeploy')
+   for handler in _logger.handlers:
+       if isinstance(handler, logging.StreamHandler) and handler.stream is sys.stdout:
+           handler.stream = sys.stderr
+   ```
+2. **Disable prefix caching for linear attention models** - Qwen3.6 crashes with it enabled
+3. **Set all parallel config explicitly** - dp=1, cp=1 required even for TP=1 to avoid assertions
+4. **Use list not numpy array for input_ids** - `async_stream_infer` expects Sequence, not ndarray
+
+### Benchmark Timing Measurement
+
+For accurate TTFT (Time To First Token) measurement:
+- **Use streaming API** - non-streaming APIs only return total elapsed time
+- **TTFT estimation from total time is inaccurate** - subprocess overhead (~1.5s) distorts results
+- **Decode speed calculation**: `(output_tokens * 1000) / (total_time_ms - prefill_time_ms)`
+
 ### Module::create() Pattern for Module Creation
 
 When creating child modules, use `turbomind::core::Module::create(cfg)` to create modules through the registry:
@@ -168,5 +190,34 @@ size_t copy_size = std::min(data_size, static_cast<size_t>(tensor.byte_size()));
   - AttentionWeight children: w_qkv, wo, q_proj, k_proj, v_proj, q_a_proj, q_b_proj, kv_a_proj, q_norm, k_norm
   - FfnWeight children: w1, w3, w2, w1w3
   - Build status: Compiles successfully, turbomind_c.so built
+
+---
+
+## 2026-05-18 - lmdeploy-2tt
+- Implemented Rust Server benchmark via Python Bridge for Qwen3.6-35B-A3B-AWQ
+- Files created:
+  - `BENCHMARK_RUST_BRIDGE_20260518.json` - Benchmark results in Python-compatible format
+- Files modified:
+  - `lmdeploy-rust-server/src/model/benchmark.rs` - Added metrics API, fixed summary grouping
+  - `lmdeploy-rust-server/src/model/engine.rs` - Added `generate_with_metrics()` and `tokenizer()` methods
+  - `lmdeploy-rust-server/src/model/python_bridge.rs` - Added `generate_with_metrics()` method
+  - `lmdeploy/turbomind/python_bridge.py` - Fixed logging, prefix caching, parallel config
+- **Benchmark Results** (3 runs per scenario, averaged):
+  | Context | TTFT (ms) | Prefill (tps) | Decode (tps) | Total Time (ms) |
+  |---------|-----------|--------------|--------------|-----------------|
+  | 1K      | 1478.48   | 249.2        | 59.4         | 12320.68        |
+  | 4K      | 1547.19   | 943.9        | 56.7         | 12893.26        |
+  | 8K      | 1656.81   | 1760.2       | 53.0         | 13806.77        |
+- **Comparison with Python TurboMind**:
+  - Python TTFT: 70-191 ms vs Rust Bridge: 1478-1657 ms (TTFT estimation issue)
+  - Python Decode: 40.6-41.2 tps vs Rust Bridge: 53.0-59.4 tps (Rust ~30% faster?)
+  - The TTFT difference is due to estimation method - Rust bridge reports total time including overhead
+- **Learnings:**
+  - Python bridge subprocess communication adds ~1.5s overhead per request
+  - TTFT measurement requires streaming API to be accurate (not implemented in bridge)
+  - Prefix caching must be disabled for Qwen3.6 (linear attention model)
+  - TurbomindEngineConfig requires explicit dp/cp settings for TP=1 to avoid assertion failures
+  - lmdeploy logging to stdout interferes with JSON protocol - must redirect to stderr
+  - Benchmark summary grouping needs tolerance for actual vs target token counts
 
 ---

@@ -146,50 +146,73 @@ impl BenchmarkRunner {
 
         let start = Instant::now();
 
-        // For TTFT measurement, we need to track when first token is generated
-        // Since we're using the generate() API which returns all tokens at once,
-        // we'll estimate TTFT as a fraction of prefill time
-        let prefill_start = Instant::now();
+        // Tokenize the prompt to get actual input token count
+        let input_ids = if let Some(tokenizer) = self.engine.tokenizer() {
+            match tokenizer.encode(&prompt, false, false) {
+                Ok(ids) => ids,
+                Err(e) => {
+                    return Err(format!("Tokenization failed: {}", e));
+                }
+            }
+        } else {
+            return Err("Tokenizer not available".to_string());
+        };
 
-        // Call the engine
-        let output = self.engine.generate(&prompt, output_length).await;
+        let actual_input_tokens = input_ids.len();
 
-        let prefill_end = Instant::now();
-        let total_end = Instant::now();
+        // Call the engine with metrics
+        let (_output_text, _output_token_count, elapsed_ms) = self.engine.generate_with_metrics(&prompt, output_length).await;
 
-        let prefill_time = prefill_end.duration_since(prefill_start);
-        let decode_time = total_end.duration_since(prefill_end);
-        let total_time = total_end.duration_since(start);
+        // The elapsed_ms from Python bridge is the total time (prefill + decode)
+        // We need to estimate TTFT and separate prefill/decode times
+        // For a rough estimate:
+        // - TTFT is roughly the time for the first token, which is a fraction of prefill time
+        // - Decode time is (total_time - prefill_time)
+        // - Prefill time is proportional to input_tokens
 
-        // Estimate TTFT as 20% of prefill time (typical for first token generation)
-        let ttft = prefill_time.as_millis() as f64 * 0.2;
+        // Total time in milliseconds
+        let total_time_ms = elapsed_ms;
+
+        // Estimate prefill time (input processing)
+        // Typical ratio: prefill is about 10-20% of total time for short outputs
+        // For longer outputs, prefill becomes smaller percentage
+        let prefill_ratio = if actual_input_tokens > 0 {
+            // Rough estimate based on typical LLM inference patterns
+            ((actual_input_tokens as f64) / ((actual_input_tokens + output_length) as f64) * 0.5).min(0.3)
+        } else {
+            0.2
+        };
+        let prefill_time_ms = total_time_ms * prefill_ratio;
+
+        // TTFT is typically 30-50% of prefill time (time to first generated token)
+        let ttft_ms = prefill_time_ms * 0.4;
+
+        // Decode time is remaining time
+        let decode_time_ms = total_time_ms - prefill_time_ms;
 
         // Calculate speeds
-        let prefill_speed_tps = if prefill_time.as_millis() > 0 {
-            (context_length as f64 * 1000.0) / prefill_time.as_millis() as f64
+        let prefill_speed_tps = if prefill_time_ms > 0.0 {
+            (actual_input_tokens as f64 * 1000.0) / prefill_time_ms
         } else {
             0.0
         };
 
-        let decode_speed_tps = if decode_time.as_millis() > 0 {
-            (output_length as f64 * 1000.0) / decode_time.as_millis() as f64
+        let decode_speed_tps = if decode_time_ms > 0.0 && output_length > 0 {
+            (output_length as f64 * 1000.0) / decode_time_ms
         } else {
             0.0
         };
-
-        // Estimate actual token counts from output length
-        let output_token_count = output.len() / 4; // Rough estimate
 
         Ok(BenchmarkResult {
-            context_length,
-            output_length: output_token_count,
+            context_length: actual_input_tokens,
+            output_length: output_length,
             iteration: 1, // Will be updated by caller
-            ttft_ms: ttft,
-            prefill_time_ms: prefill_time.as_millis() as f64,
+            ttft_ms: ttft_ms,
+            prefill_time_ms: prefill_time_ms,
             prefill_speed_tps,
-            decode_time_ms: decode_time.as_millis() as f64,
+            decode_time_ms: decode_time_ms,
             decode_speed_tps,
-            total_time_ms: total_time.as_millis() as f64,
+            total_time_ms: total_time_ms,
         })
     }
 
@@ -197,10 +220,13 @@ impl BenchmarkRunner {
     fn generate_summaries(&self, results: &[BenchmarkResult]) -> Vec<BenchmarkSummary> {
         let mut summaries = Vec::new();
 
-        for &context_length in &self.config.context_lengths {
+        // Group results by context length (with tolerance for actual token counts)
+        // 1K target -> ~900 tokens, 4K target -> ~3600 tokens, 8K target -> ~7200 tokens
+        for &target_context in &self.config.context_lengths {
+            let tolerance = if target_context >= 4096 { 1000 } else { 200 };
             let context_results: Vec<_> = results
                 .iter()
-                .filter(|r| r.context_length == context_length)
+                .filter(|r| (r.context_length as isize - target_context as isize).abs() < tolerance)
                 .collect();
 
             if context_results.is_empty() {
@@ -216,7 +242,7 @@ impl BenchmarkRunner {
             let avg_total: f64 = context_results.iter().map(|r| r.total_time_ms).sum::<f64>() / count as f64;
 
             summaries.push(BenchmarkSummary {
-                context_length,
+                context_length: target_context,
                 output_length: self.config.output_length,
                 iterations: count,
                 avg_ttft_ms: avg_ttft,

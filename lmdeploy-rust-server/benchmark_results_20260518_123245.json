@@ -1,0 +1,142 @@
+{
+  "all_results": [
+    {
+      "context_length": 1024,
+      "decode_speed_tps": 0.0,
+      "decode_time_ms": 0.0,
+      "iteration": 1,
+      "output_length": 0,
+      "prefill_speed_tps": 83.06968443254644,
+      "prefill_time_ms": 12327.0,
+      "total_time_ms": 12327.0,
+      "ttft_ms": 2465.4
+    },
+    {
+      "context_length": 1024,
+      "decode_speed_tps": 0.0,
+      "decode_time_ms": 0.0,
+      "iteration": 1,
+      "output_length": 0,
+      "prefill_speed_tps": 83.10339230644377,
+      "prefill_time_ms": 12322.0,
+      "total_time_ms": 12322.0,
+      "ttft_ms": 2464.4
+    },
+    {
+      "context_length": 1024,
+      "decode_speed_tps": 0.0,
+      "decode_time_ms": 0.0,
+      "iteration": 1,
+      "output_length": 0,
+      "prefill_speed_tps": 83.089905874716,
+      "prefill_time_ms": 12324.0,
+      "total_time_ms": 12324.0,
+      "ttft_ms": 2464.8
+    },
+    {
+      "context_length": 4096,
+      "decode_speed_tps": 0.0,
+      "decode_time_ms": 0.0,
+      "iteration": 1,
+      "output_length": 0,
+      "prefill_speed_tps": 317.6917707283022,
+      "prefill_time_ms": 12893.0,
+      "total_time_ms": 12893.0,
+      "ttft_ms": 2578.6000000000004
+    },
+    {
+      "context_length": 4096,
+      "decode_speed_tps": 0.0,
+      "decode_time_ms": 0.0,
+      "iteration": 1,
+      "output_length": 0,
+      "prefill_speed_tps": 317.83968340187783,
+      "prefill_time_ms": 12887.0,
+      "total_time_ms": 12887.0,
+      "ttft_ms": 2577.4
+    },
+    {
+      "context_length": 4096,
+      "decode_speed_tps": 0.0,
+      "decode_time_ms": 0.0,
+      "iteration": 1,
+      "output_length": 0,
+      "prefill_speed_tps": 317.9136914001863,
+      "prefill_time_ms": 12884.0,
+      "total_time_ms": 12884.0,
+      "ttft_ms": 2576.8
+    },
+    {
+      "context_length": 8192,
+      "decode_speed_tps": 0.0,
+      "decode_time_ms": 0.0,
+      "iteration": 1,
+      "output_length": 0,
+      "prefill_speed_tps": 593.6662076962099,
+      "prefill_time_ms": 13799.0,
+      "total_time_ms": 13799.0,
+      "ttft_ms": 2759.8
+    },
+    {
+      "context_length": 8192,
+      "decode_speed_tps": 0.0,
+      "decode_time_ms": 0.0,
+      "iteration": 1,
+      "output_length": 0,
+      "prefill_speed_tps": 592.9357266936885,
+      "prefill_time_ms": 13816.0,
+      "total_time_ms": 13816.0,
+      "ttft_ms": 2763.2000000000003
+    },
+    {
+      "context_length": 8192,
+      "decode_speed_tps": 0.0,
+      "decode_time_ms": 0.0,
+      "iteration": 1,
+      "output_length": 0,
+      "prefill_speed_tps": 593.0215723179383,
+      "prefill_time_ms": 13814.0,
+      "total_time_ms": 13814.0,
+      "ttft_ms": 2762.8
+    }
+  ],
+  "engine": "LMDeploy TurboMind",
+  "gpu_memory_used_gb": 0.03125,
+  "model": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ",
+  "summary": [
+    {
+      "avg_decode_speed_tps": 0.0,
+      "avg_prefill_speed_tps": 83.0876608712354,
+      "avg_total_time_ms": 12324.333333333334,
+      "avg_ttft_ms": 2464.866666666667,
+      "context_length": 1024,
+      "iterations": 3,
+      "max_ttft_ms": 2465.4,
+      "min_ttft_ms": 2464.4,
+      "output_length": 512
+    },
+    {
+      "avg_decode_speed_tps": 0.0,
+      "avg_prefill_speed_tps": 317.8150485101221,
+      "avg_total_time_ms": 12888.0,
+      "avg_ttft_ms": 2577.6,
+      "context_length": 4096,
+      "iterations": 3,
+      "max_ttft_ms": 2578.6000000000004,
+      "min_ttft_ms": 2576.8,
+      "output_length": 512
+    },
+    {
+      "avg_decode_speed_tps": 0.0,
+      "avg_prefill_speed_tps": 593.2078355692789,
+      "avg_total_time_ms": 13809.666666666666,
+      "avg_ttft_ms": 2761.933333333333,
+      "context_length": 8192,
+      "iterations": 3,
+      "max_ttft_ms": 2763.2000000000003,
+      "min_ttft_ms": 2759.8,
+      "output_length": 512
+    }
+  ],
+  "timestamp": "2026-05-18T12:32:45.149505380+00:00"
+}

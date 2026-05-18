@@ -118,10 +118,11 @@ impl PythonBridge {
         );
 
         // Find the bridge script
-        let bridge_script = std::path::PathBuf::from("lmdeploy/turbomind/python_bridge.py");
+        // Look in ../lmdeploy/turbomind/ relative to lmdeploy-rust-server
+        let bridge_script = std::path::PathBuf::from("../lmdeploy/turbomind/python_bridge.py");
         let bridge_script = if !bridge_script.exists() {
             // Try relative to project root
-            std::path::PathBuf::from("./lmdeploy/turbomind/python_bridge.py")
+            std::path::PathBuf::from("../../lmdeploy/turbomind/python_bridge.py")
         } else {
             bridge_script
         };
@@ -212,8 +213,8 @@ impl PythonBridge {
         Ok(response)
     }
 
-    /// Generate tokens from input_ids
-    pub fn generate(&self, input_ids: Vec<u32>, max_new_tokens: usize) -> Result<Vec<u32>> {
+    /// Generate tokens from input_ids, returning (output_ids, elapsed_ms)
+    pub fn generate_with_metrics(&self, input_ids: Vec<u32>, max_new_tokens: usize) -> Result<(Vec<u32>, f64)> {
         let cmd = BridgeCommand::Generate {
             input_ids,
             max_new_tokens,
@@ -223,7 +224,13 @@ impl PythonBridge {
         };
 
         let response = self.send_command(&cmd)?;
-        Ok(response.output_ids)
+        Ok((response.output_ids, response.elapsed_ms as f64))
+    }
+
+    /// Generate tokens from input_ids
+    pub fn generate(&self, input_ids: Vec<u32>, max_new_tokens: usize) -> Result<Vec<u32>> {
+        let (ids, _) = self.generate_with_metrics(input_ids, max_new_tokens)?;
+        Ok(ids)
     }
 
     /// Get schedule metrics
