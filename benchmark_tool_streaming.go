@@ -66,9 +66,9 @@ type OpenAIMessage struct {
 // generatePrompt 生成指定 token 数量的 prompt
 func generatePrompt(targetTokens int) string {
 	baseText := "This is a benchmark test for measuring LLM inference performance. " +
-		"The quick brown fox jumps over the lazy dog. " +
-		"Lorem ipsum dolor sit amet, consectetur adipiscing elit. " +
-		"Please write a detailed explanation about computer science and artificial intelligence. "
+			"The quick brown fox jumps over the lazy dog. " +
+			"Lorem ipsum dolor sit amet, consectetur adipiscing elit. " +
+			"Please write a detailed explanation about computer science and artificial intelligence. "
 
 	estimatedChars := targetTokens * 4
 	repeat := estimatedChars / len(baseText) + 1
@@ -83,7 +83,7 @@ func generatePrompt(targetTokens int) string {
 }
 
 // sendStreamingRequest 发送流式请求并测量时间
-func sendStreamingRequest(client *http.Client, config Config, prompt string, maxTokens int) (*BenchmarkResult, error) {
+func sendStreamingRequest(client *http.Client, config Config, prompt string, maxTokens int, contextSize int) (*BenchmarkResult, error) {
 	reqBody := StreamingRequest{
 		Model:       config.Model,
 		Messages:    []OpenAIMessage{{Role: "user", Content: prompt}},
@@ -123,8 +123,7 @@ func sendStreamingRequest(client *http.Client, config Config, prompt string, max
 	// Process streaming response
 	br := bufio.NewReader(resp.Body)
 	firstTokenTime := time.Time{}
-	tokenCount := 0
-	tokenLatencies := []time.Duration{}
+	var completionTokens int
 
 	for {
 		line, err := br.ReadString('\n')
@@ -149,31 +148,29 @@ func sendStreamingRequest(client *http.Client, config Config, prompt string, max
 			continue
 		}
 
+		// Extract usage.completion_tokens if present (final chunk)
+		if usage, ok := chunk["usage"].(map[string]interface{}); ok {
+			if ct, ok := usage["completion_tokens"].(float64); ok {
+				completionTokens = int(ct)
+			}
+		}
+
 		choices, ok := chunk["choices"].([]interface{})
 		if !ok || len(choices) == 0 {
 			continue
 		}
 
 		choice := choices[0].(map[string]interface{})
-		delta, ok := choice["delta"].(map[string]interface{})
-		if !ok {
+		// Check that delta exists (some responses may have just finish_reason)
+		if _, hasDelta := choice["delta"]; !hasDelta {
 			continue
 		}
 
-		content, ok := delta["content"].(string)
-		if !ok || content == "" {
-			continue
-		}
-
-		tokenCount++
+		// Track first token time
 		if firstTokenTime.IsZero() {
-			firstTokenTime = time.Now()
-		} else {
-			tokenLatencies = append(tokenLatencies, time.Since(firstTokenTime))
 			firstTokenTime = time.Now()
 		}
 	}
-
 	resp.Body.Close()
 	totalDuration := time.Since(start)
 
@@ -182,7 +179,7 @@ func sendStreamingRequest(client *http.Client, config Config, prompt string, max
 		TotalDuration:     totalDuration,
 		PrefillDuration:   time.Duration(0),
 		DecodeDuration:    time.Duration(0),
-		TokensPerSecond:   float64(tokenCount) / totalDuration.Seconds(),
+		TokensPerSecond:   float64(completionTokens) / totalDuration.Seconds(),
 		SuccessCount:      1,
 	}
 
@@ -191,31 +188,12 @@ func sendStreamingRequest(client *http.Client, config Config, prompt string, max
 		result.FirstTokenLatencyMs = float64(result.PrefillDuration.Milliseconds())
 		result.DecodeDuration = totalDuration - result.PrefillDuration
 
-		if tokenCount > 1 && len(tokenLatencies) > 0 {
-			// Calculate average token latency
-			var sum time.Duration
-			for _, lat := range tokenLatencies {
-				sum += lat
-			}
-			result.AvgTokenLatencyMs = float64(sum.Milliseconds()) / float64(len(tokenLatencies))
-
-			// Calculate P99 token latency
-			sort.Slice(tokenLatencies, func(i, j int) bool {
-				return tokenLatencies[i] < tokenLatencies[j]
-			})
-			p99Idx := int(float64(len(tokenLatencies)) * 0.99)
-			if p99Idx < len(tokenLatencies) {
-				result.P99TokenLatencyMs = float64(tokenLatencies[p99Idx].Milliseconds())
-			}
-		}
-
-		// Tokens per second
+		// Use actual completion tokens from usage
 		if result.PrefillDuration > 0 {
-			promptLen := len(prompt)
-			result.PrefillTokensPerSec = float64(promptLen) / result.PrefillDuration.Seconds()
+			result.PrefillTokensPerSec = float64(contextSize) / result.PrefillDuration.Seconds()
 		}
-		if result.DecodeDuration > 0 && tokenCount > 1 {
-			result.decodeTokensPerSec = float64(tokenCount-1) / result.DecodeDuration.Seconds()
+		if result.DecodeDuration > 0 && completionTokens > 0 {
+			result.decodeTokensPerSec = float64(completionTokens) / result.DecodeDuration.Seconds()
 		}
 	}
 
@@ -239,13 +217,16 @@ func runBenchmark(config Config, contextSize, outputLen, concurrency int) Benchm
 	results := make(chan *BenchmarkResult, config.NumRequests)
 	errors := make(chan error, config.NumRequests)
 
+	startTime := time.Now()
+
 	// Worker pool
+	requestsPerWorker := config.NumRequests / concurrency
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for range config.NumRequests / concurrency {
-				resp, err := sendStreamingRequest(client, config, prompt, outputLen)
+			for j := 0; j < requestsPerWorker; j++ {
+				resp, err := sendStreamingRequest(client, config, prompt, outputLen, contextSize)
 				if err != nil {
 					errors <- err
 					results <- nil
@@ -255,8 +236,6 @@ func runBenchmark(config Config, contextSize, outputLen, concurrency int) Benchm
 			}
 		}()
 	}
-
-	startTime := time.Now()
 
 	// Wait for completion
 	wg.Wait()

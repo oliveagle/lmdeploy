@@ -20,6 +20,8 @@
 #include "src/turbomind/models/decoder_layer_weight.h"
 #include "src/turbomind/models/attention_weight.h"
 #include "src/turbomind/models/ffn_weight.h"
+#include "src/turbomind/models/moe_weight.h"
+#include "src/turbomind/models/delta_net_weight.h"
 #include "src/turbomind/models/norm_weight.h"
 #include "src/turbomind/models/linear_weight.h"
 #include "src/turbomind/turbomind.h"
@@ -510,30 +512,54 @@ static HfModelConfig ParseHfConfig(const std::string& model_dir)
 
 namespace {
 
-// Map turbomind::SafetensorsReader::TM_DataType to TM_DataType (C API)
-static TM_DataType ToCApiDtype(turbomind::SafetensorsReader::TM_DataType dt)
+// Map turbomind::DataType to TM_DataType (C API)
+static TM_DataType ToCApiDtype(turbomind::DataType dt)
 {
-    using CppDT = turbomind::SafetensorsReader::TM_DataType;
     switch (dt) {
-        case CppDT::kNull:        return TM_DATATYPE_INVALID;
-        case CppDT::kBool:        return TM_DATATYPE_BOOL;
-        case CppDT::kUint8:       return TM_DATATYPE_UINT8;
-        case CppDT::kUint16:      return TM_DATATYPE_UINT16;
-        case CppDT::kUint32:      return TM_DATATYPE_UINT32;
-        case CppDT::kUint64:      return TM_DATATYPE_UINT64;
-        case CppDT::kInt8:        return TM_DATATYPE_INT8;
-        case CppDT::kInt16:       return TM_DATATYPE_INT16;
-        case CppDT::kInt32:       return TM_DATATYPE_INT32;
-        case CppDT::kInt64:       return TM_DATATYPE_INT64;
-        case CppDT::kFloat16:     return TM_DATATYPE_FP16;
-        case CppDT::kFloat32:     return TM_DATATYPE_FP32;
-        case CppDT::kFloat64:     return TM_DATATYPE_FP64;
-        case CppDT::kBfloat16:    return TM_DATATYPE_BF16;
-        case CppDT::kFloat8_e4m3: return TM_DATATYPE_FP8_E4M3;
-        case CppDT::kFloat4_e2m1: return TM_DATATYPE_FP4_E2M1;
-        case CppDT::kUint4:       return TM_DATATYPE_UINT4;
-        default:                  return TM_DATATYPE_INVALID;
+        case turbomind::DataType::kNull:        return TM_DATATYPE_INVALID;
+        case turbomind::DataType::kBool:        return TM_DATATYPE_BOOL;
+        case turbomind::DataType::kUint8:       return TM_DATATYPE_UINT8;
+        case turbomind::DataType::kUint16:      return TM_DATATYPE_UINT16;
+        case turbomind::DataType::kUint32:      return TM_DATATYPE_UINT32;
+        case turbomind::DataType::kUint64:      return TM_DATATYPE_UINT64;
+        case turbomind::DataType::kInt8:        return TM_DATATYPE_INT8;
+        case turbomind::DataType::kInt16:       return TM_DATATYPE_INT16;
+        case turbomind::DataType::kInt32:       return TM_DATATYPE_INT32;
+        case turbomind::DataType::kInt64:       return TM_DATATYPE_INT64;
+        case turbomind::DataType::kFloat16:     return TM_DATATYPE_FP16;
+        case turbomind::DataType::kFloat32:     return TM_DATATYPE_FP32;
+        case turbomind::DataType::kFloat64:     return TM_DATATYPE_FP64;
+        case turbomind::DataType::kBfloat16:    return TM_DATATYPE_BF16;
+        case turbomind::DataType::kFloat8_e4m3: return TM_DATATYPE_FP8_E4M3;
+        case turbomind::DataType::kFloat4_e2m1: return TM_DATATYPE_FP4_E2M1;
+        case turbomind::DataType::kUint4:       return TM_DATATYPE_UINT4;
+        default:                                return TM_DATATYPE_INVALID;
     }
+}
+
+/// Create a LinearConfig appropriate for AWQ 4-bit quantized weights.
+/// When AWQ is enabled, weight dtype is kUint4 (4-bit packed), scales/zeros use model activation dtype.
+/// For non-AWQ, uses plain row-major format with activation dtype.
+static turbomind::core::LinearConfig CreateAwqLinearConfig(
+    int input_dim,
+    int output_dim,
+    turbomind::DataType data_type,
+    bool is_awq,
+    int awq_group_size)
+{
+    turbomind::core::LinearConfig cfg;
+    cfg.input_dim = input_dim;
+    cfg.output_dim = output_dim;
+    cfg.data_type = data_type;
+    cfg.has_bias = false;
+
+    if (is_awq) {
+        cfg.format = turbomind::ResolveLinearWeightFormat(data_type, turbomind::kUint4, awq_group_size, 1);
+    } else {
+        cfg.format = turbomind::DataFormat{};
+    }
+
+    return cfg;
 }
 
 }  // anonymous namespace
@@ -824,7 +850,7 @@ static void LoadWeightsFromSafetensors(
                     shape64.push_back(static_cast<int64_t>(dim));
                 }
 
-                turbomind::DataType tm_dtype = FromCDataType(ToCApiDtype(meta->dtype));
+                turbomind::DataType tm_dtype = meta->dtype;
 
                 param.alloc(meta->shape, tm_dtype);
 
@@ -929,6 +955,20 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     size_t down_proj_pos = result.find(".down_proj.");
     if (down_proj_pos != std::string::npos) {
         result.replace(down_proj_pos, 11, ".w2.");
+    }
+
+    // AWQ quantization parameters
+    // weight_scale -> scales, weight_zero -> zeros
+    size_t scale_pos = result.find(".weight_scale");
+    while (scale_pos != std::string::npos) {
+        result.replace(scale_pos, 13, ".scales");
+        scale_pos = result.find(".weight_scale");
+    }
+
+    size_t zero_pos = result.find(".weight_zero");
+    while (zero_pos != std::string::npos) {
+        result.replace(zero_pos, 12, ".zeros");
+        zero_pos = result.find(".weight_zero");
     }
 
     // Embeddings
@@ -1060,12 +1100,9 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
         }
 
         // 3. Create and add output child (LinearWeight)
-        turbomind::core::LinearConfig output_cfg;
-        output_cfg.input_dim = hf_config.hidden_size;
-        output_cfg.output_dim = hf_config.vocab_size;
-        output_cfg.data_type = weight_cfg.data_type;
-        output_cfg.format = turbomind::DataFormat{};  // Default = plain row-major
-        output_cfg.has_bias = false;
+        auto output_cfg = CreateAwqLinearConfig(
+            hf_config.hidden_size, hf_config.vocab_size,
+            weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
         auto output_module = turbomind::core::Module::create(output_cfg);
         if (output_module) {
             model_weight->add_child("output", std::move(output_module));
@@ -1110,7 +1147,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
                 decoder_layer->add_child("ffn_norm", std::move(ffn_norm_module));
             }
 
-            // 4c. Create attention (AttentionWeight)
+            // 4c. Create attention (AttentionWeight) with its child modules
             turbomind::core::AttentionConfig attn_cfg;
             attn_cfg.hidden_dim = hf_config.hidden_size;
             attn_cfg.head_dim = head_dim;
@@ -1130,10 +1167,48 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             attn_cfg.rope = turbomind::core::RopeConfig{};
             auto attn_module = turbomind::core::Module::create(attn_cfg);
             if (attn_module) {
+                auto* attn = static_cast<turbomind::AttentionWeight*>(attn_module.get());
+
+                // Create q_proj LinearWeight child
+                auto q_proj_cfg = CreateAwqLinearConfig(
+                    hf_config.hidden_size, hf_config.num_attention_heads * head_dim,
+                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                auto q_proj_module = turbomind::core::Module::create(q_proj_cfg);
+                if (q_proj_module) {
+                    attn->add_child("q_proj", std::move(q_proj_module));
+                }
+
+                // Create k_proj LinearWeight child
+                auto k_proj_cfg = CreateAwqLinearConfig(
+                    hf_config.hidden_size, hf_config.num_key_value_heads * head_dim,
+                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                auto k_proj_module = turbomind::core::Module::create(k_proj_cfg);
+                if (k_proj_module) {
+                    attn->add_child("k_proj", std::move(k_proj_module));
+                }
+
+                // Create v_proj LinearWeight child
+                auto v_proj_cfg = CreateAwqLinearConfig(
+                    hf_config.hidden_size, hf_config.num_key_value_heads * head_dim,
+                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                auto v_proj_module = turbomind::core::Module::create(v_proj_cfg);
+                if (v_proj_module) {
+                    attn->add_child("v_proj", std::move(v_proj_module));
+                }
+
+                // Create wo LinearWeight child
+                auto wo_cfg = CreateAwqLinearConfig(
+                    hf_config.num_attention_heads * head_dim, hf_config.hidden_size,
+                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                auto wo_module = turbomind::core::Module::create(wo_cfg);
+                if (wo_module) {
+                    attn->add_child("wo", std::move(wo_module));
+                }
+
                 decoder_layer->add_child("attention", std::move(attn_module));
             }
 
-            // 4d. Create feed_forward (FfnWeight)
+            // 4d. Create feed_forward (FfnWeight) with its child modules
             turbomind::core::FfnConfig ffn_cfg;
             ffn_cfg.hidden_dim = hf_config.hidden_size;
             ffn_cfg.inter_size = hf_config.intermediate_size;
@@ -1145,32 +1220,169 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             ffn_cfg.tp_rank = 0;
             auto ffn_module = turbomind::core::Module::create(ffn_cfg);
             if (ffn_module) {
+                auto* ffn = static_cast<turbomind::FfnWeight*>(ffn_module.get());
+
+                // Create w1 LinearWeight child (gate_proj)
+                auto w1_cfg = CreateAwqLinearConfig(
+                    hf_config.hidden_size, hf_config.intermediate_size,
+                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                auto w1_module = turbomind::core::Module::create(w1_cfg);
+                if (w1_module) {
+                    ffn->add_child("w1", std::move(w1_module));
+                }
+
+                // Create w3 LinearWeight child (up_proj)
+                auto w3_cfg = CreateAwqLinearConfig(
+                    hf_config.hidden_size, hf_config.intermediate_size,
+                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                auto w3_module = turbomind::core::Module::create(w3_cfg);
+                if (w3_module) {
+                    ffn->add_child("w3", std::move(w3_module));
+                }
+
+                // Create w2 LinearWeight child (down_proj)
+                auto w2_cfg = CreateAwqLinearConfig(
+                    hf_config.intermediate_size, hf_config.hidden_size,
+                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                auto w2_module = turbomind::core::Module::create(w2_cfg);
+                if (w2_module) {
+                    ffn->add_child("w2", std::move(w2_module));
+                }
+
                 decoder_layer->add_child("feed_forward", std::move(ffn_module));
             }
 
-            // 4e. Create moe_ffn (MoeWeight) if this is a MoE model
+            // 4e. Create moe_ffn (MoeWeight) with its child modules if this is a MoE model
             if (hf_config.num_local_experts > 0) {
                 turbomind::core::MoeConfig moe_cfg;
-                moe_cfg.hidden_dim = hf_config.hidden_size;
-                moe_cfg.inter_size = hf_config.intermediate_size;
-                moe_cfg.num_experts = hf_config.num_local_experts;
-                moe_cfg.num_experts_per_tok = hf_config.num_experts_per_tok;
+                moe_cfg.expert_num = hf_config.num_local_experts;
+                moe_cfg.experts_per_token = hf_config.num_experts_per_tok;
+                moe_cfg.act_type = 0;  // SiLU
+                moe_cfg.fuse_silu = true;
+                moe_cfg.norm_topk_prob = true;
+                moe_cfg.topk_method = "greedy";
+                moe_cfg.scoring_func = "softmax";
+                moe_cfg.topk_group = 0;
+                moe_cfg.n_group = 0;
+                moe_cfg.router_n_groups = 1;
+                moe_cfg.routed_scale = 1.0;
                 moe_cfg.data_type = weight_cfg.data_type;
-                moe_cfg.tp_size = 1;
-                moe_cfg.tp_rank = 0;
                 auto moe_module = turbomind::core::Module::create(moe_cfg);
                 if (moe_module) {
+                    auto* moe = static_cast<turbomind::MoeWeight*>(moe_module.get());
+
+                    // Create gate LinearWeight child
+                    auto gate_cfg = CreateAwqLinearConfig(
+                        hf_config.hidden_size, hf_config.num_local_experts,
+                        weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                    auto gate_module = turbomind::core::Module::create(gate_cfg);
+                    if (gate_module) {
+                        moe->add_child("gate", std::move(gate_module));
+                    }
+
+                    // Create experts ModuleList child
+                    turbomind::core::ModuleListConfig experts_cfg;
+                    auto experts_list_unique = turbomind::core::Module::create(experts_cfg);
+                    auto* experts_list = static_cast<turbomind::core::ModuleList*>(experts_list_unique.get());
+
+                    // Create each expert FfnWeight
+                    for (int expert_idx = 0; expert_idx < hf_config.num_local_experts; ++expert_idx) {
+                        turbomind::core::FfnConfig expert_ffn_cfg;
+                        expert_ffn_cfg.hidden_dim = hf_config.hidden_size;
+                        expert_ffn_cfg.inter_size = hf_config.intermediate_size;
+                        expert_ffn_cfg.act_type = 0;  // SiLU
+                        expert_ffn_cfg.fuse_silu = true;
+                        expert_ffn_cfg.is_expert = true;
+                        expert_ffn_cfg.data_type = weight_cfg.data_type;
+                        expert_ffn_cfg.tp_size = 1;
+                        expert_ffn_cfg.tp_rank = 0;
+                        auto expert_ffn_module = turbomind::core::Module::create(expert_ffn_cfg);
+                        if (expert_ffn_module) {
+                            auto* expert_ffn = static_cast<turbomind::FfnWeight*>(expert_ffn_module.get());
+
+                            // Create w1 LinearWeight child for expert
+                            auto expert_w1_cfg = CreateAwqLinearConfig(
+                                hf_config.hidden_size, hf_config.intermediate_size,
+                                weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                            auto expert_w1_module = turbomind::core::Module::create(expert_w1_cfg);
+                            if (expert_w1_module) {
+                                expert_ffn->add_child("w1", std::move(expert_w1_module));
+                            }
+
+                            // Create w3 LinearWeight child for expert
+                            auto expert_w3_cfg = CreateAwqLinearConfig(
+                                hf_config.hidden_size, hf_config.intermediate_size,
+                                weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                            auto expert_w3_module = turbomind::core::Module::create(expert_w3_cfg);
+                            if (expert_w3_module) {
+                                expert_ffn->add_child("w3", std::move(expert_w3_module));
+                            }
+
+                            // Create w2 LinearWeight child for expert
+                            auto expert_w2_cfg = CreateAwqLinearConfig(
+                                hf_config.intermediate_size, hf_config.hidden_size,
+                                weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                            auto expert_w2_module = turbomind::core::Module::create(expert_w2_cfg);
+                            if (expert_w2_module) {
+                                expert_ffn->add_child("w2", std::move(expert_w2_module));
+                            }
+
+                            // Add expert to experts ModuleList
+                            experts_list->add_child(std::to_string(expert_idx), std::move(expert_ffn_module));
+                        }
+                    }
+
+                    // Add experts to MoeWeight
+                    moe->add_child("experts", std::move(experts_list_unique));
+
                     decoder_layer->add_child("moe_ffn", std::move(moe_module));
                 }
             }
 
-            // 4f. Create linear_attn (DeltaNetWeight) if this model has linear attention
+            // 4f. Create linear_attn (DeltaNetWeight) with its child modules if this model has linear attention
             if (hf_config.use_linear_attn) {
                 turbomind::core::DeltaNetConfig delta_cfg;
                 delta_cfg.hidden_dim = hf_config.hidden_size;
+                delta_cfg.num_k_heads = hf_config.num_attention_heads;
+                delta_cfg.num_v_heads = hf_config.num_key_value_heads;
+                delta_cfg.key_head_dim = head_dim;
+                delta_cfg.value_head_dim = head_dim;
+                delta_cfg.d_conv = 4;
                 delta_cfg.data_type = weight_cfg.data_type;
+                delta_cfg.tp_size = 1;
+                delta_cfg.tp_rank = 0;
                 auto delta_module = turbomind::core::Module::create(delta_cfg);
                 if (delta_module) {
+                    auto* delta = static_cast<turbomind::DeltaNetWeight*>(delta_module.get());
+
+                    // Create in_proj_all LinearWeight child
+                    auto in_proj_cfg = CreateAwqLinearConfig(
+                        hf_config.hidden_size, 3 * hf_config.hidden_size,
+                        weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                    auto in_proj_module = turbomind::core::Module::create(in_proj_cfg);
+                    if (in_proj_module) {
+                        delta->add_child("in_proj_all", std::move(in_proj_module));
+                    }
+
+                    // Create out_proj LinearWeight child
+                    auto out_proj_cfg = CreateAwqLinearConfig(
+                        hf_config.hidden_size, hf_config.hidden_size,
+                        weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                    auto out_proj_module = turbomind::core::Module::create(out_proj_cfg);
+                    if (out_proj_module) {
+                        delta->add_child("out_proj", std::move(out_proj_module));
+                    }
+
+                    // Create norm NormWeight child
+                    turbomind::core::NormConfig delta_norm_cfg;
+                    delta_norm_cfg.dim = hf_config.hidden_size;
+                    delta_norm_cfg.data_type = weight_cfg.data_type;
+                    delta_norm_cfg.norm_eps = 1e-6f;
+                    auto delta_norm_module = turbomind::core::Module::create(delta_norm_cfg);
+                    if (delta_norm_module) {
+                        delta->add_child("norm", std::move(delta_norm_module));
+                    }
+
                     decoder_layer->add_child("linear_attn", std::move(delta_module));
                 }
             }

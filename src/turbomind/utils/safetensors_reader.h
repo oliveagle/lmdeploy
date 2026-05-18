@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include "src/turbomind/core/data_type.h"
+
 namespace turbomind {
 
 /// Safetensors file reader (header-only implementation)
@@ -29,27 +31,7 @@ public:
         std::vector<size_t> shape;
         size_t offset;       // Offset within the binary blob
         size_t size;         // Size in bytes
-        TM_DataType dtype;   // TurboMind data type
-    };
-
-    enum class TM_DataType {
-        kNull = 0,
-        kBool = 1,
-        kUint8 = 2,
-        kUint16 = 3,
-        kUint32 = 4,
-        kUint64 = 5,
-        kInt8 = 6,
-        kInt16 = 7,
-        kInt32 = 8,
-        kInt64 = 9,
-        kFloat16 = 10,
-        kFloat32 = 11,
-        kFloat64 = 12,
-        kBfloat16 = 13,
-        kFloat8_e4m3 = 14,
-        kFloat4_e2m1 = 15,
-        kUint4 = 16,
+        DataType dtype;      // TurboMind data type
     };
 
     /// Open a safetensors file and parse the header
@@ -393,30 +375,30 @@ private:
         }
     }
 
-    /// Parse dtype string to TM_DataType
-    static TM_DataType ParseDtype(const std::string& dtype)
+    /// Parse dtype string to DataType
+    static DataType ParseDtype(const std::string& dtype)
     {
-        if (dtype == "F32" || dtype == "fp32") return TM_DataType::kFloat32;
-        if (dtype == "F16" || dtype == "fp16") return TM_DataType::kFloat16;
-        if (dtype == "BF16" || dtype == "bf16") return TM_DataType::kBfloat16;
-        if (dtype == "I64" || dtype == "i64") return TM_DataType::kInt64;
-        if (dtype == "I32" || dtype == "i32") return TM_DataType::kInt32;
-        if (dtype == "I16" || dtype == "i16") return TM_DataType::kInt16;
-        if (dtype == "I8" || dtype == "i8") return TM_DataType::kInt8;
-        if (dtype == "U64" || dtype == "u64") return TM_DataType::kUint64;
-        if (dtype == "U32" || dtype == "u32") return TM_DataType::kUint32;
-        if (dtype == "U16" || dtype == "u16") return TM_DataType::kUint16;
-        if (dtype == "U8" || dtype == "u8") return TM_DataType::kUint8;
-        if (dtype == "F64" || dtype == "fp64") return TM_DataType::kFloat64;
-        if (dtype == "BOOL" || dtype == "bool") return TM_DataType::kBool;
+        if (dtype == "F32" || dtype == "fp32") return DataType::kFloat32;
+        if (dtype == "F16" || dtype == "fp16") return DataType::kFloat16;
+        if (dtype == "BF16" || dtype == "bf16") return DataType::kBfloat16;
+        if (dtype == "I64" || dtype == "i64") return DataType::kInt64;
+        if (dtype == "I32" || dtype == "i32") return DataType::kInt32;
+        if (dtype == "I16" || dtype == "i16") return DataType::kInt16;
+        if (dtype == "I8" || dtype == "i8") return DataType::kInt8;
+        if (dtype == "U64" || dtype == "u64") return DataType::kUint64;
+        if (dtype == "U32" || dtype == "u32") return DataType::kUint32;
+        if (dtype == "U16" || dtype == "u16") return DataType::kUint16;
+        if (dtype == "U8" || dtype == "u8") return DataType::kUint8;
+        if (dtype == "F64" || dtype == "fp64") return DataType::kFloat64;
+        if (dtype == "BOOL" || dtype == "bool") return DataType::kBool;
         // Default to FP32 for unknown types
-        return TM_DataType::kFloat32;
+        return DataType::kFloat32;
     }
 
-    std::ifstream stream_;
-    size_t file_size_ = 0;
-    size_t header_size_ = 0;
-    std::vector<TensorMeta> metas_;
+    mutable std::ifstream stream_;
+    mutable size_t file_size_ = 0;
+    mutable size_t header_size_ = 0;
+    mutable std::vector<TensorMeta> metas_;
 };
 
 }  // namespace turbomind

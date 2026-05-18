@@ -7,6 +7,37 @@ after each iteration and it's included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
+### C++ 层 ModuleTree 子模块构建模式
+
+**问题**: C API `InitFromPath()` 创建父模块但未创建子模块，导致 `LoadWeightsFromSafetensors` 无法通过 `child()` 导航找到权重参数。
+
+**解决方案**: 在 `InitFromPath()` 中为每个父模块创建其 LinearWeight 和 NormWeight 子模块。
+
+**关键实现**:
+```cpp
+// 创建 AttentionWeight 后，立即创建其 LinearWeight 子模块
+auto attn_module = turbomind::core::Module::create(attn_cfg);
+if (attn_module) {
+    auto* attn = static_cast<turbomind::AttentionWeight*>(attn_module.get());
+
+    // 创建 q_proj 子模块
+    turbomind::core::LinearConfig q_proj_cfg;
+    q_proj_cfg.input_dim = hidden_size;
+    q_proj_cfg.output_dim = num_heads * head_dim;
+    q_proj_cfg.data_type = weight_cfg.data_type;
+    auto q_proj_module = turbomind::core::Module::create(q_proj_cfg);
+    attn->add_child("q_proj", std::move(q_proj_module));
+
+    // 同样方式创建 k_proj, v_proj, wo
+}
+```
+
+**子模块结构**:
+- `AttentionWeight`: q_proj, k_proj, v_proj, wo (LinearWeight)
+- `FfnWeight`: w1, w2, w3 (LinearWeight)
+- `MoeWeight`: gate (LinearWeight), experts (ModuleList of FfnWeight)
+- `DeltaNetWeight`: in_proj_all, out_proj (LinearWeight), norm (NormWeight)
+
 ### SafetensorsReader Header-Only Pattern
 
 **问题**: 需要在 C++ 层读取 HuggingFace safetensors 格式文件，原有实现在 turbomind_c.cc 中是简单的内联实现。
@@ -42,7 +73,9 @@ if (meta) {
 std::vector<uint8_t> data = reader.read_tensor("layer.weight");
 ```
 
-**C API 适配**: 通过 `ToCApiDtype()` 函数将内部 `TM_DataType` 转换为 C API 版本。
+**C API 适配**: 通过 `ToCApiDtype()` 函数将内部 `DataType` 转换为 C API 版本。
+
+**类型冲突修复**: SafetensorsReader 原本定义了内部 `TM_DataType`，与 C API 的 `TM_DataType` 冲突。修复方案是直接使用 `turbomind::DataType`，移除内部枚举定义。
 
 ### HfConfigParser JSON Library Pattern
 
@@ -238,8 +271,25 @@ ModelWeight
 
 ---
 
+## 2026-05-19 - lmdeploy-82u
+- **Implemented**: 在 C++ 层构建完整 ModelWeight 层级结构
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.cc` - 在 InitFromPath 中创建所有子模块
+  - `src/turbomind/utils/safetensors_reader.h` - 修复类型冲突，使用 turbomind::DataType
+- **Learnings**:
+  - AttentionWeight 需要 LinearWeight 子模块 (q_proj, k_proj, v_proj, wo) 才能加载权重
+  - FfnWeight 需要 LinearWeight 子模块 (w1, w2, w3) 才能加载权重
+  - MoeWeight 需要 gate LinearWeight 和 experts ModuleList (FfnWeight 列表)
+  - DeltaNetWeight 需要 in_proj_all, out_proj LinearWeight 和 norm NormWeight
+  - SafetensorsReader 原本定义内部 TM_DataType 枚举，与 C API TM_DataType 冲突
+  - 修复方案：移除 SafetensorsReader 的内部枚举，直接使用 turbomind::DataType
+  - stream_ 成员需要 mutable 才能在 const 方法中调用 seekg/read
+  - LoadWeightsFromSafetensors 使用 current->child(name) 导航模块树
+  - 子模块创建必须在父模块 add_child 之前完成（因为 unique_ptr 转移所有权）
 
-## 2026-05-19 - lmdeploy-uq0
+---
+
+## 2026-05-19 - lmdeploy-6l2
 - **Implemented**: 在 C++ 层实现 HuggingFace config.json 解析器
 - **Files changed**:
   - `src/turbomind/utils/hf_config_parser.h` - 新增 header-only JSON 解析器
@@ -272,3 +322,17 @@ ModelWeight
 
 ---
 
+## 2026-05-19 - lmdeploy-sw3
+- **Implemented**: C++ 层支持 AWQ 4-bit 量化权重加载
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.cc` - 添加 `CreateAwqLinearConfig()` 辅助函数，所有 LinearWeight 创建使用 AWQ-aware format
+- **Learnings**:
+  - `ResolveLinearWeightFormat(data_type, kUint4, group_size, 1)` 创建 AWQ 量化格式
+  - AWQ 格式: `dtype=kUint4`, `block_sizes={group_size, 1}`, `scales.dtype=data_type`, `zeros.dtype=data_type`
+  - `LinearConfig.format` 控制量化格式，空格式表示无量化
+  - `LinearWeight::prepare()` 在 `kUint4` 格式时会自动调用 `extend_to_u16()` 和 pack converter
+  - AWQ 权重映射: `weight_scale` → `scales`, `weight_zero` → `zeros`
+  - `LinearWeight` 有三个 param: `weight`, `scales`, `zeros`
+  - scales 和 zeros 在 `prepare()` 中会被 `fuse_scales_and_zeros()` 合并
+
+---
