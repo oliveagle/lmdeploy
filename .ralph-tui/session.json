@@ -3,10 +3,10 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-18T16:41:33.064Z",
-  "currentIteration": 3,
+  "updatedAt": "2026-05-18T16:48:19.718Z",
+  "currentIteration": 4,
   "maxIterations": 50,
-  "tasksCompleted": 2,
+  "tasksCompleted": 3,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -196,6 +196,16 @@
       "durationMs": 993224,
       "startedAt": "2026-05-18T16:01:30.045Z",
       "endedAt": "2026-05-18T16:18:03.269Z"
+    },
+    {
+      "iteration": 4,
+      "status": "completed",
+      "taskId": "lmdeploy-72b",
+      "taskTitle": "Rust Server 纯 C++ 推理 (无 Python 依赖)",
+      "taskCompleted": true,
+      "durationMs": 1400573,
+      "startedAt": "2026-05-18T16:18:12.476Z",
+      "endedAt": "2026-05-18T16:41:33.049Z"
     }
   ],
   "skippedTaskIds": [],

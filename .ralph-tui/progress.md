@@ -159,3 +159,21 @@ ModelWeight
 
 ---
 
+## 2026-05-19 - lmdeploy-pld
+- **Implemented**: 分析 C API InitFromPath 限制，找出 HF 加载障碍
+- **Files changed**:
+  - `ANALYSIS_INITFROMPATH_LIMITS_20260519.md` - 创建详细分析报告
+- **Learnings**:
+  - C API InitFromPath 已实现基础模块树构建，但缺少关键子模块
+  - AttentionWeight 需要 LinearWeight 子模块 (w_qkv, wo, q_proj, k_proj, v_proj)
+  - FfnWeight 需要 LinearWeight 子模块 (w1, w3, w2, w1w3)
+  - QKV 融合未实现：HF 有分离的 q/k/v_proj，TM 使用 fused w_qkv
+  - AWQ 量化处理不完整：INT4 → FP16 反量化缺失
+  - DeltaNet/MoE 支持缺失：Qwen3.6-35B-A3B 需要 linear_attn 子模块
+  - 嵌套 config 支持缺失：Qwen3.5 MoE 的 text_config 未解析
+  - Python Builder 模式 vs C API：Python 使用 `_tm.create_module()` + `add_child_raw()`，C API 只实现单层
+  - 当前 LoadWeightsFromSafetensors() 只做 memcpy，无权重格式转换
+  - 关键方法缺失：权重融合逻辑、AWQ 反量化、子模块绑定
+
+---
+
