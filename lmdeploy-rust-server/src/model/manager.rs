@@ -5,21 +5,102 @@
 //! - Model routing (multiple models support)
 //! - Hot loading via API
 //! - Model loading progress tracking
-//!
-//! NOTE: The underlying engine is a mock implementation. Model loading/unloading
-//! is simulated with delays. Real TurboMind engine integration is pending.
+//! - Engine type selection (PythonBridge or Pure C++)
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::error::{AppError, Result};
+use crate::model::cpp_engine::{EngineType, TurboMindCEngine};
 use crate::model::engine::{ModelState, ModelInfo, TurboMindEngine};
+
+/// Unified engine enum supporting both PythonBridge and C++ engines
+pub enum ModelEngine {
+    /// Python Bridge engine (compatibility mode)
+    PythonBridge(TurboMindEngine),
+    /// Pure C++ engine (no Python dependency)
+    PureCpp(TurboMindCEngine),
+}
+
+impl ModelEngine {
+    pub fn engine_type(&self) -> EngineType {
+        match self {
+            ModelEngine::PythonBridge(_) => EngineType::PythonBridge,
+            ModelEngine::PureCpp(_) => EngineType::PureCpp,
+        }
+    }
+
+    pub async fn generate(&self, prompt: &str, max_tokens: usize) -> String {
+        match self {
+            ModelEngine::PythonBridge(e) => e.generate(prompt, max_tokens).await,
+            ModelEngine::PureCpp(e) => e.generate(prompt, max_tokens).await,
+        }
+    }
+
+    pub async fn generate_with_metrics(&self, prompt: &str, max_tokens: usize) -> (String, usize, f64) {
+        match self {
+            ModelEngine::PythonBridge(e) => e.generate_with_metrics(prompt, max_tokens).await,
+            ModelEngine::PureCpp(e) => e.generate_with_metrics(prompt, max_tokens).await,
+        }
+    }
+
+    pub async fn generate_stream(&self, prompt: &str) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+        match self {
+            ModelEngine::PythonBridge(e) => e.generate_stream(prompt).await,
+            ModelEngine::PureCpp(e) => e.generate_stream(prompt).await,
+        }
+    }
+
+    pub async fn embed(&self, text: &str, dimensions: Option<usize>) -> Vec<f32> {
+        match self {
+            ModelEngine::PythonBridge(e) => e.embed(text, dimensions).await,
+            ModelEngine::PureCpp(e) => e.embed(text, dimensions).await,
+        }
+    }
+
+    pub async fn reload(&mut self, new_model_path: &str) -> Result<()> {
+        match self {
+            ModelEngine::PythonBridge(e) => e.reload(new_model_path).await,
+            ModelEngine::PureCpp(e) => e.reload(new_model_path).await,
+        }
+    }
+
+    pub fn info(&self) -> ModelInfo {
+        match self {
+            ModelEngine::PythonBridge(e) => {
+                let info = e.info();
+                ModelInfo {
+                    name: info.name,
+                    path: info.path,
+                    state: info.state,
+                    loaded_at: info.loaded_at,
+                }
+            }
+            ModelEngine::PureCpp(e) => {
+                let info = e.info();
+                // Convert cpp_engine::ModelState to engine::ModelState
+                let state = match info.state {
+                    crate::model::cpp_engine::ModelState::Unloaded => ModelState::Unloaded,
+                    crate::model::cpp_engine::ModelState::Loading => ModelState::Loading,
+                    crate::model::cpp_engine::ModelState::Ready => ModelState::Ready,
+                    crate::model::cpp_engine::ModelState::Failed(msg) => ModelState::Failed(msg),
+                };
+                ModelInfo {
+                    name: info.name,
+                    path: info.path,
+                    state,
+                    loaded_at: info.loaded_at,
+                }
+            }
+        }
+    }
+}
 
 /// Model Manager - manages multiple model instances
 pub struct ModelManager {
     /// Map of model name -> engine instance
-    models: HashMap<String, Arc<RwLock<TurboMindEngine>>>,
+    models: HashMap<String, Arc<RwLock<ModelEngine>>>,
     /// Default model name (used when no model specified)
     default_model: String,
 }
@@ -34,25 +115,45 @@ impl ModelManager {
     }
 
     /// Create a new ModelManager with a default model loaded
-    pub async fn with_default_model(model_path: &str) -> Result<Self> {
+    /// Uses the specified engine type (PythonBridge or PureCpp)
+    pub async fn with_default_model_and_type(model_path: &str, engine_type: EngineType) -> Result<Self> {
         let mut manager = Self::new();
-        let engine = TurboMindEngine::new(model_path).await?;
-        let model_name = engine.model_name.clone();
+        let model_engine = match engine_type {
+            EngineType::PythonBridge => {
+                let python_engine = TurboMindEngine::new(model_path).await?;
+                ModelEngine::PythonBridge(python_engine)
+            }
+            EngineType::PureCpp => {
+                let cpp_engine = TurboMindCEngine::new(model_path).await?;
+                ModelEngine::PureCpp(cpp_engine)
+            }
+        };
+
+        let model_name = match &model_engine {
+            ModelEngine::PythonBridge(e) => e.model_name.clone(),
+            ModelEngine::PureCpp(e) => e.model_name.clone(),
+        };
 
         tracing::info!(
             model_name = %model_name,
             model_path = %model_path,
+            engine_type = %engine_type.as_str(),
             "Loaded default model"
         );
 
-        manager.models.insert(model_name.clone(), Arc::new(RwLock::new(engine)));
+        manager.models.insert(model_name.clone(), Arc::new(RwLock::new(model_engine)));
         manager.default_model = model_name;
 
         Ok(manager)
     }
 
-    /// Load a new model
-    pub async fn load_model(&mut self, model_name: &str, model_path: &str) -> Result<()> {
+    /// Backward compatibility: Create with PythonBridge engine
+    pub async fn with_default_model(model_path: &str) -> Result<Self> {
+        Self::with_default_model_and_type(model_path, EngineType::PythonBridge).await
+    }
+
+    /// Load a new model with specified engine type
+    pub async fn load_model_with_type(&mut self, model_name: &str, model_path: &str, engine_type: EngineType) -> Result<()> {
         if self.models.contains_key(model_name) {
             return Err(AppError::ModelAlreadyLoaded(model_name.to_string()));
         }
@@ -60,14 +161,29 @@ impl ModelManager {
         tracing::info!(
             model_name = %model_name,
             model_path = %model_path,
+            engine_type = %engine_type.as_str(),
             "Loading new model"
         );
 
-        let engine = TurboMindEngine::new(model_path).await?;
-        self.models.insert(model_name.to_string(), Arc::new(RwLock::new(engine)));
+        let model_engine = match engine_type {
+            EngineType::PythonBridge => {
+                let python_engine = TurboMindEngine::new(model_path).await?;
+                ModelEngine::PythonBridge(python_engine)
+            }
+            EngineType::PureCpp => {
+                let cpp_engine = TurboMindCEngine::new(model_path).await?;
+                ModelEngine::PureCpp(cpp_engine)
+            }
+        };
 
+        self.models.insert(model_name.to_string(), Arc::new(RwLock::new(model_engine)));
         tracing::info!(model_name = %model_name, "Model loaded successfully");
         Ok(())
+    }
+
+    /// Backward compatibility: Load model with PythonBridge
+    pub async fn load_model(&mut self, model_name: &str, model_path: &str) -> Result<()> {
+        self.load_model_with_type(model_name, model_path, EngineType::PythonBridge).await
     }
 
     /// Unload a model (release memory)
@@ -91,7 +207,8 @@ impl ModelManager {
             .get(model_name)
             .ok_or_else(|| AppError::ModelNotFound(model_name.to_string()))?;
 
-        engine.write().await.reload(new_path).await?;
+        let mut eng = engine.write().await;
+        eng.reload(new_path).await?;
 
         tracing::info!(
             model_name = %model_name,
@@ -102,7 +219,7 @@ impl ModelManager {
     }
 
     /// Get a model by name (or default if not specified)
-    pub fn get_model(&self, model_name: Option<&str>) -> Option<Arc<RwLock<TurboMindEngine>>> {
+    pub fn get_model(&self, model_name: Option<&str>) -> Option<Arc<RwLock<ModelEngine>>> {
         let name = model_name.unwrap_or(&self.default_model);
         // Try exact match first
         if let Some(engine) = self.models.get(name) {
@@ -129,9 +246,34 @@ impl ModelManager {
     /// List all loaded models
     pub async fn list_models(&self) -> Vec<ModelInfo> {
         let mut infos = Vec::new();
-        for engine in self.models.values() {
+        for (name, engine) in self.models.iter() {
             let eng = engine.read().await;
-            infos.push(eng.info());
+            let info = match &*eng {
+                ModelEngine::PythonBridge(e) => {
+                    let i = e.info();
+                    ModelInfo {
+                        name: name.clone(),
+                        path: i.path,
+                        state: i.state,
+                        loaded_at: i.loaded_at,
+                    }
+                }
+                ModelEngine::PureCpp(e) => {
+                    let i = e.info();
+                    ModelInfo {
+                        name: name.clone(),
+                        path: i.path,
+                        state: match i.state {
+                            crate::model::cpp_engine::ModelState::Unloaded => ModelState::Unloaded,
+                            crate::model::cpp_engine::ModelState::Loading => ModelState::Loading,
+                            crate::model::cpp_engine::ModelState::Ready => ModelState::Ready,
+                            crate::model::cpp_engine::ModelState::Failed(msg) => ModelState::Failed(msg),
+                        },
+                        loaded_at: i.loaded_at,
+                    }
+                }
+            };
+            infos.push(info);
         }
         infos
     }
@@ -139,7 +281,33 @@ impl ModelManager {
     /// Get info for a specific model
     pub async fn get_model_info(&self, model_name: &str) -> Option<ModelInfo> {
         let engine = self.models.get(model_name)?;
-        Some(engine.read().await.info())
+        let eng = engine.read().await;
+        let info = match &*eng {
+            ModelEngine::PythonBridge(e) => {
+                let i = e.info();
+                ModelInfo {
+                    name: model_name.to_string(),
+                    path: i.path,
+                    state: i.state,
+                    loaded_at: i.loaded_at,
+                }
+            }
+            ModelEngine::PureCpp(e) => {
+                let i = e.info();
+                ModelInfo {
+                    name: model_name.to_string(),
+                    path: i.path,
+                    state: match i.state {
+                        crate::model::cpp_engine::ModelState::Unloaded => ModelState::Unloaded,
+                        crate::model::cpp_engine::ModelState::Loading => ModelState::Loading,
+                        crate::model::cpp_engine::ModelState::Ready => ModelState::Ready,
+                        crate::model::cpp_engine::ModelState::Failed(msg) => ModelState::Failed(msg),
+                    },
+                    loaded_at: i.loaded_at,
+                }
+            }
+        };
+        Some(info)
     }
 
     /// Check if a model is loaded

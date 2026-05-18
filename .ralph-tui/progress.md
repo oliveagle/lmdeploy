@@ -7,6 +7,57 @@ after each iteration and it's included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
+### Rust FFI Send/Sync Pattern for C++ Pointers
+
+**问题**: FFI types containing raw pointers (e.g., `TensorMap`, `GenConfig`, `ModelRequest`) are not `Send + Sync`, preventing them from being used in async contexts with `tokio::spawn`.
+
+**解决方案**: Add `unsafe impl Send for Type` and `unsafe impl Sync for Type` for all FFI wrapper types.
+
+**关键实现**:
+```rust
+pub struct TensorMap(*mut TM_TensorMap);
+
+// Safety: TensorMap is Send + Sync because the underlying C++ API handles concurrency internally
+unsafe impl Send for TensorMap {}
+unsafe impl Sync for TensorMap {}
+```
+
+**适用范围**: All FFI types that wrap C++ pointers:
+- `EngineConfig`
+- `TensorMap`
+- `GenConfig`
+- `ModelRequest`
+- `TurboMind`
+
+**注意事项**: The underlying C++ implementation must be thread-safe. TurboMind handles concurrency internally.
+
+### Engine Type Selection Pattern
+
+**问题**: Need to support both Python Bridge (compatibility) and Pure C++ (no Python dependency) engines.
+
+**解决方案**: Create `ModelEngine` enum that wraps both engine types and delegates calls.
+
+**关键实现**:
+```rust
+pub enum ModelEngine {
+    PythonBridge(TurboMindEngine),
+    PureCpp(TurboMindCEngine),
+}
+
+impl ModelEngine {
+    pub async fn generate(&self, prompt: &str, max_tokens: usize) -> String {
+        match self {
+            ModelEngine::PythonBridge(e) => e.generate(prompt, max_tokens).await,
+            ModelEngine::PureCpp(e) => e.generate(prompt, max_tokens).await,
+        }
+    }
+}
+```
+
+**配置**: `engine_type` field in config.toml (default: "python_bridge", options: "pure_cpp")
+
+---
+
 ### C++ 层 ModuleTree 子模块构建模式
 
 **问题**: C API `InitFromPath()` 创建父模块但未创建子模块，导致 `LoadWeightsFromSafetensors` 无法通过 `child()` 导航找到权重参数。
@@ -186,6 +237,19 @@ ModelWeight
 
 ---
 
+## 2026-05-19 - lmdeploy-m9v
+- **Implemented**: Rust FFI 绑定完整覆盖 C++ C API
+- **Files changed**:
+  - `lmdeploy-rust-server/src/turbomind_c.rs` - Added missing FFI bindings
+- **Added FFI bindings**:
+  - EngineConfig setters: `set_tune_layer_num`, `set_max_context_token_num`, `set_num_tokens_per_iter`, `set_max_prefill_iters`, `set_async`, `set_outer_dp_size`
+  - TurboMind: `init_from_hf`, `get_attn_tp_rank`, `get_mlp_tp_rank`, `get_model_tp_rank`
+  - GenerationConfig: `set_bad_ids`, `set_min_p`, `set_output_last_hidden_state`
+  - TensorMap: `set_float32`, `set_int32_gpu`, `set_int64_gpu`, `set_float32_gpu`
+  - Safetensors: `open`, `close`, `get_tensor`, `num_tensors`, `get_tensor_name`
+- All 36 existing tests pass, cargo check compiles clean
+---
+
 ## 2026-05-19 - lmdeploy-72b
 - **Implemented**: Rust Server pure C++ inference engine (no Python dependency)
 - **Files changed**:
@@ -336,3 +400,23 @@ ModelWeight
   - scales 和 zeros 在 `prepare()` 中会被 `fuse_scales_and_zeros()` 合并
 
 ---
+
+## 2026-05-19 - lmdeploy-i4i
+- **Implemented**: Rust Engine Integration - 移除 Python Bridge，直接调用 C++
+- **Files changed**:
+  - `lmdeploy-rust-server/src/model/mod.rs` - Made `cpp_engine` module public, exported common types
+  - `lmdeploy-rust-server/src/model/manager.rs` - Added `ModelEngine` enum and engine type selection methods
+  - `lmdeploy-rust-server/src/turbomind_c.rs` - Added `Send + Sync` impls for FFI types (`EngineConfig`, `GenConfig`, `TensorMap`, `ModelRequest`)
+  - `lmdeploy-rust-server/src/server.rs` - Updated server startup to use config's `engine_type`
+- **Key changes**:
+  - Created `ModelEngine` enum wrapping `TurboMindEngine` (PythonBridge) and `TurboMindCEngine` (PureCpp)
+  - `ModelManager::with_default_model_and_type()` loads models with specified engine type
+  - `ModelManager::load_model_with_type()` loads additional models with engine type
+  - Config `engine_type` field controls which engine is used (default: "python_bridge")
+  - All 36 tests pass
+- **Learnings**:
+  - FFI types with raw pointers need explicit `unsafe impl Send/Sync` for async use
+  - `ModelEngine` enum delegates to inner engines via match
+  - Config `engine_type` parsed via `EngineType::from_str()`
+  - Both engines kept for backward compatibility
+  - Engine type can be set per-model in multi_model config

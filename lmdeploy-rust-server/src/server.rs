@@ -132,9 +132,13 @@ pub struct BatchStatsResponse {
 }
 
 pub async fn start_server(config: &AppConfig) -> Result<()> {
-    // Initialize ModelManager with default model
+    // Parse engine type from config
+    let engine_type = crate::model::cpp_engine::EngineType::from_str(&config.model.engine_type)
+        .unwrap_or(crate::model::cpp_engine::EngineType::PythonBridge);
+
+    // Initialize ModelManager with default model using specified engine type
     let model_manager = Arc::new(RwLock::new(
-        ModelManager::with_default_model(&config.model.model_path).await?,
+        ModelManager::with_default_model_and_type(&config.model.model_path, engine_type).await?,
     ));
 
     // Log default model info
@@ -152,10 +156,13 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
                 tracing::info!(
                     model_name = %entry.name,
                     model_path = %entry.path,
+                    engine_type = %entry.engine_type,
                     "Loading additional model from config"
                 );
+                let entry_engine_type = crate::model::cpp_engine::EngineType::from_str(&entry.engine_type)
+                    .unwrap_or(crate::model::cpp_engine::EngineType::PythonBridge);
                 let mut mm = model_manager.write().await;
-                if let Err(e) = mm.load_model(&entry.name, &entry.path).await {
+                if let Err(e) = mm.load_model_with_type(&entry.name, &entry.path, entry_engine_type).await {
                     tracing::warn!(
                         error = %e,
                         model_name = %entry.name,

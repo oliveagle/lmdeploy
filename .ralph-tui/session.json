@@ -3,10 +3,10 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-18T17:56:47.341Z",
-  "currentIteration": 8,
+  "updatedAt": "2026-05-18T18:36:06.792Z",
+  "currentIteration": 10,
   "maxIterations": 50,
-  "tasksCompleted": 6,
+  "tasksCompleted": 7,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -246,13 +246,34 @@
       "durationMs": 1746126,
       "startedAt": "2026-05-18T17:13:27.877Z",
       "endedAt": "2026-05-18T17:42:34.003Z"
+    },
+    {
+      "iteration": 9,
+      "status": "completed",
+      "taskId": "lmdeploy-sw3",
+      "taskTitle": "C++ 层支持 AWQ 4-bit 量化权重加载",
+      "taskCompleted": true,
+      "durationMs": 852205,
+      "startedAt": "2026-05-18T17:42:35.124Z",
+      "endedAt": "2026-05-18T17:56:47.329Z"
+    },
+    {
+      "iteration": 10,
+      "status": "completed",
+      "taskId": "lmdeploy-m9v",
+      "taskTitle": "Rust FFI 绑定: 实现纯 Rust C API 调用",
+      "taskCompleted": false,
+      "durationMs": 813971,
+      "startedAt": "2026-05-18T17:56:49.058Z",
+      "endedAt": "2026-05-18T18:10:23.029Z"
     }
   ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
   "activeTaskIds": [
     "lmdeploy-5wx",
-    "lmdeploy-82u"
+    "lmdeploy-82u",
+    "lmdeploy-m9v"
   ],
   "subagentPanelVisible": false
 }

@@ -127,6 +127,12 @@ extern "C" {
     pub fn TM_EngineConfig_SetAttnDpSize(config: *mut TM_EngineConfig, value: c_int);
     pub fn TM_EngineConfig_SetAttnCpSize(config: *mut TM_EngineConfig, value: c_int);
     pub fn TM_EngineConfig_SetMlpTpSize(config: *mut TM_EngineConfig, value: c_int);
+    pub fn TM_EngineConfig_SetOuterDpSize(config: *mut TM_EngineConfig, value: c_int);
+    pub fn TM_EngineConfig_SetTuneLayerNum(config: *mut TM_EngineConfig, value: c_int);
+    pub fn TM_EngineConfig_SetMaxContextTokenNum(config: *mut TM_EngineConfig, value: c_int);
+    pub fn TM_EngineConfig_SetNumTokensPerIter(config: *mut TM_EngineConfig, value: c_int);
+    pub fn TM_EngineConfig_SetMaxPrefillIters(config: *mut TM_EngineConfig, value: c_int);
+    pub fn TM_EngineConfig_SetAsync(config: *mut TM_EngineConfig, value: c_int);
     pub fn TM_EngineConfig_AddDevice(config: *mut TM_EngineConfig, device_id: c_int);
     pub fn TM_EngineConfig_SetNNodes(config: *mut TM_EngineConfig, value: c_int);
     pub fn TM_EngineConfig_SetNodeRank(config: *mut TM_EngineConfig, value: c_int);
@@ -136,6 +142,7 @@ extern "C" {
     pub fn TM_TurboMind_Create(model_dir: *const c_char, config: *mut TM_EngineConfig) -> *mut TM_TurboMind;
     pub fn TM_TurboMind_Destroy(tm: *mut TM_TurboMind);
     pub fn TM_TurboMind_InitFromPath(tm: *mut TM_TurboMind, device_id: c_int, model_dir: *const c_char, trust_remote_code: c_int) -> c_int;
+    pub fn TM_TurboMind_InitFromHF(tm: *mut TM_TurboMind, device_id: c_int, model_dir: *const c_char, output_dir: *const c_char) -> c_int;
     pub fn TM_TurboMind_CreateContext(tm: *mut TM_TurboMind, index: c_int);
     pub fn TM_TurboMind_CreateRoot(tm: *mut TM_TurboMind, index: c_int);
     pub fn TM_TurboMind_ProcessWeights(tm: *mut TM_TurboMind, index: c_int);
@@ -143,6 +150,7 @@ extern "C" {
     pub fn TM_TurboMind_IsDummyNode(tm: *mut TM_TurboMind) -> bool;
     pub fn TM_TurboMind_GetAttnTpRank(tm: *mut TM_TurboMind, index: c_int) -> c_int;
     pub fn TM_TurboMind_GetMlpTpRank(tm: *mut TM_TurboMind, index: c_int) -> c_int;
+    pub fn TM_TurboMind_GetModelTpRank(tm: *mut TM_TurboMind, index: c_int) -> c_int;
     pub fn TM_TurboMind_GetScheduleMetrics(
         tm: *mut TM_TurboMind,
         index: c_int,
@@ -189,6 +197,47 @@ extern "C" {
         out_ndim: *mut c_int,
         out_shape: *mut i64,
     ) -> bool;
+    pub fn TM_TensorMap_SetFloat32(
+        map: *mut TM_TensorMap,
+        name: *const c_char,
+        data: *const c_float,
+        ndim: c_int,
+        shape: *const i64,
+    );
+    pub fn TM_TensorMap_SetInt32GPU(
+        map: *mut TM_TensorMap,
+        name: *const c_char,
+        data: *const c_int,
+        ndim: c_int,
+        shape: *const i64,
+    );
+    pub fn TM_TensorMap_SetInt64GPU(
+        map: *mut TM_TensorMap,
+        name: *const c_char,
+        data: *const i64,
+        ndim: c_int,
+        shape: *const i64,
+    );
+    pub fn TM_TensorMap_SetFloat32GPU(
+        map: *mut TM_TensorMap,
+        name: *const c_char,
+        data: *const c_float,
+        ndim: c_int,
+        shape: *const i64,
+    );
+
+    // Safetensors
+    pub fn TM_Safetensors_Open(file_path: *const c_char) -> *mut c_void;
+    pub fn TM_Safetensors_Close(handle: *mut c_void);
+    pub fn TM_Safetensors_GetTensor(
+        handle: *mut c_void,
+        name: *const c_char,
+        out_data: *mut *mut c_void,
+        out_size: *mut usize,
+        out_dtype: *mut TM_DataType,
+    ) -> c_int;
+    pub fn TM_Safetensors_NumTensors(handle: *mut c_void) -> c_int;
+    pub fn TM_Safetensors_GetTensorName(handle: *mut c_void, index: c_int) -> *const c_char;
 
     // Generation config
     pub fn TM_GenerationConfig_Create() -> *mut TM_GenerationConfig;
@@ -204,6 +253,9 @@ extern "C" {
     pub fn TM_GenerationConfig_SetRandomSeed(config: *mut TM_GenerationConfig, value: u64);
     pub fn TM_GenerationConfig_SetOutputLogprobs(config: *mut TM_GenerationConfig, value: c_int);
     pub fn TM_GenerationConfig_SetOutputLogits(config: *mut TM_GenerationConfig, value: c_int);
+    pub fn TM_GenerationConfig_SetOutputLastHiddenState(config: *mut TM_GenerationConfig, value: c_int);
+    pub fn TM_GenerationConfig_SetBadIds(config: *mut TM_GenerationConfig, ids: *const c_int, count: c_int);
+    pub fn TM_GenerationConfig_SetMinP(config: *mut TM_GenerationConfig, value: c_float);
 
     // Model request
     pub fn TM_ModelRequest_Create(tm: *mut TM_TurboMind) -> *mut TM_ModelRequest;
@@ -271,6 +323,10 @@ impl std::error::Error for FFError {}
 
 /// RAII wrapper for TM_EngineConfig
 pub struct EngineConfig(*mut TM_EngineConfig);
+
+// Safety: EngineConfig is Send + Sync because the underlying C++ engine handles concurrency internally
+unsafe impl Send for EngineConfig {}
+unsafe impl Sync for EngineConfig {}
 
 impl EngineConfig {
     pub fn new() -> FFResult<Self> {
@@ -369,6 +425,36 @@ impl EngineConfig {
     pub fn set_quant_policy(&mut self, policy: c_int) {
         unsafe { TM_EngineConfig_SetQuantPolicy(self.0, policy) }
     }
+
+    #[inline]
+    pub fn set_tune_layer_num(&mut self, value: c_int) {
+        unsafe { TM_EngineConfig_SetTuneLayerNum(self.0, value) }
+    }
+
+    #[inline]
+    pub fn set_max_context_token_num(&mut self, value: c_int) {
+        unsafe { TM_EngineConfig_SetMaxContextTokenNum(self.0, value) }
+    }
+
+    #[inline]
+    pub fn set_num_tokens_per_iter(&mut self, value: c_int) {
+        unsafe { TM_EngineConfig_SetNumTokensPerIter(self.0, value) }
+    }
+
+    #[inline]
+    pub fn set_max_prefill_iters(&mut self, value: c_int) {
+        unsafe { TM_EngineConfig_SetMaxPrefillIters(self.0, value) }
+    }
+
+    #[inline]
+    pub fn set_async(&mut self, value: c_int) {
+        unsafe { TM_EngineConfig_SetAsync(self.0, value) }
+    }
+
+    #[inline]
+    pub fn set_outer_dp_size(&mut self, value: c_int) {
+        unsafe { TM_EngineConfig_SetOuterDpSize(self.0, value) }
+    }
 }
 
 impl Drop for EngineConfig {
@@ -434,6 +520,33 @@ impl TurboMind {
 
     pub fn create_engine(&self, index: c_int) {
         unsafe { TM_TurboMind_CreateEngine(self.0, index) }
+    }
+
+    pub fn init_from_hf(&self, device_id: c_int, model_dir: &str, output_dir: &str) -> FFResult<()> {
+        unsafe {
+            let model_dir_c = std::ffi::CString::new(model_dir).unwrap();
+            let output_dir_c = std::ffi::CString::new(output_dir).unwrap();
+            let ret = TM_TurboMind_InitFromHF(self.0, device_id, model_dir_c.as_ptr(), output_dir_c.as_ptr());
+            if ret != 0 {
+                return Err(FFError::from_last_error().unwrap_or(FFError {
+                    code: TM_ErrorCode::TM_ERR_RUNTIME,
+                    message: format!("InitFromHF failed with code {}", ret),
+                }));
+            }
+            Ok(())
+        }
+    }
+
+    pub fn get_attn_tp_rank(&self, index: c_int) -> c_int {
+        unsafe { TM_TurboMind_GetAttnTpRank(self.0, index) }
+    }
+
+    pub fn get_mlp_tp_rank(&self, index: c_int) -> c_int {
+        unsafe { TM_TurboMind_GetMlpTpRank(self.0, index) }
+    }
+
+    pub fn get_model_tp_rank(&self, index: c_int) -> c_int {
+        unsafe { TM_TurboMind_GetModelTpRank(self.0, index) }
     }
 
     pub fn is_dummy_node(&self) -> bool {
@@ -502,6 +615,10 @@ pub struct ScheduleMetrics {
 /// RAII wrapper for TM_GenerationConfig
 pub struct GenConfig(*mut TM_GenerationConfig);
 
+// Safety: GenConfig is Send + Sync because the underlying C++ engine handles concurrency internally
+unsafe impl Send for GenConfig {}
+unsafe impl Sync for GenConfig {}
+
 impl GenConfig {
     pub fn new() -> FFResult<Self> {
         unsafe {
@@ -559,6 +676,23 @@ impl GenConfig {
     pub fn set_random_seed(&mut self, seed: u64) {
         unsafe { TM_GenerationConfig_SetRandomSeed(self.0, seed) }
     }
+
+    #[inline]
+    pub fn set_bad_ids(&mut self, ids: &[c_int]) {
+        unsafe {
+            TM_GenerationConfig_SetBadIds(self.0, ids.as_ptr(), ids.len() as c_int);
+        }
+    }
+
+    #[inline]
+    pub fn set_min_p(&mut self, min_p: c_float) {
+        unsafe { TM_GenerationConfig_SetMinP(self.0, min_p) }
+    }
+
+    #[inline]
+    pub fn set_output_last_hidden_state(&mut self, value: c_int) {
+        unsafe { TM_GenerationConfig_SetOutputLastHiddenState(self.0, value) }
+    }
 }
 
 impl Drop for GenConfig {
@@ -569,6 +703,10 @@ impl Drop for GenConfig {
 
 /// RAII wrapper for TM_TensorMap
 pub struct TensorMap(*mut TM_TensorMap);
+
+// Safety: TensorMap is Send + Sync because the underlying C++ API handles concurrency internally
+unsafe impl Send for TensorMap {}
+unsafe impl Sync for TensorMap {}
 
 impl TensorMap {
     pub fn new() -> FFResult<Self> {
@@ -612,6 +750,34 @@ impl TensorMap {
         }
     }
 
+    pub fn set_float32(&mut self, name: &str, data: &[c_float], shape: &[i64]) {
+        unsafe {
+            let name_c = std::ffi::CString::new(name).unwrap();
+            TM_TensorMap_SetFloat32(self.0, name_c.as_ptr(), data.as_ptr(), shape.len() as c_int, shape.as_ptr());
+        }
+    }
+
+    pub fn set_int32_gpu(&mut self, name: &str, data: *const c_int, shape: &[i64]) {
+        unsafe {
+            let name_c = std::ffi::CString::new(name).unwrap();
+            TM_TensorMap_SetInt32GPU(self.0, name_c.as_ptr(), data, shape.len() as c_int, shape.as_ptr());
+        }
+    }
+
+    pub fn set_int64_gpu(&mut self, name: &str, data: *const i64, shape: &[i64]) {
+        unsafe {
+            let name_c = std::ffi::CString::new(name).unwrap();
+            TM_TensorMap_SetInt64GPU(self.0, name_c.as_ptr(), data, shape.len() as c_int, shape.as_ptr());
+        }
+    }
+
+    pub fn set_float32_gpu(&mut self, name: &str, data: *const c_float, shape: &[i64]) {
+        unsafe {
+            let name_c = std::ffi::CString::new(name).unwrap();
+            TM_TensorMap_SetFloat32GPU(self.0, name_c.as_ptr(), data, shape.len() as c_int, shape.as_ptr());
+        }
+    }
+
     /// Get the raw C pointer for passing to C functions
     pub fn as_mut_ptr(&self) -> *mut TM_TensorMap {
         self.0
@@ -626,6 +792,10 @@ impl Drop for TensorMap {
 
 /// RAII wrapper for TM_ModelRequest
 pub struct ModelRequest(*mut TM_ModelRequest);
+
+// Safety: ModelRequest is Send + Sync because the underlying C++ engine handles concurrency internally
+unsafe impl Send for ModelRequest {}
+unsafe impl Sync for ModelRequest {}
 
 impl ModelRequest {
     pub fn create(tm: &TurboMind) -> FFResult<Self> {

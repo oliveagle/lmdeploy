@@ -39,7 +39,7 @@ type BenchmarkResult struct {
 	DecodeDuration         time.Duration
 	TokensPerSecond        float64
 	PrefillTokensPerSec    float64
-	decodeTokensPerSec     float64
+	DecodeTokensPerSec  float64
 	SuccessCount           int
 	ErrorCount             int
 	Error                  string
@@ -124,6 +124,7 @@ func sendStreamingRequest(client *http.Client, config Config, prompt string, max
 	br := bufio.NewReader(resp.Body)
 	firstTokenTime := time.Time{}
 	var completionTokens int
+	var tokenCount int // Track actual tokens received
 
 	for {
 		line, err := br.ReadString('\n')
@@ -161,18 +162,28 @@ func sendStreamingRequest(client *http.Client, config Config, prompt string, max
 		}
 
 		choice := choices[0].(map[string]interface{})
-		// Check that delta exists (some responses may have just finish_reason)
-		if _, hasDelta := choice["delta"]; !hasDelta {
+		delta, hasDelta := choice["delta"].(map[string]interface{})
+		if !hasDelta {
 			continue
 		}
 
+		// Check if this chunk has content (not just finish_reason)
+		if content, ok := delta["content"].(string); ok && content != "" {
+			tokenCount++
+		}
+
 		// Track first token time
-		if firstTokenTime.IsZero() {
+		if firstTokenTime.IsZero() && tokenCount > 0 {
 			firstTokenTime = time.Now()
 		}
 	}
 	resp.Body.Close()
 	totalDuration := time.Since(start)
+
+	// Use actual token count if completion_tokens is 0
+	if completionTokens == 0 && tokenCount > 0 {
+		completionTokens = tokenCount
+	}
 
 	// Calculate metrics
 	result := &BenchmarkResult{
@@ -193,7 +204,7 @@ func sendStreamingRequest(client *http.Client, config Config, prompt string, max
 			result.PrefillTokensPerSec = float64(contextSize) / result.PrefillDuration.Seconds()
 		}
 		if result.DecodeDuration > 0 && completionTokens > 0 {
-			result.decodeTokensPerSec = float64(completionTokens) / result.DecodeDuration.Seconds()
+			result.DecodeTokensPerSec = float64(completionTokens) / result.DecodeDuration.Seconds()
 		}
 	}
 
@@ -267,7 +278,7 @@ func runBenchmark(config Config, contextSize, outputLen, concurrency int) Benchm
 			sumDecode += r.DecodeDuration
 			sumTokensPerSec += r.TokensPerSecond
 			sumPrefillTPS += r.PrefillTokensPerSec
-			sumDecodeTPS += r.decodeTokensPerSec
+			sumDecodeTPS += r.DecodeTokensPerSec
 			sumFirstToken += r.FirstTokenLatencyMs
 			sumAvgToken += r.AvgTokenLatencyMs
 			sumP99Token += r.P99TokenLatencyMs
@@ -278,7 +289,7 @@ func runBenchmark(config Config, contextSize, outputLen, concurrency int) Benchm
 		result.DecodeDuration = time.Duration(int64(float64(sumDecode.Milliseconds()) / n) * 1e6)
 		result.TokensPerSecond = sumTokensPerSec / n
 		result.PrefillTokensPerSec = sumPrefillTPS / n
-		result.decodeTokensPerSec = sumDecodeTPS / n
+		result.DecodeTokensPerSec = sumDecodeTPS / n
 		result.FirstTokenLatencyMs = sumFirstToken / n
 		result.AvgTokenLatencyMs = sumAvgToken / n
 		result.P99TokenLatencyMs = sumP99Token / n
@@ -309,7 +320,7 @@ func printStats(results []BenchmarkResult) {
 			fmt.Printf("%-15s | %-10d | %-8d | %-10d | %-15.2f | %-15.2f | %-15.2f | %-12.0f | %-12.2f\n",
 				r.Scenario, r.ContextSize, r.OutputLen, r.Concurrency,
 				r.FirstTokenLatencyMs, r.AvgTokenLatencyMs, r.P99TokenLatencyMs,
-				r.PrefillTokensPerSec, r.decodeTokensPerSec)
+				r.PrefillTokensPerSec, r.DecodeTokensPerSec)
 		}
 	}
 
@@ -327,8 +338,8 @@ func printStats(results []BenchmarkResult) {
 		for _, c := range []int{1, 2, 4} {
 			found := false
 			for _, r := range scenarios[scenario] {
-				if r.Concurrency == c && r.decodeTokensPerSec > 0 {
-					fmt.Printf(" | %-18.2f", r.decodeTokensPerSec)
+				if r.Concurrency == c && r.DecodeTokensPerSec > 0 {
+					fmt.Printf(" | %-18.2f", r.DecodeTokensPerSec)
 					found = true
 					break
 				}
@@ -464,7 +475,7 @@ func main() {
 				if result.SuccessCount > 0 {
 					fmt.Printf("  Success: %d/%d | FirstToken: %.2fms | Decode: %.2f t/s\n",
 						result.SuccessCount, result.NumRequests,
-						result.FirstTokenLatencyMs, result.decodeTokensPerSec)
+						result.FirstTokenLatencyMs, result.DecodeTokensPerSec)
 				} else {
 					fmt.Printf("  FAILED: %s\n", result.Error)
 				}
