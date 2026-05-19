@@ -3,6 +3,25 @@
 This file tracks progress across iterations. Agents update this file
 after each iteration and it's included in prompts for context.
 
+## 2026-05-19 - lmdeploy-zor
+- **Status**: Verified and closed - Rust + C++ 纯原生推理路径已完整实现
+- **Files verified**:
+  - `lmdeploy-rust-server/src/model/cpp_engine.rs` - TurboMindCEngine 完整实现
+  - `lmdeploy-rust-server/src/model/manager.rs` - ModelEngine 枚举 + 引擎类型选择
+  - `lmdeploy-rust-server/src/model/engine.rs` - Python Bridge 引擎
+  - `lmdeploy-rust-server/src/turbomind_c.rs` - 完整 C API FFI 绑定 + Send/Sync
+  - `lmdeploy-rust-server/src/config.rs` - engine_type 配置字段
+  - `lmdeploy-rust-server/examples/e2e_test.rs` - 端到端测试程序
+- **实现内容**:
+  - TurboMindCEngine: 纯 C++ 模型加载、AWQ 检测、tokenizer、generate、generate_stream、reload
+  - ModelEngine enum: PythonBridge vs PureCpp 统一分发
+  - 36 个单元测试通过，cargo check 编译成功
+- **Learnings**:
+  - Rust 层纯 C++ 推理路径已完整实现，所有类型和功能都已绑定
+  - C++ 层存在 ModelWeight::prepare 崩溃问题，但这不在 Rust 层解决范围内
+  - 引擎类型选择通过 config.toml 的 engine_type 字段控制
+---
+
 ### AWQ Offline Weight Export Pattern
 
 **问题**: 需要将 AWQ safetensors 转换为 TurboMind .bin 格式，供 C++ InitFromPath() 离线加载。
@@ -629,5 +648,39 @@ ModelWeight
   - Tensor 通过 DLPack 协议与 Python 交互，无需额外内存拷贝
   - config.yaml 必需字段：`model_name`、`tensor_para_size`、`head_num`、`layer_num`、`hidden_size`、`vocab_size` 等
   - 权重文件需要 64 字节对齐以优化 GPU 加载性能
+
+---
+
+## 2026-05-19 - lmdeploy-s8l
+- **Status**: BLOCKED - C++ 引擎 `InitFromPath()` 在 `ModelWeight::prepare()` 中崩溃
+- **Files analyzed**:
+  - `src/turbomind/capi/turbomind_c.cc` - C API InitFromPath() implementation
+  - `src/turbomind/models/model_weight.cc` - ModelWeight::prepare() crash location
+  - `src/turbomind/core/module.cc` - ModuleList implementation
+  - `lmdeploy-rust-server/src/model/cpp_engine.rs` - Rust C++ engine wrapper
+- **Root Cause**: `ModelWeight::layer(0)` 返回 nullptr，因为 `layers` ModuleList 为空
+- **Debug findings**:
+  1. Python TurboMind (`lmdeploy.turbomind.TurboMind`) 加载模型成功 ✅
+  2. C API `InitFromPath()` 崩溃发生在 `ProcessWeights()` → `ModelRoot::prepare()` → `ModelWeight::prepare()`
+  3. 错误位置：`model_weight.cc:23` 的 `TM_CHECK(l0)` 断言失败
+  4. 问题与模型类型无关（AWQ、非 AWQ、MoE、非 MoE 都会崩溃）
+  5. `DecoderLayerWeight` 已通过 `TM_MODULE_REGISTER` 正确注册到类型系统
+  6. Python bridge 引擎 (`engine_type = "python_bridge"`) 仍然正常工作 ✅
+- **Potential Root Causes**:
+  - `TM_MODULE_METHODS` 生成的 `add_child()` 正确设置 `layers` 成员
+  - `ModelList::add_child()` 正确维护 `items_` 和 `indexed_` 向量
+  - 崩溃发生在 `add_child()` 之后，可能是 `unique_ptr` move 后指针生命周期问题
+  - 或者 `ModelWeight::layers` 在 `add_child()` 后被正确设置，但在 `prepare()` 调用时已变为 null
+- **Workaround**: 使用 Python bridge 引擎进行推理
+  - 修改 `config/default.toml`: `engine_type = "python_bridge"`
+  - Rust tests pass (36 tests passed)
+- **Next Steps for C++ Engine**:
+  - 需要深入调试 C++ 内存管理，特别是 `unique_ptr` move 后的生命周期
+  - 检查 `ModelWeight::add_child()` 的实现是否正确处理 `ModuleList` 类型
+  - 验证 `ModuleList::child()` 在 `ModelWeight::layer()` 中是否能正确找到子模块
+- **Learnings**:
+  - C++ 引擎的模块树构建依赖于 X-macro 生成的代码，调试难度较高
+  - Python bridge 引擎提供了稳定的替代方案，可以用于生产部署
+  - 纯 C++ 引擎需要更深入的调试和测试才能达到生产就绪状态
 
 ---

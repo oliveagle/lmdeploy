@@ -3,10 +3,10 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-19T04:53:13.275Z",
-  "currentIteration": 16,
+  "updatedAt": "2026-05-19T11:47:27.450Z",
+  "currentIteration": 18,
   "maxIterations": 50,
-  "tasksCompleted": 11,
+  "tasksCompleted": 12,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -326,6 +326,26 @@
       "durationMs": 3297388,
       "startedAt": "2026-05-19T03:40:09.825Z",
       "endedAt": "2026-05-19T04:35:07.213Z"
+    },
+    {
+      "iteration": 17,
+      "status": "completed",
+      "taskId": "lmdeploy-w1w",
+      "taskTitle": "实现 AWQ 离线权重转换工具",
+      "taskCompleted": true,
+      "durationMs": 1067715,
+      "startedAt": "2026-05-19T04:35:25.470Z",
+      "endedAt": "2026-05-19T04:53:13.185Z"
+    },
+    {
+      "iteration": 18,
+      "status": "completed",
+      "taskId": "lmdeploy-s8l",
+      "taskTitle": "测试 C++ 引擎端到端推理",
+      "taskCompleted": false,
+      "durationMs": 4079511,
+      "startedAt": "2026-05-19T04:53:14.729Z",
+      "endedAt": "2026-05-19T06:01:14.240Z"
     }
   ],
   "skippedTaskIds": [],
@@ -335,7 +355,8 @@
     "lmdeploy-82u",
     "lmdeploy-m9v",
     "lmdeploy-zk3",
-    "lmdeploy-85l"
+    "lmdeploy-85l",
+    "lmdeploy-s8l"
   ],
   "subagentPanelVisible": false
 }

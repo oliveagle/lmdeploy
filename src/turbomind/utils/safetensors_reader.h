@@ -138,6 +138,25 @@ public:
     /// Get file size
     size_t file_size() const { return file_size_; }
 
+    /// Parse dtype string to DataType
+    static DataType ParseDtype(const std::string& dtype)
+    {
+        if (dtype == "F32" || dtype == "fp32") return DataType::kFloat32;
+        if (dtype == "F16" || dtype == "fp16") return DataType::kFloat16;
+        if (dtype == "BF16" || dtype == "bf16") return DataType::kBfloat16;
+        if (dtype == "I64" || dtype == "i64") return DataType::kInt64;
+        if (dtype == "I32" || dtype == "i32") return DataType::kInt32;
+        if (dtype == "I16" || dtype == "i16") return DataType::kInt16;
+        if (dtype == "I8" || dtype == "i8") return DataType::kInt8;
+        if (dtype == "U64" || dtype == "u64") return DataType::kUint64;
+        if (dtype == "U32" || dtype == "u32") return DataType::kUint32;
+        if (dtype == "U16" || dtype == "u16") return DataType::kUint16;
+        if (dtype == "U8" || dtype == "u8") return DataType::kUint8;
+        if (dtype == "F64" || dtype == "fp64") return DataType::kFloat64;
+        if (dtype == "BOOL" || dtype == "bool") return DataType::kBool;
+        return DataType::kFloat32;
+    }
+
 private:
     /// Parse the safetensors header (8-byte size + JSON metadata)
     void ParseHeader()
@@ -373,26 +392,6 @@ private:
 
             metas_.push_back(meta);
         }
-    }
-
-    /// Parse dtype string to DataType
-    static DataType ParseDtype(const std::string& dtype)
-    {
-        if (dtype == "F32" || dtype == "fp32") return DataType::kFloat32;
-        if (dtype == "F16" || dtype == "fp16") return DataType::kFloat16;
-        if (dtype == "BF16" || dtype == "bf16") return DataType::kBfloat16;
-        if (dtype == "I64" || dtype == "i64") return DataType::kInt64;
-        if (dtype == "I32" || dtype == "i32") return DataType::kInt32;
-        if (dtype == "I16" || dtype == "i16") return DataType::kInt16;
-        if (dtype == "I8" || dtype == "i8") return DataType::kInt8;
-        if (dtype == "U64" || dtype == "u64") return DataType::kUint64;
-        if (dtype == "U32" || dtype == "u32") return DataType::kUint32;
-        if (dtype == "U16" || dtype == "u16") return DataType::kUint16;
-        if (dtype == "U8" || dtype == "u8") return DataType::kUint8;
-        if (dtype == "F64" || dtype == "fp64") return DataType::kFloat64;
-        if (dtype == "BOOL" || dtype == "bool") return DataType::kBool;
-        // Default to FP32 for unknown types
-        return DataType::kFloat32;
     }
 
     mutable std::ifstream stream_;

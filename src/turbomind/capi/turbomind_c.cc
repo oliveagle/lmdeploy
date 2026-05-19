@@ -2,6 +2,16 @@
 // C API implementation for TurboMind inference engine
 
 #include "turbomind_c.h"
+#include <cstdio>
+
+// Debug function to write to a file
+static void debug_log(const char* msg) {
+    FILE* f = fopen("/tmp/turbomind_debug.log", "a");
+    if (f) {
+        fputs(msg, f);
+        fclose(f);
+    }
+}
 
 #include <algorithm>
 #include <atomic>
@@ -406,6 +416,10 @@ struct HfModelConfig {
     // Nested config support (Qwen3.5 MoE, multimodal models)
     bool has_text_config = false;
     bool has_model_config = false;
+
+    // Per-layer attention types (Qwen3.5)
+    // If empty, fall back to use_linear_attn for all layers
+    std::vector<bool> layer_is_linear_attn;
 };
 
 // Parse HuggingFace config.json using the HfConfigParser
@@ -476,7 +490,29 @@ static HfModelConfig ParseHfConfig(const std::string& model_dir)
     config.num_experts_per_tok = get_int("num_experts_per_tok", 0);
 
     // DeltaNet / Linear Attention
+    // Qwen3.5 uses layer_types array (["linear_attention", "full_attention", ...])
+    // Older models use use_linear_attn boolean
     config.use_linear_attn = get_bool("use_linear_attn", false);
+
+    // Parse layer_types if present (Qwen3.5)
+    const auto& layer_types_val = config_source.get("layer_types");
+    if (!layer_types_val.is_null() && layer_types_val.is_array()) {
+        const auto& layer_types_arr = layer_types_val.as_array();
+        config.layer_is_linear_attn.reserve(layer_types_arr.size());
+        for (const auto& layer_type : layer_types_arr) {
+            if (layer_type.is_string()) {
+                const std::string type_str = layer_type.as_string();
+                // "linear_attention" means use DeltaNetWeight
+                // "full_attention" means use AttentionWeight
+                config.layer_is_linear_attn.push_back(type_str == "linear_attention");
+            } else {
+                config.layer_is_linear_attn.push_back(false);
+            }
+        }
+    } else {
+        // No layer_types specified, use use_linear_attn for all layers
+        config.layer_is_linear_attn.resize(config.num_hidden_layers, config.use_linear_attn);
+    }
 
     // RoPE configuration
     config.rope_dim = get_int("rope_dim", 0);
@@ -789,22 +825,35 @@ static void LoadWeightsFromSafetensors(
     try {
         turbomind::SafetensorsReader reader(safetensors_path);
 
+        fprintf(stderr, "[C-API] Loading safetensors: %s (%zu tensors)\n", safetensors_path, reader.num_tensors());
+        fflush(stderr);
+
+        int loaded_count = 0;
+        int skip_count = 0;
+        int debug_count = 0;
+
         // Iterate over all tensors in the file
         for (size_t i = 0; i < reader.num_tensors(); ++i) {
             const std::string& tensor_name = reader.tensor_name(i);
 
-            // Map HF weight names to TurboMind module paths
-            // HF format: model.layers.0.self_attn.q_proj.weight
-            // TM format: layers.0.attention.w_qkv.weight
+            // DEBUG: print first 10 tensor names
+            if (debug_count < 10) {
+                fprintf(stderr, "[C-API] Tensor[%zu]: '%s'\n", i, tensor_name.c_str());
+                fflush(stderr);
+                ++debug_count;
+            }
 
+            // Map HF weight names to TurboMind module paths
             std::string tm_path = MapHuggingFaceWeightToTurboMind(tensor_name);
             if (tm_path.empty()) {
+                ++skip_count;
                 continue;  // Skip unmapped weights
             }
 
             // Get tensor metadata
             const auto* meta = reader.get_tensor_meta(tensor_name);
             if (!meta) {
+                fprintf(stderr, "[C-API] Failed to get metadata for %s (mapped to %s)\n", tensor_name.c_str(), tm_path.c_str());
                 continue;  // Skip failed reads
             }
 
@@ -829,51 +878,88 @@ static void LoadWeightsFromSafetensors(
 
             // Navigate to the target module
             turbomind::core::Module* current = model_weight;
+            if (debug_count < 5) {
+                fprintf(stderr, "[C-API] Navigate: model_weight=%p, type=%s\n", (void*)model_weight, model_weight->type());
+            }
             for (size_t j = 0; j < parts.size() - 1; ++j) {
-                if (!current) break;
-                current = current->child(parts[j]);
+                if (!current) {
+                    if (debug_count < 5) {
+                        fprintf(stderr, "[C-API] Navigation failed at part[%zu]='%s'\n", j, parts[j].c_str());
+                    }
+                    break;
+                }
+                turbomind::core::Module* next = current->child(parts[j]);
+                if (debug_count < 5) {
+                    fprintf(stderr, "[C-API] child('%s'): %p (type=%s)\n", parts[j].c_str(), (void*)next, next ? next->type() : "null");
+                }
+                current = next;
             }
 
             if (!current) {
+                if (debug_count < 20) {
+                    fprintf(stderr, "[C-API] Module tree navigation failed for '%s' -> '%s'\n", tensor_name.c_str(), tm_path.c_str());
+                    fflush(stderr);
+                }
+                ++skip_count;
                 continue;
             }
 
             // The last part is the param name (e.g., "weight")
             std::string param_name = parts.back();
 
-            // Allocate and copy the tensor
-            auto param = current->param(param_name);
-            if (param) {
-                // Convert shape from size_t to int64_t for compatibility
-                std::vector<int64_t> shape64;
-                for (const auto& dim : meta->shape) {
-                    shape64.push_back(static_cast<int64_t>(dim));
+            // Try to get the LinearWeight directly for param access
+            turbomind::LinearWeight* linear = dynamic_cast<turbomind::LinearWeight*>(current);
+            turbomind::core::Param param;
+            if (linear) {
+                param = linear->param(param_name);
+            } else {
+                param = current->param(param_name);
+            }
+
+            if (!param) {
+                if (loaded_count < 5) {
+                    fprintf(stderr, "[C-API] Param '%s' not found in module '%s' (path='%s', type='%s')\n",
+                            param_name.c_str(), current->full_path().c_str(), tm_path.c_str(), current->type());
+                    fflush(stderr);
                 }
+                ++skip_count;
+                continue;
+            }
 
-                turbomind::DataType tm_dtype = meta->dtype;
+            // Convert shape from size_t to int64_t for compatibility
+            std::vector<int64_t> shape64;
+            for (const auto& dim : meta->shape) {
+                shape64.push_back(static_cast<int64_t>(dim));
+            }
 
-                param.alloc(meta->shape, tm_dtype);
+            turbomind::DataType tm_dtype = meta->dtype;
 
-                // Copy data (TODO: handle device placement)
-                auto tensor = param.get();
-                if (tensor && tensor.raw_data()) {
-                    size_t copy_size = std::min(data.size(), static_cast<size_t>(tensor.byte_size()));
-                    std::memcpy(tensor.raw_data(), data.data(), copy_size);
-                }
+            param.alloc(meta->shape, tm_dtype);
+
+            // Copy data (TODO: handle device placement)
+            auto tensor = param.get();
+            if (tensor && tensor.raw_data()) {
+                size_t copy_size = std::min(data.size(), static_cast<size_t>(tensor.byte_size()));
+                std::memcpy(tensor.raw_data(), data.data(), copy_size);
+                ++loaded_count;
             }
         }
+
+        fprintf(stderr, "[C-API] Loaded %d tensors, skipped %d from %s\n", loaded_count, skip_count, safetensors_path);
+        fflush(stderr);
     }
     catch (const std::exception& e) {
         // Log error but continue with other files
-        std::cerr << "Error loading safetensors file " << safetensors_path << ": " << e.what() << std::endl;
+        fprintf(stderr, "[C-API] Error loading safetensors file %s: %s\n", safetensors_path, e.what());
+        fflush(stderr);
     }
 }
 
 // Map HuggingFace weight names to TurboMind module paths
 static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
 {
-    // HF format: model.layers.0.self_attn.q_proj.weight
-    // TM format: layers.0.attention.w_qkv.weight
+    // HF format: model.language_model.layers.0.mlp.gate_proj.weight
+    // TM format: layers.0.feed_forward.w1.weight
 
     std::string result = hf_name;
 
@@ -882,118 +968,88 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
         result = result.substr(6);
     }
 
-    // Remove ".language_model." prefix if present (for vision-language models)
-    size_t lang_pos = result.find(".language_model.");
-    if (lang_pos != std::string::npos) {
-        result = result.substr(0, lang_pos) + result.substr(lang_pos + 17);
+    // Remove "language_model." prefix if present (for vision-language models)
+    if (result.find("language_model.") == 0) {
+        result = result.substr(15);
     }
 
-    // Replace common patterns
+    // ========================================================
+    // Top-level params (no dots before them)
+    // ========================================================
+    // lm_head.weight -> output.weight
+    if (result.find("lm_head.") == 0) {
+        result = "output." + result.substr(8);  // "lm_head." = 8 chars
+    }
+    // embed_tokens.weight -> tok_embeddings.weight
+    if (result.find("embed_tokens.") == 0) {
+        result = "tok_embeddings." + result.substr(13);  // "embed_tokens." = 13 chars
+    }
+
+    // ========================================================
+    // Layer-level replacements
+    // Do these in order: module name -> sub-module name -> param suffix
+    // ========================================================
     // self_attn -> attention
-    size_t self_attn_pos = result.find(".self_attn.");
-    while (self_attn_pos != std::string::npos) {
-        result.replace(self_attn_pos, 11, ".attention.");
-        self_attn_pos = result.find(".self_attn.");
+    size_t pos;
+    while ((pos = result.find(".self_attn.")) != std::string::npos) {
+        result.replace(pos, 11, ".attention.");
     }
 
     // mlp -> feed_forward
-    size_t mlp_pos = result.find(".mlp.");
-    while (mlp_pos != std::string::npos) {
-        result.replace(mlp_pos, 5, ".feed_forward.");
-        mlp_pos = result.find(".mlp.");
+    while ((pos = result.find(".mlp.")) != std::string::npos) {
+        result.replace(pos, 5, ".feed_forward.");
     }
 
     // input_layernorm -> attention_norm
-    size_t input_ln_pos = result.find(".input_layernorm");
-    while (input_ln_pos != std::string::npos) {
-        result.replace(input_ln_pos, 16, ".attention_norm");
-        input_ln_pos = result.find(".input_layernorm");
+    while ((pos = result.find(".input_layernorm")) != std::string::npos) {
+        result.replace(pos, 16, ".attention_norm");
     }
 
     // post_attention_layernorm -> ffn_norm
-    size_t post_ln_pos = result.find(".post_attention_layernorm");
-    while (post_ln_pos != std::string::npos) {
-        result.replace(post_ln_pos, 24, ".ffn_norm");
-        post_ln_pos = result.find(".post_attention_layernorm");
+    while ((pos = result.find(".post_attention_layernorm")) != std::string::npos) {
+        result.replace(pos, 24, ".ffn_norm");
     }
 
-    // QKV projection handling
-    // q_proj, k_proj, v_proj -> w_qkv (fused)
-    // This is complex because we need to fuse multiple tensors
-    // For now, just map individual names
-    size_t q_proj_pos = result.find(".q_proj.");
-    if (q_proj_pos != std::string::npos) {
-        result.replace(q_proj_pos, 9, ".q_proj.");
+    // QKV projections
+    while ((pos = result.find(".q_proj.")) != std::string::npos) {
+        result.replace(pos, 8, ".q_proj.");
+    }
+    while ((pos = result.find(".k_proj.")) != std::string::npos) {
+        result.replace(pos, 8, ".k_proj.");
+    }
+    while ((pos = result.find(".v_proj.")) != std::string::npos) {
+        result.replace(pos, 8, ".v_proj.");
     }
 
-    size_t k_proj_pos = result.find(".k_proj.");
-    if (k_proj_pos != std::string::npos) {
-        result.replace(k_proj_pos, 9, ".k_proj.");
+    // o_proj -> wo
+    while ((pos = result.find(".o_proj.")) != std::string::npos) {
+        result.replace(pos, 8, ".wo.");
     }
 
-    size_t v_proj_pos = result.find(".v_proj.");
-    if (v_proj_pos != std::string::npos) {
-        result.replace(v_proj_pos, 9, ".v_proj.");
+    // FFN projections
+    while ((pos = result.find(".gate_proj.")) != std::string::npos) {
+        result.replace(pos, 11, ".w1.");
+    }
+    while ((pos = result.find(".up_proj.")) != std::string::npos) {
+        result.replace(pos, 9, ".w3.");
+    }
+    while ((pos = result.find(".down_proj.")) != std::string::npos) {
+        result.replace(pos, 11, ".w2.");
     }
 
-    size_t o_proj_pos = result.find(".o_proj.");
-    if (o_proj_pos != std::string::npos) {
-        result.replace(o_proj_pos, 9, ".wo.");
+    // AWQ quantization parameters (qweight -> weight, etc.)
+    // These must be last so .weight suffix is already established
+    while ((pos = result.find(".qweight")) != std::string::npos) {
+        result.replace(pos, 8, ".weight");
     }
-
-    // FFN layers
-    size_t gate_proj_pos = result.find(".gate_proj.");
-    if (gate_proj_pos != std::string::npos) {
-        result.replace(gate_proj_pos, 12, ".w1.");
+    while ((pos = result.find(".qzeros")) != std::string::npos) {
+        result.replace(pos, 7, ".zeros");
     }
-
-    size_t up_proj_pos = result.find(".up_proj.");
-    if (up_proj_pos != std::string::npos) {
-        result.replace(up_proj_pos, 9, ".w3.");
+    while ((pos = result.find(".weight_scale")) != std::string::npos) {
+        result.replace(pos, 13, ".scales");
     }
-
-    size_t down_proj_pos = result.find(".down_proj.");
-    if (down_proj_pos != std::string::npos) {
-        result.replace(down_proj_pos, 11, ".w2.");
-    }
-
-    // AWQ quantization parameters
-    // qweight -> weight (AWQ 4-bit packed weight)
-    size_t qweight_pos = result.find(".qweight");
-    while (qweight_pos != std::string::npos) {
-        result.replace(qweight_pos, 8, ".weight");
-        qweight_pos = result.find(".qweight");
-    }
-
-    // qzeros -> zeros (AWQ quantized zero points)
-    size_t qzeros_pos = result.find(".qzeros");
-    while (qzeros_pos != std::string::npos) {
-        result.replace(qzeros_pos, 7, ".zeros");
-        qzeros_pos = result.find(".qzeros");
-    }
-
-    // weight_scale -> scales, weight_zero -> zeros (legacy naming)
-    size_t scale_pos = result.find(".weight_scale");
-    while (scale_pos != std::string::npos) {
-        result.replace(scale_pos, 13, ".scales");
-        scale_pos = result.find(".weight_scale");
-    }
-
-    size_t zero_pos = result.find(".weight_zero");
-    while (zero_pos != std::string::npos) {
-        result.replace(zero_pos, 12, ".zeros");
-        zero_pos = result.find(".weight_zero");
-    }
-
-    // Embeddings
-    size_t embed_pos = result.find(".embed_tokens.");
-    if (embed_pos != std::string::npos) {
-        result.replace(embed_pos, 14, ".tok_embeddings.");
-    }
-
-    size_t lm_head_pos = result.find(".lm_head.");
-    if (lm_head_pos != std::string::npos) {
-        result.replace(lm_head_pos, 9, ".output.");
+    while ((pos = result.find(".weight_zero")) != std::string::npos) {
+        result.replace(pos, 12, ".zeros");
     }
 
     return result;
@@ -1051,7 +1107,9 @@ int TM_TurboMind_InitFromHF(
 
 int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model_dir, int trust_remote_code)
 {
+    debug_log("[InitFromPath] ENTER\n");
     if (!tm || !model_dir) {
+        debug_log("[InitFromPath] Invalid args\n");
         SetError(TM_ERR_INVALID_ARG, "tm and model_dir must not be NULL");
         return TM_ERR_INVALID_ARG;
     }
@@ -1069,8 +1127,16 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             return TM_ERR_RUNTIME;
         }
 
+        debug_log("[InitFromPath] Step 2: CreateRoot OK\n");
+
         // Step 3: Parse HuggingFace config.json
         HfModelConfig hf_config = ParseHfConfig(std::string(model_dir));
+
+        char cfg_log[128];
+        snprintf(cfg_log, sizeof(cfg_log), "[InitFromPath] hs=%d nl=%d na=%d v=%d\n",
+                 hf_config.hidden_size, hf_config.num_hidden_layers,
+                 hf_config.num_attention_heads, hf_config.vocab_size);
+        debug_log(cfg_log);
 
         // Create ModelWeightConfig with appropriate settings
         turbomind::core::ModelWeightConfig weight_cfg;
@@ -1091,6 +1157,11 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             SetError(TM_ERR_RUNTIME, "Failed to create ModelWeight module");
             return TM_ERR_RUNTIME;
         }
+
+        fprintf(stderr, "[C-API] Parsed config: hidden_size=%d, num_layers=%d, num_heads=%d, num_kv_heads=%d, is_awq=%d\n",
+                hf_config.hidden_size, hf_config.num_hidden_layers, hf_config.num_attention_heads,
+                hf_config.num_key_value_heads, hf_config.is_awq);
+        fflush(stderr);
 
         // Build the complete module tree
         auto* model_weight = static_cast<turbomind::ModelWeight*>(weight_module.get());
@@ -1129,6 +1200,13 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
         // Calculate head dimensions
         int head_dim = hf_config.hidden_size / hf_config.num_attention_heads;
+
+        fprintf(stderr, "[C-API] Creating %d decoder layers (hidden_size=%d, num_heads=%d, head_dim=%d)\n",
+                hf_config.num_hidden_layers, hf_config.hidden_size, hf_config.num_attention_heads, head_dim);
+        char log_buf[256];
+        snprintf(log_buf, sizeof(log_buf), "[C-API] Creating %d layers (hs=%d, nh=%d, hd=%d)\n",
+                 hf_config.num_hidden_layers, hf_config.hidden_size, hf_config.num_attention_heads, head_dim);
+        debug_log(log_buf);
 
         // Create each decoder layer
         for (int layer_idx = 0; layer_idx < hf_config.num_hidden_layers; ++layer_idx) {
@@ -1353,8 +1431,12 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
                 }
             }
 
-            // 4f. Create linear_attn (DeltaNetWeight) with its child modules if this model has linear attention
-            if (hf_config.use_linear_attn) {
+            // 4f. Create linear_attn (DeltaNetWeight) if this layer uses linear attention
+            // or create attention (AttentionWeight) if this layer uses full attention
+            bool is_linear_attn = layer_idx < (int)hf_config.layer_is_linear_attn.size() &&
+                                  hf_config.layer_is_linear_attn[layer_idx];
+
+            if (is_linear_attn) {
                 turbomind::core::DeltaNetConfig delta_cfg;
                 delta_cfg.hidden_dim = hf_config.hidden_size;
                 delta_cfg.num_k_heads = hf_config.num_attention_heads;
@@ -1403,7 +1485,15 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
             // Add layer to ModuleList
             layers_list->add_child(std::to_string(layer_idx), std::move(layer_module));
+
+            char log_buf2[128];
+            snprintf(log_buf2, sizeof(log_buf2), "[C-API] Added layer %d to ModuleList\n", layer_idx);
+            debug_log(log_buf2);
         }
+
+        char log_buf3[128];
+        snprintf(log_buf3, sizeof(log_buf3), "[C-API] ModuleList size after loop: %d\n", layers_list->size());
+        debug_log(log_buf3);
 
         // Add layers to ModelWeight
         auto* layers_result = model_weight->add_child("layers", std::move(layers_list_unique));
@@ -1411,6 +1501,15 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             SetError(TM_ERR_RUNTIME, "Failed to add layers child to ModelWeight");
             return TM_ERR_RUNTIME;
         }
+
+        fprintf(stderr, "[C-API] After add_child('layers'), model_weight->layers size = %d\n",
+                model_weight->layers ? model_weight->layers->size() : -1);
+        fflush(stderr);
+
+        char log_buf4[128];
+        snprintf(log_buf4, sizeof(log_buf4), "[C-API] After add_child: layers ptr=%p, size=%d\n",
+                 (void*)model_weight->layers.get(), model_weight->layers ? model_weight->layers->size() : -1);
+        debug_log(log_buf4);
 
         // Verify layers were added
         if (!model_weight->layers) {
@@ -1427,7 +1526,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
         }
 
         // Get the model_weight pointer from the root (it's now owned by root)
-        turbomind::ModelWeight* model_weight = static_cast<turbomind::ModelWeight*>(root->child("text_model"));
+        model_weight = static_cast<turbomind::ModelWeight*>(root->child("text_model"));
         if (!model_weight) {
             SetError(TM_ERR_RUNTIME, "Failed to get ModelWeight from root");
             return TM_ERR_RUNTIME;

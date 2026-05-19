@@ -3,7 +3,13 @@
 
 add_library(turbomind_c SHARED turbomind_c.cc)
 target_include_directories(turbomind_c PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(turbomind_c PUBLIC turbomind weight_serializer)
+
+# Force-link all objects from static libraries that contain self-registration
+# globals (module type registrars).  Without --whole-archive, the linker
+# strips registrar objects because nobody references them directly.
+target_link_libraries(turbomind_c PUBLIC models turbomind weight_serializer)
+set_property(TARGET turbomind_c APPEND PROPERTY LINK_OPTIONS
+    "-Wl,--whole-archive" "$<TARGET_FILE:models>" "$<TARGET_FILE:turbomind>" "-Wl,--no-whole-archive")
 
 # Ensure standard lib prefix for dynamic linking
 set_target_properties(turbomind_c PROPERTIES

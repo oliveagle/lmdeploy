@@ -11,7 +11,7 @@
 //!   cargo run --example e2e_test -- [model_path]
 //!
 //! Example:
-//!   cargo run --example e2e_test -- /mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ
+//!   cargo run --example e2e_test -- /mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B
 
 use std::time::Instant;
 
@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| {
-            "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ".to_string()
+            "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B".to_string()
         });
 
     println!("=== LMDeploy Pure C++ E2E Test ===");

@@ -96,6 +96,7 @@ turbomind_c_EXTERNAL_OBJECTS =
 lib/libturbomind_c.so: src/turbomind/capi/CMakeFiles/turbomind_c.dir/turbomind_c.cc.o
 lib/libturbomind_c.so: src/turbomind/capi/CMakeFiles/turbomind_c.dir/build.make
 lib/libturbomind_c.so: src/turbomind/capi/CMakeFiles/turbomind_c.dir/compiler_depend.ts
+lib/libturbomind_c.so: lib/libmodels.a
 lib/libturbomind_c.so: lib/libturbomind.a
 lib/libturbomind_c.so: lib/libweight_serializer.a
 lib/libturbomind_c.so: lib/libengine.a
@@ -109,7 +110,6 @@ lib/libturbomind_c.so: lib/libgloo.a
 lib/libturbomind_c.so: lib/libnvtx_utils.a
 lib/libturbomind_c.so: lib/libmodels.a
 lib/libturbomind_c.so: lib/libgeneration.a
-lib/libturbomind_c.so: lib/libmemory_utils.a
 lib/libturbomind_c.so: lib/libban_bad_words.a
 lib/libturbomind_c.so: lib/libsampling_penalty_kernels.a
 lib/libturbomind_c.so: lib/libsampling_topk_kernels.a
@@ -134,6 +134,7 @@ lib/libturbomind_c.so: lib/libdecoding_kernels.a
 lib/libturbomind_c.so: lib/libquantization_kernels.a
 lib/libturbomind_c.so: lib/libunfused_attention_kernels.a
 lib/libturbomind_c.so: lib/libgpt_kernels.a
+lib/libturbomind_c.so: lib/libmemory_utils.a
 lib/libturbomind_c.so: lib/libanomaly_handler.a
 lib/libturbomind_c.so: lib/libcore.a
 lib/libturbomind_c.so: lib/libcuda_utils.a

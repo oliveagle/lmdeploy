@@ -103,7 +103,7 @@ void TestSafetensorsReader()
         assert(meta1->shape[1] == 3);
         assert(meta1->offset == 0);
         assert(meta1->size == 24);
-        assert(meta1->dtype == SafetensorsReader::TM_DataType::kFloat32);
+        assert(meta1->dtype == DataType::kFloat32);
 
         const auto* meta2 = reader.get_tensor_meta("tensor2");
         assert(meta2 != nullptr);
@@ -112,7 +112,7 @@ void TestSafetensorsReader()
         assert(meta2->shape[0] == 4);
         assert(meta2->offset == 24);
         assert(meta2->size == 16);
-        assert(meta2->dtype == SafetensorsReader::TM_DataType::kInt32);
+        assert(meta2->dtype == DataType::kInt32);
 
         std::cout << "  [PASS] Tensor metadata" << std::endl;
     }
@@ -178,11 +178,11 @@ void TestSafetensorsReader()
     // Test 8: Dtype parsing
     {
         // Test various dtype strings
-        assert(SafetensorsReader::ParseDtype("F32") == SafetensorsReader::TM_DataType::kFloat32);
-        assert(SafetensorsReader::ParseDtype("fp16") == SafetensorsReader::TM_DataType::kFloat16);
-        assert(SafetensorsReader::ParseDtype("BF16") == SafetensorsReader::TM_DataType::kBfloat16);
-        assert(SafetensorsReader::ParseDtype("I64") == SafetensorsReader::TM_DataType::kInt64);
-        assert(SafetensorsReader::ParseDtype("U8") == SafetensorsReader::TM_DataType::kUint8);
+        assert(SafetensorsReader::ParseDtype("F32") == DataType::kFloat32);
+        assert(SafetensorsReader::ParseDtype("fp16") == DataType::kFloat16);
+        assert(SafetensorsReader::ParseDtype("BF16") == DataType::kBfloat16);
+        assert(SafetensorsReader::ParseDtype("I64") == DataType::kInt64);
+        assert(SafetensorsReader::ParseDtype("U8") == DataType::kUint8);
         std::cout << "  [PASS] Dtype parsing" << std::endl;
     }
 
