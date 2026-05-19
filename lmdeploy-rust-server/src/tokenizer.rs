@@ -10,6 +10,7 @@ use anyhow::{Result, anyhow};
 use tokenizers::Tokenizer;
 
 /// LMDeploy tokenizer wrapper
+#[derive(Clone)]
 pub struct LMTokenizer {
     tokenizer: Arc<Tokenizer>,
     /// BOS token ID

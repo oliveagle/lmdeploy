@@ -278,13 +278,36 @@ int TM_ModelRequest_Forward(
     bool enable_metrics,
     TM_TensorMap* output_tensors);
 
+// Non-blocking forward inference with stream_output enabled.
+// Returns immediately after submitting the request. Caller must poll
+// TM_ModelRequest_GetState to check completion and read intermediate tokens.
+// Returns 0 on success, negative on error
+int TM_ModelRequest_ForwardAsync(
+    TM_ModelRequest* req,
+    TM_TensorMap* input_tensors,
+    const TM_SessionParam* session,
+    const TM_GenerationConfig* gen_cfg,
+    bool stream_output,
+    bool enable_metrics);
+
+// Get the output_ids tensor from the in-flight request.
+// Returns a pointer to int32 array of generated tokens and the count.
+// Only valid during stream_output mode (between ForwardAsync and completion).
+// Returns 0 on success, negative if no output available
+int TM_ModelRequest_GetStreamToken(
+    TM_ModelRequest* req,
+    void** out_data,
+    size_t* out_count);
+
 // Cancel running request
 void TM_ModelRequest_Cancel(TM_ModelRequest* req);
 
 // End session (signals request completion)
 void TM_ModelRequest_End(TM_ModelRequest* req, uint64_t session_id);
 
-// Request status codes (from Request::Status enum)
+// Get request state from streaming mode.
+// Returns 0 on success, -1 if state is null
+int TM_ModelRequest_GetStreamingState(TM_ModelRequest* req, TM_RequestStatus* out_status, int* out_seq_len);
 typedef enum {
     TM_STATUS_OK = 0,
     TM_STATUS_INVALID = 1,

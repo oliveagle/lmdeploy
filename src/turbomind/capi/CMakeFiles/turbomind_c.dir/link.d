@@ -49,7 +49,7 @@
   /usr/local/cuda-12.5/targets/x86_64-linux/lib/libcudart.so \
   /usr/local/cuda-12.5/targets/x86_64-linux/lib/stubs/libcuda.so \
   /usr/lib/x86_64-linux-gnu/librt.a \
-  ../../../_deps/fmt-build/libfmt.a \
+  ../../../_deps/fmt-build/libfmtd.a \
   /usr/lib/gcc/x86_64-linux-gnu/13/crtendS.o \
   /usr/lib/gcc/x86_64-linux-gnu/13/../../../x86_64-linux-gnu/crtn.o \
   /usr/lib/gcc/x86_64-linux-gnu/13/../../../x86_64-linux-gnu/libpthread.a \
@@ -71,23 +71,26 @@
   /usr/lib/gcc/x86_64-linux-gnu/13/libgcc_s.so \
   /usr/lib/gcc/x86_64-linux-gnu/13/../../../x86_64-linux-gnu/libgcc_s.so.1 \
   /usr/lib/gcc/x86_64-linux-gnu/13/libgcc.a \
-  /tmp/ccqQJYrV.ltrans0.ltrans.o \
-  /tmp/ccqQJYrV.ltrans1.ltrans.o \
-  /tmp/ccqQJYrV.ltrans2.ltrans.o \
-  /tmp/ccqQJYrV.ltrans3.ltrans.o \
-  /tmp/ccqQJYrV.ltrans4.ltrans.o \
-  /tmp/ccqQJYrV.ltrans5.ltrans.o \
-  /tmp/ccqQJYrV.ltrans6.ltrans.o \
-  /tmp/ccqQJYrV.ltrans7.ltrans.o \
-  /tmp/ccqQJYrV.ltrans8.ltrans.o \
-  /tmp/ccqQJYrV.ltrans9.ltrans.o \
-  /tmp/ccqQJYrV.ltrans10.ltrans.o \
-  /tmp/ccqQJYrV.ltrans11.ltrans.o \
-  /tmp/ccqQJYrV.ltrans12.ltrans.o \
-  /tmp/ccqQJYrV.ltrans13.ltrans.o \
-  /tmp/ccqQJYrV.ltrans14.ltrans.o \
-  /tmp/ccqQJYrV.ltrans15.ltrans.o \
-  /tmp/ccqQJYrV.ltrans16.ltrans.o
+  /tmp/ccxqivZM.ltrans0.ltrans.o \
+  /tmp/ccxqivZM.ltrans1.ltrans.o \
+  /tmp/ccxqivZM.ltrans2.ltrans.o \
+  /tmp/ccxqivZM.ltrans3.ltrans.o \
+  /tmp/ccqtyZwh.debug.temp.o \
+  /tmp/ccAiZ9mk.debug.temp.o \
+  /tmp/ccapmYI1.debug.temp.o \
+  /tmp/ccTqmfpy.debug.temp.o \
+  /tmp/ccfE5zLU.debug.temp.o \
+  /tmp/cckZpc7i.debug.temp.o \
+  /tmp/ccMakOcB.debug.temp.o \
+  /tmp/ccOiEYpf.debug.temp.o \
+  /tmp/cc5FzMwU.debug.temp.o \
+  /tmp/ccL9w0eo.debug.temp.o \
+  /tmp/ccm6VzQ1.debug.temp.o \
+  /tmp/ccShsYsS.debug.temp.o \
+  /tmp/cccl9cXo.debug.temp.o \
+  /tmp/cc99f8QV.debug.temp.o \
+  /tmp/ccA6WfB6.debug.temp.o \
+  /tmp/ccrwjXMA.debug.temp.o
 
 /usr/lib/gcc/x86_64-linux-gnu/13/../../../x86_64-linux-gnu/crti.o:
 
@@ -189,7 +192,7 @@ CMakeFiles/turbomind_c.dir/turbomind_c.cc.o:
 
 /usr/lib/x86_64-linux-gnu/librt.a:
 
-../../../_deps/fmt-build/libfmt.a:
+../../../_deps/fmt-build/libfmtd.a:
 
 /usr/lib/gcc/x86_64-linux-gnu/13/crtendS.o:
 
@@ -233,36 +236,42 @@ CMakeFiles/turbomind_c.dir/turbomind_c.cc.o:
 
 /usr/lib/gcc/x86_64-linux-gnu/13/libgcc.a:
 
-/tmp/ccqQJYrV.ltrans0.ltrans.o:
+/tmp/ccxqivZM.ltrans0.ltrans.o:
 
-/tmp/ccqQJYrV.ltrans1.ltrans.o:
+/tmp/ccxqivZM.ltrans1.ltrans.o:
 
-/tmp/ccqQJYrV.ltrans2.ltrans.o:
+/tmp/ccxqivZM.ltrans2.ltrans.o:
 
-/tmp/ccqQJYrV.ltrans3.ltrans.o:
+/tmp/ccxqivZM.ltrans3.ltrans.o:
 
-/tmp/ccqQJYrV.ltrans4.ltrans.o:
+/tmp/ccqtyZwh.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans5.ltrans.o:
+/tmp/ccAiZ9mk.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans6.ltrans.o:
+/tmp/ccapmYI1.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans7.ltrans.o:
+/tmp/ccTqmfpy.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans8.ltrans.o:
+/tmp/ccfE5zLU.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans9.ltrans.o:
+/tmp/cckZpc7i.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans10.ltrans.o:
+/tmp/ccMakOcB.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans11.ltrans.o:
+/tmp/ccOiEYpf.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans12.ltrans.o:
+/tmp/cc5FzMwU.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans13.ltrans.o:
+/tmp/ccL9w0eo.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans14.ltrans.o:
+/tmp/ccm6VzQ1.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans15.ltrans.o:
+/tmp/ccShsYsS.debug.temp.o:
 
-/tmp/ccqQJYrV.ltrans16.ltrans.o:
+/tmp/cccl9cXo.debug.temp.o:
+
+/tmp/cc99f8QV.debug.temp.o:
+
+/tmp/ccA6WfB6.debug.temp.o:
+
+/tmp/ccrwjXMA.debug.temp.o:

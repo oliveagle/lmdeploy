@@ -3,6 +3,43 @@
 This file tracks progress across iterations. Agents update this file
 after each iteration and it's included in prompts for context.
 
+## 2026-05-20 - lmdeploy-x63
+- **Status**: Verified and closed - Pure Rust tokenizer already implemented
+- **Verified**:
+  - `lmdeploy-rust-server/src/tokenizer.rs` - 使用 HuggingFace `tokenizers` crate (纯 Rust 实现)
+  - `Cargo.toml` - 依赖 `tokenizers = "0.21"` (官方 HuggingFace Rust tokenizer 库)
+  - NO Python 依赖 - 直接从 `tokenizer.json` 或 `tokenizer.model` 文件加载
+  - 支持完整功能: encode/decode, batch encoding, BOS/EOS tokens, raw encoding, id-to-token 映射
+  - 4 个 tokenizer 单元测试全部通过 ✅
+- **Learnings**:
+  - `tokenizers` crate 是 HuggingFace 官方纯 Rust tokenizer 实现，无需 Python
+  - `Tokenizer::from_file()` 直接读取 tokenizer.json/model 文件
+  - 支持 SentencePiece (tokenizer.model) 和 fast tokenizer (tokenizer.json) 格式
+  - `LMTokenizer::from_path()` 按优先级搜索: tokenizer.json > tokenizer.model > tokenizer_config.json
+
+---
+
+## 2026-05-19 - lmdeploy-09p
+- **Implemented**: Forward 执行绑定 - 异步推理和流式输出
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.h` - 添加 `TM_ModelRequest_ForwardAsync`, `TM_ModelRequest_GetStreamToken`, `TM_ModelRequest_GetStreamingState`
+  - `src/turbomind/capi/turbomind_c.cc` - 实现异步 Forward 和流式 token 获取
+  - `lmdeploy-rust-server/src/turbomind_c.rs` - 添加 Rust FFI bindings
+  - `lmdeploy-rust-server/src/model/cpp_engine.rs` - 实现 `generate_stream` 方法
+  - `lmdeploy-rust-server/src/tokenizer.rs` - 为 LMTokenizer 添加 Clone derive
+- **Learnings**:
+  - `TM_ModelRequest_Forward` 是同步阻塞版本，使用 `future.get()` 等待完成
+  - `TM_ModelRequest_ForwardAsync` 是非阻塞版本，返回后立即开始推理
+  - 流式输出通过 `stream_output=true` 标志启用，C++ 引擎在每个 token 生成后更新 `AtomicRequestState`
+  - `TM_ModelRequest_GetStreamingState` 使用 `exchange(nullptr)` 原子交换获取状态（只获取一次）
+  - `TM_ModelRequest_GetStreamToken` 读取 `output_ids` tensor 获取当前生成的所有 token
+  - Rust 层使用 `spawn_blocking` + `mpsc::channel` 实现 token-by-token 流式输出
+  - 轮询间隔 5ms 避免忙等待，`seq_len` 增量检测确保只发送新生成的 token
+  - `tokio_stream::wrappers::ReceiverStream` 将 `mpsc::Receiver` 转换为 Stream
+  - 所有 52 个测试通过
+
+---
+
 ## 2026-05-19 - lmdeploy-oo1
 - **Status**: Verified and closed - FFN feed_forward 权重加载已完整实现
 - **Verified**:
@@ -14,6 +51,22 @@ after each iteration and it's included in prompts for context.
   - MoE expert FfnWeight 也正确创建 w1, w2, w3 子模块
   - 52 Rust 测试全部通过 ✅
   - 3 Python 集成测试全部通过 ✅
+---
+
+## 2026-05-19 - lmdeploy-h2w
+- **Status**: Verified and closed - LinearWeight::param() works correctly
+- **Verified**:
+  - `text_model.param("tok_embeddings")` → Valid Param + tensor (shape=[248320, 4096])
+  - `output.param("weight")` → Valid Param + tensor
+  - `attention_norm.param("weight")` → Valid Param + tensor
+  - `ffn.child("w2").param("weight")` → Valid Param + tensor (shape=[12288, 4096])
+  - `ffn.child("w1w3").param("weight")` → Valid Param + tensor (shape=[4096, 24576])
+- **Finding**: The TM_MODULE_METHODS macro expansion and param() implementation work correctly
+- **Learnings**:
+  - FfnWeight uses w1w3 fused child (not separate w1/w3) for FFN layers
+  - DecoderLayerWeight may have missing "attention" child depending on model architecture
+  - C API InitFromPath() builds an incomplete module tree compared to Python builder
+  - The actual bug for C++ engine is module tree construction, not param() method
 ---
 
 ## Codebase Patterns
@@ -41,6 +94,65 @@ Qwen3.5/3.6 multimodal models store actual parameters in `text_config` sub-objec
 let text_config = config.get("text_config").or_else(|| config.get("model_config")).unwrap_or(&config);
 let hidden_size = text_config.get("hidden_size").unwrap_or(config.get("hidden_size")).unwrap_or("N/A");
 ```
+
+### C++ Streaming Forward Pattern
+
+**问题**: C++ `TM_ModelRequest_Forward` 是同步阻塞的，无法实现流式输出。
+
+**解决方案**: 添加非阻塞 `TM_ModelRequest_ForwardAsync` 和轮询机制：
+
+```cpp
+// C API: 提交异步推理请求
+int TM_ModelRequest_ForwardAsync(
+    TM_ModelRequest* req,
+    TM_TensorMap* input_tensors,
+    const TM_SessionParam* session,
+    const TM_GenerationConfig* gen_cfg,
+    bool stream_output,  // true = 启用逐 token 更新
+    bool enable_metrics);
+
+// 获取流式输出状态（原子交换，只返回一次）
+int TM_ModelRequest_GetStreamingState(
+    TM_ModelRequest* req,
+    TM_RequestStatus* out_status,
+    int* out_seq_len);
+
+// 读取 output_ids tensor
+int TM_ModelRequest_GetStreamToken(
+    TM_ModelRequest* req,
+    void** out_data,
+    size_t* out_count);
+```
+
+**Rust 层实现**:
+```rust
+// 轮询循环在 spawn_blocking 线程中运行
+loop {
+    sleep(Duration::from_millis(5));  // 避免忙等待
+    let (status, seq_len) = req.get_streaming_state()?;
+
+    // 只处理新 token
+    if seq_len > prev_seq_len {
+        let (ptr, count) = req.get_stream_token()?;
+        let tokens = unsafe { slice::from_raw_parts(ptr, count) };
+        let new_tokens = &tokens[prev_seq_len..seq_len];
+        tx.blocking_send(tokenizer.decode(new_tokens)?);
+        prev_seq_len = seq_len;
+    }
+
+    if matches!(status, TM_STATUS_FINISH | TM_STATUS_CANCEL | ...) {
+        break;
+    }
+}
+```
+
+**关键点**:
+- `stream_output=true` 使 C++ 引擎在每 token 后调用 `UpdateState(r, Request::kOk, seq_len)`
+- `AtomicRequestState::exchange(nullptr)` 原子交换只返回一次状态
+- Rust 轮询检测 `seq_len` 增加，只解码新生成的 token
+- `tokio_stream::wrappers::ReceiverStream` 将 `mpsc::Receiver` 转为 `Stream<Item = String>`
+
+---
 
 ### DeltaNet linear_attn Fused Projection Pattern
 

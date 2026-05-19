@@ -282,6 +282,24 @@ extern "C" {
         out_data: *mut *mut c_void,
         out_size: *mut usize,
     ) -> c_int;
+    pub fn TM_ModelRequest_ForwardAsync(
+        req: *mut TM_ModelRequest,
+        input_tensors: *mut TM_TensorMap,
+        session: *const TM_SessionParam,
+        gen_cfg: *const TM_GenerationConfig,
+        stream_output: bool,
+        enable_metrics: bool,
+    ) -> c_int;
+    pub fn TM_ModelRequest_GetStreamToken(
+        req: *mut TM_ModelRequest,
+        out_data: *mut *mut c_void,
+        out_count: *mut usize,
+    ) -> c_int;
+    pub fn TM_ModelRequest_GetStreamingState(
+        req: *mut TM_ModelRequest,
+        out_status: *mut TM_RequestStatus,
+        out_seq_len: *mut c_int,
+    ) -> c_int;
 }
 
 /// Result type for FFI operations
@@ -864,6 +882,75 @@ impl ModelRequest {
         }
 
         Ok((out_data as *const u8, out_size))
+    }
+
+    /// Submit a non-blocking forward request with stream_output enabled.
+    /// Caller must poll `get_streaming_state` to check completion and `get_stream_token`
+    /// to read intermediate tokens during generation.
+    pub fn forward_async(
+        &mut self,
+        input_tensors: &mut TensorMap,
+        session: &TM_SessionParam,
+        gen_cfg: &GenConfig,
+        stream_output: bool,
+        enable_metrics: bool,
+    ) -> FFResult<()> {
+        unsafe {
+            let ret = TM_ModelRequest_ForwardAsync(
+                self.0,
+                input_tensors.0,
+                session,
+                gen_cfg.0,
+                stream_output,
+                enable_metrics,
+            );
+            if ret != 0 {
+                return Err(FFError::from_last_error().unwrap_or(FFError {
+                    code: TM_ErrorCode::TM_ERR_RUNTIME,
+                    message: "ForwardAsync failed".into(),
+                }));
+            }
+            Ok(())
+        }
+    }
+
+    /// Get output_ids tensor data from in-flight streaming request.
+    /// Returns (data_ptr, token_count) where data_ptr points to int32 array.
+    pub fn get_stream_token(&self) -> FFResult<(*const c_int, usize)> {
+        let mut out_data: *mut c_void = std::ptr::null_mut();
+        let mut out_count: usize = 0;
+
+        let ret = unsafe {
+            TM_ModelRequest_GetStreamToken(self.0, &mut out_data, &mut out_count)
+        };
+
+        if ret != 0 {
+            return Err(FFError::from_last_error().unwrap_or(FFError {
+                code: TM_ErrorCode::TM_ERR_RUNTIME,
+                message: "GetStreamToken failed".into(),
+            }));
+        }
+
+        Ok((out_data as *const c_int, out_count))
+    }
+
+    /// Get streaming request state (non-destructive polling)
+    pub fn get_streaming_state(&self) -> FFResult<(TM_RequestStatus, c_int)> {
+        let mut out_status: TM_RequestStatus = TM_RequestStatus::TM_STATUS_OK;
+        let mut out_seq_len: c_int = 0;
+
+        let ret = unsafe {
+            TM_ModelRequest_GetStreamingState(self.0, &mut out_status, &mut out_seq_len)
+        };
+
+        if ret != 0 {
+            return Err(FFError::from_last_error().unwrap_or(FFError {
+                code: TM_ErrorCode::TM_ERR_RUNTIME,
+                message: "GetStreamingState failed".into(),
+            }));
+        }
+
+        Ok((out_status, out_seq_len))
     }
 }
 

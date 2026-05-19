@@ -232,22 +232,13 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o: src/tur
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
   /usr/include/x86_64-linux-gnu/bits/sched.h \
-  /usr/include/x86_64-linux-gnu/bits/select-decl.h \
   /usr/include/x86_64-linux-gnu/bits/select.h \
-  /usr/include/x86_64-linux-gnu/bits/select2.h \
   /usr/include/x86_64-linux-gnu/bits/setjmp.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2.h \
   /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
   /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib.h \
-  /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
-  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
   /usr/include/x86_64-linux-gnu/bits/struct_mutex.h \
   /usr/include/x86_64-linux-gnu/bits/struct_rwlock.h \
   /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h \
@@ -286,8 +277,6 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o: src/tur
   /usr/include/x86_64-linux-gnu/bits/waitflags.h \
   /usr/include/x86_64-linux-gnu/bits/waitstatus.h \
   /usr/include/x86_64-linux-gnu/bits/wchar.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2.h \
   /usr/include/x86_64-linux-gnu/bits/wctype-wchar.h \
   /usr/include/x86_64-linux-gnu/bits/wordsize.h \
   /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
@@ -614,22 +603,13 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o: src/tur
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
   /usr/include/x86_64-linux-gnu/bits/sched.h \
-  /usr/include/x86_64-linux-gnu/bits/select-decl.h \
   /usr/include/x86_64-linux-gnu/bits/select.h \
-  /usr/include/x86_64-linux-gnu/bits/select2.h \
   /usr/include/x86_64-linux-gnu/bits/setjmp.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2.h \
   /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
   /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib.h \
-  /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
-  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
   /usr/include/x86_64-linux-gnu/bits/struct_mutex.h \
   /usr/include/x86_64-linux-gnu/bits/struct_rwlock.h \
   /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h \
@@ -668,8 +648,6 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o: src/tur
   /usr/include/x86_64-linux-gnu/bits/waitflags.h \
   /usr/include/x86_64-linux-gnu/bits/waitstatus.h \
   /usr/include/x86_64-linux-gnu/bits/wchar.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2.h \
   /usr/include/x86_64-linux-gnu/bits/wctype-wchar.h \
   /usr/include/x86_64-linux-gnu/bits/wordsize.h \
   /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
@@ -994,22 +972,13 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o: src/tur
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
   /usr/include/x86_64-linux-gnu/bits/sched.h \
-  /usr/include/x86_64-linux-gnu/bits/select-decl.h \
   /usr/include/x86_64-linux-gnu/bits/select.h \
-  /usr/include/x86_64-linux-gnu/bits/select2.h \
   /usr/include/x86_64-linux-gnu/bits/setjmp.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2.h \
   /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
   /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib.h \
-  /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
-  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
   /usr/include/x86_64-linux-gnu/bits/struct_mutex.h \
   /usr/include/x86_64-linux-gnu/bits/struct_rwlock.h \
   /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h \
@@ -1048,8 +1017,6 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o: src/tur
   /usr/include/x86_64-linux-gnu/bits/waitflags.h \
   /usr/include/x86_64-linux-gnu/bits/waitstatus.h \
   /usr/include/x86_64-linux-gnu/bits/wchar.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2.h \
   /usr/include/x86_64-linux-gnu/bits/wctype-wchar.h \
   /usr/include/x86_64-linux-gnu/bits/wordsize.h \
   /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
@@ -1375,22 +1342,13 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o: src
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
   /usr/include/x86_64-linux-gnu/bits/sched.h \
-  /usr/include/x86_64-linux-gnu/bits/select-decl.h \
   /usr/include/x86_64-linux-gnu/bits/select.h \
-  /usr/include/x86_64-linux-gnu/bits/select2.h \
   /usr/include/x86_64-linux-gnu/bits/setjmp.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2.h \
   /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
   /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib.h \
-  /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
-  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
   /usr/include/x86_64-linux-gnu/bits/struct_mutex.h \
   /usr/include/x86_64-linux-gnu/bits/struct_rwlock.h \
   /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h \
@@ -1429,8 +1387,6 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o: src
   /usr/include/x86_64-linux-gnu/bits/waitflags.h \
   /usr/include/x86_64-linux-gnu/bits/waitstatus.h \
   /usr/include/x86_64-linux-gnu/bits/wchar.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2.h \
   /usr/include/x86_64-linux-gnu/bits/wctype-wchar.h \
   /usr/include/x86_64-linux-gnu/bits/wordsize.h \
   /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
@@ -1774,22 +1730,13 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o: s
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
   /usr/include/x86_64-linux-gnu/bits/sched.h \
-  /usr/include/x86_64-linux-gnu/bits/select-decl.h \
   /usr/include/x86_64-linux-gnu/bits/select.h \
-  /usr/include/x86_64-linux-gnu/bits/select2.h \
   /usr/include/x86_64-linux-gnu/bits/setjmp.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2.h \
   /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
   /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib.h \
-  /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
-  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
   /usr/include/x86_64-linux-gnu/bits/struct_mutex.h \
   /usr/include/x86_64-linux-gnu/bits/struct_rwlock.h \
   /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h \
@@ -1828,8 +1775,6 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o: s
   /usr/include/x86_64-linux-gnu/bits/waitflags.h \
   /usr/include/x86_64-linux-gnu/bits/waitstatus.h \
   /usr/include/x86_64-linux-gnu/bits/wchar.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2.h \
   /usr/include/x86_64-linux-gnu/bits/wctype-wchar.h \
   /usr/include/x86_64-linux-gnu/bits/wordsize.h \
   /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
@@ -2456,22 +2401,13 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
   /usr/include/x86_64-linux-gnu/bits/sched.h \
-  /usr/include/x86_64-linux-gnu/bits/select-decl.h \
   /usr/include/x86_64-linux-gnu/bits/select.h \
-  /usr/include/x86_64-linux-gnu/bits/select2.h \
   /usr/include/x86_64-linux-gnu/bits/setjmp.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2.h \
   /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
   /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib.h \
-  /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
-  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
   /usr/include/x86_64-linux-gnu/bits/struct_mutex.h \
   /usr/include/x86_64-linux-gnu/bits/struct_rwlock.h \
   /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h \
@@ -2510,8 +2446,6 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o
   /usr/include/x86_64-linux-gnu/bits/waitflags.h \
   /usr/include/x86_64-linux-gnu/bits/waitstatus.h \
   /usr/include/x86_64-linux-gnu/bits/wchar.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2.h \
   /usr/include/x86_64-linux-gnu/bits/wctype-wchar.h \
   /usr/include/x86_64-linux-gnu/bits/wordsize.h \
   /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
@@ -2790,17 +2724,9 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/common_reference.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/apply_cv.h:
+/usr/include/x86_64-linux-gnu/bits/types/__sigset_t.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/alignment_of.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_rvalue_reference.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_lvalue_reference.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_cv.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_const.h:
+/usr/include/x86_64-linux-gnu/bits/types/__locale_t.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/__FILE.h:
 
@@ -2818,16 +2744,6 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__memory/voidify.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_object.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/unwrap_ref.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdio2.h:
-
-/usr/include/c++/13/bits/ptr_traits.h:
-
 /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h:
@@ -2836,19 +2752,17 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o
 
 /usr/include/x86_64-linux-gnu/c++/13/bits/gthr-default.h:
 
+/usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h:
+
 /usr/include/time.h:
-
-/usr/include/x86_64-linux-gnu/bits/select2.h:
-
-src/turbomind/comm/cuda_ipc/fused_allreduce_ex.cu:
-
-/usr/include/c++/13/cmath:
 
 /usr/include/x86_64-linux-gnu/bits/sched.h:
 
 src/turbomind/comm/cuda_ipc/semaphore.h:
 
 /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h:
+
+/usr/include/c++/13/sstream:
 
 /usr/include/x86_64-linux-gnu/bits/local_lim.h:
 
@@ -2873,8 +2787,6 @@ src/turbomind/comm/cuda_ipc/semaphore.h:
 /usr/include/x86_64-linux-gnu/bits/byteswap.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__concepts/swappable.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdio.h:
 
 /usr/include/string.h:
 
@@ -2920,6 +2832,10 @@ src/turbomind/comm/cuda_ipc/semaphore.h:
 
 /usr/include/c++/13/unordered_map:
 
+/usr/include/x86_64-linux-gnu/bits/types/cookie_io_functions_t.h:
+
+/usr/include/c++/13/bits/nested_exception.h:
+
 /usr/local/cuda-12.5/targets/x86_64-linux/include/crt/sm_70_rt.h:
 
 src/turbomind/comm/cuda_ipc/mscclpp.h:
@@ -2948,19 +2864,9 @@ src/turbomind/comm/cuda_ipc/mscclpp.h:
 
 /usr/include/x86_64-linux-gnu/bits/stdint-intn.h:
 
-src/turbomind/core/core.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cub/config.cuh:
-
 /usr/include/c++/13/stdlib.h:
 
 src/turbomind/core/scope.h:
-
-/usr/include/c++/13/sstream:
-
-/usr/include/c++/13/bits/nested_exception.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/cookie_io_functions_t.h:
 
 /usr/include/c++/13/set:
 
@@ -3068,10 +2974,6 @@ src/turbomind/comm/cuda_ipc/multimem.cuh:
 
 /usr/include/c++/13/tr1/riemann_zeta.tcc:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_volatile.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/unary_function.h:
-
 /usr/include/c++/13/bits/streambuf_iterator.h:
 
 /usr/include/x86_64-linux-gnu/bits/flt-eval-method.h:
@@ -3096,8 +2998,6 @@ src/turbomind/kernels/core/meta.h:
 
 /usr/include/c++/13/iosfwd:
 
-/usr/include/x86_64-linux-gnu/bits/stdio2-decl.h:
-
 /usr/local/cuda-12.5/targets/x86_64-linux/include/crt/device_double_functions.hpp:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__iterator/advance.h:
@@ -3114,10 +3014,6 @@ src/turbomind/kernels/core/meta.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/sm_35_atomic_functions.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/aligned_union.h:
-
-/usr/include/c++/13/bits/fstream.tcc:
-
 /usr/include/x86_64-linux-gnu/bits/atomic_wide_counter.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__iterator/concepts.h:
@@ -3125,6 +3021,12 @@ src/turbomind/kernels/core/meta.h:
 /usr/include/c++/13/bits/refwrap.h:
 
 /usr/include/c++/13/bit:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_trivial.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/__fpos_t.h:
+
+/usr/include/c++/13/bits/basic_string.tcc:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/reference_wrapper.h:
 
@@ -3148,11 +3050,15 @@ src/turbomind/comm/cuda_ipc/allgather.cu:
 
 /usr/include/c++/13/bits/cxxabi_init_exception.h:
 
+/usr/include/x86_64-linux-gnu/bits/types/clock_t.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda_fp8.hpp:
+
+/usr/lib/gcc/x86_64-linux-gnu/13/include/syslimits.h:
+
 /usr/include/c++/13/bits/char_traits.h:
 
 /usr/include/c++/13/bits/std_function.h:
-
-/usr/include/x86_64-linux-gnu/bits/select-decl.h:
 
 /usr/include/x86_64-linux-gnu/c++/13/bits/ctype_inline.h:
 
@@ -3181,6 +3087,8 @@ src/turbomind/core/data_type.h:
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/function.h:
 
 src/turbomind/comm/cuda_ipc/cuda_ipc_comm.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h:
 
 /usr/include/c++/13/bits/stl_relops.h:
 
@@ -3266,12 +3174,6 @@ src/turbomind/comm/cuda_ipc/common.h:
 
 /usr/include/x86_64-linux-gnu/bits/fp-logb.h:
 
-/usr/include/x86_64-linux-gnu/bits/wchar2.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_pointer.h:
-
-/usr/include/c++/13/bits/algorithmfwd.h:
-
 /usr/include/x86_64-linux-gnu/bits/long-double.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/sm_30_intrinsics.hpp:
@@ -3308,13 +3210,7 @@ _deps/fmt-src/include/fmt/format.h:
 
 /usr/include/c++/13/bits/cpp_type_traits.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/aligned_storage.h:
-
-/usr/include/c++/13/cassert:
-
 src/turbomind/kernels/core/sub_byte_ptr.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdlib.h:
 
 /usr/include/c++/13/bits/stl_vector.h:
 
@@ -3360,6 +3256,8 @@ src/turbomind/comm/host_comm.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda_runtime_api.h:
 
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_const.h:
+
 /usr/include/c++/13/bits/memoryfwd.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__config:
@@ -3396,19 +3294,21 @@ src/turbomind/comm/host_comm.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__cccl/dialect.h:
 
-/usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h:
-
 /usr/include/x86_64-linux-gnu/bits/mathcalls-narrow.h:
 
 /usr/include/c++/13/bits/stl_multiset.h:
 
-/usr/include/x86_64-linux-gnu/bits/strings_fortified.h:
+/usr/include/linux/errno.h:
+
+/usr/include/c++/13/bits/std_abs.h:
 
 src/turbomind/comm/cuda_ipc/group_sum.h:
 
 /usr/include/c++/13/bits/postypes.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/sm_60_atomic_functions.hpp:
+
+/usr/include/c++/13/bits/ptr_traits.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_nothrow_move_assignable.h:
 
@@ -3427,12 +3327,6 @@ src/turbomind/comm/cuda_ipc/group_sum.h:
 /usr/include/c++/13/cerrno:
 
 /usr/include/c++/13/bits/stringfwd.h:
-
-/usr/include/linux/errno.h:
-
-/usr/include/c++/13/bits/std_abs.h:
-
-/usr/include/x86_64-linux-gnu/bits/wchar2-decl.h:
 
 src/turbomind/macro.h:
 
@@ -3526,35 +3420,21 @@ src/turbomind/comm/cuda_ipc/allreduce.cu:
 
 /usr/include/c++/13/cstdint:
 
+src/turbomind/comm/cuda_ipc/fused_allreduce_ex.cu:
+
+/usr/include/c++/13/cmath:
+
 /usr/include/c++/13/fstream:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cub/util_arch.cuh:
 
-/usr/include/x86_64-linux-gnu/bits/types/__sigset_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_trivial.h:
-
-/usr/include/c++/13/bits/basic_string.tcc:
-
-/usr/include/x86_64-linux-gnu/bits/types/__fpos_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/__locale_t.h:
-
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/has_unique_object_representation.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h:
 
 /usr/include/math.h:
 
 /usr/include/c++/13/cstdio:
-
-/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/clock_t.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda_fp8.hpp:
-
-/usr/lib/gcc/x86_64-linux-gnu/13/include/syslimits.h:
 
 /usr/include/c++/13/type_traits:
 
@@ -3576,17 +3456,13 @@ src/turbomind/kernels/core/data_type.h:
 
 /usr/include/x86_64-linux-gnu/bits/typesizes.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/can_extract_key.h:
-
-/usr/include/c++/13/bits/stream_iterator.h:
-
 /usr/include/x86_64-linux-gnu/bits/waitflags.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/sm_32_intrinsics.hpp:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/binary_negate.h:
-
 /usr/include/c++/13/bits/charconv.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/binary_negate.h:
 
 /usr/include/x86_64-linux-gnu/c++/13/bits/atomic_word.h:
 
@@ -3784,6 +3660,8 @@ src/turbomind/core/tensor.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/binder2nd.h:
 
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/alignment_of.h:
+
 src/turbomind/comm/cuda_ipc/broadcast.cu:
 
 src/turbomind/comm/cuda_ipc/cuda_ipc_comm.cu:
@@ -3820,6 +3698,12 @@ src/turbomind/core/context.h:
 
 src/turbomind/core/copy.h:
 
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_cv.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cub/config.cuh:
+
+src/turbomind/core/core.h:
+
 src/turbomind/core/layout.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cub/detail/uninitialized_copy.cuh:
@@ -3846,7 +3730,15 @@ src/turbomind/core/stream.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/mem_fn.h:
 
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/unary_function.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_volatile.h:
+
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cub/detail/detect_cuda_runtime.cuh:
+
+/usr/include/c++/13/bits/fstream.tcc:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/aligned_union.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cub/thread/thread_load.cuh:
 
@@ -3914,8 +3806,6 @@ src/turbomind/comm/device_comm.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__concepts/destructible.h:
 
-/usr/include/x86_64-linux-gnu/bits/string_fortified.h:
-
 /usr/include/c++/13/initializer_list:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__concepts/predicate.h:
@@ -3966,6 +3856,10 @@ src/turbomind/comm/device_comm.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/pointer_to_unary_function.h:
 
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_object.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/unwrap_ref.h:
+
 /usr/include/x86_64-linux-gnu/bits/wordsize.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/weak_result_type.h:
@@ -3991,6 +3885,8 @@ src/turbomind/comm/device_comm.h:
 /usr/local/cuda-12.5/targets/x86_64-linux/include/builtin_types.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__memory/construct_at.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/apply_cv.h:
 
 /usr/include/c++/13/bits/stl_algobase.h:
 
@@ -4021,3 +3917,19 @@ src/turbomind/comm/device_comm.h:
 /usr/include/c++/13/bits/shared_ptr_base.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__tuple_dir/tuple_size.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_lvalue_reference.h:
+
+/usr/include/c++/13/bits/algorithmfwd.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_pointer.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/add_rvalue_reference.h:
+
+/usr/include/c++/13/cassert:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/aligned_storage.h:
+
+/usr/include/c++/13/bits/stream_iterator.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/can_extract_key.h:

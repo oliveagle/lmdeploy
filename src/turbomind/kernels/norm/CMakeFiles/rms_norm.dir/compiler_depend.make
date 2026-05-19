@@ -241,22 +241,13 @@ src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/rms_norm.cu.o: src/turbomind/
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
   /usr/include/x86_64-linux-gnu/bits/sched.h \
-  /usr/include/x86_64-linux-gnu/bits/select-decl.h \
   /usr/include/x86_64-linux-gnu/bits/select.h \
-  /usr/include/x86_64-linux-gnu/bits/select2.h \
   /usr/include/x86_64-linux-gnu/bits/setjmp.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2.h \
   /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
   /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib.h \
-  /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
-  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
   /usr/include/x86_64-linux-gnu/bits/struct_mutex.h \
   /usr/include/x86_64-linux-gnu/bits/struct_rwlock.h \
   /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h \
@@ -295,8 +286,6 @@ src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/rms_norm.cu.o: src/turbomind/
   /usr/include/x86_64-linux-gnu/bits/waitflags.h \
   /usr/include/x86_64-linux-gnu/bits/waitstatus.h \
   /usr/include/x86_64-linux-gnu/bits/wchar.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2-decl.h \
-  /usr/include/x86_64-linux-gnu/bits/wchar2.h \
   /usr/include/x86_64-linux-gnu/bits/wctype-wchar.h \
   /usr/include/x86_64-linux-gnu/bits/wordsize.h \
   /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
@@ -859,47 +848,25 @@ src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/rms_norm.cu.o: src/turbomind/
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_array.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_abstract.h:
+/usr/include/x86_64-linux-gnu/bits/types/__FILE.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/integral_constant.h:
+/usr/include/x86_64-linux-gnu/bits/timesize.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/disjunction.h:
+/usr/include/c++/13/bits/locale_classes.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/dependent_type.h:
+/usr/include/x86_64-linux-gnu/bits/time.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/decay.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/copy_cvref.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/copy_cv.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_object.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/unwrap_ref.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdio2.h:
-
-/usr/include/c++/13/bits/ptr_traits.h:
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__memory/voidify.h:
 
 /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h:
 
-/usr/include/time.h:
-
-/usr/include/x86_64-linux-gnu/bits/select2.h:
-
-/usr/include/c++/13/cmath:
+/usr/include/x86_64-linux-gnu/bits/select.h:
 
 /usr/include/x86_64-linux-gnu/c++/13/bits/gthr-default.h:
 
-/usr/include/x86_64-linux-gnu/bits/select.h:
-
-/usr/include/x86_64-linux-gnu/bits/time.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__memory/voidify.h:
+/usr/include/time.h:
 
 /usr/include/x86_64-linux-gnu/bits/sched.h:
 
@@ -928,8 +895,6 @@ src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/rms_norm.cu.o: src/turbomind/
 /usr/include/x86_64-linux-gnu/bits/byteswap.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__concepts/swappable.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdio.h:
 
 /usr/include/string.h:
 
@@ -995,10 +960,6 @@ src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/rms_norm.cu.o: src/turbomind/
 
 /usr/include/x86_64-linux-gnu/bits/stdint-intn.h:
 
-src/turbomind/core/core.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cub/config.cuh:
-
 /usr/include/c++/13/stdlib.h:
 
 src/turbomind/core/scope.h:
@@ -1010,6 +971,8 @@ src/turbomind/core/scope.h:
 /usr/include/x86_64-linux-gnu/bits/types/cookie_io_functions_t.h:
 
 /usr/include/c++/13/pstl/pstl_config.h:
+
+/usr/include/x86_64-linux-gnu/bits/struct_rwlock.h:
 
 /usr/include/strings.h:
 
@@ -1039,12 +1002,6 @@ src/turbomind/core/scope.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/driver_functions.h:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_nothrow_destructible.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/extent.h:
-
-/usr/include/c++/13/ext/numeric_traits.h:
-
 /usr/include/x86_64-linux-gnu/bits/types/struct_timeval.h:
 
 /usr/include/c++/13/pstl/glue_algorithm_defs.h:
@@ -1073,6 +1030,8 @@ src/turbomind/core/scope.h:
 
 /usr/include/c++/13/bits/stl_pair.h:
 
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/disjunction.h:
+
 /usr/include/c++/13/debug/debug.h:
 
 /usr/include/c++/13/debug/assertions.h:
@@ -1084,6 +1043,8 @@ src/turbomind/core/scope.h:
 /usr/include/c++/13/cwchar:
 
 /usr/include/x86_64-linux-gnu/sys/select.h:
+
+/usr/include/c++/13/cmath:
 
 /usr/include/x86_64-linux-gnu/bits/stdio_lim.h:
 
@@ -1135,8 +1096,6 @@ src/turbomind/kernels/core/meta.h:
 
 /usr/include/c++/13/iosfwd:
 
-/usr/include/x86_64-linux-gnu/bits/stdio2-decl.h:
-
 /usr/local/cuda-12.5/targets/x86_64-linux/include/crt/device_double_functions.hpp:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__iterator/advance.h:
@@ -1148,8 +1107,6 @@ src/turbomind/kernels/core/meta.h:
 /usr/include/c++/13/bits/alloc_traits.h:
 
 /usr/include/x86_64-linux-gnu/bits/fp-logb.h:
-
-/usr/include/x86_64-linux-gnu/bits/wchar2.h:
 
 /usr/include/x86_64-linux-gnu/bits/long-double.h:
 
@@ -1166,6 +1123,8 @@ src/turbomind/kernels/core/meta.h:
 /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h:
 
 src/turbomind/core/context.h:
+
+/usr/include/c++/13/bits/stl_vector.h:
 
 src/turbomind/kernels/core/sub_byte_ptr.h:
 
@@ -1193,6 +1152,10 @@ src/turbomind/core/copy.h:
 
 /usr/include/x86_64-linux-gnu/bits/math-vector.h:
 
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/default_searcher.h:
+
+/usr/include/c++/13/bits/hash_bytes.h:
+
 /usr/include/c++/13/bits/basic_ios.tcc:
 
 /usr/include/c++/13/stdexcept:
@@ -1200,6 +1163,10 @@ src/turbomind/core/copy.h:
 /usr/include/c++/13/clocale:
 
 /usr/include/c++/13/bit:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cub/config.cuh:
+
+src/turbomind/core/core.h:
 
 /usr/include/c++/13/iostream:
 
@@ -1247,15 +1214,11 @@ _deps/fmt-src/include/fmt/format.h:
 
 /usr/include/c++/13/bits/std_function.h:
 
-/usr/include/x86_64-linux-gnu/bits/select-decl.h:
-
 /usr/include/x86_64-linux-gnu/c++/13/bits/ctype_inline.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/crt/host_defines.h:
 
 src/turbomind/core/check.h:
-
-/usr/include/x86_64-linux-gnu/bits/strings_fortified.h:
 
 /usr/include/x86_64-linux-gnu/bits/stdint-least.h:
 
@@ -1268,10 +1231,6 @@ src/turbomind/core/data_type.h:
 src/turbomind/core/allocator.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/library_types.h:
-
-/usr/include/c++/13/bits/stl_vector.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdlib.h:
 
 /usr/include/x86_64-linux-gnu/asm/errno.h:
 
@@ -1307,6 +1266,10 @@ src/turbomind/core/layout.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cub/detail/uninitialized_copy.cuh:
 
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_constructible.h:
+
+/usr/include/x86_64-linux-gnu/bits/types.h:
+
 /usr/include/c++/13/bits/cpp_type_traits.h:
 
 src/turbomind/kernels/core/common.h:
@@ -1318,10 +1281,6 @@ src/turbomind/kernels/core/common.h:
 /usr/include/x86_64-linux-gnu/bits/types/struct_FILE.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/pointer_to_binary_function.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/clockid_t.h:
-
-src/turbomind/kernels/norm/rms_norm.h:
 
 /usr/include/c++/13/bits/align.h:
 
@@ -1376,8 +1335,6 @@ src/turbomind/utils/cuda_utils.h:
 /usr/include/c++/13/bits/uses_allocator_args.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__cuda/cstddef_prelude.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/__FILE.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__concepts/constructible.h:
 
@@ -1435,10 +1392,6 @@ src/turbomind/kernels/core/array.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cub/util_debug.cuh:
 
-/usr/include/c++/13/bits/locale_classes.h:
-
-/usr/include/x86_64-linux-gnu/bits/timesize.h:
-
 /usr/include/c++/13/bits/locale_facets.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/initializer_list:
@@ -1473,23 +1426,27 @@ src/turbomind/core/logger.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__cccl/dialect.h:
 
-/usr/include/c++/13/bits/locale_facets.tcc:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_allocator.h:
-
-/usr/include/c++/13/bits/string_view.tcc:
+/usr/include/c++/13/bits/ptr_traits.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_nothrow_move_assignable.h:
 
 /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h:
 
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_allocator.h:
+
+/usr/include/c++/13/bits/string_view.tcc:
+
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cub/detail/cpp_compatibility.cuh:
+
+/usr/include/c++/13/bits/locale_facets.tcc:
 
 /usr/include/c++/13/bits/shared_ptr.h:
 
 /usr/include/c++/13/cerrno:
 
 /usr/include/c++/13/bits/stringfwd.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_abstract.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__utility/in_place.h:
 
@@ -1513,13 +1470,9 @@ src/turbomind/macro.h:
 
 /usr/include/c++/13/cstdint:
 
-/usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h:
-
 /usr/include/x86_64-linux-gnu/bits/mathcalls-narrow.h:
 
 /usr/include/linux/errno.h:
-
-/usr/include/x86_64-linux-gnu/bits/wchar2-decl.h:
 
 /usr/include/c++/13/bits/std_abs.h:
 
@@ -1567,10 +1520,6 @@ src/turbomind/macro.h:
 
 /usr/include/c++/13/tr1/beta_function.tcc:
 
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/enable_if.h:
-
-/usr/include/c++/13/bits/stl_function.h:
-
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_swappable.h:
 
 /usr/include/x86_64-linux-gnu/bits/locale.h:
@@ -1583,16 +1532,6 @@ src/turbomind/macro.h:
 
 /usr/include/c++/13/cctype:
 
-/usr/include/x86_64-linux-gnu/bits/struct_rwlock.h:
-
-/usr/include/c++/13/bits/hash_bytes.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/default_searcher.h:
-
-/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_constructible.h:
-
-/usr/include/x86_64-linux-gnu/bits/types.h:
-
 /usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_trivial.h:
@@ -1603,15 +1542,21 @@ src/turbomind/macro.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/__locale_t.h:
 
+/usr/include/math.h:
+
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/has_unique_object_representation.h:
 
 /usr/include/c++/13/cstdio:
 
-/usr/include/math.h:
-
 /usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/clock_t.h:
+
+src/turbomind/kernels/norm/rms_norm.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/clockid_t.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h:
 
 /usr/include/c++/13/type_traits:
 
@@ -1813,6 +1758,8 @@ _deps/fmt-src/include/fmt/base.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/__cccl_config:
 
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/copy_cvref.h:
+
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/bind_front.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__cccl/visibility.h:
@@ -1935,8 +1882,6 @@ _deps/fmt-src/include/fmt/base.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__concepts/invocable.h:
 
-/usr/include/x86_64-linux-gnu/bits/string_fortified.h:
-
 /usr/include/c++/13/initializer_list:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__concepts/predicate.h:
@@ -1992,6 +1937,10 @@ _deps/fmt-src/include/fmt/base.h:
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/operations.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/pointer_to_unary_function.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_object.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__functional/unwrap_ref.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__fwd/hash.h:
 
@@ -2068,3 +2017,21 @@ _deps/fmt-src/include/fmt/base.h:
 /usr/include/c++/13/bits/unordered_map.h:
 
 /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/conjunction.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/copy_cv.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/decay.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/dependent_type.h:
+
+/usr/include/c++/13/bits/stl_function.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/enable_if.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/is_nothrow_destructible.h:
+
+/usr/include/c++/13/ext/numeric_traits.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/extent.h:
+
+/usr/local/cuda-12.5/targets/x86_64-linux/include/cuda/std/detail/libcxx/include/__type_traits/integral_constant.h:

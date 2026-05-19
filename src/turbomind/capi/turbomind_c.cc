@@ -913,44 +913,49 @@ static void LoadWeightsFromSafetensors(
             // The last part is the param name (e.g., "weight")
             std::string param_name = parts.back();
 
-            // Try to get the LinearWeight directly for param access
-            turbomind::LinearWeight* linear = dynamic_cast<turbomind::LinearWeight*>(current);
-            turbomind::core::Param param;
-            if (linear) {
-                param = linear->param(param_name);
-            } else {
-                param = current->param(param_name);
-            }
-
-            // Convert shape from size_t to int64_t for compatibility
-            turbomind::DataType tm_dtype = meta->dtype;
-
-            // Check if param exists by iterating all params
+            // Use for_each_param to find the param
+            turbomind::core::Tensor* target_tensor = nullptr;
             bool param_exists = false;
+            int param_count = 0;
 
-            // DEBUG: print params for first LinearWeight encountered
-            bool debug_params = false;
-            if (dynamic_cast<turbomind::LinearWeight*>(current)) {
-                static int debug_linear_count = 0;
-                if (debug_linear_count < 1) {
-                    debug_params = true;
-                    ++debug_linear_count;
-                    fprintf(stderr, "[C-API] DEBUG: LinearWeight params for '%s':\n", current->full_path().c_str());
-                    fflush(stderr);
-                }
-            }
+            // ALWAYS print first 5 modules
+            static int debug_for_each_count = 0;
+            bool debug_for_each = (debug_for_each_count < 5);
+
+            fprintf(stderr, "[C-API] DEBUG: for_each_param on '%s' (type='%s')\n",
+                    current->full_path().c_str(), current->type());
 
             current->for_each_param([&](const char* name, turbomind::core::Tensor& tensor) {
-                if (debug_params) {
-                    fprintf(stderr, "[C-API] DEBUG:   param '%s', tensor_valid=%d\n", name, static_cast<bool>(tensor));
-                    fflush(stderr);
-                }
+                ++param_count;
+                fprintf(stderr, "[C-API] DEBUG   param[%d]: name='%s'\n", param_count, name);
                 if (std::string(name) == param_name) {
                     param_exists = true;
+                    target_tensor = &tensor;
                 }
             });
+            fprintf(stderr, "[C-API] DEBUG   found %d params, looking for '%s', found=%d\n",
+                    param_count, param_name.c_str(), param_exists);
+            ++debug_for_each_count;
 
-            if (!param_exists) {
+            // If the param exists, allocate it directly
+            if (param_exists && target_tensor) {
+                // Allocate the tensor with the required shape
+                std::vector<turbomind::core::ssize_t> shape_vec;
+                for (auto s : meta->shape) {
+                    shape_vec.push_back(static_cast<turbomind::core::ssize_t>(s));
+                }
+                turbomind::Layout layout{shape_vec};
+                turbomind::DataType dtype = meta->dtype;
+                turbomind::core::Device device{turbomind::DeviceType::kDEVICE, 0};
+                *target_tensor = turbomind::core::Tensor{std::move(layout), dtype, device};
+
+                auto tensor = *target_tensor;
+                if (tensor.raw_data()) {
+                    size_t copy_size = std::min(data.size(), static_cast<size_t>(tensor.byte_size()));
+                    std::memcpy(tensor.raw_data(), data.data(), copy_size);
+                    ++loaded_count;
+                }
+            } else {
                 if (loaded_count < 5) {
                     fprintf(stderr, "[C-API] Param '%s' not found in module '%s' (path='%s', type='%s')\n",
                             param_name.c_str(), current->full_path().c_str(), tm_path.c_str(), current->type());
@@ -958,17 +963,6 @@ static void LoadWeightsFromSafetensors(
                 }
                 ++skip_count;
                 continue;
-            }
-
-            // Param exists, allocate it
-            param.alloc(meta->shape, tm_dtype);
-
-            // Copy data (TODO: handle device placement)
-            auto tensor = param.get();
-            if (tensor && tensor.raw_data()) {
-                size_t copy_size = std::min(data.size(), static_cast<size_t>(tensor.byte_size()));
-                std::memcpy(tensor.raw_data(), data.data(), copy_size);
-                ++loaded_count;
             }
         }
 
@@ -2029,6 +2023,8 @@ struct TM_ModelRequest {
     std::shared_ptr<turbomind::TensorMap> output_tensors;
     std::shared_ptr<turbomind::AtomicRequestState> output_state;
     std::shared_ptr<turbomind::RequestMetrics> output_metrics;
+    std::shared_ptr<turbomind::TensorMap> streaming_tensors;
+    std::shared_ptr<turbomind::AtomicRequestState> streaming_state;
 };
 
 TM_ModelRequest* TM_ModelRequest_Create(TM_TurboMind* tm)
@@ -2106,6 +2102,76 @@ int TM_ModelRequest_Forward(
     }
 }
 
+int TM_ModelRequest_ForwardAsync(
+    TM_ModelRequest* req,
+    TM_TensorMap* input_tensors,
+    const TM_SessionParam* session,
+    const TM_GenerationConfig* gen_cfg,
+    bool stream_output,
+    bool enable_metrics)
+{
+    if (!req || !input_tensors || !session || !gen_cfg) {
+        SetError(TM_ERR_INVALID_ARG, "NULL argument to TM_ModelRequest_ForwardAsync");
+        return TM_ERR_INVALID_ARG;
+    }
+
+    try {
+        turbomind::ModelRequest::InputParam param{};
+        param.tensors = std::make_shared<turbomind::core::TensorMap>(std::move(input_tensors->map));
+        param.session.id = session->id;
+        param.session.step = session->step;
+        param.session.start_flag = session->start_flag;
+        param.session.end_flag = session->end_flag;
+        param.gen_cfg = gen_cfg->config;
+        param.stream_output = stream_output;
+        param.enable_metrics = enable_metrics;
+
+        // Submit request asynchronously - don't block, let caller poll state
+        auto out = req->req->Forward(std::move(param), []() {
+            // Completion callback - does nothing in async mode
+        });
+
+        // Store outputs as shared state for polling
+        req->streaming_tensors = std::move(out.tensors);
+        req->streaming_state = std::move(out.state);
+        req->output_metrics = std::move(out.metrics);
+
+        return TM_OK;
+    }
+    catch (const std::exception& e) {
+        SetError(TM_ERR_RUNTIME, e.what());
+        return TM_ERR_RUNTIME;
+    }
+}
+
+int TM_ModelRequest_GetStreamToken(
+    TM_ModelRequest* req,
+    void** out_data,
+    size_t* out_count)
+{
+    if (!req || !out_data || !out_count) {
+        SetError(TM_ERR_INVALID_ARG, "NULL argument to TM_ModelRequest_GetStreamToken");
+        return TM_ERR_INVALID_ARG;
+    }
+
+    if (!req->streaming_tensors) {
+        SetError(TM_ERR_RUNTIME, "No streaming request in progress");
+        return TM_ERR_RUNTIME;
+    }
+
+    auto it = req->streaming_tensors->find("output_ids");
+    if (it == req->streaming_tensors->end()) {
+        SetError(TM_ERR_NOT_FOUND, "output_ids not found in streaming tensors");
+        return TM_ERR_NOT_FOUND;
+    }
+
+    const auto& tensor = it->second;
+    *out_data = const_cast<void*>(tensor.raw_data());
+    *out_count = static_cast<size_t>(tensor.shape(0));
+
+    return 0;
+}
+
 void TM_ModelRequest_Cancel(TM_ModelRequest* req)
 {
     req->req->Cancel();
@@ -2125,6 +2191,25 @@ int TM_ModelRequest_GetState(TM_ModelRequest* req, TM_RequestStatus* out_status,
     auto state = req->output_state ? req->output_state->exchange(nullptr) : nullptr;
     if (!state) {
         // No state available - request may not have completed yet
+        *out_status = TM_STATUS_OK;
+        if (out_seq_len) *out_seq_len = 0;
+        return 0;
+    }
+
+    *out_status = static_cast<TM_RequestStatus>(state->status);
+    if (out_seq_len) *out_seq_len = state->seq_len;
+    return 0;
+}
+
+int TM_ModelRequest_GetStreamingState(TM_ModelRequest* req, TM_RequestStatus* out_status, int* out_seq_len)
+{
+    if (!req || !out_status) {
+        return TM_ERR_INVALID_ARG;
+    }
+
+    auto state = req->streaming_state ? req->streaming_state->exchange(nullptr) : nullptr;
+    if (!state) {
+        // No state available - request still running or not started
         *out_status = TM_STATUS_OK;
         if (out_seq_len) *out_seq_len = 0;
         return 0;

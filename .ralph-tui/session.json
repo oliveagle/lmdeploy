@@ -3,10 +3,10 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-19T13:16:55.291Z",
-  "currentIteration": 23,
+  "updatedAt": "2026-05-19T16:01:53.574Z",
+  "currentIteration": 26,
   "maxIterations": 50,
-  "tasksCompleted": 14,
+  "tasksCompleted": 15,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -396,6 +396,36 @@
       "durationMs": 1946758,
       "startedAt": "2026-05-19T12:36:06.026Z",
       "endedAt": "2026-05-19T13:08:32.784Z"
+    },
+    {
+      "iteration": 24,
+      "status": "completed",
+      "taskId": "lmdeploy-oo1",
+      "taskTitle": "修复 FFN feed_forward 权重加载",
+      "taskCompleted": true,
+      "durationMs": 501164,
+      "startedAt": "2026-05-19T13:08:34.112Z",
+      "endedAt": "2026-05-19T13:16:55.276Z"
+    },
+    {
+      "iteration": 25,
+      "status": "completed",
+      "taskId": "lmdeploy-h2w",
+      "taskTitle": "修复 LinearWeight::param() 返回空的问题",
+      "taskCompleted": false,
+      "durationMs": 3106085,
+      "startedAt": "2026-05-19T14:39:09.724Z",
+      "endedAt": "2026-05-19T15:30:55.809Z"
+    },
+    {
+      "iteration": 26,
+      "status": "completed",
+      "taskId": "lmdeploy-09p",
+      "taskTitle": "完成 Forward 执行绑定",
+      "taskCompleted": false,
+      "durationMs": 1458652,
+      "startedAt": "2026-05-19T15:30:57.045Z",
+      "endedAt": "2026-05-19T15:55:15.697Z"
     }
   ],
   "skippedTaskIds": [],
@@ -409,7 +439,9 @@
     "lmdeploy-s8l",
     "lmdeploy-4rt",
     "lmdeploy-gg4",
-    "lmdeploy-s60"
+    "lmdeploy-s60",
+    "lmdeploy-h2w",
+    "lmdeploy-09p"
   ],
   "subagentPanelVisible": false
 }

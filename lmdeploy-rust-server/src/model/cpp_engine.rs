@@ -396,11 +396,141 @@ impl TurboMindCEngine {
         }
     }
 
-    /// Generate text with streaming output (placeholder for now)
+    /// Generate text with streaming output (token-by-token)
     pub async fn generate_stream(&self, prompt: &str) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
-        // For now, fall back to non-streaming
-        let text = self.generate(prompt, 512).await;
-        Box::pin(futures::stream::once(async move { text }))
+        // Tokenize input
+        let (input_ids, tokenizer) = match &self.tokenizer {
+            Some(t) => {
+                let ids = match t.encode(prompt, false, false) {
+                    Ok(ids) => ids,
+                    Err(e) => {
+                        tracing::error!(error = %e, "Tokenization failed");
+                        return Box::pin(futures::stream::empty());
+                    }
+                };
+                // Create a new tokenizer instance for the thread (clone doesn't work for tokenizer)
+                // We need to pass the tokenizer path or use the existing one
+                (ids, t.clone())
+            }
+            None => {
+                tracing::error!("Tokenizer not available");
+                return Box::pin(futures::stream::empty());
+            }
+        };
+
+        let input_ids_vec: Vec<i64> = input_ids.iter().map(|&id| id as i64).collect();
+        let prompt_len = input_ids.len() as i32;
+        let vocab_size = tokenizer.vocab_size();
+
+        // Clone needed for thread spawn
+        let tm = self.tm.as_ref().expect("TurboMind not initialized").clone();
+        let request = self.request.as_ref().expect("Request not initialized").clone();
+
+        let (tx, rx) = tokio::sync::mpsc::channel::<String>(32);
+
+        tokio::task::spawn_blocking(move || {
+            let mut req_guard = request.blocking_lock();
+
+            // Prepare input tensors
+            let mut input_tensors = match crate::turbomind_c::TensorMap::new() {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to create tensor map");
+                    return;
+                }
+            };
+            let input_ids_shape = [input_ids_vec.len() as i64];
+            input_tensors.set_int64("input_ids", &input_ids_vec, &input_ids_shape);
+            input_tensors.set_int32("sequence_length", &[prompt_len], &[1]);
+
+            // Prepare generation config
+            let mut gen_cfg = match crate::turbomind_c::GenConfig::new() {
+                Ok(g) => g,
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to create gen config");
+                    return;
+                }
+            };
+            gen_cfg.set_max_new_tokens(1024);
+            gen_cfg.set_temperature(0.7);
+            gen_cfg.set_top_p(0.95);
+            gen_cfg.set_top_k(50);
+
+            // Session parameters
+            let session = crate::turbomind_c::TM_SessionParam {
+                id: 42,
+                step: 0,
+                start_flag: true,
+                end_flag: true,
+            };
+
+            // Submit async forward with stream_output=true
+            if let Err(e) = req_guard.forward_async(
+                &mut input_tensors,
+                &session,
+                &gen_cfg,
+                true,  // stream_output
+                false, // enable_metrics
+            ) {
+                tracing::error!(error = ?e, "ForwardAsync failed");
+                return;
+            }
+
+            // Polling loop for streaming tokens
+            let mut prev_seq_len = input_ids_vec.len() as i32;
+
+            loop {
+                // Small sleep to avoid busy-waiting
+                std::thread::sleep(std::time::Duration::from_millis(5));
+
+                let (status, seq_len) = match req_guard.get_streaming_state() {
+                    Ok(s) => s,
+                    Err(_) => continue, // State not yet available, keep polling
+                };
+
+                // Read new tokens if seq_len increased
+                if seq_len > prev_seq_len {
+                    match req_guard.get_stream_token() {
+                        Ok((data_ptr, token_count)) if token_count > 0 => {
+                            let all_tokens = unsafe {
+                                std::slice::from_raw_parts(data_ptr, token_count)
+                            };
+
+                            // Decode only new tokens
+                            let new_len = seq_len as usize;
+                            if new_len <= token_count && new_len > prev_seq_len as usize {
+                                let new_tokens = &all_tokens[prev_seq_len as usize..new_len];
+                                // Decode new tokens to text
+                                let token_ids: Vec<u32> = new_tokens.iter().map(|&id| id as u32).collect();
+                                let token_str = if let Ok(s) = tokenizer.decode(&token_ids, true) {
+                                    s
+                                } else {
+                                    String::new()
+                                };
+                                if !token_str.is_empty() {
+                                    // Blocking send to avoid dropping tokens
+                                    let _ = tx.blocking_send(token_str);
+                                }
+                            }
+                            prev_seq_len = seq_len;
+                        }
+                        _ => {} // Ignore errors or empty token count
+                    }
+                }
+
+                // Check if generation is complete
+                match status {
+                    crate::turbomind_c::TM_RequestStatus::TM_STATUS_FINISH => break,
+                    crate::turbomind_c::TM_RequestStatus::TM_STATUS_CANCEL => break,
+                    crate::turbomind_c::TM_RequestStatus::TM_STATUS_FAIL => break,
+                    crate::turbomind_c::TM_RequestStatus::TM_STATUS_TOO_LONG => break,
+                    crate::turbomind_c::TM_RequestStatus::TM_STATUS_INCONSISTENCY => break,
+                    _ => continue,
+                }
+            }
+        });
+
+        Box::pin(tokio_stream::wrappers::ReceiverStream::new(rx))
     }
 
     /// Get the tokenizer

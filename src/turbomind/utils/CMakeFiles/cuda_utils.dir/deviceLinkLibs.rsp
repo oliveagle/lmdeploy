@@ -1,1 +1,1 @@
- "../../../_deps/fmt-build/libfmt.a"  -ldl "/usr/lib/x86_64-linux-gnu/librt.a" 
+ "../../../_deps/fmt-build/libfmtd.a"  -ldl "/usr/lib/x86_64-linux-gnu/librt.a" 

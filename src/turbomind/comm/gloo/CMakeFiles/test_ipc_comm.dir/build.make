@@ -107,7 +107,7 @@ bin/test_ipc_comm: lib/libcuda_utils.a
 bin/test_ipc_comm: /usr/local/cuda-12.5/targets/x86_64-linux/lib/libcudart.so
 bin/test_ipc_comm: /usr/local/cuda-12.5/targets/x86_64-linux/lib/stubs/libcuda.so
 bin/test_ipc_comm: /usr/lib/x86_64-linux-gnu/librt.a
-bin/test_ipc_comm: _deps/fmt-build/libfmt.a
+bin/test_ipc_comm: _deps/fmt-build/libfmtd.a
 bin/test_ipc_comm: src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable ../../../../bin/test_ipc_comm"
 	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/gloo && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/test_ipc_comm.dir/link.txt --verbose=$(VERBOSE)
