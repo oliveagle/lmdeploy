@@ -3,7 +3,23 @@
 This file tracks progress across iterations. Agents update this file
 after each iteration and it is included in prompts for context.
 
-## 2026-05-20 - lmdeploy-6xm
+## 2026-05-20 - lmdeploy-56l
+- **Investigation**: ContextGuard lifecycle in `TM_TurboMind_InitFromPath` (`src/turbomind/capi/turbomind_c.cc`)
+- **Finding**: ContextGuard lifecycle is **correct** - `ctx_guard` created at line 1320 stays in scope through `LoadWeightsFromSafetensors` (line 1737) and `ProcessWeights` (line 1741)
+- **Key discovery**: `model_root->context()` returns `ContextGuard{stream_, alloca_}` which pushes both CUDA stream and device allocator onto thread-local stack. Guard remains in scope until function exit (line 1752).
+- **Conclusion**: The crash after "found 4 params, looking for weight, found=1" is NOT a ContextGuard lifecycle issue. Root cause is elsewhere (likely missing parameters or weight mapping issues).
+- **Files examined**:
+  - `src/turbomind/capi/turbomind_c.cc` - InitFromPath entry point
+  - `src/turbomind/models/model_root.h` - `context()` method definition
+  - `src/turbomind/core/context.h` - ContextGuard RAII implementation
+  - `src/turbomind/core/context.cc` - Thread-local ContextStorage with allocator stacks
+  - `src/turbomind/turbomind.cc` - ProcessWeights creates its own guard (line 95)
+- **Learnings:**
+  - `ContextGuard` is variadic template - pushes all args (stream + allocator) on construction, pops on destruction
+  - `ContextStorage` is thread-local with separate stacks for stream, host_alloc, device_alloc, pinned_alloc
+  - `ProcessWeights` creates its own `ContextGuard` - it doesn't rely on InitFromPath's guard
+  - The guard's scope is correct; the crash is caused by missing weight parameters, not context lifecycle
+---
 - **Issue**: `LoadWeightsFromSafetensors` in `src/turbomind/capi/turbomind_c.cc` used `std::memcpy` for GPU tensor copies, causing segfault
 - **Fix**: Added device type check and use `cudaMemcpy` with `cudaMemcpyHostToDevice` for GPU tensors, `std::memcpy` only for CPU tensors
 - **Files changed**:
