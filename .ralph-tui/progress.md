@@ -3,11 +3,48 @@
 This file tracks progress across iterations. Agents update this file
 after each iteration and it's included in prompts for context.
 
-## Codebase Patterns (Study These First)
+### AWQ Offline Weight Export Pattern
 
-*Add reusable patterns discovered during development here.*
+**问题**: 需要将 AWQ safetensors 转换为 TurboMind .bin 格式，供 C++ InitFromPath() 离线加载。
 
-### AWQ Weight Name Mapping (HF → TurboMind)
+**解决方案**: 实现 `lmdeploy/turbomind/export_awq_weights.py` 脚本，利用 Python TurboMind API 完成转换。
+
+**关键流程**:
+1. `TurboMind(model_path, engine_config)` → 构建完整 C++ 模块树 + 加载 AWQ 权重
+2. 通过 `model_comm.root(0).child("text_model")` 获取 ModelWeight 模块
+3. 递归遍历模块树，通过 `module.param(name).get()` 提取 `Tensor`
+4. 通过 Tensor 的 `__dlpack__()` 转换为 torch tensor
+5. 写入 .bin 文件 + 索引 JSON + config.yaml
+
+**模块树结构**:
+```
+text_model (ModelWeight)
+├── tok_embeddings (param)
+├── norm (NormWeight)
+├── output (LinearWeight)
+└── layers (ModuleList)
+    └── 0..N (DecoderLayerWeight)
+        ├── attention (AttentionWeight) → LinearWeight children
+        ├── feed_forward (FfnWeight) → LinearWeight children
+        └── moe_ffn / linear_attn (optional)
+```
+
+**关键 API**:
+- `module.param(name)` → `Param` handle
+- `param.get()` → `Tensor` (C++ side, with dlpack support)
+- `tensor.__dlpack__()` → PyCapsule → `torch.from_dlpack()`
+- `module.child(name)` → child module handle
+- `module.type()` → module type string
+
+**Learnings**:
+- TurboMind 使用 Builder 模式构建模块树，权重在构建时完成格式转换
+- AWQ 权重在 Python 侧已完成反量化，提取后可以直接存储为 FP16
+- DLPack 是 C++/Python tensor 交互的标准方式，无需额外拷贝
+- config.yaml 是 TurboMind 识别模型所必需的配置
+
+---
+
+## 2026-05-19 - lmdeploy-w1w
 
 **问题**: AWQ 量化模型在 safetensors 中使用特殊的后缀命名：`.qweight`（INT32 打包的 4-bit 权重）、`.scales`（float16 缩放因子）、`.qzeros`（INT32 零点）。而 TurboMind C++ 期望的参数名为 `.weight`、`.scales`、`.zeros`。
 
@@ -568,5 +605,29 @@ ModelWeight
   - AWQ 权重以 int32 存储（每 8 个 4-bit 值打包），需要通过 GEMM converter 转换为计算格式
   - Rust 引擎 `quant_policy=4` 触发 C++ 层 AWQ 处理逻辑
   - C++ 层 AWQ 支持已在 `lmdeploy-sw3` 中完成，本任务补充了权重名称映射
+
+---
+
+## 2026-05-19 - lmdeploy-w1w
+- **Implemented**: AWQ 离线权重转换工具 `lmdeploy/turbomind/export_awq_weights.py`
+- **Files changed**:
+  - `lmdeploy/turbomind/export_awq_weights.py` - 新建离线转换脚本
+  - `.ralph-tui/progress.md` - 添加 AWQ 离线权重导出模式文档
+- **功能**:
+  - 利用 Python TurboMind API 加载 AWQ 模型
+  - 通过 C++ Module API 提取转换后的权重
+  - 输出到 `model_path/workspace/tm_weights/` 目录
+  - 生成 `weights.bin`、`weight_index.json`、`config.yaml`
+- **关键实现**:
+  - `TurboMind(model_path)` 构建完整模块树并加载 AWQ 权重
+  - 递归遍历模块树：`module.child(name)` 导航，`module.param(name).get()` 提取
+  - DLPack 交互：`tensor.__dlpack__()` → `torch.from_dlpack()`
+  - 模块类型识别：`ModelWeight`、`DecoderLayerWeight`、`AttentionWeight`、`FfnWeight`、`LinearWeight`、`NormWeight`、`ModuleList`
+- **Learnings**:
+  - Python TurboMind 使用 Builder 模式构建模块树，权重在构建时完成 AWQ 反量化
+  - C++ Module API 提供 `param()`、`child()`、`type()` 方法用于导航和提取
+  - Tensor 通过 DLPack 协议与 Python 交互，无需额外内存拷贝
+  - config.yaml 必需字段：`model_name`、`tensor_para_size`、`head_num`、`layer_num`、`hidden_size`、`vocab_size` 等
+  - 权重文件需要 64 字节对齐以优化 GPU 加载性能
 
 ---

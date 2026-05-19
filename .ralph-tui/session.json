@@ -3,10 +3,10 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-19T04:35:07.233Z",
-  "currentIteration": 15,
+  "updatedAt": "2026-05-19T04:53:13.275Z",
+  "currentIteration": 16,
   "maxIterations": 50,
-  "tasksCompleted": 10,
+  "tasksCompleted": 11,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -316,6 +316,16 @@
       "durationMs": 1725850,
       "startedAt": "2026-05-19T03:11:13.661Z",
       "endedAt": "2026-05-19T03:39:59.511Z"
+    },
+    {
+      "iteration": 16,
+      "status": "completed",
+      "taskId": "lmdeploy-is8",
+      "taskTitle": "修复 AWQ 转 TurboMind 权重流程",
+      "taskCompleted": true,
+      "durationMs": 3297388,
+      "startedAt": "2026-05-19T03:40:09.825Z",
+      "endedAt": "2026-05-19T04:35:07.213Z"
     }
   ],
   "skippedTaskIds": [],
