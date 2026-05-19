@@ -3,6 +3,20 @@
 This file tracks progress across iterations. Agents update this file
 after each iteration and it is included in prompts for context.
 
+## 2026-05-20 - lmdeploy-j8d
+- **Issue**: config/default.toml had `engine_type = "python_bridge"`, causing server to use python_bridge instead of pure_cpp
+- **Fix**: Changed both `config/default.toml` and `default_engine_type()` / `default_model_engine_type()` in `src/config.rs` to use `"pure_cpp"`
+- **Files changed**:
+  - `lmdeploy-rust-server/config/default.toml` — `engine_type = "pure_cpp"`
+  - `lmdeploy-rust-server/src/config.rs` — `default_engine_type()` and `default_model_engine_type()` return `"pure_cpp"`, updated comments
+- **Verified**: 52 Rust tests pass, config loads correctly
+- **Learnings:**
+  - Config loading order: hardcoded defaults → `/etc/lmdeploy/config.toml` → bundled `default.toml` → env vars
+  - `AppConfig::load()` uses `include_str!("../config/default.toml")` so the bundled TOML must match desired defaults
+  - Both `default_engine_type()` and `default_model_engine_type()` default functions must be consistent with the TOML file
+
+---
+
 ## 2026-05-20 - lmdeploy-7kt
 - **Status**: Verified and closed - Pure Rust + C++ inference path complete
 - **Files changed**:

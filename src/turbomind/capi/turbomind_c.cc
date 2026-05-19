@@ -1293,8 +1293,25 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
                 hf_config.num_key_value_heads, hf_config.is_awq);
         fflush(stderr);
 
-        // Build the complete module tree
-        auto* model_weight = static_cast<turbomind::ModelWeight*>(weight_module.get());
+        // Attach ModelWeight to ModelRoot as 'text_model' child FIRST
+        // This moves weight_module into the ModelRoot, so weight_module is no longer valid
+        auto* model_root = static_cast<turbomind::ModelRoot*>(root);
+        auto* result = model_root->add_child("text_model", std::move(weight_module));
+        if (!result) {
+            SetError(TM_ERR_RUNTIME, "Failed to attach ModelWeight to ModelRoot");
+            return TM_ERR_RUNTIME;
+        }
+
+        // Get ModelWeight pointer from the ModelRoot (now owned by ModelRoot)
+        auto* model_weight = model_root->text_model_ptr();
+        if (!model_weight) {
+            SetError(TM_ERR_RUNTIME, "Failed to get ModelWeight from ModelRoot");
+            return TM_ERR_RUNTIME;
+        }
+
+        // Get weight context from ModelRoot for setting up ContextGuard
+        // This is required before any param.alloc() calls
+        auto ctx_guard = model_root->context();
 
         // 1. Create and add tok_embeddings param
         // Shape: [vocab_size, hidden_size]
@@ -1697,26 +1714,8 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             return TM_ERR_RUNTIME;
         }
 
-        // Attach to ModelRoot via add_child
-        // After this, model_weight pointer is invalid because weight_module is moved
-        auto* result = root->add_child("text_model", std::move(weight_module));
-        if (!result) {
-            SetError(TM_ERR_RUNTIME, "Failed to attach ModelWeight to ModelRoot");
-            return TM_ERR_RUNTIME;
-        }
-
-        // Get the model_weight pointer from the root (it's now owned by root)
-        model_weight = static_cast<turbomind::ModelWeight*>(root->child("text_model"));
-        if (!model_weight) {
-            SetError(TM_ERR_RUNTIME, "Failed to get ModelWeight from root");
-            return TM_ERR_RUNTIME;
-        }
-
-        // Verify layers are still accessible after attaching to root
-        if (!model_weight->layers) {
-            SetError(TM_ERR_RUNTIME, "layers child is null after attaching to root");
-            return TM_ERR_RUNTIME;
-        }
+        // NOTE: ModelWeight is already attached to ModelRoot via add_child_raw above
+        // No need to attach again here - weight_module is already moved
 
         // Step 4: Load weights from safetensors files
         // Find all safetensors files in the model directory
