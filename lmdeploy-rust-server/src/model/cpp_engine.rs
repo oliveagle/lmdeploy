@@ -26,8 +26,8 @@ pub enum EngineType {
 impl EngineType {
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
-            "python" | "bridge" | "py" => Some(EngineType::PythonBridge),
-            "cpp" | "c++" | "native" => Some(EngineType::PureCpp),
+            "python" | "bridge" | "py" | "python_bridge" => Some(EngineType::PythonBridge),
+            "cpp" | "c++" | "native" | "pure_cpp" => Some(EngineType::PureCpp),
             _ => None,
         }
     }
@@ -58,6 +58,7 @@ pub struct ModelInfo {
     pub state: ModelState,
     pub loaded_at: Option<i64>,
     pub engine_type: EngineType,
+    pub quant_policy: i32,
 }
 
 impl Default for ModelInfo {
@@ -68,6 +69,7 @@ impl Default for ModelInfo {
             state: ModelState::Unloaded,
             loaded_at: None,
             engine_type: EngineType::default(),
+            quant_policy: 0,
         }
     }
 }
@@ -153,6 +155,9 @@ impl TurboMindCEngine {
         })?;
 
         // Configure engine
+        // data_type is the activation dtype (kHalf), not the weight dtype.
+        // AWQ weights are kUint4 but computations happen in fp16.
+        engine_config.set_data_type(crate::turbomind_c::TM_DataType::TM_DATATYPE_FP16);
         engine_config.set_session_len(65536);
         engine_config.set_max_batch_size(32);
         engine_config.set_cache_block_seq_len(64);
@@ -227,6 +232,7 @@ impl TurboMindCEngine {
             state: self.state.clone(),
             loaded_at: self.loaded_at,
             engine_type: self.engine_type,
+            quant_policy: self.quant_policy,
         }
     }
 

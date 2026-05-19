@@ -277,4 +277,29 @@ impl AppConfig {
 
         Ok(config)
     }
+
+    pub fn load_from_file(path: &str) -> Result<Self, config::ConfigError> {
+        // Order: defaults first, then user config, then env vars
+        let builder = Config::builder()
+            .add_source(
+                config::File::from_str(
+                    include_str!("../config/default.toml"),
+                    config::FileFormat::Toml,
+                )
+                .required(false),
+            )
+            .add_source(File::with_name(path).required(true))
+            .add_source(Environment::with_prefix("LMDEPLOY").separator("_"));
+
+        let mut config: Self = builder.build()?.try_deserialize()?;
+
+        // Override model_path from LMDEPLOY_MODEL_PATH if set
+        if let Ok(path) = std::env::var("LMDEPLOY_MODEL_PATH") {
+            if !path.is_empty() {
+                config.model.model_path = path;
+            }
+        }
+
+        Ok(config)
+    }
 }

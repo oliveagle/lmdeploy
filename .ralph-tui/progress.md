@@ -7,6 +7,19 @@ after each iteration and it's included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
+### EngineConfig data_type for AWQ Models
+
+**问题**: C++ 引擎 `TurboMind::Impl` 构造函数要求 `data_type` 必须是 `kBfloat16` 或 `kHalf`，但 AWQ 模型初始化时该字段默认为 `kUnknown` (0)，导致 `TM_CHECK` 断言失败。
+
+**解决方案**: 在创建 `EngineConfig` 后显式设置 `data_type = kHalf`。
+
+**关键实现**:
+```rust
+engine_config.set_data_type(TM_DataType::TM_DATATYPE_FP16);
+```
+
+**注意**: `data_type` 是激活 dtype，不是权重 dtype。AWQ 权重以 `kUint4` 存储但计算在 fp16 中进行，所以必须设为 `kHalf`。
+
 ### Rust FFI Send/Sync Pattern for C++ Pointers
 
 **问题**: FFI types containing raw pointers (e.g., `TensorMap`, `GenConfig`, `ModelRequest`) are not `Send + Sync`, preventing them from being used in async contexts with `tokio::spawn`.
@@ -55,6 +68,42 @@ impl ModelEngine {
 ```
 
 **配置**: `engine_type` field in config.toml (default: "python_bridge", options: "pure_cpp")
+
+### E2E Testing Pattern for C++ Integration
+
+**问题**: 需要验证纯 Rust + C++ 推理路径的完整性，包括 tokenizer、配置检测、引擎初始化和推理。
+
+**解决方案**: 创建 `examples/e2e_test.rs` 端到端测试程序。
+
+**关键实现**:
+```rust
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = std::env::args().nth(1).unwrap_or(DEFAULT_MODEL);
+    let engine = TurboMindCEngine::new(&model_path).await?;
+    let tokenizer = engine.tokenizer().ok_or("Tokenizer not available")?;
+    let (output, num_tokens, elapsed_ms) = engine.generate_with_metrics(prompt, max_tokens).await;
+    Ok(())
+}
+```
+
+**运行方式**:
+```bash
+cargo run --example e2e_test -- [model_path]
+# 需要 LD_LIBRARY_PATH 指向 libturbomind_c.so
+LD_LIBRARY_PATH=lmdeploy-rust-server/lib:$LD_LIBRARY_PATH cargo run --example e2e_test
+```
+
+**测试覆盖**:
+1. Phase 1: 模型加载和引擎初始化
+2. Phase 2: Tokenizer 验证（vocab_size）
+3. Phase 3: 短推理（~32 tokens）
+4. Phase 4: 长生成（~128 tokens）
+
+**注意事项**:
+- C++ 库路径必须通过 LD_LIBRARY_PATH 设置
+- 测试程序验证各阶段状态并输出详细指标
+- 失败时会明确指出失败阶段（模型加载、tokenizer、推理等）
 
 ---
 
@@ -235,6 +284,17 @@ ModelWeight
 2. Committing weight data via `_copy_shard_to_param()`
 3. Attaching children via `add_child_raw()`
 
+---
+
+## 2026-05-19 - lmdeploy-g89
+- **Implemented**: C++ 引擎 AWQ 模型加载支持 - 修复 data_type 检查失败
+- **Files changed**:
+  - `lmdeploy-rust-server/src/model/cpp_engine.rs` - Added `set_data_type(TM_DATATYPE_FP16)` before other config settings
+- **Learnings**:
+  - `TurboMind::Impl` requires `data_type` to be `kHalf` or `kBfloat16` for activation dtype
+  - For AWQ models, weights are stored as `kUint4` but computation dtype is still `kHalf`
+  - Default `data_type=0` (kUnknown) causes `TM_CHECK` assertion failure at init
+  - The fix is a single `set_data_type()` call before other config setters
 ---
 
 ## 2026-05-19 - lmdeploy-m9v
@@ -420,3 +480,22 @@ ModelWeight
   - Config `engine_type` parsed via `EngineType::from_str()`
   - Both engines kept for backward compatibility
   - Engine type can be set per-model in multi_model config
+
+## 2026-05-19 - lmdeploy-zk3
+- **Implemented**: 端到端测试: 纯 Rust+C++ 推理验证
+- **Files changed**:
+  - `lmdeploy-rust-server/examples/e2e_test.rs` - 创建端到端测试程序
+  - `lmdeploy-rust-server/src/model/cpp_engine.rs` - 添加 quant_policy 到 ModelInfo
+- **验证结果**:
+  - ✅ Tokenizer 加载成功（vocab_size=248070）
+  - ✅ AWQ 检测成功（quant_policy=4）
+  - ❌ C++ 引擎初始化失败（datatype check：turbomind.cc:152）
+- **Learnings**:
+  - 端到端测试使用 cargo run --example e2e_test 运行
+  - C++ 库需要 LD_LIBRARY_PATH 设置才能找到 libturbomind_c.so
+  - 测试覆盖 4 个阶段：模型加载、tokenizer、短推理、长生成
+  - **C++ 引擎已知问题**：`data_type_ == kBfloat16 || data_type_ == kHalf` 检查失败，C++ 层需要支持当前模型的 datatype
+  - 测试框架已就绪，C++ 层 datatype 支持完成后自动可用
+
+---
+
