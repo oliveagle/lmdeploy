@@ -3,6 +3,18 @@
 This file tracks progress across iterations. Agents update this file
 after each iteration and it is included in prompts for context.
 
+## 2026-05-20 - lmdeploy-0lz
+- **Issue**: `TM_TurboMind_InitFromPath` in `src/turbomind/capi/turbomind_c.cc` had `ContextGuard` created but going out of scope immediately after creation, before `LoadWeightsFromSafetensors` was called
+- **Fix**: Moved `ctx_guard` creation to line 1315, before GPU allocations. The guard now covers all GPU tensor allocations (`tok_emb_param.alloc()`, `LoadWeightsFromSafetensors`) through the entire weight loading process until `ProcessWeights`/`CreateEngine`
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.cc` — moved `ctx_guard` from between model creation and GPU allocations to right before the first GPU allocation
+- **Learnings:**
+  - `ContextGuard` is a RAII wrapper that pushes CUDA context + allocator on construction and pops on destruction
+  - If guard goes out of scope before GPU operations, those operations run without the correct CUDA context
+  - Pattern: Build module tree (CPU-only) first, then create ContextGuard, then do GPU allocations under guard
+  - `ProcessWeights` creates its own guard internally, so only the C API path was affected
+---
+
 ## 2026-05-20 - lmdeploy-j8d
 - **Issue**: config/default.toml had `engine_type = "python_bridge"`, causing server to use python_bridge instead of pure_cpp
 - **Fix**: Changed both `config/default.toml` and `default_engine_type()` / `default_model_engine_type()` in `src/config.rs` to use `"pure_cpp"`
@@ -44,6 +56,40 @@ after each iteration and it is included in prompts for context.
 ---
 
 ## Codebase Patterns
+
+### CUDA ContextGuard RAII Pattern
+
+**问题**: C++ `TM_TurboMind_InitFromPath` 中 `ContextGuard` 创建后立即超出作用域，导致 GPU 内存分配时没有正确的 CUDA 上下文。
+
+**解决方案**: 确保 `ContextGuard` 覆盖所有 GPU 操作：
+
+```cpp
+// ❌ 错误: guard 立即超出作用域
+auto ctx_guard = model_root->context();  // Line 1314
+// ... 大量代码 ...
+LoadWeightsFromSafetensors(...);  // Line 1731 - GPU 分配时 guard 已销毁!
+
+// ✅ 正确: guard 在所有 GPU 操作前创建，在函数结束时销毁
+auto* model_weight = model_root->text_model_ptr();
+
+// 创建 guard - 覆盖后续所有 GPU 操作
+auto ctx_guard = model_root->context();
+
+// 1. GPU tensor 分配
+tok_emb_param.alloc(shape, dtype);
+
+// 2. 加载权重到 GPU
+LoadWeightsFromSafetensors(model_weight, path, config);  // 内部创建 GPU tensor
+
+// 3. ProcessWeights 内部创建自己的 guard
+tm->instance->ProcessWeights(index);
+```
+
+**关键点**:
+- `ContextGuard` 是 RAII 包装器：构造时 push CUDA context + allocator，析构时 pop
+- 模块树构建 (CPU-only) 可以在 guard 外进行
+- **所有** GPU 内存分配必须在 guard 作用域内
+- `LoadWeightsFromSafetensors` 内部分配 GPU tensor，必须被 guard 覆盖
 
 ### C++ Streaming Forward Pattern
 

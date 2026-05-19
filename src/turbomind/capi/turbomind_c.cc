@@ -1309,8 +1309,9 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             return TM_ERR_RUNTIME;
         }
 
-        // Get weight context from ModelRoot for setting up ContextGuard
-        // This is required before any param.alloc() calls
+        // All GPU allocations must happen under ContextGuard.
+        // Create the guard BEFORE any GPU memory allocation.
+        // The guard's destructor pushes CUDA context + allocator, and pops on scope exit.
         auto ctx_guard = model_root->context();
 
         // 1. Create and add tok_embeddings param
