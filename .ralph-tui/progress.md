@@ -541,7 +541,22 @@ ModelWeight
 
 ---
 
-## 2026-05-19 - lmdeploy-um9
+## 2026-05-19 - lmdeploy-is8
+- **Analyzed**: AWQ 转 TurboMind 权重流程已实现在 C++ 层
+- **Files changed**:
+  - `lmdeploy-rust-server/src/model/cpp_engine.rs` - 添加缺失配置 (nnodes, tensor parallelism)
+  - `src/turbomind/capi/turbomind_c.cc` - 修复 model_weight 指针生命周期
+- **Learnings**:
+  - **AWQ 权重转换已实现在 C++ 层**：`InitFromPath()` 直接从 safetensors 加载，不需要离线转换
+  - C++ 层 `InitFromPath()` 流程：CreateContext → CreateRoot → 构建 ModelWeight 模块树 → LoadWeightsFromSafetensors → ProcessWeights → CreateEngine
+  - **ModelWeight 指针生命周期关键问题**：`add_child("layers", ...)` 后 `layers_list_unique` 被 move，无法再访问；必须用 `root->child("text_model")` 重新获取指针
+  - C++ 层 LMDEPLOY_DIST_INIT_ADDR 错误：需要设置 `nnodes=1` 禁用分布式模式
+  - TurboMind 初始化需要完整的 tensor parallelism 配置：`attn_tp_size=1, attn_cp_size=1, attn_dp_size=1, mlp_tp_size=1`（满足 `mlp_tp_size == attn_dp_size * attn_tp_size * attn_cp_size`）
+  - **当前阻塞点**：`ModelWeight::prepare()` 中 `layer(0)` 返回 nullptr，原因是 layers ModuleList 指针丢失
+  - 可能的根因：`std::unique_ptr<ModuleList> layers` 成员在 add_child 时通过 TM_ADD_CHILD_CASE 宏正确设置，但后续指针访问仍有问题
+  - **解决方案方向**：使用 Python `deploy.TurboMind` 进行权重转换，或修改 C++ 层使用 Python Builder 模式
+
+---
 - **Implemented**: C++ 层 AWQ 权重名称映射，支持 `.qweight`、`.qzeros` 后缀
 - **Files changed**:
   - `src/turbomind/capi/turbomind_c.cc` - 添加 `.qweight` → `.weight`、`.qzeros` → `.zeros` 映射

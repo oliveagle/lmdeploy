@@ -729,6 +729,19 @@ parser/fast:
 .PHONY : parser/fast
 
 #=============================================================================
+# Target rules for targets named weight_serializer
+
+# Build rule for target.
+weight_serializer: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 weight_serializer
+.PHONY : weight_serializer
+
+# fast build rule for target.
+weight_serializer/fast:
+	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/weight_serializer.dir/build.make src/turbomind/utils/CMakeFiles/weight_serializer.dir/build
+.PHONY : weight_serializer/fast
+
+#=============================================================================
 # Target rules for targets named core
 
 # Build rule for target.
@@ -1241,6 +1254,7 @@ help:
 	@echo "... turbomind"
 	@echo "... turbomind_c"
 	@echo "... unfused_attention_kernels"
+	@echo "... weight_serializer"
 	@echo "... xgrammar"
 	@echo "... yaml-cpp"
 	@echo "... yaml-cpp-parse"

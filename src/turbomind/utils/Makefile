@@ -252,6 +252,20 @@ parser/fast:
 	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/parser.dir/build.make src/turbomind/utils/CMakeFiles/parser.dir/build
 .PHONY : parser/fast
 
+# Convenience name for target.
+src/turbomind/utils/CMakeFiles/weight_serializer.dir/rule:
+	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/weight_serializer.dir/rule
+.PHONY : src/turbomind/utils/CMakeFiles/weight_serializer.dir/rule
+
+# Convenience name for target.
+weight_serializer: src/turbomind/utils/CMakeFiles/weight_serializer.dir/rule
+.PHONY : weight_serializer
+
+# fast build rule for target.
+weight_serializer/fast:
+	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/weight_serializer.dir/build.make src/turbomind/utils/CMakeFiles/weight_serializer.dir/build
+.PHONY : weight_serializer/fast
+
 anomaly_handler.o: anomaly_handler.cu.o
 .PHONY : anomaly_handler.o
 
@@ -372,6 +386,30 @@ parser.cc.s:
 	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/parser.dir/build.make src/turbomind/utils/CMakeFiles/parser.dir/parser.cc.s
 .PHONY : parser.cc.s
 
+weight_serializer.o: weight_serializer.cc.o
+.PHONY : weight_serializer.o
+
+# target to build an object file
+weight_serializer.cc.o:
+	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/weight_serializer.dir/build.make src/turbomind/utils/CMakeFiles/weight_serializer.dir/weight_serializer.cc.o
+.PHONY : weight_serializer.cc.o
+
+weight_serializer.i: weight_serializer.cc.i
+.PHONY : weight_serializer.i
+
+# target to preprocess a source file
+weight_serializer.cc.i:
+	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/weight_serializer.dir/build.make src/turbomind/utils/CMakeFiles/weight_serializer.dir/weight_serializer.cc.i
+.PHONY : weight_serializer.cc.i
+
+weight_serializer.s: weight_serializer.cc.s
+.PHONY : weight_serializer.s
+
+# target to generate assembly for a file
+weight_serializer.cc.s:
+	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/weight_serializer.dir/build.make src/turbomind/utils/CMakeFiles/weight_serializer.dir/weight_serializer.cc.s
+.PHONY : weight_serializer.cc.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -391,6 +429,7 @@ help:
 	@echo "... memory_utils"
 	@echo "... nvtx_utils"
 	@echo "... parser"
+	@echo "... weight_serializer"
 	@echo "... anomaly_handler.o"
 	@echo "... anomaly_handler.i"
 	@echo "... anomaly_handler.s"
@@ -406,6 +445,9 @@ help:
 	@echo "... parser.o"
 	@echo "... parser.i"
 	@echo "... parser.s"
+	@echo "... weight_serializer.o"
+	@echo "... weight_serializer.i"
+	@echo "... weight_serializer.s"
 .PHONY : help
 
 

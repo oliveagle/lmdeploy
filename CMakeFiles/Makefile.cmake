@@ -256,6 +256,7 @@ set(CMAKE_DEPEND_INFO_FILES
   "src/turbomind/utils/CMakeFiles/memory_utils.dir/DependInfo.cmake"
   "src/turbomind/utils/CMakeFiles/anomaly_handler.dir/DependInfo.cmake"
   "src/turbomind/utils/CMakeFiles/parser.dir/DependInfo.cmake"
+  "src/turbomind/utils/CMakeFiles/weight_serializer.dir/DependInfo.cmake"
   "src/turbomind/core/CMakeFiles/core.dir/DependInfo.cmake"
   "src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/DependInfo.cmake"
   "src/turbomind/kernels/CMakeFiles/stop_criteria.dir/DependInfo.cmake"

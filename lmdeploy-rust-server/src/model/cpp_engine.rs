@@ -165,6 +165,22 @@ impl TurboMindCEngine {
         engine_config.set_enable_prefix_caching(false);
         engine_config.set_enable_metrics(true);
         engine_config.set_quant_policy(quant_policy);
+
+        // Set nnodes=1 to disable distributed mode (avoid LMDEPLOY_DIST_INIT_ADDR requirement)
+        engine_config.set_nnodes(1);
+        engine_config.set_node_rank(0);
+
+        // Set tensor parallelism sizes (required for TurboMind initialization)
+        // These must satisfy: mlp_tp_size == attn_dp_size * attn_tp_size * attn_cp_size
+        engine_config.set_attn_tp_size(1);
+        engine_config.set_attn_cp_size(1);
+        engine_config.set_attn_dp_size(1);
+        engine_config.set_mlp_tp_size(1);
+
+        // Set prefill iteration limits
+        engine_config.set_num_tokens_per_iter(0);
+        engine_config.set_max_prefill_iters(1);
+
         engine_config.add_device(0); // GPU 0
 
         // Create TurboMind instance via C API

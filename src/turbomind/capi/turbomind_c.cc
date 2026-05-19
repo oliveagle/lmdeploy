@@ -1406,12 +1406,36 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
         }
 
         // Add layers to ModelWeight
-        model_weight->add_child("layers", std::move(layers_list_unique));
+        auto* layers_result = model_weight->add_child("layers", std::move(layers_list_unique));
+        if (!layers_result) {
+            SetError(TM_ERR_RUNTIME, "Failed to add layers child to ModelWeight");
+            return TM_ERR_RUNTIME;
+        }
+
+        // Verify layers were added
+        if (!model_weight->layers) {
+            SetError(TM_ERR_RUNTIME, "layers child is null after add_child");
+            return TM_ERR_RUNTIME;
+        }
 
         // Attach to ModelRoot via add_child
+        // After this, model_weight pointer is invalid because weight_module is moved
         auto* result = root->add_child("text_model", std::move(weight_module));
         if (!result) {
             SetError(TM_ERR_RUNTIME, "Failed to attach ModelWeight to ModelRoot");
+            return TM_ERR_RUNTIME;
+        }
+
+        // Get the model_weight pointer from the root (it's now owned by root)
+        turbomind::ModelWeight* model_weight = static_cast<turbomind::ModelWeight*>(root->child("text_model"));
+        if (!model_weight) {
+            SetError(TM_ERR_RUNTIME, "Failed to get ModelWeight from root");
+            return TM_ERR_RUNTIME;
+        }
+
+        // Verify layers are still accessible after attaching to root
+        if (!model_weight->layers) {
+            SetError(TM_ERR_RUNTIME, "layers child is null after attaching to root");
             return TM_ERR_RUNTIME;
         }
 
