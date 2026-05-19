@@ -66,7 +66,62 @@ after each iteration and it is included in prompts for context.
 
 ---
 
+## 2026-05-20 - lmdeploy-xso
+- **Issue**: Python bridge script path in `python_bridge.rs` used relative path `'../lmdeploy/turbomind/python_bridge.py'` which fails depending on working directory
+- **Fix**: Use `CARGO_MANIFEST_DIR` environment variable for canonical path resolution, with fallback to `LMDEPLOY_BRIDGE_SCRIPT` env var
+- **Files changed**:
+  - `lmdeploy-rust-server/src/model/python_bridge.rs` — replaced relative path with multi-fallback resolution using `CARGO_MANIFEST_DIR`
+- **Verified**: 52 Rust tests passed
+- **Learnings**:
+  - `CARGO_MANIFEST_DIR` provides the package manifest directory at compile time
+  - Use `.canonicalize()` to resolve symlinks and get absolute paths
+  - `PathBuf` doesn't implement `Display` — use `.display()` in `tracing::debug!` macros
+  - Environment variable fallback (`LMDEPLOY_BRIDGE_SCRIPT`) provides flexibility for custom deployments
+
+---
+
 ## Codebase Patterns
+
+### Canonical Path Resolution for Rust Subprocess Scripts
+
+**问题**: Rust 代码中使用相对路径如 `"../lmdeploy/turbomind/python_bridge.py"` 来定位子进程脚本，在不同工作目录下运行时会失败。
+
+**解决方案**: 使用 `CARGO_MANIFEST_DIR` 环境变量结合多层回退机制：
+
+```rust
+// Get manifest directory at compile time
+let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+    .map(std::path::PathBuf::from)
+    .unwrap_or_else(|_| std::env::current_dir().unwrap());
+
+// First try: relative to manifest dir
+let bridge_script = manifest_dir
+    .join("../lmdeploy/turbomind/python_bridge.py")
+    .canonicalize()
+    .ok();
+
+// Second try: different relative path
+let bridge_script = bridge_script.or_else(|| {
+    manifest_dir
+        .join("lmdeploy/turbomind/python_bridge.py")
+        .canonicalize()
+        .ok()
+});
+
+// Third try: environment variable
+let bridge_script = bridge_script.or_else(|| {
+    std::env::var("LMDEPLOY_BRIDGE_SCRIPT")
+        .map(std::path::PathBuf::from)
+        .ok()
+        .filter(|p| p.exists())
+});
+```
+
+**关键点**:
+- `CARGO_MANIFEST_DIR` 在编译时提供包目录路径
+- `.canonicalize()` 解析符号链接并返回绝对路径
+- 环境变量提供灵活性以覆盖默认位置
+- `tracing::debug!` 中使用 `PathBuf` 时需要 `.display()` 方法
 
 ### CUDA ContextGuard RAII Pattern
 

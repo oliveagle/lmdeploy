@@ -179,22 +179,54 @@ impl PythonBridge {
             "Starting Python bridge subprocess"
         );
 
-        // Find the bridge script
-        // Look in ../lmdeploy/turbomind/ relative to lmdeploy-rust-server
-        let bridge_script = std::path::PathBuf::from("../lmdeploy/turbomind/python_bridge.py");
-        let bridge_script = if !bridge_script.exists() {
-            // Try relative to project root
-            std::path::PathBuf::from("../../lmdeploy/turbomind/python_bridge.py")
-        } else {
-            bridge_script
+        // Find the bridge script using canonical path resolution
+        // Use CARGO_MANIFEST_DIR to locate the lmdeploy package directory reliably
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| std::env::current_dir().unwrap());
+
+        // First try: <manifest_dir>/../lmdeploy/turbomind/python_bridge.py
+        // This works when running from lmdeploy-rust-server/ directory
+        let bridge_script = manifest_dir
+            .join("../lmdeploy/turbomind/python_bridge.py")
+            .canonicalize()
+            .ok();
+
+        // Second try: <manifest_dir>/lmdeploy/turbomind/python_bridge.py
+        // This works when running from the lmdeploy root directory
+        let bridge_script = bridge_script.or_else(|| {
+            manifest_dir
+                .join("lmdeploy/turbomind/python_bridge.py")
+                .canonicalize()
+                .ok()
+        });
+
+        // Third try: environment variable LMDEPLOY_BRIDGE_SCRIPT
+        let bridge_script = bridge_script.or_else(|| {
+            std::env::var("LMDEPLOY_BRIDGE_SCRIPT")
+                .map(std::path::PathBuf::from)
+                .ok()
+                .filter(|p| p.exists())
+        });
+
+        let bridge_script = match bridge_script {
+            Some(path) => path,
+            None => {
+                // Provide helpful error message with debug info
+                let debug_paths = vec![
+                    manifest_dir.join("../lmdeploy/turbomind/python_bridge.py"),
+                    manifest_dir.join("lmdeploy/turbomind/python_bridge.py"),
+                ];
+                return Err(crate::error::AppError::ModelLoadFailed(format!(
+                    "Python bridge script not found. Searched:\n  - {}\n  - {}\n\n\
+                    Set LMDEPLOY_BRIDGE_SCRIPT env var to specify the exact path.",
+                    debug_paths[0].display(),
+                    debug_paths[1].display()
+                )));
+            }
         };
 
-        if !bridge_script.exists() {
-            return Err(crate::error::AppError::ModelLoadFailed(format!(
-                "Python bridge script not found: {:?}",
-                bridge_script
-            )));
-        }
+        tracing::debug!(bridge_script = %bridge_script.display(), "Resolved Python bridge script path");
 
         // Start the Python subprocess
         let mut child = Command::new("python3")
