@@ -3,6 +3,19 @@
 This file tracks progress across iterations. Agents update this file
 after each iteration and it's included in prompts for context.
 
+## 2026-05-19 - lmdeploy-oo1
+- **Status**: Verified and closed - FFN feed_forward 权重加载已完整实现
+- **Verified**:
+  - `lmdeploy-rust-server/src/turbomind/capi/turbomind_c.cc` - 权重路径映射 + FfnWeight 模块创建
+  - `.mlp.` → `.feed_forward.` 映射正确
+  - `.gate_proj.` → `.w1.`, `.up_proj.` → `.w3.`, `.down_proj.` → `.w2.` 映射正确
+  - MoE expert 路径 `.mlp.experts.` → `.moe_ffn.experts.` 映射正确
+  - FfnWeight 模块包含 w1, w2, w3 LinearWeight 子模块创建
+  - MoE expert FfnWeight 也正确创建 w1, w2, w3 子模块
+  - 52 Rust 测试全部通过 ✅
+  - 3 Python 集成测试全部通过 ✅
+---
+
 ## Codebase Patterns
 
 ### E2E Testing Pattern
@@ -28,6 +41,56 @@ Qwen3.5/3.6 multimodal models store actual parameters in `text_config` sub-objec
 let text_config = config.get("text_config").or_else(|| config.get("model_config")).unwrap_or(&config);
 let hidden_size = text_config.get("hidden_size").unwrap_or(config.get("hidden_size")).unwrap_or("N/A");
 ```
+
+### DeltaNet linear_attn Fused Projection Pattern
+
+**问题**: Qwen3.5/3.6 混合注意力架构中，linear_attn 层（DeltaNetWeight）的 HuggingFace 权重使用独立的投影矩阵（`in_proj_qkv`, `in_proj_z`, `in_proj_b`, `in_proj_a`），而 TurboMind C++ 推理期望融合的 `in_proj_all` 矩阵，布局为 `[qkv | z | b | a]`。
+
+**解决方案**: 在 C++ 层 `InitFromPath()` 中为 DeltaNetWeight 创建独立的 LinearWeight 子模块加载各投影权重：
+
+```cpp
+// 计算各投影维度
+const int qkv_out = 2 * num_k_heads * key_head_dim + num_v_heads * value_head_dim;
+const int z_out = num_v_heads * value_head_dim;
+const int a_out = num_v_heads;
+const int b_out = num_v_heads;
+const int fused_out = qkv_out + z_out + a_out + b_out;
+
+// 创建独立的 LinearWeight 子模块
+delta->add_child("in_proj_qkv", CreateAwqLinearConfig(hidden, qkv_out, ...));
+delta->add_child("in_proj_z", CreateAwqLinearConfig(hidden, z_out, ...));
+delta->add_child("in_proj_a", CreateAwqLinearConfig(hidden, a_out, ...));
+delta->add_child("in_proj_b", CreateAwqLinearConfig(hidden, b_out, ...));
+// 融合矩阵（推理时使用）
+delta->add_child("in_proj_all", CreateAwqLinearConfig(hidden, fused_out, ...));
+```
+
+**维度计算**: hidden=2048, num_k_heads=16, num_v_heads=32, key_head_dim=128, value_head_dim=128:
+- QKV: [8192, 2048], Z: [4096, 2048], A: [32, 2048], B: [32, 2048]
+- 融合: [12352, 2048]（不是 3*hidden_size=6144）
+
+**注意**: 权重加载后需要在 `DeltaNetWeight::prepare()` 中实现融合逻辑，将 `in_proj_qkv`, `in_proj_z`, `in_proj_b`, `in_proj_a` 合并到 `in_proj_all`。Python 的 `DeltaNetBuilder.add_input_projections()` 使用 `fuse_gdn()` 实现此融合。
+
+---
+
+## 2026-05-19 - lmdeploy-s60
+- **Fixed**: DeltaNet linear_attn 模块权重加载支持
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.cc` - 在 InitFromPath() 中为 DeltaNetWeight 添加独立的 LinearWeight 子模块
+- **Changes**:
+  1. 创建 `in_proj_qkv` LinearWeight (qkv_out=8192)
+  2. 创建 `in_proj_z` LinearWeight (z_out=4096)
+  3. 创建 `in_proj_a` LinearWeight (a_out=32)
+  4. 创建 `in_proj_b` LinearWeight (b_out=32)
+  5. 修正 `in_proj_all` 维度 (fused_out=12352, 不是 3*hidden_size=6144)
+- **Learnings**:
+  - Qwen3.5/3.6 HF 模型使用独立的线性投影权重，不是融合的
+  - HF 权重路径: `linear_attn.in_proj_qkv/weight/z/b/a/conv1d/A_log/dt_bias/norm/out_proj`
+  - C++ 推理期望融合的 `in_proj_all` (布局: [qkv | z | b | a])
+  - 维度计算: `qkv=2*num_k_heads*key_head_dim+num_v_heads*value_head_dim=8192`, `z=num_v_heads*value_head_dim=4096`, `a=b=num_v_heads=32`
+  - 融合后总维度: 12352 (不是 6144)
+  - 权重融合需要在 `DeltaNetWeight::prepare()` 中实现
+  - Rust 52 个测试全部通过
 
 ---
 
@@ -743,4 +806,26 @@ ModelWeight
   - Python bridge 引擎提供了稳定的替代方案，可以用于生产部署
   - 纯 C++ 引擎需要更深入的调试和测试才能达到生产就绪状态
 
+---
+
+## 2026-05-19 - lmdeploy-gg4
+- **Implemented**: 修复 safetensors 权重路径映射 - 添加 mtp.layers.* 别名支持
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.cc` - 添加 MTP 权重路径映射支持
+- **Changes**:
+  1. HfModelConfig 添加 `mtp_num_hidden_layers` 字段
+  2. ParseHfConfig 解析 `mtp_num_hidden_layers` 配置项
+  3. MapHuggingFaceWeightToTurboMind 添加 MTP 路径映射：
+     - `mtp.layers.X.self_attn.*` → `layers.X.attention.*`（复用主模型权重）
+     - `mtp.layers.X.mlp.*` → `layers.X.feed_forward.*`
+     - `mtp.layers.X.input_layernorm` → `layers.X.attention_norm`
+     - `mtp.norm.*` → `mtp.norm.*`
+     - `mtp.fc.*` → `mtp.fc.*`
+     - `mtp.pre_fc_norm_*` → `mtp.pre_fc_norm_*`
+- **Learnings**:
+  - MTP (Multi-Token Prediction) 层权重与主模型层权重共享
+  - Python 代码中 `name.replace('mtp.', 'model.')` 将 MTP 层映射到主模型层
+  - 因此 C++ 映射也复用 `layers.X.*` 路径，与主模型层共享参数
+  - MTP 特有的顶层参数（norm, fc, pre_fc_norm_*）需要单独映射
+  - Rust 52 个测试全部通过
 ---

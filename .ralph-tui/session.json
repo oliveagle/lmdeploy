@@ -3,10 +3,10 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-19T12:21:00.160Z",
-  "currentIteration": 20,
+  "updatedAt": "2026-05-19T13:16:55.291Z",
+  "currentIteration": 23,
   "maxIterations": 50,
-  "tasksCompleted": 13,
+  "tasksCompleted": 14,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -366,6 +366,36 @@
       "durationMs": 441028,
       "startedAt": "2026-05-19T11:47:43.790Z",
       "endedAt": "2026-05-19T11:55:04.818Z"
+    },
+    {
+      "iteration": 21,
+      "status": "completed",
+      "taskId": "lmdeploy-3xr",
+      "taskTitle": "完成 E2E 推理测试",
+      "taskCompleted": true,
+      "durationMs": 1554005,
+      "startedAt": "2026-05-19T11:55:06.132Z",
+      "endedAt": "2026-05-19T12:21:00.137Z"
+    },
+    {
+      "iteration": 22,
+      "status": "completed",
+      "taskId": "lmdeploy-gg4",
+      "taskTitle": "修复 safetensors 权重路径映射 - 添加 mtp.layers.* 别名支持",
+      "taskCompleted": false,
+      "durationMs": 895129,
+      "startedAt": "2026-05-19T12:21:09.724Z",
+      "endedAt": "2026-05-19T12:36:04.853Z"
+    },
+    {
+      "iteration": 23,
+      "status": "completed",
+      "taskId": "lmdeploy-s60",
+      "taskTitle": "修复 DeltaNet linear_attn 模块权重加载",
+      "taskCompleted": false,
+      "durationMs": 1946758,
+      "startedAt": "2026-05-19T12:36:06.026Z",
+      "endedAt": "2026-05-19T13:08:32.784Z"
     }
   ],
   "skippedTaskIds": [],
@@ -377,7 +407,9 @@
     "lmdeploy-zk3",
     "lmdeploy-85l",
     "lmdeploy-s8l",
-    "lmdeploy-4rt"
+    "lmdeploy-4rt",
+    "lmdeploy-gg4",
+    "lmdeploy-s60"
   ],
   "subagentPanelVisible": false
 }

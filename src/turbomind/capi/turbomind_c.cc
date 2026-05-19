@@ -400,6 +400,9 @@ struct HfModelConfig {
     int num_local_experts = 0;
     int num_experts_per_tok = 0;
 
+    // MTP (Multi-Token Prediction) configuration
+    int mtp_num_hidden_layers = 0;
+
     // DeltaNet / Linear Attention
     bool use_linear_attn = false;
 
@@ -488,6 +491,9 @@ static HfModelConfig ParseHfConfig(const std::string& model_dir)
     // MoE configuration
     config.num_local_experts = get_int("num_local_experts", 0);
     config.num_experts_per_tok = get_int("num_experts_per_tok", 0);
+
+    // MTP (Multi-Token Prediction) configuration
+    config.mtp_num_hidden_layers = get_int("mtp_num_hidden_layers", 0);
 
     // DeltaNet / Linear Attention
     // Qwen3.5 uses layer_types array (["linear_attention", "full_attention", ...])
@@ -916,7 +922,35 @@ static void LoadWeightsFromSafetensors(
                 param = current->param(param_name);
             }
 
-            if (!param) {
+            // Convert shape from size_t to int64_t for compatibility
+            turbomind::DataType tm_dtype = meta->dtype;
+
+            // Check if param exists by iterating all params
+            bool param_exists = false;
+
+            // DEBUG: print params for first LinearWeight encountered
+            bool debug_params = false;
+            if (dynamic_cast<turbomind::LinearWeight*>(current)) {
+                static int debug_linear_count = 0;
+                if (debug_linear_count < 1) {
+                    debug_params = true;
+                    ++debug_linear_count;
+                    fprintf(stderr, "[C-API] DEBUG: LinearWeight params for '%s':\n", current->full_path().c_str());
+                    fflush(stderr);
+                }
+            }
+
+            current->for_each_param([&](const char* name, turbomind::core::Tensor& tensor) {
+                if (debug_params) {
+                    fprintf(stderr, "[C-API] DEBUG:   param '%s', tensor_valid=%d\n", name, static_cast<bool>(tensor));
+                    fflush(stderr);
+                }
+                if (std::string(name) == param_name) {
+                    param_exists = true;
+                }
+            });
+
+            if (!param_exists) {
                 if (loaded_count < 5) {
                     fprintf(stderr, "[C-API] Param '%s' not found in module '%s' (path='%s', type='%s')\n",
                             param_name.c_str(), current->full_path().c_str(), tm_path.c_str(), current->type());
@@ -926,14 +960,7 @@ static void LoadWeightsFromSafetensors(
                 continue;
             }
 
-            // Convert shape from size_t to int64_t for compatibility
-            std::vector<int64_t> shape64;
-            for (const auto& dim : meta->shape) {
-                shape64.push_back(static_cast<int64_t>(dim));
-            }
-
-            turbomind::DataType tm_dtype = meta->dtype;
-
+            // Param exists, allocate it
             param.alloc(meta->shape, tm_dtype);
 
             // Copy data (TODO: handle device placement)
@@ -973,6 +1000,78 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     // Remove "language_model." prefix if present (for vision-language models)
     if (result.find("language_model.") == 0) {
         result = result.substr(15);
+    }
+
+    // ========================================================
+    // MTP (Multi-Token Prediction) paths
+    // ========================================================
+    // MTP shares weights with main model layers (mtp.layers.X.* -> layers.X.*)
+    // MTP-specific params (norm, fc, pre_fc_norm_*) use mtp.* prefix
+    bool is_mtp = result.find("mtp.") == 0;
+    if (is_mtp) {
+        // Remove mtp prefix for mapping
+        result = result.substr(4);  // Remove "mtp." prefix
+
+        // MTP-specific top-level params: mtp.norm, mtp.fc, mtp.pre_fc_norm_*
+        // Map to mtp_top_level.* namespace
+        if (result == "norm.weight") {
+            return "mtp.norm.weight";
+        }
+        if (result == "norm") {
+            return "mtp.norm";
+        }
+        if (result.find("fc.") == 0) {
+            return "mtp." + result;
+        }
+        if (result.find("pre_fc_norm_") == 0) {
+            return "mtp." + result;
+        }
+
+        // MTP layers share weights with main model: layers.X.*
+        if (result.find("layers.") == 0) {
+            // Strip "layers." and apply to main model layers
+            result = result.substr(7);
+
+            // Apply standard mappings for the shared layer weights
+            size_t mtp_pos;
+            while ((mtp_pos = result.find(".self_attn.")) != std::string::npos) {
+                result.replace(mtp_pos, 11, ".attention.");
+            }
+            while ((mtp_pos = result.find(".mlp.experts.")) != std::string::npos) {
+                result.replace(mtp_pos, 13, ".moe_ffn.experts.");
+            }
+            while ((mtp_pos = result.find(".mlp.")) != std::string::npos) {
+                result.replace(mtp_pos, 5, ".feed_forward.");
+            }
+            while ((mtp_pos = result.find(".input_layernorm")) != std::string::npos) {
+                result.replace(mtp_pos, 16, ".attention_norm");
+            }
+            while ((mtp_pos = result.find(".post_attention_layernorm")) != std::string::npos) {
+                result.replace(mtp_pos, 24, ".ffn_norm");
+            }
+            while ((mtp_pos = result.find(".o_proj.")) != std::string::npos) {
+                result.replace(mtp_pos, 8, ".wo.");
+            }
+            while ((mtp_pos = result.find(".gate_proj.")) != std::string::npos) {
+                result.replace(mtp_pos, 11, ".w1.");
+            }
+            while ((mtp_pos = result.find(".up_proj.")) != std::string::npos) {
+                result.replace(mtp_pos, 9, ".w3.");
+            }
+            while ((mtp_pos = result.find(".down_proj.")) != std::string::npos) {
+                result.replace(mtp_pos, 11, ".w2.");
+            }
+            while ((mtp_pos = result.find(".qweight")) != std::string::npos) {
+                result.replace(mtp_pos, 8, ".weight");
+            }
+            while ((mtp_pos = result.find(".qzeros")) != std::string::npos) {
+                result.replace(mtp_pos, 7, ".zeros");
+            }
+
+            return result;  // Map to main model layers
+        }
+
+        return result;
     }
 
     // ========================================================
@@ -1069,6 +1168,10 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     while ((pos = result.find(".down_proj.")) != std::string::npos) {
         result.replace(pos, 11, ".w2.");
     }
+
+    // DeltaNet (linear_attn) specific mappings are no longer needed
+    // since separate projection children (in_proj_qkv, in_proj_a, in_proj_b, in_proj_z)
+    // are now created in the module tree
 
     // AWQ quantization parameters (qweight -> weight, etc.)
     // These must be last so .weight suffix is already established
@@ -1484,9 +1587,59 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
                 if (delta_module) {
                     auto* delta = static_cast<turbomind::DeltaNetWeight*>(delta_module.get());
 
-                    // Create in_proj_all LinearWeight child
+                    // Calculate the correct fused input projection dimension
+                    // Layout: [qkv | z | b | a]
+                    // qkv: 2*num_k_heads*key_head_dim + num_v_heads*value_head_dim
+                    // z: num_v_heads*value_head_dim
+                    // b: num_v_heads
+                    // a: num_v_heads
+                    const int num_k_heads = hf_config.num_attention_heads;
+                    const int num_v_heads = hf_config.num_key_value_heads;
+                    const int key_head_dim = head_dim;
+                    const int value_head_dim = head_dim;
+                    const int qkv_out = 2 * num_k_heads * key_head_dim + num_v_heads * value_head_dim;
+                    const int z_out = num_v_heads * value_head_dim;
+                    const int a_out = num_v_heads;
+                    const int b_out = num_v_heads;
+                    const int fused_out = qkv_out + z_out + a_out + b_out;
+
+                    // Create separate projection LinearWeight children (for HF weight loading)
+                    // These will be fused into in_proj_all during prepare()
+                    auto in_proj_qkv_cfg = CreateAwqLinearConfig(
+                        hf_config.hidden_size, qkv_out,
+                        weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                    auto in_proj_qkv_module = turbomind::core::Module::create(in_proj_qkv_cfg);
+                    if (in_proj_qkv_module) {
+                        delta->add_child("in_proj_qkv", std::move(in_proj_qkv_module));
+                    }
+
+                    auto in_proj_z_cfg = CreateAwqLinearConfig(
+                        hf_config.hidden_size, z_out,
+                        weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                    auto in_proj_z_module = turbomind::core::Module::create(in_proj_z_cfg);
+                    if (in_proj_z_module) {
+                        delta->add_child("in_proj_z", std::move(in_proj_z_module));
+                    }
+
+                    auto in_proj_a_cfg = CreateAwqLinearConfig(
+                        hf_config.hidden_size, a_out,
+                        weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                    auto in_proj_a_module = turbomind::core::Module::create(in_proj_a_cfg);
+                    if (in_proj_a_module) {
+                        delta->add_child("in_proj_a", std::move(in_proj_a_module));
+                    }
+
+                    auto in_proj_b_cfg = CreateAwqLinearConfig(
+                        hf_config.hidden_size, b_out,
+                        weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                    auto in_proj_b_module = turbomind::core::Module::create(in_proj_b_cfg);
+                    if (in_proj_b_module) {
+                        delta->add_child("in_proj_b", std::move(in_proj_b_module));
+                    }
+
+                    // Create in_proj_all LinearWeight child (fused, used during forward)
                     auto in_proj_cfg = CreateAwqLinearConfig(
-                        hf_config.hidden_size, 3 * hf_config.hidden_size,
+                        hf_config.hidden_size, fused_out,
                         weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
                     auto in_proj_module = turbomind::core::Module::create(in_proj_cfg);
                     if (in_proj_module) {
