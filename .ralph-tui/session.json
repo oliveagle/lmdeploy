@@ -3,10 +3,10 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-19T02:57:41.516Z",
-  "currentIteration": 12,
+  "updatedAt": "2026-05-19T03:39:59.598Z",
+  "currentIteration": 14,
   "maxIterations": 50,
-  "tasksCompleted": 8,
+  "tasksCompleted": 9,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -286,6 +286,26 @@
       "durationMs": 795948,
       "startedAt": "2026-05-18T18:36:22.565Z",
       "endedAt": "2026-05-18T18:49:38.513Z"
+    },
+    {
+      "iteration": 13,
+      "status": "completed",
+      "taskId": "lmdeploy-g89",
+      "taskTitle": "C++ 引擎支持 AWQ 量化模型",
+      "taskCompleted": true,
+      "durationMs": 304535,
+      "startedAt": "2026-05-19T02:52:36.965Z",
+      "endedAt": "2026-05-19T02:57:41.500Z"
+    },
+    {
+      "iteration": 14,
+      "status": "completed",
+      "taskId": "lmdeploy-85l",
+      "taskTitle": "分析 C++ 引擎 AWQ 加载失败根因",
+      "taskCompleted": false,
+      "durationMs": 791461,
+      "startedAt": "2026-05-19T02:58:01.028Z",
+      "endedAt": "2026-05-19T03:11:12.489Z"
     }
   ],
   "skippedTaskIds": [],
@@ -294,7 +314,8 @@
     "lmdeploy-5wx",
     "lmdeploy-82u",
     "lmdeploy-m9v",
-    "lmdeploy-zk3"
+    "lmdeploy-zk3",
+    "lmdeploy-85l"
   ],
   "subagentPanelVisible": false
 }

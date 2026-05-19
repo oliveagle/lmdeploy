@@ -7,6 +7,18 @@ after each iteration and it's included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
+### AWQ Weight Name Mapping (HF → TurboMind)
+
+**问题**: AWQ 量化模型在 safetensors 中使用特殊的后缀命名：`.qweight`（INT32 打包的 4-bit 权重）、`.scales`（float16 缩放因子）、`.qzeros`（INT32 零点）。而 TurboMind C++ 期望的参数名为 `.weight`、`.scales`、`.zeros`。
+
+**解决方案**: 在 `MapHuggingFaceWeightToTurboMind()` 中添加 AWQ 后缀映射：
+- `.qweight` → `.weight`
+- `.qzeros` → `.zeros`
+- `.weight_scale` → `.scales`（旧版命名）
+- `.weight_zero` → `.zeros`（旧版命名）
+
+**注意**: AWQ 权重以 int32 打包存储（每 8 个 4-bit 值打包为一个 int32），加载时 `LinearWeight::prepare()` 通过 `extend_to_u16()` 扩展到 uint16，再通过 GEMM converter 转换为计算格式。
+
 ### EngineConfig data_type for AWQ Models
 
 **问题**: C++ 引擎 `TurboMind::Impl` 构造函数要求 `data_type` 必须是 `kBfloat16` 或 `kHalf`，但 AWQ 模型初始化时该字段默认为 `kUnknown` (0)，导致 `TM_CHECK` 断言失败。
@@ -499,3 +511,47 @@ ModelWeight
 
 ---
 
+
+## 2026-05-19 - lmdeploy-85l
+- **Analyzed**: C++ 引擎 AWQ 加载失败的 data_type 检查根因
+- **Files analyzed**:
+  - `src/turbomind/turbomind.cc:152` - `TM_CHECK(data_type_ == kBfloat16 || data_type_ == kHalf)` 检查
+  - `src/turbomind/core/data_type.h` - 数据类型枚举定义和别名 (`kHalf = kFloat16`)
+  - `src/turbomind/capi/turbomind_c.cc` - C API 数据类型转换和 EngineConfig 处理
+  - `lmdeploy/turbomind/turbomind.py` - Python TurboMind 如何设置 `data_type`
+  - `lmdeploy-rust-server/src/model/cpp_engine.rs` - Rust C++ 引擎的配置设置
+- **Root Cause Analysis**:
+  1. **检查位置**: `TurboMind::Impl` 构造函数第 152 行要求 `data_type_` 必须是 `kBfloat16` 或 `kHalf`
+  2. **数据流**: Python `engine_config.dtype` → `_tm.DataType.TYPE_FP16` → C++ `DataType::kFloat16` → TurboMind 构造函数 `data_type_`
+  3. **关键别名**: `kHalf = kFloat16` (在 data_type.h:80 定义)
+  4. **C API 映射**: `TM_DATATYPE_FP16` → `FromCDataType()` → `DataType::kFloat16`
+  5. **修复状态**: Rust 引擎已在 `cpp_engine.rs:160` 显式设置 `set_data_type(TM_DATATYPE_FP16)`
+- **AWQ 权重格式**:
+  - **激活 dtype**: `kHalf` (fp16) - 用于所有计算
+  - **权重 dtype**: `kUint4` (4-bit 整数) - AWQ 量化权重存储
+  - **scale/zero dtype**: `kFloat16` - 反量化参数
+  - **计算流程**: 读取 4-bit 权重 → 反量化 (weight * scale + zero) → fp16 计算 → fp16 激活
+- **Learnings**:
+  - `data_type` 字段是激活 dtype，不是权重 dtype
+  - AWQ 模型权重以 4-bit 存储但所有计算在 fp16 中进行
+  - Python TurboMind 通过 `get_tm_config()` 自动检测并设置正确的 dtype
+  - C++ 引擎需要显式设置 `data_type = kHalf` 以通过检查
+  - 错误消息 "Check failed: data_type_ == kBfloat16 || data_type_ == kHalf" 表明 `data_type_` 未正确初始化
+  - 当前修复已在 Rust 引擎实现并通过测试
+
+---
+
+## 2026-05-19 - lmdeploy-um9
+- **Implemented**: C++ 层 AWQ 权重名称映射，支持 `.qweight`、`.qzeros` 后缀
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.cc` - 添加 `.qweight` → `.weight`、`.qzeros` → `.zeros` 映射
+  - `.ralph-tui/progress.md` - 添加 AWQ 权重名称映射模式文档
+- **Learnings**:
+  - AWQ 量化模型在 safetensors 中使用特殊命名：`.qweight`（int32 打包）、`.qzeros`（int32）、`.scales`（float16）
+  - Qwen3.6-35B-A3B-AWQ 有 420 个 qweight 张量、420 个 scales 张量、420 个 qzeros 张量
+  - C++ `LinearWeight::prepare()` 处理 AWQ 反量化：`extend_to_u16()` 扩展 4-bit 到 uint16，`fuse_scales_and_zeros()` 合并 scales/zeros
+  - AWQ 权重以 int32 存储（每 8 个 4-bit 值打包），需要通过 GEMM converter 转换为计算格式
+  - Rust 引擎 `quant_policy=4` 触发 C++ 层 AWQ 处理逻辑
+  - C++ 层 AWQ 支持已在 `lmdeploy-sw3` 中完成，本任务补充了权重名称映射
+
+---

@@ -958,7 +958,21 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     }
 
     // AWQ quantization parameters
-    // weight_scale -> scales, weight_zero -> zeros
+    // qweight -> weight (AWQ 4-bit packed weight)
+    size_t qweight_pos = result.find(".qweight");
+    while (qweight_pos != std::string::npos) {
+        result.replace(qweight_pos, 8, ".weight");
+        qweight_pos = result.find(".qweight");
+    }
+
+    // qzeros -> zeros (AWQ quantized zero points)
+    size_t qzeros_pos = result.find(".qzeros");
+    while (qzeros_pos != std::string::npos) {
+        result.replace(qzeros_pos, 7, ".zeros");
+        qzeros_pos = result.find(".qzeros");
+    }
+
+    // weight_scale -> scales, weight_zero -> zeros (legacy naming)
     size_t scale_pos = result.find(".weight_scale");
     while (scale_pos != std::string::npos) {
         result.replace(scale_pos, 13, ".scales");
