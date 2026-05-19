@@ -305,9 +305,7 @@ void TM_ModelRequest_Cancel(TM_ModelRequest* req);
 // End session (signals request completion)
 void TM_ModelRequest_End(TM_ModelRequest* req, uint64_t session_id);
 
-// Get request state from streaming mode.
-// Returns 0 on success, -1 if state is null
-int TM_ModelRequest_GetStreamingState(TM_ModelRequest* req, TM_RequestStatus* out_status, int* out_seq_len);
+// Request status enumeration
 typedef enum {
     TM_STATUS_OK = 0,
     TM_STATUS_INVALID = 1,
@@ -321,6 +319,10 @@ typedef enum {
     TM_STATUS_INCONSISTENCY = 9,
     TM_STATUS_NO_QUEUE = 10,
 } TM_RequestStatus;
+
+// Get request state from streaming mode.
+// Returns 0 on success, -1 if state is null
+int TM_ModelRequest_GetStreamingState(TM_ModelRequest* req, TM_RequestStatus* out_status, int* out_seq_len);
 
 // Get request state
 // Returns 0 on success, -1 if state is null
