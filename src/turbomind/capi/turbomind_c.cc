@@ -2,6 +2,7 @@
 // C API implementation for TurboMind inference engine
 
 #include "turbomind_c.h"
+#include <cuda_runtime.h>
 #include <cstdio>
 
 // Debug function to write to a file
@@ -952,7 +953,11 @@ static void LoadWeightsFromSafetensors(
                 auto tensor = *target_tensor;
                 if (tensor.raw_data()) {
                     size_t copy_size = std::min(data.size(), static_cast<size_t>(tensor.byte_size()));
-                    std::memcpy(tensor.raw_data(), data.data(), copy_size);
+                    if (tensor.device().type == turbomind::DeviceType::kDEVICE) {
+                        cudaMemcpy(tensor.raw_data(), data.data(), copy_size, cudaMemcpyHostToDevice);
+                    } else {
+                        std::memcpy(tensor.raw_data(), data.data(), copy_size);
+                    }
                     ++loaded_count;
                 }
             } else {

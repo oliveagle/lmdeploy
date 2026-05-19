@@ -3,6 +3,17 @@
 This file tracks progress across iterations. Agents update this file
 after each iteration and it is included in prompts for context.
 
+## 2026-05-20 - lmdeploy-6xm
+- **Issue**: `LoadWeightsFromSafetensors` in `src/turbomind/capi/turbomind_c.cc` used `std::memcpy` for GPU tensor copies, causing segfault
+- **Fix**: Added device type check and use `cudaMemcpy` with `cudaMemcpyHostToDevice` for GPU tensors, `std::memcpy` only for CPU tensors
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.cc` — added `#include <cuda_runtime.h>` and device-aware tensor copy logic
+- **Learnings**:
+  - `std::memcpy` only works for CPU-to-CPU copies
+  - GPU tensor copies must use `cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice)`
+  - Check `tensor.device().type == DeviceType::kDEVICE` to determine copy method
+---
+
 ## 2026-05-20 - lmdeploy-0lz
 - **Issue**: `TM_TurboMind_InitFromPath` in `src/turbomind/capi/turbomind_c.cc` had `ContextGuard` created but going out of scope immediately after creation, before `LoadWeightsFromSafetensors` was called
 - **Fix**: Moved `ctx_guard` creation to line 1315, before GPU allocations. The guard now covers all GPU tensor allocations (`tok_emb_param.alloc()`, `LoadWeightsFromSafetensors`) through the entire weight loading process until `ProcessWeights`/`CreateEngine`
@@ -90,6 +101,30 @@ tm->instance->ProcessWeights(index);
 - 模块树构建 (CPU-only) 可以在 guard 外进行
 - **所有** GPU 内存分配必须在 guard 作用域内
 - `LoadWeightsFromSafetensors` 内部分配 GPU tensor，必须被 guard 覆盖
+
+### GPU Tensor Copy Pattern
+
+**问题**: `LoadWeightsFromSafetensors` 中使用 `std::memcpy` 将 CPU 数据复制到 GPU tensor，导致 segfault。
+
+**解决方案**: 根据目标 tensor 的设备类型选择正确的复制方法：
+
+```cpp
+// ❌ 错误: GPU tensor 不能用 std::memcpy
+std::memcpy(tensor.raw_data(), data.data(), copy_size);  // segfault!
+
+// ✅ 正确: 检查设备类型，选择正确的复制方法
+if (tensor.device().type == turbomind::DeviceType::kDEVICE) {
+    cudaMemcpy(tensor.raw_data(), data.data(), copy_size, cudaMemcpyHostToDevice);
+} else {
+    std::memcpy(tensor.raw_data(), data.data(), copy_size);
+}
+```
+
+**关键点**:
+- `std::memcpy` 只适用于 CPU-to-CPU 复制
+- GPU tensor 必须使用 `cudaMemcpy` + `cudaMemcpyHostToDevice`
+- 需要 `#include <cuda_runtime.h>`
+- 检查 `tensor.device().type` 来决定使用哪种方法
 
 ### C++ Streaming Forward Pattern
 
