@@ -960,6 +960,8 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
 {
     // HF format: model.language_model.layers.0.mlp.gate_proj.weight
     // TM format: layers.0.feed_forward.w1.weight
+    // HF MoE format: model.layers.0.mlp.experts.0.gate_proj.weight
+    // TM MoE format: layers.0.moe_ffn.experts.0.w1.weight
 
     std::string result = hf_name;
 
@@ -986,18 +988,49 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     }
 
     // ========================================================
+    // MoE-specific mappings (must be before general mlp -> feed_forward)
+    // ========================================================
+    // Handle MoE expert paths: .mlp.experts.N.<proj> -> .moe_ffn.experts.N.<proj>
+    // This pattern matches: layers.X.mlp.experts.Y.gate_proj.weight
+    size_t pos;
+    while ((pos = result.find(".mlp.experts.")) != std::string::npos) {
+        result.replace(pos, 13, ".moe_ffn.experts.");
+    }
+
+    // Handle MoE gate: .mlp.gate.weight -> .moe_ffn.gate.weight
+    // (This is the router gate, not to be confused with gate_proj)
+    // Pattern: layers.X.mlp.gate.weight -> layers.X.moe_ffn.gate.weight
+    // We need to be careful not to match .gate_proj.
+    // Check for .mlp.gate. followed by weight (not _proj)
+    size_t mlp_gate_pos = 0;
+    while ((mlp_gate_pos = result.find(".mlp.gate.")) != std::string::npos) {
+        // Check if this is actually .mlp.gate_proj. (skip if so)
+        if (result.substr(mlp_gate_pos).find(".gate_proj.") == std::string::npos &&
+            result.find("weight", mlp_gate_pos) < result.find(".", mlp_gate_pos + 10)) {
+            result.replace(mlp_gate_pos, 10, ".moe_ffn.gate.");
+        } else {
+            break;
+        }
+    }
+
+    // ========================================================
     // Layer-level replacements
     // Do these in order: module name -> sub-module name -> param suffix
     // ========================================================
     // self_attn -> attention
-    size_t pos;
     while ((pos = result.find(".self_attn.")) != std::string::npos) {
         result.replace(pos, 11, ".attention.");
     }
 
-    // mlp -> feed_forward
+    // mlp -> feed_forward (only for non-MoE models)
+    // Skip if we already have moe_ffn
     while ((pos = result.find(".mlp.")) != std::string::npos) {
-        result.replace(pos, 5, ".feed_forward.");
+        // Don't replace if it's part of moe_ffn
+        if (result.find(".moe_ffn.", pos - 5) != pos - 5) {
+            result.replace(pos, 5, ".feed_forward.");
+        } else {
+            break;
+        }
     }
 
     // input_layernorm -> attention_norm
@@ -1026,7 +1059,7 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
         result.replace(pos, 8, ".wo.");
     }
 
-    // FFN projections
+    // FFN projections (applies to both standard FFN and MoE experts)
     while ((pos = result.find(".gate_proj.")) != std::string::npos) {
         result.replace(pos, 11, ".w1.");
     }

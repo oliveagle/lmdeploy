@@ -3,10 +3,10 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-19T11:47:27.450Z",
-  "currentIteration": 18,
+  "updatedAt": "2026-05-19T12:21:00.160Z",
+  "currentIteration": 20,
   "maxIterations": 50,
-  "tasksCompleted": 12,
+  "tasksCompleted": 13,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -346,6 +346,26 @@
       "durationMs": 4079511,
       "startedAt": "2026-05-19T04:53:14.729Z",
       "endedAt": "2026-05-19T06:01:14.240Z"
+    },
+    {
+      "iteration": 19,
+      "status": "completed",
+      "taskId": "lmdeploy-zor",
+      "taskTitle": "实现 Rust + C++ 纯原生推理路径",
+      "taskCompleted": true,
+      "durationMs": 215143,
+      "startedAt": "2026-05-19T11:43:52.291Z",
+      "endedAt": "2026-05-19T11:47:27.434Z"
+    },
+    {
+      "iteration": 20,
+      "status": "completed",
+      "taskId": "lmdeploy-4rt",
+      "taskTitle": "修复权重加载路径映射",
+      "taskCompleted": false,
+      "durationMs": 441028,
+      "startedAt": "2026-05-19T11:47:43.790Z",
+      "endedAt": "2026-05-19T11:55:04.818Z"
     }
   ],
   "skippedTaskIds": [],
@@ -356,7 +376,8 @@
     "lmdeploy-m9v",
     "lmdeploy-zk3",
     "lmdeploy-85l",
-    "lmdeploy-s8l"
+    "lmdeploy-s8l",
+    "lmdeploy-4rt"
   ],
   "subagentPanelVisible": false
 }

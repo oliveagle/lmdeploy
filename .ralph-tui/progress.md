@@ -3,6 +3,51 @@
 This file tracks progress across iterations. Agents update this file
 after each iteration and it's included in prompts for context.
 
+## Codebase Patterns
+
+### E2E Testing Pattern
+
+Rust integration tests use `tests/e2e_test.rs` for component-level validation:
+- Tokenizer loading, encoding/decoding roundtrip
+- Model config parsing with nested config support (text_config)
+- Engine type parsing and AWQ detection
+- Model state machine transitions
+
+Python integration tests use `tests/e2e_integration.py` for end-to-end validation:
+- Python tokenizer loading via `lmdeploy.tokenizer.Tokenizer`
+- Config parsing with nested config support
+- AWQ quantization detection from config.json
+- Alternative path handling for broken symlinks
+
+All tests run: `cargo test` (52 tests) + `python3 tests/e2e_integration.py` (3 tests)
+
+### Nested Config Detection Pattern
+
+Qwen3.5/3.6 multimodal models store actual parameters in `text_config` sub-object, not at root level. Config readers must handle both flat and nested structures:
+```rust
+let text_config = config.get("text_config").or_else(|| config.get("model_config")).unwrap_or(&config);
+let hidden_size = text_config.get("hidden_size").unwrap_or(config.get("hidden_size")).unwrap_or("N/A");
+```
+
+---
+
+## 2026-05-19 - lmdeploy-3xr
+- **Implemented**: E2E 推理测试
+- **Files changed**:
+  - `lmdeploy-rust-server/tests/e2e_test.rs` - Rust 集成测试套件 (16 个测试)
+  - `lmdeploy-rust-server/tests/e2e_integration.py` - Python 集成测试套件 (3 个测试)
+- **验证结果**:
+  - 52 个 Rust 测试全部通过 (36 个单元测试 + 16 个 E2E 测试)
+  - 3 个 Python 集成测试全部通过
+  - Tokenizer 编码/解码 roundtrip 正确
+  - 嵌套 config 解析正确 (text_config)
+  - AWQ 检测正确
+- **Learnings**:
+  - `tests/` 目录下测试文件自动被 cargo 识别
+  - Python E2E 测试可以验证 AWQ 模型检测逻辑
+  - AWQ 模型路径可能是 broken symlink，需要容错处理
+---
+
 ## 2026-05-19 - lmdeploy-zor
 - **Status**: Verified and closed - Rust + C++ 纯原生推理路径已完整实现
 - **Files verified**:
@@ -20,6 +65,21 @@ after each iteration and it's included in prompts for context.
   - Rust 层纯 C++ 推理路径已完整实现，所有类型和功能都已绑定
   - C++ 层存在 ModelWeight::prepare 崩溃问题，但这不在 Rust 层解决范围内
   - 引擎类型选择通过 config.toml 的 engine_type 字段控制
+---
+
+## 2026-05-19 - lmdeploy-4rt
+- **Fixed**: 权重加载路径映射 - 添加 MoE expert 路径映射
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.cc` - `MapHuggingFaceWeightToTurboMind()` 添加 MoE expert 路径映射
+- **Fix details**:
+  - `.mlp.experts.N.gate_proj` → `.moe_ffn.experts.N.w1`
+  - `.mlp.experts.N.up_proj` → `.moe_ffn.experts.N.w3`
+  - `.mlp.experts.N.down_proj` → `.moe_ffn.experts.N.w2`
+- **Learnings**:
+  - MoE expert 路径映射必须在 `mlp -> feed_forward` 之前处理，否则会被错误映射
+  - `.mlp.gate.weight` (router gate) 需要区别于 `.mlp.gate_proj.weight` (FFN gate)
+  - `.gate_proj.` → `.w1.` 的映射同时适用于标准 FFN 和 MoE expert，无需额外处理
+  - C++ 代码编译通过，Rust 36 个测试全部通过
 ---
 
 ### AWQ Offline Weight Export Pattern
