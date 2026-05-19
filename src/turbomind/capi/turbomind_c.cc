@@ -940,6 +940,11 @@ static void LoadWeightsFromSafetensors(
 
             // If the param exists, allocate it directly
             if (param_exists && target_tensor) {
+                // DEBUG: Check Context state before tensor construction
+                fprintf(stderr, "[C-API] DEBUG: Before Tensor alloc for '%s.%s' - will call Context::alloc\n",
+                        current->full_path().c_str(), param_name.c_str());
+                fflush(stderr);
+
                 // Allocate the tensor with the required shape
                 std::vector<turbomind::core::ssize_t> shape_vec;
                 for (auto s : meta->shape) {
@@ -948,7 +953,15 @@ static void LoadWeightsFromSafetensors(
                 turbomind::Layout layout{shape_vec};
                 turbomind::DataType dtype = meta->dtype;
                 turbomind::core::Device device{turbomind::DeviceType::kDEVICE, 0};
+
+                fprintf(stderr, "[C-API] DEBUG: Constructing Tensor (shape_size=%zu, dtype=%d)...\n",
+                        shape_vec.size(), (int)dtype);
+                fflush(stderr);
+
                 *target_tensor = turbomind::core::Tensor{std::move(layout), dtype, device};
+
+                fprintf(stderr, "[C-API] DEBUG: Tensor constructed, raw_data=%p\n", (*target_tensor).raw_data());
+                fflush(stderr);
 
                 auto tensor = *target_tensor;
                 if (tensor.raw_data()) {
@@ -959,6 +972,8 @@ static void LoadWeightsFromSafetensors(
                         std::memcpy(tensor.raw_data(), data.data(), copy_size);
                     }
                     ++loaded_count;
+                    fprintf(stderr, "[C-API] DEBUG: Copied %zu bytes for '%s'\n", copy_size, tensor_name.c_str());
+                    fflush(stderr);
                 }
             } else {
                 if (loaded_count < 5) {
