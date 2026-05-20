@@ -824,6 +824,7 @@ static std::vector<std::string> FindSafetensorsFiles(const std::string& model_di
 }
 
 // Load weights from a safetensors file and populate the ModelWeight module
+// Optimized version: batches cudaMemcpyAsync calls for better performance
 static void LoadWeightsFromSafetensors(
     turbomind::ModelWeight* model_weight,
     const char* safetensors_path,
@@ -835,11 +836,24 @@ static void LoadWeightsFromSafetensors(
         fprintf(stderr, "[C-API] Loading safetensors: %s (%zu tensors)\n", safetensors_path, reader.num_tensors());
         fflush(stderr);
 
+        // Structure to hold batched tensor data for async copy
+        struct PendingTensor {
+            std::string tensor_name;
+            std::string tm_path;
+            std::vector<uint8_t> data;
+            std::vector<turbomind::core::ssize_t> shape;
+            turbomind::DataType dtype;
+            turbomind::core::Module* module;
+            std::string param_name;
+        };
+
+        std::vector<PendingTensor> pending_tensors;
         int loaded_count = 0;
         int skip_count = 0;
         int debug_count = 0;
 
-        // Iterate over all tensors in the file
+        // Phase 1: Read all tensor metadata and data from disk (CPU-side)
+        // This batches disk I/O and prepares data for GPU transfer
         for (size_t i = 0; i < reader.num_tensors(); ++i) {
             const std::string& tensor_name = reader.tensor_name(i);
 
@@ -861,17 +875,16 @@ static void LoadWeightsFromSafetensors(
             const auto* meta = reader.get_tensor_meta(tensor_name);
             if (!meta) {
                 fprintf(stderr, "[C-API] Failed to get metadata for %s (mapped to %s)\n", tensor_name.c_str(), tm_path.c_str());
-                continue;  // Skip failed reads
+                continue;
             }
 
-            // Read tensor data
+            // Read tensor data from disk
             std::vector<uint8_t> data = reader.read_tensor(tensor_name);
             if (data.empty()) {
-                continue;  // Skip failed reads
+                continue;
             }
 
             // Parse the TurboMind path to find the module and param
-            // Format: "layers.0.attention.w_qkv.weight" or "tok_embeddings" (direct param)
             std::vector<std::string> parts;
             std::stringstream ss(tm_path);
             std::string part;
@@ -885,113 +898,96 @@ static void LoadWeightsFromSafetensors(
 
             // Navigate to the target module
             turbomind::core::Module* current = model_weight;
-            if (debug_count < 5) {
-                fprintf(stderr, "[C-API] Navigate: model_weight=%p, type=%s\n", (void*)model_weight, model_weight->type());
-            }
 
-            // If there's only one part (e.g., "tok_embeddings"), it's a direct param on model_weight
-            // If there are multiple parts (e.g., "layers.0.attention.w_qkv.weight"), navigate the module tree
             if (parts.size() > 1) {
                 for (size_t j = 0; j < parts.size() - 1; ++j) {
-                    if (!current) {
-                        if (debug_count < 5) {
-                            fprintf(stderr, "[C-API] Navigation failed at part[%zu]='%s'\n", j, parts[j].c_str());
-                        }
-                        break;
-                    }
-                    turbomind::core::Module* next = current->child(parts[j]);
-                    if (debug_count < 5) {
-                        fprintf(stderr, "[C-API] child('%s'): %p (type=%s)\n", parts[j].c_str(), (void*)next, next ? next->type() : "null");
-                    }
-                    current = next;
+                    if (!current) break;
+                    current = current->child(parts[j]);
                 }
             }
 
             if (!current) {
-                if (debug_count < 20) {
-                    fprintf(stderr, "[C-API] Module tree navigation failed for '%s' -> '%s'\n", tensor_name.c_str(), tm_path.c_str());
-                    fflush(stderr);
-                }
                 ++skip_count;
                 continue;
             }
 
-            // The last part is the param name (e.g., "weight"), or the only part (e.g., "tok_embeddings")
-            std::string param_name = parts.back();
+            // Prepare shape vector
+            std::vector<turbomind::core::ssize_t> shape_vec;
+            for (auto s : meta->shape) {
+                shape_vec.push_back(static_cast<turbomind::core::ssize_t>(s));
+            }
 
-            // Use for_each_param to find the param
+            // Store pending tensor for batch processing
+            pending_tensors.push_back({
+                tensor_name,
+                tm_path,
+                std::move(data),
+                shape_vec,
+                meta->dtype,
+                current,
+                parts.back()
+            });
+        }
+
+        // Phase 2: Batch GPU memory allocation and async data transfer
+        fprintf(stderr, "[C-API] Batch processing %zu tensors...\n", pending_tensors.size());
+        fflush(stderr);
+
+        // Create CUDA stream for async transfers
+        cudaStream_t copy_stream;
+        cudaStreamCreate(&copy_stream);
+
+        // Vector to track allocated tensors for synchronization
+        std::vector<turbomind::core::Tensor*> allocated_tensors;
+
+        for (auto& pending : pending_tensors) {
+            // Check if param exists
             turbomind::core::Tensor* target_tensor = nullptr;
             bool param_exists = false;
-            int param_count = 0;
 
-            // ALWAYS print first 5 modules
-            static int debug_for_each_count = 0;
-            bool debug_for_each = (debug_for_each_count < 5);
-
-            fprintf(stderr, "[C-API] DEBUG: for_each_param on '%s' (type='%s')\n",
-                    current->full_path().c_str(), current->type());
-
-            current->for_each_param([&](const char* name, turbomind::core::Tensor& tensor) {
-                ++param_count;
-                fprintf(stderr, "[C-API] DEBUG   param[%d]: name='%s'\n", param_count, name);
-                if (std::string(name) == param_name) {
+            pending.module->for_each_param([&](const char* name, turbomind::core::Tensor& tensor) {
+                if (std::string(name) == pending.param_name) {
                     param_exists = true;
                     target_tensor = &tensor;
                 }
             });
-            fprintf(stderr, "[C-API] DEBUG   found %d params, looking for '%s', found=%d\n",
-                    param_count, param_name.c_str(), param_exists);
-            ++debug_for_each_count;
 
-            // If the param exists, allocate it directly
             if (param_exists && target_tensor) {
-                // DEBUG: Check Context state before tensor construction
-                fprintf(stderr, "[C-API] DEBUG: Before Tensor alloc for '%s.%s' - will call Context::alloc\n",
-                        current->full_path().c_str(), param_name.c_str());
-                fflush(stderr);
-
                 // Allocate the tensor with the required shape
-                std::vector<turbomind::core::ssize_t> shape_vec;
-                for (auto s : meta->shape) {
-                    shape_vec.push_back(static_cast<turbomind::core::ssize_t>(s));
-                }
-                turbomind::Layout layout{shape_vec};
-                turbomind::DataType dtype = meta->dtype;
+                turbomind::Layout layout{pending.shape};
                 turbomind::core::Device device{turbomind::DeviceType::kDEVICE, 0};
 
-                fprintf(stderr, "[C-API] DEBUG: Constructing Tensor (shape_size=%zu, dtype=%d)...\n",
-                        shape_vec.size(), (int)dtype);
-                fflush(stderr);
-
-                *target_tensor = turbomind::core::Tensor{std::move(layout), dtype, device};
-
-                fprintf(stderr, "[C-API] DEBUG: Tensor constructed, raw_data=%p\n", (*target_tensor).raw_data());
-                fflush(stderr);
+                *target_tensor = turbomind::core::Tensor{std::move(layout), pending.dtype, device};
+                allocated_tensors.push_back(target_tensor);
 
                 auto tensor = *target_tensor;
                 if (tensor.raw_data()) {
-                    size_t copy_size = std::min(data.size(), static_cast<size_t>(tensor.byte_size()));
+                    size_t copy_size = std::min(pending.data.size(), static_cast<size_t>(tensor.byte_size()));
                     if (tensor.device().type == turbomind::DeviceType::kDEVICE) {
-                        cudaMemcpy(tensor.raw_data(), data.data(), copy_size, cudaMemcpyHostToDevice);
+                        // Use async copy for better performance
+                        cudaMemcpyAsync(tensor.raw_data(), pending.data.data(), copy_size,
+                                       cudaMemcpyHostToDevice, copy_stream);
                     } else {
-                        std::memcpy(tensor.raw_data(), data.data(), copy_size);
+                        std::memcpy(tensor.raw_data(), pending.data.data(), copy_size);
                     }
                     ++loaded_count;
-                    fprintf(stderr, "[C-API] DEBUG: Copied %zu bytes for '%s'\n", copy_size, tensor_name.c_str());
-                    fflush(stderr);
                 }
             } else {
-                if (loaded_count < 5) {
-                    fprintf(stderr, "[C-API] Param '%s' not found in module '%s' (path='%s', type='%s')\n",
-                            param_name.c_str(), current->full_path().c_str(), tm_path.c_str(), current->type());
-                    fflush(stderr);
-                }
                 ++skip_count;
-                continue;
             }
         }
 
+        // Synchronize all async copies
+        cudaStreamSynchronize(copy_stream);
+        cudaStreamDestroy(copy_stream);
+
         fprintf(stderr, "[C-API] Loaded %d tensors, skipped %d from %s\n", loaded_count, skip_count, safetensors_path);
+        fflush(stderr);
+
+        // Trim CUDA memory pool to release unused memory back to OS
+        // This prevents OOM during large model loading due to unbounded pool growth
+        turbomind::core::Context::device_alloc()->trim(0);
+        fprintf(stderr, "[C-API] Trimmed CUDA memory pool after loading %s\n", safetensors_path);
         fflush(stderr);
     }
     catch (const std::exception& e) {
@@ -1135,7 +1131,38 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     // Layer-level replacements
     // Do these in order: module name -> sub-module name -> param suffix
     // ========================================================
-    // self_attn -> attention
+    // DeltaNet (linear_attn) specific mappings
+    // Map HF DeltaNet layer paths to TurboMind linear_attn paths
+    // HF format: layers.X.self_attn.in_proj.qkv.weight
+    // TM format: layers.X.linear_attn.in_proj_qkv.weight
+    // Apply these BEFORE the general self_attn -> attention replacement
+    while ((pos = result.find(".self_attn.in_proj.qkv.")) != std::string::npos) {
+        result.replace(pos, 21, ".linear_attn.in_proj_qkv.");
+    }
+    while ((pos = result.find(".self_attn.in_proj.z.")) != std::string::npos) {
+        result.replace(pos, 20, ".linear_attn.in_proj_z.");
+    }
+    while ((pos = result.find(".self_attn.in_proj.a.")) != std::string::npos) {
+        result.replace(pos, 20, ".linear_attn.in_proj_a.");
+    }
+    while ((pos = result.find(".self_attn.in_proj.b.")) != std::string::npos) {
+        result.replace(pos, 20, ".linear_attn.in_proj_b.");
+    }
+
+    // Also handle fused in_proj.weight -> in_proj_all for linear_attn
+    while ((pos = result.find(".self_attn.in_proj.weight")) != std::string::npos) {
+        result.replace(pos, 22, ".linear_attn.in_proj_all.weight");
+    }
+
+    // Linear attention output projection mapping
+    while ((pos = result.find(".linear_attn.linear_out_proj.")) != std::string::npos) {
+        result.replace(pos, 29, ".linear_attn.out_proj.");
+    }
+    while ((pos = result.find(".self_attn.linear_out_proj.")) != std::string::npos) {
+        result.replace(pos, 25, ".linear_attn.out_proj.");
+    }
+
+    // self_attn -> attention (for standard full attention layers)
     while ((pos = result.find(".self_attn.")) != std::string::npos) {
         result.replace(pos, 11, ".attention.");
     }
@@ -1188,9 +1215,8 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
         result.replace(pos, 11, ".w2.");
     }
 
-    // DeltaNet (linear_attn) specific mappings are no longer needed
-    // since separate projection children (in_proj_qkv, in_proj_a, in_proj_b, in_proj_z)
-    // are now created in the module tree
+    // Note: DeltaNet (linear_attn) specific mappings are handled earlier
+    // in the function (before self_attn -> attention replacement)
 
     // AWQ quantization parameters (qweight -> weight, etc.)
     // These must be last so .weight suffix is already established

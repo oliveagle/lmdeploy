@@ -3,8 +3,8 @@
   "sessionId": "c326a191-04c2-4142-a7ae-957674ce9658",
   "status": "running",
   "startedAt": "2026-05-18T14:14:36.166Z",
-  "updatedAt": "2026-05-20T01:52:31.079Z",
-  "currentIteration": 38,
+  "updatedAt": "2026-05-20T06:13:35.184Z",
+  "currentIteration": 41,
   "maxIterations": 50,
   "tasksCompleted": 26,
   "isPaused": false,
@@ -546,6 +546,36 @@
       "durationMs": 1050683,
       "startedAt": "2026-05-20T01:35:00.093Z",
       "endedAt": "2026-05-20T01:52:30.776Z"
+    },
+    {
+      "iteration": 39,
+      "status": "completed",
+      "taskId": "lmdeploy-zm7",
+      "taskTitle": "lmdeploy-891: Fix CUDA OOM in safetensors weight loading for large models",
+      "taskCompleted": false,
+      "durationMs": 951727,
+      "startedAt": "2026-05-20T04:52:18.144Z",
+      "endedAt": "2026-05-20T05:08:09.871Z"
+    },
+    {
+      "iteration": 40,
+      "status": "completed",
+      "taskId": "lmdeploy-hr0",
+      "taskTitle": "lmdeploy-892: Optimize weight loading performance for pure C++ engine",
+      "taskCompleted": false,
+      "durationMs": 289854,
+      "startedAt": "2026-05-20T05:08:11.108Z",
+      "endedAt": "2026-05-20T05:13:00.962Z"
+    },
+    {
+      "iteration": 41,
+      "status": "completed",
+      "taskId": "lmdeploy-fcp",
+      "taskTitle": "lmdeploy-893: Implement pure Rust Tokenizer for C++ engine",
+      "taskCompleted": false,
+      "durationMs": 178588,
+      "startedAt": "2026-05-20T05:13:02.132Z",
+      "endedAt": "2026-05-20T05:16:00.720Z"
     }
   ],
   "skippedTaskIds": [],
@@ -562,7 +592,10 @@
     "lmdeploy-s60",
     "lmdeploy-h2w",
     "lmdeploy-09p",
-    "lmdeploy-d6w"
+    "lmdeploy-d6w",
+    "lmdeploy-zm7",
+    "lmdeploy-hr0",
+    "lmdeploy-fcp"
   ],
   "subagentPanelVisible": false
 }

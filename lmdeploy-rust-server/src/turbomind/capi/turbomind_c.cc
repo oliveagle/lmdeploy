@@ -1092,18 +1092,10 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             return TM_ERR_RUNTIME;
         }
 
-        // Build the complete module tree
+        // Build the complete module tree (structure only - no GPU allocations yet)
         auto* model_weight = static_cast<turbomind::ModelWeight*>(weight_module.get());
 
-        // 1. Create and add tok_embeddings param
-        // Shape: [vocab_size, hidden_size]
-        std::vector<size_t> tok_emb_shape = {(size_t)hf_config.vocab_size, (size_t)hf_config.hidden_size};
-        auto tok_emb_param = model_weight->param("tok_embeddings");
-        if (tok_emb_param) {
-            tok_emb_param.alloc(tok_emb_shape, weight_cfg.data_type);
-        }
-
-        // 2. Create and add norm child (NormWeight)
+        // 1. Create and add norm child (NormWeight)
         turbomind::core::NormConfig norm_cfg;
         norm_cfg.dim = hf_config.hidden_size;
         norm_cfg.data_type = weight_cfg.data_type;
@@ -1113,7 +1105,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             model_weight->add_child("norm", std::move(norm_module));
         }
 
-        // 3. Create and add output child (LinearWeight)
+        // 2. Create and add output child (LinearWeight)
         auto output_cfg = CreateAwqLinearConfig(
             hf_config.hidden_size, hf_config.vocab_size,
             weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
@@ -1122,7 +1114,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             model_weight->add_child("output", std::move(output_module));
         }
 
-        // 4. Create and add layers ModuleList
+        // 3. Create and add layers ModuleList
         turbomind::core::ModuleListConfig layers_cfg;
         auto layers_list_unique = turbomind::core::Module::create(layers_cfg);
         auto* layers_list = static_cast<turbomind::core::ModuleList*>(layers_list_unique.get());
@@ -1427,7 +1419,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
         }
 
         // Get the model_weight pointer from the root (it's now owned by root)
-        turbomind::ModelWeight* model_weight = static_cast<turbomind::ModelWeight*>(root->child("text_model"));
+        model_weight = static_cast<turbomind::ModelWeight*>(root->child("text_model"));
         if (!model_weight) {
             SetError(TM_ERR_RUNTIME, "Failed to get ModelWeight from root");
             return TM_ERR_RUNTIME;
@@ -1438,6 +1430,12 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             SetError(TM_ERR_RUNTIME, "layers child is null after attaching to root");
             return TM_ERR_RUNTIME;
         }
+
+        // All GPU allocations must happen under ContextGuard.
+        // Create the guard BEFORE any GPU memory allocation.
+        // The guard's destructor pushes CUDA context + allocator, and pops on scope exit.
+        auto* model_root = static_cast<turbomind::ModelRoot*>(root);
+        auto ctx_guard = model_root->context();
 
         // Step 4: Load weights from safetensors files
         // Find all safetensors files in the model directory

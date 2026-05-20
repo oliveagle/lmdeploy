@@ -202,6 +202,23 @@ src/turbomind/capi/CMakeFiles/turbomind_c.dir/turbomind_c.cc.o: \
  /usr/include/c++/13/tr1/poly_hermite.tcc \
  /usr/include/c++/13/tr1/poly_laguerre.tcc \
  /usr/include/c++/13/tr1/riemann_zeta.tcc /usr/include/c++/13/cstring \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda_runtime.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/crt/host_config.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/builtin_types.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/device_types.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/crt/host_defines.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/driver_types.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/vector_types.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/surface_types.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/texture_types.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/library_types.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/channel_descriptor.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda_runtime_api.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda_device_runtime_api.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/driver_functions.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/vector_functions.h \
+ /usr/local/cuda-12.5/targets/x86_64-linux/include/vector_functions.hpp \
+ /usr/include/c++/13/utility /usr/include/c++/13/bits/stl_relops.h \
  /usr/include/c++/13/algorithm /usr/include/c++/13/bits/stl_algo.h \
  /usr/include/c++/13/bits/algorithmfwd.h \
  /usr/include/c++/13/bits/stl_heap.h \
@@ -248,30 +265,13 @@ src/turbomind/capi/CMakeFiles/turbomind_c.dir/turbomind_c.cc.o: \
  /usr/include/c++/13/bits/align.h \
  /usr/include/c++/13/bits/shared_ptr_atomic.h \
  /usr/include/c++/13/backward/auto_ptr.h \
- /usr/include/c++/13/pstl/glue_memory_defs.h /usr/include/c++/13/utility \
- /usr/include/c++/13/bits/stl_relops.h \
+ /usr/include/c++/13/pstl/glue_memory_defs.h \
  /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/core/allocator.h \
  /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/core/common.h \
  /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/utils/cuda_utils.h \
  /usr/include/c++/13/iostream \
  /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda.h \
  /usr/include/c++/13/stdlib.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda_runtime.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/crt/host_config.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/builtin_types.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/device_types.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/crt/host_defines.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/driver_types.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/vector_types.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/surface_types.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/texture_types.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/library_types.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/channel_descriptor.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda_runtime_api.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/cuda_device_runtime_api.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/driver_functions.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/vector_functions.h \
- /usr/local/cuda-12.5/targets/x86_64-linux/include/vector_functions.hpp \
  /usr/local/cuda-12.5/targets/x86_64-linux/include/cublasLt.h \
  /usr/local/cuda-12.5/targets/x86_64-linux/include/cublas_api.h \
  /usr/local/cuda-12.5/targets/x86_64-linux/include/cuComplex.h \

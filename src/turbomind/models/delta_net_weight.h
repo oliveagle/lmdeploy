@@ -48,6 +48,10 @@ public:
 
     // --- X-macro field lists ---
 #define DELTA_NET_WEIGHT_CHILDREN(X)                                                                                   \
+    X(LinearWeight, in_proj_qkv)                                                                                       \
+    X(LinearWeight, in_proj_z)                                                                                         \
+    X(LinearWeight, in_proj_a)                                                                                         \
+    X(LinearWeight, in_proj_b)                                                                                         \
     X(LinearWeight, in_proj_all)                                                                                       \
     X(LinearWeight, out_proj)                                                                                          \
     X(NormWeight, norm)

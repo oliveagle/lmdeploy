@@ -7,11 +7,11 @@ CUDA_DEFINES = -DBUILD_MULTI_GPU=1 -DENABLE_BF16 -DUSE_NVTX
 
 CUDA_INCLUDES = --options-file CMakeFiles/core.dir/includes_CUDA.rsp
 
-CUDA_FLAGS =  -Xcompiler -Wall -ldl --expt-extended-lambda --expt-relaxed-constexpr --std=c++17 --diag-suppress=128 --diag-suppress=27 -g -O0 -G -Xcompiler -Wall -std=c++17 "--generate-code=arch=compute_70,code=[sm_70]" "--generate-code=arch=compute_75,code=[sm_75]" "--generate-code=arch=compute_80,code=[sm_80]" "--generate-code=arch=compute_86,code=[sm_86]" "--generate-code=arch=compute_89,code=[sm_89]" "--generate-code=arch=compute_90a,code=[sm_90a]" -Xcompiler=-fPIC -Xptxas=-v
+CUDA_FLAGS =  -Xcompiler -Wall -ldl --expt-extended-lambda --expt-relaxed-constexpr --std=c++17 --diag-suppress=128 --diag-suppress=27 -O3 -DNDEBUG        -O3        --use_fast_math -std=c++17 "--generate-code=arch=compute_70,code=[sm_70]" "--generate-code=arch=compute_75,code=[sm_75]" "--generate-code=arch=compute_80,code=[sm_80]" "--generate-code=arch=compute_86,code=[sm_86]" "--generate-code=arch=compute_89,code=[sm_89]" "--generate-code=arch=compute_90a,code=[sm_90a]" -Xcompiler=-fPIC -Xptxas=-v
 
 CXX_DEFINES = -DBUILD_MULTI_GPU=1 -DENABLE_BF16 -DUSE_NVTX
 
 CXX_INCLUDES = -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/fmt-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy -I/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/concurrentqueue-src -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include
 
-CXX_FLAGS = -g  -Wall -O0 -std=gnu++17 -fPIC
+CXX_FLAGS = -O3 -DNDEBUG         -O3 -std=gnu++17 -fPIC
 

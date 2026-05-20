@@ -1,3 +1,50 @@
+## Codebase Patterns
+
+- **CUDA Memory Pool Allocator**: `CudaMemPoolAllocator` uses `cudaMallocFromPoolAsync` with `ReleaseThreshold = UINT64_MAX`. It caches allocations and never releases memory back to OS unless `trim()` is explicitly called. For large model loading, call `Context::device_alloc()->trim(0)` after each safetensors file to prevent OOM.
+- **ContextGuard Lifecycle**: Create `ContextGuard` via `model_root->context()` BEFORE any GPU memory allocations. It pushes CUDA context + allocator onto thread-local stacks and pops on scope exit. All Tensor allocations must happen while guard is in scope.
+- **Weight Loading Flow**: ModelRoot → add_child("text_model", weight_module) → ctx_guard → LoadWeightsFromSafetensors → ProcessWeights → CreateEngine
+- **Async Weight Loading**: Use `cudaMemcpyAsync` with CUDA streams to batch GPU memory transfers. Pattern: (1) Read all tensor data from disk first, (2) Allocate all GPU tensors, (3) Batch async copies with `cudaMemcpyAsync`, (4) `cudaStreamSynchronize`, (5) Destroy stream. This overlaps PCI-E transfers and reduces kernel launch overhead.
+- **DeltaNetWeight Module Children**: HuggingFace stores linear attention weights as `self_attn.in_proj.qkv/z/a/b.weight`, which must be mapped to TurboMind's `linear_attn.in_proj_qkv/in_proj_z/in_proj_a/in_proj_b.weight`. The weight mapping in `MapHuggingFaceWeightToTurboMind` must handle DeltaNet paths BEFORE the general `self_attn -> attention` replacement to avoid incorrect routing. All DeltaNet children (`in_proj_qkv`, `in_proj_z`, `in_proj_a`, `in_proj_b`) must be declared in `DELTA_NET_WEIGHT_CHILDREN` X-macro for the module tree to recognize them during weight loading.
+
+## 2026-05-20 - lmdeploy-fcp
+- **Verified**: Pure Rust Tokenizer already implemented - no Python dependency
+- **Implementation**: Uses `tokenizers = 0.21` (HuggingFace Rust crate) for pure Rust tokenization
+- **Files**: `src/tokenizer.rs` - Full encode/decode/BOS/EOS/batch support
+- **Integration**: Both `cpp_engine.rs` and `engine.rs` use `LMTokenizer`
+- **Tests**: 36 tests passing (including 12 tokenizer-specific tests)
+- **Learnings**:
+  - This work was already completed in lmdeploy-x63 (closed)
+  - The tokenizer loads directly from tokenizer.json/tokenizer.model files
+  - No Python bridge or C API dependency for tokenization
+  - Both engine paths (PythonBridge and PureCpp) use the same pure Rust tokenizer
+
+---
+- **Optimized**: Weight loading performance by batching cudaMemcpyAsync calls
+- **Changes**: Modified `LoadWeightsFromSafetensors` to use two-phase approach:
+  - Phase 1: Read all tensor data from disk into CPU memory (batch disk I/O)
+  - Phase 2: Allocate all GPU tensors, then use `cudaMemcpyAsync` with a CUDA stream for batch transfers
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.cc` - Replaced sequential cudaMemcpy with batched cudaMemcpyAsync
+- **Learnings:**
+  - Sequential cudaMemcpy has high per-call overhead (kernel launch, PCIe setup)
+  - Batching with cudaMemcpyAsync allows CUDA to pipeline transfers and reduce overhead
+  - Pattern: Read all data → Allocate all tensors → Async copy all → Sync
+  - Keep stream creation/sync outside the tensor loop for maximum efficiency
+- **Performance Impact**: Expected 3-5x speedup for large models (19GB) by reducing thousands of cudaMemcpy calls to a single stream-sync
+
+---
+
+## 2026-05-20 - lmdeploy-zm7
+- **Fixed**: CUDA OOM in safetensors weight loading for large models
+- **Root Cause**: CUDA memory pool (`CudaMemPoolAllocator`) uses `ReleaseThreshold = UINT64_MAX`, causing unbounded growth during weight loading. For large models (e.g., Qwen3.5-9B with 32 layers), loading hundreds of weight tensors causes the pool to exhaust GPU memory.
+- **Fix**: Added `turbomind::core::Context::device_alloc()->trim(0)` call after loading each safetensors file. This releases unused memory back to the OS, preventing OOM.
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.cc` - Added trim call in `LoadWeightsFromSafetensors` after each file
+- **Learnings**:
+  - The CUDA memory pool allocator (`CudaMemPoolAllocator`) caches allocations and never releases memory unless `trim()` is explicitly called
+  - Weight loading happens sequentially for all tensors across all safetensors files, so memory pressure accumulates
+  - Calling `trim(0)` after each safetensors file is a good balance between performance and memory usage
+---
 ## 2026-05-20 - lmdeploy-bwa
 - **Fixed**: dtype mapping in SafetensorsReader - `TensorMeta::dtype` was uninitialized when dtype field not found in JSON, causing wrong dtype values (e.g. 67591 instead of kFloat16). Added explicit default initialization for dtype, offset, size fields.
 - **Fixed**: Added more dtype string variants to `ParseDtype()` (e.g., "float16", "int32", "uint64", etc.) to handle various safetensors file formats.
@@ -33,4 +80,26 @@
   - The crash before the fixes was from using `std::memcpy` (host) on GPU device memory - `cudaMemcpy` with `HostToDevice` is required
   - After fixes, the only remaining issue is GPU memory capacity for large models
   - `libturbomind_c.so` lives in `build/lib/`, not `lmdeploy-rust-server/` - needs manual `cp` to sync
+---
+
+## 2026-05-20 - lmdeploy-olq
+- **Fixed**: DeltaNetWeight missing in_proj_qkv submodule support for Qwen3.5-9B hybrid attention layers
+- **Root Cause**: HuggingFace stores linear attention weights as `layers.X.self_attn.in_proj.qkv.weight` (and z/a/b variants), but the TurboMind weight mapping didn't handle these paths, and the DeltaNetWeight module didn't declare these children in its X-macro.
+- **Fix Applied**:
+  1. Added `in_proj_qkv`, `in_proj_z`, `in_proj_a`, `in_proj_b` to `DELTA_NET_WEIGHT_CHILDREN` X-macro in `delta_net_weight.h`
+  2. Added weight mapping in `MapHuggingFaceWeightToTurboMind` to convert:
+     - `.self_attn.in_proj.qkv.` → `.linear_attn.in_proj_qkv.`
+     - `.self_attn.in_proj.z.` → `.linear_attn.in_proj_z.`
+     - `.self_attn.in_proj.a.` → `.linear_attn.in_proj_a.`
+     - `.self_attn.in_proj.b.` → `.linear_attn.in_proj_b.`
+     - `.self_attn.linear_out_proj.` → `.linear_attn.out_proj.`
+  3. These mappings are applied BEFORE the general `self_attn → attention` replacement to avoid incorrect routing
+- **Files changed**:
+  - `src/turbomind/models/delta_net_weight.h` - Added DeltaNet input projection children to X-macro
+  - `src/turbomind/capi/turbomind_c.cc` - Added DeltaNet-specific weight mappings
+- **Learnings**:
+  - Hybrid attention models (Qwen3.5-9B) use `layer_types` array to specify linear_attention vs full_attention per layer
+  - The C++ engine already creates `linear_attn` (DeltaNetWeight) child for linear attention layers based on `layer_is_linear_attn` config
+  - Weight mappings must be ordered carefully: specific patterns (DeltaNet) before general patterns (self_attn → attention)
+  - All module children that receive weights must be declared in the X-macro for proper tree navigation during weight loading
 ---
