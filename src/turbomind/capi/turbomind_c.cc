@@ -549,6 +549,7 @@ static HfModelConfig ParseHfConfig(const std::string& model_dir)
 // ============================================================
 
 #include "src/turbomind/utils/safetensors_reader.h"
+#include "src/turbomind/utils/safetensors_reader_mmap.h"
 
 // Wrapper to adapt turbomind::SafetensorsReader to the C API
 // The C API uses an opaque void* handle, so we wrap the C++ reader
@@ -831,56 +832,37 @@ static void LoadWeightsFromSafetensors(
     const HfModelConfig& hf_config)
 {
     try {
-        turbomind::SafetensorsReader reader(safetensors_path);
+        // Use mmap-based reader for zero-copy tensor access
+        turbomind::SafetensorsReaderMmap reader(safetensors_path);
 
         fprintf(stderr, "[C-API] Loading safetensors: %s (%zu tensors)\n", safetensors_path, reader.num_tensors());
         fflush(stderr);
 
-        // Structure to hold batched tensor data for async copy
-        struct PendingTensor {
-            std::string tensor_name;
-            std::string tm_path;
-            std::vector<uint8_t> data;
-            std::vector<turbomind::core::ssize_t> shape;
-            turbomind::DataType dtype;
+        // Pre-build a mapping of param_name -> Tensor* pointer on each module we encounter.
+        // This avoids O(m) for_each_param() for every tensor loaded.
+        struct ModuleParamInfo {
             turbomind::core::Module* module;
+            std::string tm_path;
             std::string param_name;
+            turbomind::core::Param existing_param;
         };
 
-        std::vector<PendingTensor> pending_tensors;
         int loaded_count = 0;
         int skip_count = 0;
-        int debug_count = 0;
 
-        // Phase 1: Read all tensor metadata and data from disk (CPU-side)
-        // This batches disk I/O and prepares data for GPU transfer
+        // Create CUDA stream for async transfers
+        cudaStream_t copy_stream;
+        cudaStreamCreate(&copy_stream);
+
+        // Phase 1: Iterate tensors, map names, and directly transfer via mmap zero-copy
+        size_t progress_count = 0;
         for (size_t i = 0; i < reader.num_tensors(); ++i) {
             const std::string& tensor_name = reader.tensor_name(i);
-
-            // DEBUG: print first 10 tensor names
-            if (debug_count < 10) {
-                fprintf(stderr, "[C-API] Tensor[%zu]: '%s'\n", i, tensor_name.c_str());
-                fflush(stderr);
-                ++debug_count;
-            }
 
             // Map HF weight names to TurboMind module paths
             std::string tm_path = MapHuggingFaceWeightToTurboMind(tensor_name);
             if (tm_path.empty()) {
                 ++skip_count;
-                continue;  // Skip unmapped weights
-            }
-
-            // Get tensor metadata
-            const auto* meta = reader.get_tensor_meta(tensor_name);
-            if (!meta) {
-                fprintf(stderr, "[C-API] Failed to get metadata for %s (mapped to %s)\n", tensor_name.c_str(), tm_path.c_str());
-                continue;
-            }
-
-            // Read tensor data from disk
-            std::vector<uint8_t> data = reader.read_tensor(tensor_name);
-            if (data.empty()) {
                 continue;
             }
 
@@ -898,7 +880,6 @@ static void LoadWeightsFromSafetensors(
 
             // Navigate to the target module
             turbomind::core::Module* current = model_weight;
-
             if (parts.size() > 1) {
                 for (size_t j = 0; j < parts.size() - 1; ++j) {
                     if (!current) break;
@@ -911,69 +892,45 @@ static void LoadWeightsFromSafetensors(
                 continue;
             }
 
-            // Prepare shape vector
+            // Use param() for O(1) lookup instead of for_each_param() iteration
+            const std::string& param_name = parts.back();
+            turbomind::core::Param target_param = current->param(param_name);
+            if (!target_param) {
+                ++skip_count;
+                continue;
+            }
+
+            // Get tensor metadata
+            const auto* meta = reader.get_tensor_meta(tensor_name);
+            if (!meta) {
+                continue;
+            }
+
+            // Get direct zero-copy pointer to mmap'd data (no CPU copy!)
+            const uint8_t* src_data = reader.get_tensor_data(tensor_name);
+
+            // Build shape vector
             std::vector<turbomind::core::ssize_t> shape_vec;
             for (auto s : meta->shape) {
                 shape_vec.push_back(static_cast<turbomind::core::ssize_t>(s));
             }
 
-            // Store pending tensor for batch processing
-            pending_tensors.push_back({
-                tensor_name,
-                tm_path,
-                std::move(data),
-                shape_vec,
-                meta->dtype,
-                current,
-                parts.back()
-            });
-        }
+            // Allocate GPU memory and transfer directly from mmap'd region
+            turbomind::Layout layout{shape_vec};
+            turbomind::core::Device device{turbomind::DeviceType::kDEVICE, 0};
+            auto tensor = target_param.alloc(std::vector<size_t>(shape_vec.begin(), shape_vec.end()), meta->dtype);
 
-        // Phase 2: Batch GPU memory allocation and async data transfer
-        fprintf(stderr, "[C-API] Batch processing %zu tensors...\n", pending_tensors.size());
-        fflush(stderr);
+            if (tensor.raw_data()) {
+                size_t copy_size = std::min(meta->size, static_cast<size_t>(tensor.byte_size()));
+                cudaMemcpyAsync(tensor.raw_data(), src_data, copy_size,
+                               cudaMemcpyHostToDevice, copy_stream);
+                ++loaded_count;
+            }
 
-        // Create CUDA stream for async transfers
-        cudaStream_t copy_stream;
-        cudaStreamCreate(&copy_stream);
-
-        // Vector to track allocated tensors for synchronization
-        std::vector<turbomind::core::Tensor*> allocated_tensors;
-
-        for (auto& pending : pending_tensors) {
-            // Check if param exists
-            turbomind::core::Tensor* target_tensor = nullptr;
-            bool param_exists = false;
-
-            pending.module->for_each_param([&](const char* name, turbomind::core::Tensor& tensor) {
-                if (std::string(name) == pending.param_name) {
-                    param_exists = true;
-                    target_tensor = &tensor;
-                }
-            });
-
-            if (param_exists && target_tensor) {
-                // Allocate the tensor with the required shape
-                turbomind::Layout layout{pending.shape};
-                turbomind::core::Device device{turbomind::DeviceType::kDEVICE, 0};
-
-                *target_tensor = turbomind::core::Tensor{std::move(layout), pending.dtype, device};
-                allocated_tensors.push_back(target_tensor);
-
-                auto tensor = *target_tensor;
-                if (tensor.raw_data()) {
-                    size_t copy_size = std::min(pending.data.size(), static_cast<size_t>(tensor.byte_size()));
-                    if (tensor.device().type == turbomind::DeviceType::kDEVICE) {
-                        // Use async copy for better performance
-                        cudaMemcpyAsync(tensor.raw_data(), pending.data.data(), copy_size,
-                                       cudaMemcpyHostToDevice, copy_stream);
-                    } else {
-                        std::memcpy(tensor.raw_data(), pending.data.data(), copy_size);
-                    }
-                    ++loaded_count;
-                }
-            } else {
-                ++skip_count;
+            ++progress_count;
+            if (progress_count % 200 == 0 || i == reader.num_tensors() - 1) {
+                fprintf(stderr, "[C-API] Transfer %zu/%zu tensors from %s\n", progress_count, reader.num_tensors(), safetensors_path);
+                fflush(stderr);
             }
         }
 
@@ -985,7 +942,6 @@ static void LoadWeightsFromSafetensors(
         fflush(stderr);
 
         // Trim CUDA memory pool to release unused memory back to OS
-        // This prevents OOM during large model loading due to unbounded pool growth
         turbomind::core::Context::device_alloc()->trim(0);
         fprintf(stderr, "[C-API] Trimmed CUDA memory pool after loading %s\n", safetensors_path);
         fflush(stderr);
