@@ -6,5 +6,5 @@ CUDA_DEFINES = -DBUILD_MULTI_GPU=1 -DENABLE_BF16 -DUSE_NVTX
 
 CUDA_INCLUDES = --options-file CMakeFiles/sampling_penalty_kernels.dir/includes_CUDA.rsp
 
-CUDA_FLAGS =  -Xcompiler -Wall -ldl --expt-extended-lambda --expt-relaxed-constexpr --std=c++17 --diag-suppress=128 --diag-suppress=27 -O3 -DNDEBUG        -O3        --use_fast_math -std=c++17 "--generate-code=arch=compute_70,code=[sm_70]" "--generate-code=arch=compute_75,code=[sm_75]" "--generate-code=arch=compute_80,code=[sm_80]" "--generate-code=arch=compute_86,code=[sm_86]" "--generate-code=arch=compute_89,code=[sm_89]" "--generate-code=arch=compute_90a,code=[sm_90a]" -Xcompiler=-fPIC
+CUDA_FLAGS =  -Xcompiler -Wall -ldl --expt-extended-lambda --expt-relaxed-constexpr --std=c++17 --diag-suppress=128 --diag-suppress=27 -g -O0 -G -Xcompiler -Wall -std=c++17 "--generate-code=arch=compute_70,code=[sm_70]" "--generate-code=arch=compute_75,code=[sm_75]" "--generate-code=arch=compute_80,code=[sm_80]" "--generate-code=arch=compute_86,code=[sm_86]" "--generate-code=arch=compute_89,code=[sm_89]" "--generate-code=arch=compute_90a,code=[sm_90a]" -Xcompiler=-fPIC
 

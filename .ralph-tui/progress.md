@@ -4,7 +4,18 @@
 - **ContextGuard Lifecycle**: Create `ContextGuard` via `model_root->context()` BEFORE any GPU memory allocations. It pushes CUDA context + allocator onto thread-local stacks and pops on scope exit. All Tensor allocations must happen while guard is in scope.
 - **Weight Loading Flow**: ModelRoot → add_child("text_model", weight_module) → ctx_guard → LoadWeightsFromSafetensors → ProcessWeights → CreateEngine
 - **Async Weight Loading**: Use `cudaMemcpyAsync` with CUDA streams to batch GPU memory transfers. Pattern: (1) Read all tensor data from disk first, (2) Allocate all GPU tensors, (3) Batch async copies with `cudaMemcpyAsync`, (4) `cudaStreamSynchronize`, (5) Destroy stream. This overlaps PCI-E transfers and reduces kernel launch overhead.
-- **DeltaNetWeight Module Children**: HuggingFace stores linear attention weights as `self_attn.in_proj.qkv/z/a/b.weight`, which must be mapped to TurboMind's `linear_attn.in_proj_qkv/in_proj_z/in_proj_a/in_proj_b.weight`. The weight mapping in `MapHuggingFaceWeightToTurboMind` must handle DeltaNet paths BEFORE the general `self_attn -> attention` replacement to avoid incorrect routing. All DeltaNet children (`in_proj_qkv`, `in_proj_z`, `in_proj_a`, `in_proj_b`) must be declared in `DELTA_NET_WEIGHT_CHILDREN` X-macro for the module tree to recognize them during weight loading.
+- **DeltaNetWeight Module Children**: HuggingFace stores linear attention weights as `self_attn.in_proj.qkv/z/a/b.weight`, which must be mapped to TurboMind's `linear_attn.in_proj_qkv/in_proj_z/in_proj_a/in_proj_b.weight`. The weight mapping in `MapHuggingFaceWeightToTurboMind` must handle DeltaNet paths BEFORE the general `self_attn -> attention` replacement to avoid incorrect routing. All DeltaNet children (`in_proj_qkv`, `in_proj_z`, `in_proj_a`, `in_proj_b`, `in_proj_all`) must be declared in `DELTA_NET_WEIGHT_CHILDREN` X-macro for the module tree to recognize them during weight loading.
+
+## 2026-05-20 - lmdeploy-6on
+- **Verified**: DeltaNetWeight `in_proj_qkv` child module creation and loading works correctly
+- **Debug Analysis**: All 32 layers successfully create and add `in_proj_qkv`, `in_proj_z`, `in_proj_a`, `in_proj_b`, `in_proj_all`, `out_proj`, and `norm` children
+- **Conclusion**: The issue was already resolved in previous work (lmdeploy-olq)
+- **Files changed**: Cleaned up debug logging added during investigation
+- **Learnings**:
+  - `Module::create()` returns valid pointer for LinearWeight with AWQ config
+  - `add_child()` and `child()` work correctly for DeltaNetWeight
+  - The X-macro `DELTA_NET_WEIGHT_CHILDREN` correctly declares all required children
+---
 
 ## 2026-05-20 - lmdeploy-fcp
 - **Verified**: Pure Rust Tokenizer already implemented - no Python dependency
