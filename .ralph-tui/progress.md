@@ -1,3 +1,25 @@
+## 2026-05-20 - lmdeploy-bwa
+- **Fixed**: dtype mapping in SafetensorsReader - `TensorMeta::dtype` was uninitialized when dtype field not found in JSON, causing wrong dtype values (e.g. 67591 instead of kFloat16). Added explicit default initialization for dtype, offset, size fields.
+- **Fixed**: Added more dtype string variants to `ParseDtype()` (e.g., "float16", "int32", "uint64", etc.) to handle various safetensors file formats.
+- **Fixed**: `embed_tokens.weight` mapping now returns "tok_embeddings" (direct param on model_weight) instead of "tok_embeddings.weight" (child module path that doesn't exist), fixing module tree navigation.
+- **Fixed**: `LoadWeightsFromSafetensors` now handles single-part paths like "tok_embeddings" as direct params on model_weight without module tree navigation.
+- **Files changed**:
+  - `src/turbomind/utils/safetensors_reader.h` - Initialize TensorMeta fields, add more dtype string variants
+  - `src/turbomind/capi/turbomind_c.cc` - Fix weight mapping and module tree navigation for top-level params
+- **Learnings:**
+  - `tok_embeddings` is a PARAM on `ModelWeight`, not a child module - weight mapping should return just the param name
+  - The safetensors JSON parser must initialize all struct fields explicitly to avoid garbage values
+  - Safetensors files use various dtype string formats - "float16" in addition to "F16", etc.
+---
+## 2026-05-20 - lmdeploy-881 (lmdeploy-d6w)
+- **Verified**: ContextGuard lifecycle is correct (line 1335, before weight allocs)
+- **Verified**: cudaMemcpy fix is in place (line 970: HostToDevice for GPU, std::memcpy for host)
+- **Conclusion**: Original segfault was from std::memcpy on GPU memory, NOT ContextGuard lifecycle issue. Fixed in lmdeploy-6xm. No code changes needed.
+- **Learnings:**
+  - ContextGuard at line 1335 creates guard via `model_root->context()` which pushes allocator — verified working
+  - The segfault attribution in this bead was incorrect; root cause was cudaMemcpy vs std::memcpy (lmdeploy-6xm)
+  - GPU memory capacity limits remain for large models (Qwen3.5-9B) — this is expected, not a bug
+---
 ## 2026-05-20 - lmdeploy-ubt
 - **Verified**: ContextGuard is correctly created BEFORE LoadWeightsFromSafetensors (line 1320 in turbomind_c.cc)
 - **Verified**: cudaMemcpy fix is in place (line 957: `cudaMemcpy(..., cudaMemcpyHostToDevice)` instead of `std::memcpy`)

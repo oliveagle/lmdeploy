@@ -141,19 +141,20 @@ public:
     /// Parse dtype string to DataType
     static DataType ParseDtype(const std::string& dtype)
     {
-        if (dtype == "F32" || dtype == "fp32") return DataType::kFloat32;
-        if (dtype == "F16" || dtype == "fp16") return DataType::kFloat16;
-        if (dtype == "BF16" || dtype == "bf16") return DataType::kBfloat16;
-        if (dtype == "I64" || dtype == "i64") return DataType::kInt64;
-        if (dtype == "I32" || dtype == "i32") return DataType::kInt32;
-        if (dtype == "I16" || dtype == "i16") return DataType::kInt16;
-        if (dtype == "I8" || dtype == "i8") return DataType::kInt8;
-        if (dtype == "U64" || dtype == "u64") return DataType::kUint64;
-        if (dtype == "U32" || dtype == "u32") return DataType::kUint32;
-        if (dtype == "U16" || dtype == "u16") return DataType::kUint16;
-        if (dtype == "U8" || dtype == "u8") return DataType::kUint8;
-        if (dtype == "F64" || dtype == "fp64") return DataType::kFloat64;
+        if (dtype == "F32" || dtype == "fp32" || dtype == "float32") return DataType::kFloat32;
+        if (dtype == "F16" || dtype == "fp16" || dtype == "float16") return DataType::kFloat16;
+        if (dtype == "BF16" || dtype == "bf16" || dtype == "bfloat16") return DataType::kBfloat16;
+        if (dtype == "I64" || dtype == "i64" || dtype == "int64") return DataType::kInt64;
+        if (dtype == "I32" || dtype == "i32" || dtype == "int32") return DataType::kInt32;
+        if (dtype == "I16" || dtype == "i16" || dtype == "int16") return DataType::kInt16;
+        if (dtype == "I8" || dtype == "i8" || dtype == "int8") return DataType::kInt8;
+        if (dtype == "U64" || dtype == "u64" || dtype == "uint64") return DataType::kUint64;
+        if (dtype == "U32" || dtype == "u32" || dtype == "uint32") return DataType::kUint32;
+        if (dtype == "U16" || dtype == "u16" || dtype == "uint16") return DataType::kUint16;
+        if (dtype == "U8" || dtype == "u8" || dtype == "uint8") return DataType::kUint8;
+        if (dtype == "F64" || dtype == "fp64" || dtype == "float64") return DataType::kFloat64;
         if (dtype == "BOOL" || dtype == "bool") return DataType::kBool;
+        // Default to float32 for unknown dtypes
         return DataType::kFloat32;
     }
 
@@ -264,6 +265,9 @@ private:
 
             TensorMeta meta;
             meta.name = tensor_name;
+            meta.dtype = DataType::kFloat32;  // Default dtype - will be overwritten if found
+            meta.offset = 0;
+            meta.size = 0;
 
             // Parse dtype, shape, data_offsets within the tensor object
             while (pos < json.size()) {

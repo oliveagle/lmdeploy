@@ -871,7 +871,7 @@ static void LoadWeightsFromSafetensors(
             }
 
             // Parse the TurboMind path to find the module and param
-            // Format: "layers.0.attention.w_qkv.weight"
+            // Format: "layers.0.attention.w_qkv.weight" or "tok_embeddings" (direct param)
             std::vector<std::string> parts;
             std::stringstream ss(tm_path);
             std::string part;
@@ -888,18 +888,23 @@ static void LoadWeightsFromSafetensors(
             if (debug_count < 5) {
                 fprintf(stderr, "[C-API] Navigate: model_weight=%p, type=%s\n", (void*)model_weight, model_weight->type());
             }
-            for (size_t j = 0; j < parts.size() - 1; ++j) {
-                if (!current) {
-                    if (debug_count < 5) {
-                        fprintf(stderr, "[C-API] Navigation failed at part[%zu]='%s'\n", j, parts[j].c_str());
+
+            // If there's only one part (e.g., "tok_embeddings"), it's a direct param on model_weight
+            // If there are multiple parts (e.g., "layers.0.attention.w_qkv.weight"), navigate the module tree
+            if (parts.size() > 1) {
+                for (size_t j = 0; j < parts.size() - 1; ++j) {
+                    if (!current) {
+                        if (debug_count < 5) {
+                            fprintf(stderr, "[C-API] Navigation failed at part[%zu]='%s'\n", j, parts[j].c_str());
+                        }
+                        break;
                     }
-                    break;
+                    turbomind::core::Module* next = current->child(parts[j]);
+                    if (debug_count < 5) {
+                        fprintf(stderr, "[C-API] child('%s'): %p (type=%s)\n", parts[j].c_str(), (void*)next, next ? next->type() : "null");
+                    }
+                    current = next;
                 }
-                turbomind::core::Module* next = current->child(parts[j]);
-                if (debug_count < 5) {
-                    fprintf(stderr, "[C-API] child('%s'): %p (type=%s)\n", parts[j].c_str(), (void*)next, next ? next->type() : "null");
-                }
-                current = next;
             }
 
             if (!current) {
@@ -911,7 +916,7 @@ static void LoadWeightsFromSafetensors(
                 continue;
             }
 
-            // The last part is the param name (e.g., "weight")
+            // The last part is the param name (e.g., "weight"), or the only part (e.g., "tok_embeddings")
             std::string param_name = parts.back();
 
             // Use for_each_param to find the param
@@ -1095,9 +1100,9 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     if (result.find("lm_head.") == 0) {
         result = "output." + result.substr(8);  // "lm_head." = 8 chars
     }
-    // embed_tokens.weight -> tok_embeddings.weight
+    // embed_tokens.weight -> tok_embeddings (direct param on model_weight)
     if (result.find("embed_tokens.") == 0) {
-        result = "tok_embeddings." + result.substr(13);  // "embed_tokens." = 13 chars
+        result = "tok_embeddings";  // Return just the param name, not "tok_embeddings.weight"
     }
 
     // ========================================================
