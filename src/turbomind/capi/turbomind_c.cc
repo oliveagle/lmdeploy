@@ -1668,36 +1668,90 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
                     // Create separate projection LinearWeight children (for HF weight loading)
                     // These will be fused into in_proj_all during prepare()
+                    char log_buf_dn[512];
+
                     auto in_proj_qkv_cfg = CreateAwqLinearConfig(
                         hf_config.hidden_size, qkv_out,
                         weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
                     auto in_proj_qkv_module = turbomind::core::Module::create(in_proj_qkv_cfg);
+                    snprintf(log_buf_dn, sizeof(log_buf_dn),
+                        "[DeltaNet] layer=%d Module::create(in_proj_qkv) -> %p\n",
+                        layer_idx, static_cast<void*>(in_proj_qkv_module.get()));
+                    debug_log(log_buf_dn);
                     if (in_proj_qkv_module) {
-                        delta->add_child("in_proj_qkv", std::move(in_proj_qkv_module));
+                        auto* add_result = delta->add_child("in_proj_qkv", std::move(in_proj_qkv_module));
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d add_child(in_proj_qkv) -> %p\n",
+                            layer_idx, static_cast<void*>(add_result));
+                        debug_log(log_buf_dn);
+                        auto* child_check = delta->child("in_proj_qkv");
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d child(in_proj_qkv) -> %p\n",
+                            layer_idx, static_cast<void*>(child_check));
+                        debug_log(log_buf_dn);
                     }
 
                     auto in_proj_z_cfg = CreateAwqLinearConfig(
                         hf_config.hidden_size, z_out,
                         weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
                     auto in_proj_z_module = turbomind::core::Module::create(in_proj_z_cfg);
+                    snprintf(log_buf_dn, sizeof(log_buf_dn),
+                        "[DeltaNet] layer=%d Module::create(in_proj_z) -> %p\n",
+                        layer_idx, static_cast<void*>(in_proj_z_module.get()));
+                    debug_log(log_buf_dn);
                     if (in_proj_z_module) {
-                        delta->add_child("in_proj_z", std::move(in_proj_z_module));
+                        auto* add_result = delta->add_child("in_proj_z", std::move(in_proj_z_module));
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d add_child(in_proj_z) -> %p\n",
+                            layer_idx, static_cast<void*>(add_result));
+                        debug_log(log_buf_dn);
+                        auto* child_check = delta->child("in_proj_z");
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d child(in_proj_z) -> %p\n",
+                            layer_idx, static_cast<void*>(child_check));
+                        debug_log(log_buf_dn);
                     }
 
                     auto in_proj_a_cfg = CreateAwqLinearConfig(
                         hf_config.hidden_size, a_out,
                         weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
                     auto in_proj_a_module = turbomind::core::Module::create(in_proj_a_cfg);
+                    snprintf(log_buf_dn, sizeof(log_buf_dn),
+                        "[DeltaNet] layer=%d Module::create(in_proj_a) -> %p\n",
+                        layer_idx, static_cast<void*>(in_proj_a_module.get()));
+                    debug_log(log_buf_dn);
                     if (in_proj_a_module) {
-                        delta->add_child("in_proj_a", std::move(in_proj_a_module));
+                        auto* add_result = delta->add_child("in_proj_a", std::move(in_proj_a_module));
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d add_child(in_proj_a) -> %p\n",
+                            layer_idx, static_cast<void*>(add_result));
+                        debug_log(log_buf_dn);
+                        auto* child_check = delta->child("in_proj_a");
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d child(in_proj_a) -> %p\n",
+                            layer_idx, static_cast<void*>(child_check));
+                        debug_log(log_buf_dn);
                     }
 
                     auto in_proj_b_cfg = CreateAwqLinearConfig(
                         hf_config.hidden_size, b_out,
                         weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
                     auto in_proj_b_module = turbomind::core::Module::create(in_proj_b_cfg);
+                    snprintf(log_buf_dn, sizeof(log_buf_dn),
+                        "[DeltaNet] layer=%d Module::create(in_proj_b) -> %p\n",
+                        layer_idx, static_cast<void*>(in_proj_b_module.get()));
+                    debug_log(log_buf_dn);
                     if (in_proj_b_module) {
-                        delta->add_child("in_proj_b", std::move(in_proj_b_module));
+                        auto* add_result = delta->add_child("in_proj_b", std::move(in_proj_b_module));
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d add_child(in_proj_b) -> %p\n",
+                            layer_idx, static_cast<void*>(add_result));
+                        debug_log(log_buf_dn);
+                        auto* child_check = delta->child("in_proj_b");
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d child(in_proj_b) -> %p\n",
+                            layer_idx, static_cast<void*>(child_check));
+                        debug_log(log_buf_dn);
                     }
 
                     // Create in_proj_all LinearWeight child (fused, used during forward)
@@ -1705,8 +1759,21 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
                         hf_config.hidden_size, fused_out,
                         weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
                     auto in_proj_module = turbomind::core::Module::create(in_proj_cfg);
+                    snprintf(log_buf_dn, sizeof(log_buf_dn),
+                        "[DeltaNet] layer=%d Module::create(in_proj_all) -> %p\n",
+                        layer_idx, static_cast<void*>(in_proj_module.get()));
+                    debug_log(log_buf_dn);
                     if (in_proj_module) {
-                        delta->add_child("in_proj_all", std::move(in_proj_module));
+                        auto* add_result = delta->add_child("in_proj_all", std::move(in_proj_module));
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d add_child(in_proj_all) -> %p\n",
+                            layer_idx, static_cast<void*>(add_result));
+                        debug_log(log_buf_dn);
+                        auto* child_check = delta->child("in_proj_all");
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d child(in_proj_all) -> %p\n",
+                            layer_idx, static_cast<void*>(child_check));
+                        debug_log(log_buf_dn);
                     }
 
                     // Create out_proj LinearWeight child
@@ -1714,8 +1781,21 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
                         hf_config.hidden_size, hf_config.hidden_size,
                         weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
                     auto out_proj_module = turbomind::core::Module::create(out_proj_cfg);
+                    snprintf(log_buf_dn, sizeof(log_buf_dn),
+                        "[DeltaNet] layer=%d Module::create(out_proj) -> %p\n",
+                        layer_idx, static_cast<void*>(out_proj_module.get()));
+                    debug_log(log_buf_dn);
                     if (out_proj_module) {
-                        delta->add_child("out_proj", std::move(out_proj_module));
+                        auto* add_result = delta->add_child("out_proj", std::move(out_proj_module));
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d add_child(out_proj) -> %p\n",
+                            layer_idx, static_cast<void*>(add_result));
+                        debug_log(log_buf_dn);
+                        auto* child_check = delta->child("out_proj");
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d child(out_proj) -> %p\n",
+                            layer_idx, static_cast<void*>(child_check));
+                        debug_log(log_buf_dn);
                     }
 
                     // Create norm NormWeight child
@@ -1724,9 +1804,24 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
                     delta_norm_cfg.data_type = weight_cfg.data_type;
                     delta_norm_cfg.norm_eps = 1e-6f;
                     auto delta_norm_module = turbomind::core::Module::create(delta_norm_cfg);
+                    snprintf(log_buf_dn, sizeof(log_buf_dn),
+                        "[DeltaNet] layer=%d Module::create(norm) -> %p\n",
+                        layer_idx, static_cast<void*>(delta_norm_module.get()));
+                    debug_log(log_buf_dn);
                     if (delta_norm_module) {
-                        delta->add_child("norm", std::move(delta_norm_module));
+                        auto* add_result = delta->add_child("norm", std::move(delta_norm_module));
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d add_child(norm) -> %p\n",
+                            layer_idx, static_cast<void*>(add_result));
+                        debug_log(log_buf_dn);
+                        auto* child_check = delta->child("norm");
+                        snprintf(log_buf_dn, sizeof(log_buf_dn),
+                            "[DeltaNet] layer=%d child(norm) -> %p\n",
+                            layer_idx, static_cast<void*>(child_check));
+                        debug_log(log_buf_dn);
                     }
+
+                    debug_log("[DeltaNet] All children created, adding linear_attn to decoder_layer\n");
 
                     decoder_layer->add_child("linear_attn", std::move(delta_module));
                 }

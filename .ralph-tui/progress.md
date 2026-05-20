@@ -5,6 +5,14 @@
 - **Weight Loading Flow**: ModelRoot → add_child("text_model", weight_module) → ctx_guard → LoadWeightsFromSafetensors → ProcessWeights → CreateEngine
 - **Async Weight Loading**: Use `cudaMemcpyAsync` with CUDA streams to batch GPU memory transfers. Pattern: (1) Read all tensor data from disk first, (2) Allocate all GPU tensors, (3) Batch async copies with `cudaMemcpyAsync`, (4) `cudaStreamSynchronize`, (5) Destroy stream. This overlaps PCI-E transfers and reduces kernel launch overhead.
 - **DeltaNetWeight Module Children**: HuggingFace stores linear attention weights as `self_attn.in_proj.qkv/z/a/b.weight`, which must be mapped to TurboMind's `linear_attn.in_proj_qkv/in_proj_z/in_proj_a/in_proj_b.weight`. The weight mapping in `MapHuggingFaceWeightToTurboMind` must handle DeltaNet paths BEFORE the general `self_attn -> attention` replacement to avoid incorrect routing. All DeltaNet children (`in_proj_qkv`, `in_proj_z`, `in_proj_a`, `in_proj_b`, `in_proj_all`) must be declared in `DELTA_NET_WEIGHT_CHILDREN` X-macro for the module tree to recognize them during weight loading.
+- **Debug Logging for DeltaNetWeight Children**: Added detailed debug logging around `Module::create()`, `add_child()`, and `child()` for all DeltaNetWeight children (in_proj_qkv, in_proj_z, in_proj_a, in_proj_b, in_proj_all, out_proj, norm) to diagnose creation/loading issues. Logs to `/tmp/turbomind_debug.log`.
+
+## 2026-05-20 - lmdeploy-1ae
+- **Added**: Debug logging for DeltaNetWeight child module creation in `turbomind_c.cc` lines 1671-1730
+- **Logging covers**: Module::create return value, add_child result, child() verification for all 7 DeltaNetWeight children
+- **Build**: Compiled successfully, library copied to lmdeploy-rust-server/
+- **Note**: DeltaNet debug logs won't appear for Qwen3.5-9B (no layer_types in config), only for hybrid models with linear attention layers
+---
 
 ## 2026-05-20 - lmdeploy-6on
 - **Verified**: DeltaNetWeight `in_proj_qkv` child module creation and loading works correctly
