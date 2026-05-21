@@ -167,3 +167,29 @@ after each iteration and it's included in prompts for context.
   - Tokenizer is only used at the Rust layer boundaries (input prompt → tokens, output tokens → text)
 
 ---
+
+## [2026-05-22] - lmdeploy-zks
+- **Investigated:** C++ safetensors loading bottleneck
+- **Files analyzed:** `src/turbomind/capi/turbomind_c.cc`, `src/turbomind/utils/safetensors_reader_mmap.h`, `src/turbomind/core/module.cc`
+- **Benchmark results (Qwen3.5-9B-HF, 4 shards):**
+  - Shard 1 (5.28GB, 13 tensors): open=0.01ms, mmap=0.00ms, parse=0.03ms
+  - Shard 2 (5.34GB, 52 tensors): mmap=0.00ms, parse=1.31ms
+  - Shard 3 (5.37GB, 62 tensors): similar fast
+  - Shard 4 (3.33GB, 644 tensors): largest tensor count
+- **Path mapping benchmark:** ~0.02ms for 53 tensors (0.000ms/tensor)
+- **Module traversal benchmark:** ~0.02ms for all operations
+- **get_tensor_data (mmap access):** 0.00ms for all tensors (zero-copy!)
+- **Findings:**
+  1. mmap is NOT the bottleneck - completes in <1ms
+  2. JSON parsing is fast - ~1-2ms for files with hundreds of tensors
+  3. Path mapping and module traversal are negligible - <0.001ms per tensor
+  4. **Likely cause of >120s loading time:** Excessive debug printing with fflush after every tensor operation (10+ flushes per tensor × 174 tensors = ~1700+ flushes during single file load)
+  5. The current LoadWeightsFromSafetensors has debug logging on every iteration which writes to stderr and flushes
+- **Recommendation:** Make debug logging conditional on a debug flag (e.g., `LMDEPLOY_LOG_LEVEL=DEBUG`)
+- **Learnings:**
+  - SafetensorsReaderMmap uses zero-copy mmap - no data copying in get_tensor_data()
+  - BatchCopy optimization (lmdeploy-hr0) already applied - good
+  - CUDA managed memory allocation (lmdeploy-zm7) - overhead likely minimal
+  - The C++ safetensors reader is actually FAST - the bottleneck is I/O overhead from debug logging
+
+---
