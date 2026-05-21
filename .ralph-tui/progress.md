@@ -51,6 +51,25 @@ after each iteration and it's included in prompts for context.
   - Always verify macros are in scope when using TM_MODULE_METHODS pattern
 ---
 
+## [2026-05-22] - lmdeploy-d6w
+- **Work status:** Debug logging added to verify ContextGuard effectiveness
+- **Implementation details:**
+  - Added debug logging in `TM_TurboMind_InitFromPath` after `ctx_guard` creation to verify allocator state
+  - Added debug logging at entry of `LoadWeightsFromSafetensors` to check if allocator is properly inherited from caller's scope
+  - Added debug logging before `target_param.alloc()` to verify allocator state at the exact point of tensor construction
+  - Added debug logging before calling `LoadWeightsFromSafetensors` to verify ctx_guard is still in scope
+- **Files changed:** `src/turbomind/capi/turbomind_c.cc`
+- **Build verification:** turbomind_c target compiled successfully (100%)
+- **Debug outputs:**
+  - Allocator validity check: `(bool)alloc`
+  - Allocator device type: `alloc->device().type`
+  - Allocator device ID: `alloc->device().id`
+- **Learnings:**
+  - Allocator class uses `operator->` to access `AllocatorImpl`, so must use `alloc->device()` not `alloc.device()`
+  - ContextGuard pushes allocator via `Context::push()` which stores it in thread-local stack
+  - Debug logging needs to be at exact point of failure (before tensor construction, not just at function entry)
+---
+
 ## [2026-05-22] - lmdeploy-09p
 - **Work status:** All required functions already implemented - verified complete
 - Implementation includes:

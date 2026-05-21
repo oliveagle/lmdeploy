@@ -832,6 +832,21 @@ static void LoadWeightsFromSafetensors(
     const char* safetensors_path,
     const HfModelConfig& hf_config)
 {
+    // DEBUG: Check if ContextGuard was properly set up by caller
+    fprintf(stderr, "[DEBUG] LoadWeightsFromSafetensors ENTRY: checking Context::device_alloc()...\n");
+    fflush(stderr);
+    {
+        auto& alloc = turbomind::core::Context::device_alloc();
+        fprintf(stderr, "[DEBUG] device_alloc valid=%d type=%d",
+                (bool)alloc, (int)(alloc->device().type));
+        if (alloc) {
+            fprintf(stderr, " device_id=%d\n", alloc->device().id);
+        } else {
+            fprintf(stderr, " INVALID_ALLOCATOR - ctx_guard NOT properly set up!\n");
+        }
+        fflush(stderr);
+    }
+
     // DIRECT FILE WRITE for diagnostics - bypass all buffering
     static int call_count = 0;
     char diag_fn[256];
@@ -998,6 +1013,19 @@ static void LoadWeightsFromSafetensors(
             // Allocate GPU memory and transfer directly from mmap'd region
             fprintf(stderr, " allocating GPU memory...");
             fflush(stderr);
+
+            // DEBUG: Verify allocator is available BEFORE tensor construction
+            {
+                auto& alloc = turbomind::core::Context::device_alloc();
+                fprintf(stderr, "[DEBUG] Before alloc: device_alloc valid=%d type=%d ",
+                        (bool)alloc, (int)(alloc->device().type));
+                if (alloc) {
+                    fprintf(stderr, "device_id=%d\n", alloc->device().id);
+                } else {
+                    fprintf(stderr, "INVALID_ALLOCATOR\n");
+                }
+                fflush(stderr);
+            }
 
             auto tensor = target_param.alloc(shape_vec, meta.dtype);
 
@@ -1428,6 +1456,19 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
         // Create the guard BEFORE any GPU memory allocation.
         // The guard's destructor pushes CUDA context + allocator, and pops on scope exit.
         auto ctx_guard = model_root->context();
+
+        // DEBUG: Verify ContextGuard is working correctly
+        {
+            char dbg[512];
+            // Check if context() returns valid stream and allocator
+            auto& alloc = turbomind::core::Context::device_alloc();
+            snprintf(dbg, sizeof(dbg),
+                "[InitFromPath] DEBUG: ctx_guard created, Context::device_alloc().valid=%d, device.type=%d\n",
+                (bool)alloc, (int)(alloc->device().type));
+            debug_log(dbg);
+            fprintf(stderr, "%s", dbg);
+            fflush(stderr);
+        }
 
         // 1. Create and add tok_embeddings param
         // Shape: [vocab_size, hidden_size]
@@ -1950,6 +1991,15 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
         for (const auto& st_file : safetensors_files) {
             fprintf(stderr, "[C-API] Loading file: %s\n", st_file.c_str());
             fflush(stderr);
+
+            // DEBUG: Verify ctx_guard is still active before calling LoadWeightsFromSafetensors
+            {
+                auto& alloc = turbomind::core::Context::device_alloc();
+                fprintf(stderr, "[DEBUG] Before LoadWeights: device_alloc valid=%d type=%d\n",
+                        (bool)alloc, (int)(alloc->device().type));
+                fflush(stderr);
+            }
+
             LoadWeightsFromSafetensors(model_weight, st_file.c_str(), hf_config);
             fprintf(stderr, "[C-API] Finished loading file: %s\n", st_file.c_str());
             fflush(stderr);
