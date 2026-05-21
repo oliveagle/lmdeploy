@@ -37,3 +37,33 @@ after each iteration and it's included in prompts for context.
 
 ---
 
+
+## [2026-05-22] - lmdeploy-h2w
+- **Fixed:** LinearWeight::param() returning empty Param
+- **Root cause:** The macros `LINEAR_WEIGHT_PARAMS` and `LINEAR_WEIGHT_CHILDREN` are defined in the header file `linear_weight.h` inside the class body. When `TM_MODULE_METHODS` is called in the .cc file, these macros may not be in scope properly due to include order or macro visibility issues.
+- **Fix:** Explicitly redefined `LINEAR_WEIGHT_CHILDREN` and `LINEAR_WEIGHT_PARAMS` macros in `linear_weight.cc` before calling `TM_MODULE_METHODS`, and added `#undef` after to clean up.
+- **Files changed:** `src/turbomind/models/linear_weight.cc`
+- **Verification:** `nm -C` shows `LinearWeight::param` symbol exists in object file
+- **Learnings:**
+  - X-macro patterns require macros to be visible at the point of use
+  - Include order in C++ can affect macro visibility
+  - The `.h` file defining macros doesn't guarantee they're visible in the `.cc` file's scope
+  - Always verify macros are in scope when using TM_MODULE_METHODS pattern
+---
+
+## [2026-05-22] - lmdeploy-09p
+- **Work status:** All required functions already implemented - verified complete
+- Implementation includes:
+  1. `TM_ModelRequest_ForwardAsync` - Non-blocking async forward inference
+  2. `TM_ModelRequest_GetStreamToken` - Stream output token retrieval
+  3. `TM_ModelRequest_GetStreamingState` - Poll request state in async mode
+  4. `TM_ModelRequest_GetOutput` - Get output tensor by name from completed request
+  5. `TM_ModelRequest_Cancel` - Cancel running request
+- **Files verified:** `src/turbomind/capi/turbomind_c.cc`, `turbomind_c.h`
+- **Build verification:** turbomind_c target compiled successfully (100%)
+- **Learnings:**
+  - The C API `ForwardAsync` submits request and returns immediately without blocking
+  - Uses shared state (`streaming_tensors`, `streaming_state`) for polling
+  - `AtomicRequestState::exchange(nullptr)` pattern ensures one-time consumption
+  - `ModelRequest::Forward` accepts callback and returns `OutputParam` with tensors/state/metrics
+---

@@ -3,10 +3,10 @@
   "sessionId": "c8e74788-0650-4e74-abd0-0c4a80afef63",
   "status": "running",
   "startedAt": "2026-05-21T14:56:07.250Z",
-  "updatedAt": "2026-05-21T15:48:46.726Z",
-  "currentIteration": 8,
+  "updatedAt": "2026-05-21T16:41:36.711Z",
+  "currentIteration": 10,
   "maxIterations": 50,
-  "tasksCompleted": 0,
+  "tasksCompleted": 1,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -71,8 +71,8 @@
       {
         "id": "lmdeploy-s60",
         "title": "修复 DeltaNet linear_attn 模块权重加载",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "lmdeploy-gg4",
@@ -528,6 +528,26 @@
       "durationMs": 708266,
       "startedAt": "2026-05-21T15:25:33.036Z",
       "endedAt": "2026-05-21T15:37:21.302Z"
+    },
+    {
+      "iteration": 9,
+      "status": "completed",
+      "taskId": "lmdeploy-s60",
+      "taskTitle": "修复 DeltaNet linear_attn 模块权重加载",
+      "taskCompleted": true,
+      "durationMs": 684210,
+      "startedAt": "2026-05-21T15:37:22.504Z",
+      "endedAt": "2026-05-21T15:48:46.714Z"
+    },
+    {
+      "iteration": 10,
+      "status": "completed",
+      "taskId": "lmdeploy-h2w",
+      "taskTitle": "修复 LinearWeight::param() 返回空的问题",
+      "taskCompleted": false,
+      "durationMs": 2941176,
+      "startedAt": "2026-05-21T15:48:57.574Z",
+      "endedAt": "2026-05-21T16:37:58.750Z"
     }
   ],
   "skippedTaskIds": [],
@@ -540,7 +560,8 @@
     "lmdeploy-85l",
     "lmdeploy-s8l",
     "lmdeploy-4rt",
-    "lmdeploy-gg4"
+    "lmdeploy-gg4",
+    "lmdeploy-h2w"
   ],
   "subagentPanelVisible": false
 }

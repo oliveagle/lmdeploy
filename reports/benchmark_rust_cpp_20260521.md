@@ -31,84 +31,123 @@ CUDA Kernels (GPU)
 
 ---
 
-## 2. 无法运行原因分析
+## 2. 实际执行结果
 
-### 问题 1: NCCL 运行时库缺失 (阻塞等级: 🔴 高)
+### 2.1 NCCL 问题已解决 ✅
 
-**错误信息**:
-```
-./target/debug/cpp_engine_test: error while loading shared libraries:
-  libnccl.so.2: cannot open shared object file: No such file or directory
-```
+NCCL 存在于多个 Python venv 中，设置 `LD_LIBRARY_PATH` 后可用：
 
-**根本原因**:
-- `libturbomind_c.so` 依赖 NCCL (NVIDIA Collective Communications Library)
-- 系统未安装 NCCL 运行时库
-- CUDA 基本库 (`libcudart.so.12`, `libcuda.so.1`) 已正确链接
-
-**验证**:
 ```bash
-$ ldd ./target/debug/cpp_engine_test | grep "not found"
-  libnccl.so.2 => not found  ← 缺失
-  libcudart.so.12 => /usr/local/cuda/lib64/libcudart.so.12 ✓
-  libcuda.so.1 => /usr/lib/x86_64-linux-gnu/libcuda.so.1 ✓
+LD_LIBRARY_PATH=/usr/local/lib/python3.12/dist-packages/nvidia/nccl/lib:$LD_LIBRARY_PATH
 ```
 
-**解决路径**:
-```bash
-# 方案 A: 从包管理器安装
-sudo apt install libnccl2 libnccl-dev
+### 2.2 程序启动成功但权重加载挂起 🔴
 
-# 方案 B: 从 CUDA Toolkit 复制
-cp /usr/local/cuda/lib64/libnccl.so.* /path/to/nccl/lib/
-export LD_LIBRARY_PATH=/path/to/nccl/lib:$LD_LIBRARY_PATH
 ```
+05-21T15:43:56.085Z ✅ Initializing TurboMind C++ engine
+05-21T15:43:57.290Z ✅ Tokenizer loaded successfully (vocab_size=248070)
+05-21T15:43:57.299Z ✅ Creating TurboMind C++ instance...
+05-21T15:43:57.311Z ⚠️ Loading weights from safetensors...
+→ 180 秒后超时 (SIGKILL)
+```
+
+**问题**: 174 个 tensors 的遍历全部失败，权重加载进入死循环
+
+### 2.3 权重加载错误详细分析
+
+#### 错误类型 1: `linear_attn` 子模块缺失 (DeltaNet 层)
+
+```
+child('linear_attn'): (nil) (type=null)
+Module tree navigation failed for 'layers.0.linear_attn.A_log'
+```
+
+**含义**: `DecoderLayerWeight` 的模块树中没有 `linear_attn` 子模块。
+**原因**: C++ 构建模型层级结构时，未为 Qwen3.5 这类 DeltaNet 架构的层创建 `linear_attn` 子模块。
+
+#### 错误类型 2: `LinearWeight` 的 `weight`/`zeros` 参数为空
+
+```
+Param 'weight' not found in module 'text_model.layers.1.feed_forward.w2' (path='layers.1.feed_forward.w2.weight', type='LinearWeight')
+Param 'zeros' not found in module 'text_model.layers.1.feed_forward.w2' (path='layers.1.feed_forward.w2.zeros', type='LinearWeight')
+```
+
+**含义**: 找到了 `LinearWeight` 模块，但其 `weight` 和 `zeros` 参数没有被分配。
+**原因**: `ModelWeight::prepare()` 未为 AWQ 量化模型分配参数字段，或者分配逻辑错误（与 `lmdeploy-4rt: 修复权重加载路径映射` 和 `lmdeploy-85l` 相关）。
+
+#### 错误类型 3: 路径映射失败
+
+```
+'model.language_model.layers.0.post_attention_layernorm.weight' → 'layers.0.ffn_normm.weight'
+  → Module tree navigation failed
+'model.language_model.layers.3.self_attn.k_norm.weight' → 'layers.3.attention.k_norm.weight'
+  → Module tree navigation failed
+```
+
+**含义**: C++ safetensors reader 的路径映射逻辑将 HF 路径转为 TM 路径，但目标模块不存在。
+
+### 2.4 总结表
+
+| 错误类型 | 出现次数 | 严重程度 | 关联 Beads |
+|----------|---------|---------|------------|
+| linear_attn 缺失 | ~100 次 | 🔴 Blocker | `lmdeploy-82u` (构建 ModelWeight) |
+| Param 'weight' 为空 | ~60 次 | 🔴 Blocker | `lmdeploy-4rt` (路径映射) |
+| 路径映射失败 | ~14 次 | 🔴 Blocker | `lmdeploy-4rt` (路径映射) |
 
 ---
 
-### 问题 2: C++ 引擎 AWQ 权重加载未完成 (阻塞等级: 🔴 高)
+## 3. 历史阻塞问题（已解决/部分解决）
 
-**错误信息** (历史):
-```
-Check failed: l0 (ModelWeight::prepare 期望 layer 结构已填充)
-```
+### ~~问题: NCCL 运行时库缺失~~ ✅ **已解决**
+通过设置 LD_LIBRARY_PATH 指向 Python venv 中的 NCCL 库解决。
 
-**根本原因**:
-- Python Pipeline 自动完成 HF→TM 格式转换 (加载到 GPU 内存)
-- C++ `InitFromPath` 期望 TurboMind 原生格式的 `.bin` 文件
-- **C API 的 safetensors reader 仅做基本 JSON header 解析**
-- **缺少 AWQ scales/zeros 的解包和反量化逻辑**
+## 4. 权重加载阻塞根因分析
 
-**已创建的 Beads**:
-| ID | 标题 | 优先级 | 状态 |
-|----|------|--------|------|
-| `lmdeploy-85l` | 分析 C++ 引擎 AWQ 加载失败根因 | P0 | in_progress |
-| `lmdeploy-5wx` | 分析 Python TurboMind 权重加载流程 | P0 | in_progress |
-| `lmdeploy-82u` | 在 C++ 层构建完整 ModelWeight 层级结构 | P1 | in_progress |
+### 根本原因: C++ 层 ModelWeight 层级结构不完整
+
+C++ 引擎在 `InitFromPath` 时，通过解析 `config.json` 动态构建 `ModelWeight` 树，然后遍历 safetensors 并将每个 tensor 映射到树中的模块参数。**当前有三类错误**：
+
+1. **线性注意力子模块缺失**: Qwen3.5 使用 Gated Delta Net (`linear_attn` + DeltaNet)，但 C++ 的 `DecoderLayerWeight` 只构建了 Attention / FFN / Norm，没有 `linear_attn` 子模块。
+
+2. **路径映射失败**: HF 权重的路径名（如 `layers.0.post_attention_layernorm.weight`）映射到 TM 内部路径（如 `layers.0.ffn_normm.weight`）时，目标模块不存在。
+
+3. **`LinearWeight::weight/zeros` 为空**: 找到 `LinearWeight` 模块但其参数未分配，可能与 `ModelWeight::prepare()` 中 `LinearWeight::param()` 返回空有关（`lmdeploy-4rt` P0）。
+
+**根本解决方案**:
+- 需要在 `InitFromPath` 中，根据模型架构类型（Qwen2 / Qwen3 / GatedDeltaNet），动态添加缺失的子模块节点。
+- 同时需要完善路径别名映射（如 `post_attention_layernorm` → `ffn_normm`）。
 
 ---
 
-## 3. 阻塞依赖链
+## 5. 当前阻塞依赖链
 
 ```
-lmdeploy-64a: 安装 NCCL 运行时库
-      ↓ (blocks)
-lmdeploy-109: 实现 C++ 引擎 AWQ 权重加载支持
-      ↓ (blocks)
-lmdeploy-0bv: 实现 Rust Server 纯 C++ benchmark 工具
+lmdeploy-4rt [P0]: 修复权重加载路径映射
+      ↓ blocks (param lookup)
+lmdeploy-82u [P1]: 在 C++ 层构建完整 ModelWeight 层级结构 (linear_attn 子模块)
+      ↓ blocks (weight loading)
+lmdeploy-s8l [P1]: 测试 C++ 引擎端到端推理
+      ↓ blocks (E2E)
+lmdeploy-0bv [P1]: 实现 Rust Server 纯 C++ benchmark 工具
 ```
 
 ### 当前阻塞点
 
-| 层级 | Bead ID | 标题 | 阻塞原因 |
-|------|---------|------|----------|
-| 底层依赖 | `lmdeploy-64a` | 安装 NCCL | 系统库缺失 |
-| 权重加载 | `lmdeploy-109` | AWQ 支持 | C++ safetensors 解析不完整 |
-| Benchmark | `lmdeploy-0bv` | Benchmark 工具 | 依赖上层完成 |
+---
+
+### 当前阻塞点
+
+| 层级 | Bead ID | 标题 | 阻塞原因 | 状态 |
+|------|---------|------|----------|------|
+| 参数查找 | `lmdeploy-4rt` | 修复权重加载路径映射 | `LinearWeight::param()` 返回空 | in_progress |
+| 层级构建 | `lmdeploy-82u` | 构建完整 ModelWeight 层级结构 | 缺失 `linear_attn` 子模块 | in_progress |
+| AWQ 加载 | `lmdeploy-85l` | 分析 AWQ 加载失败根因 | 路径映射失败 | in_progress |
+| E2E 验证 | `lmdeploy-s8l` | 测试 C++ 引擎端到端推理 | 权重加载挂起 | in_progress |
+| Benchmark | `lmdeploy-0bv` | 实现纯 C++ benchmark 工具 | 依赖 E2E 验证 | open |
 
 ---
 
-## 4. 已有的 Python TurboMind 基准数据
+## 6. 已有的 Python TurboMind 基准数据
 
 ### 测试环境
 
@@ -126,88 +165,103 @@ lmdeploy-0bv: 实现 Rust Server 纯 C++ benchmark 工具
 | 4K | 122.06 ms | 33,728 t/s | 41.0 t/s | 24.45 ms |
 | 8K | 191.37 ms | 42,875 t/s | 40.6 t/s | 24.69 ms |
 
-### 预期 Rust+C++ vs Python 对比
+---
 
-| 指标 | Python (预期) | Rust C++ (预期) | 优势来源 |
-|------|--------------|----------------|---------|
-| Decode 速度 | ~41 t/s | ~41 t/s | 相同 (受 GPU 带宽限制) |
-| 并发性能 | 受 GIL 影响 | 无 GIL | Rust 胜出 |
-| 启动延迟 | pybind11 桥接 | 直接调用 | Rust 略优 |
-| Streaming | ✅ 完整 | ⚠️ 待实现 | Python |
+## 7. 已完成的部分 (历史记录)
+
+### ✅ Rust FFI 绑定 (`lmdeploy-m9v`)
+- 完整的 C API 声明 (`TM_CreateEngine`, `TM_InitFromPath`, `TM_Forward`, 等)
+- Rust 包装 (`TurboMindEngine`, `TurboMindCEngine`)
+- FFI 调用无 Python 依赖
+
+### ✅ C++ C API
+- 支持从 safetensors 直接加载，无需 Python 转换 (`turbomind_c.cc`)
+- AWQ 量化配置 (quant_policy=4) 可设置
+- Streaming 输出支持
+
+### ✅ Benchmark 框架 (`benchmark.rs`)
+- TTFT/Prefill/Decode 测量逻辑
+- 多 context length (1K/4K/8K) 配置
 
 ---
 
-## 5. 下一步行动
+## 8. 下一步行动优先级
 
-### 立即行动 (解锁阻塞)
+### 立即解决 (P0)
 
-1. **安装 NCCL 运行时** (`lmdeploy-64a`)
-   ```bash
-   # 检查 CUDA 版本并安装对应 NCCL
-   nvcc --version  # 查看 CUDA 版本
-   sudo apt install libnccl2 libnccl-dev
-   ```
+1. **修复 `LinearWeight::param()` 返回空** (`lmdeploy-4rt`)
+   - 调试 `turbomind/capi/turbomind_c.cc` 中的 `LinearWeight::param()`
+   - 确保 weights/zeros 指针正确分配
+2. **分析 AWQ 路径映射失败** (`lmdeploy-85l`)
+   - 比较 Python vs C++ 的路径转换
+   - 找出缺失别名的映射表
 
-2. **验证 C++ 引擎加载非量化模型**
-   - 使用不含 AWQ 的 FP16 模型测试
-   - 确认 C++ 路径完整性
+### 高优先级 (P1)
 
-### 中期行动 (完成 AWQ 支持)
+3. **构建 `linear_attn` 子模块** (`lmdeploy-82u`)
+   - 在 `DecoderLayerWeight` 初始化中添加 `linear_attn` 分支
+   - 处理 `conv1d`, `dt_bias`, `in_proj_a`, `in_proj_b`, `in_proj_qkv`, `in_proj_z`, `out_proj`, `norm` 等参数
+4. **完成 E2E 验证** (`lmdeploy-s8l`)
+   - 确保权重加载在合理时间（< 30s）内完成
+   - 运行单 token 生成测试
 
-3. **实现 AWQ 权重加载** (`lmdeploy-109`)
-   - 分析 `ModelLoader.export()` 的转换逻辑
-   - 在 C++ 层实现 safetensors → GPU 内存转换
-   - 添加 AWQ scales/zeros 反量化
+### 基准收集
 
-4. **完善 benchmark 工具** (`lmdeploy-0bv`)
-   - 精确测量 TTFT (首 token 时间)
-   - 分离 prefill/decode 速度
-   - 并发性能测试
+5. **实现纯 C++ benchmark** (`lmdeploy-0bv`)
+   - 使用 `cpp_engine_test.rs` 扩展为完整 benchmark
+   - 收集 TTFT/Prefill/Decode，与 Python 对比
 
 ---
 
-## 6. 创建的 Beads
+## 9. 已创建的 Beads (最新状态)
 
-| ID | Title | Type | Priority | Labels |
-|----|-------|------|----------|--------|
-| `lmdeploy-64a` | 安装 NCCL 运行时库以支持 C++ 引擎 | bug | P1 | cpp,nccl |
-| `lmdeploy-109` | 实现 C++ 引擎 AWQ 权重加载支持 | feature | P0 | cpp,awq |
-| `lmdeploy-0bv` | 实现 Rust Server 纯 C++ benchmark 工具 | task | P1 | cpp,benchmark |
+| ID | Title | Type | Priority | Labels | Status |
+|----|-------|------|----------|--------|--------|
+| `lmdeploy-4rt` | 修复权重加载路径映射 | bug | P0 | cpp | in_progress |
+| `lmdeploy-85l` | 分析 C++ 引擎 AWQ 加载失败根因 | task | P0 | cpp | in_progress |
+| `lmdeploy-82u` | 在 C++ 层构建完整 ModelWeight 层级结构 | task | P1 | cpp | in_progress |
+| `lmdeploy-s8l` | 测试 C++ 引擎端到端推理 | task | P1 | cpp | in_progress |
+| `lmdeploy-0bv` | 实现 Rust Server 纯 C++ benchmark 工具 | task | P1 | cpp,benchmark | open |
 
 ### 依赖关系
 ```
-lmdeploy-64a (NCCL)
-    ↓ blocks
-lmdeploy-109 (AWQ 支持)
-    ↓ blocks
-lmdeploy-0bv (Benchmark)
+lmdeploy-4rt (路径映射) → lmdeploy-82u (层级结构) → lmdeploy-s8l (E2E) → lmdeploy-0bv (Benchmark)
 ```
 
 ---
 
-## 7. 结论
+## 10. 结论
 
 ### 当前状态
 
 | 组件 | 状态 | 说明 |
 |------|------|------|
-| Rust FFI 绑定 | ✅ 完成 | 可编译 |
-| C++ C API | ✅ 完成 | 存在但有功能缺失 |
-| Benchmark 框架 | ✅ 完成 | 代码完整 |
-| NCCL 运行时 | ❌ 缺失 | 阻止运行 |
-| AWQ 加载 | ❌ 不完整 | 阻止 AWQ 模型加载 |
-| E2E Benchmark | ⏳ 等待 | 依赖上层解决 |
+| Rust FFI 绑定 | ✅ 完成 | 可编译，无 Python 依赖 |
+| C++ C API | ✅ 完成 | 存在但需要权重加载修复 |
+| NCCL 运行时 | ✅ 可用 | 通过 LD_LIBRARY_PATH 指向 venv 中的库 |
+| 权重加载 | ❌ 挂起 | ModelWeight 层级结构不完整，路径映射失败 |
+| E2E Benchmark | ❌ 等待 | 依赖权重加载问题解决 |
 
-### 解决方案路径
+### 预期解决方案路径
 
 ```
-1. 安装 NCCL → 2. 完成 AWQ 加载 → 3. 运行 Benchmark → 4. 对比 Python
+1. lmdeploy-4rt (param 空问题)
+   ↓
+2. lmdeploy-82u (构建 linear_attn 层级) + lmdeploy-85l (路径映射)
+   ↓
+3. lmdeploy-s8l (E2E 验证)
+   ↓
+4. lmdeploy-0bv (Benchmark)
 ```
+
+**当前 Blockers**: `lmdeploy-4rt` P0 - 需要解决 `LinearWeight::param()` 返回空才能继续。
 
 ---
 
-**报告生成时间**: 2026-05-21 16:00
+**报告生成时间**: 2026-05-21 16:20
+**最后更新**: 实际运行测试 2026-05-21 15:43-16:03
 **相关文件**:
 - `lmdeploy-rust-server/src/model/cpp_engine.rs` - C++ 引擎实现
-- `lmdeploy-rust-server/src/turbomind_c.rs` - FFI 绑定
+- `lmdeploy-rust-server/src/turbomind/capi/turbomind_c.cc` - C++ C API (核心问题区域)
 - `lmdeploy-rust-server/src/model/benchmark.rs` - Benchmark 框架
+- `reports/benchmark_rust_cpp_20260521.md` - 本文档

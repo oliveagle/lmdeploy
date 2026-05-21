@@ -270,6 +270,18 @@ void LinearWeight::prepare()
 
 TM_MODULE_REGISTER(LinearWeight, core::LinearConfig);
 
+// Redefine the macros needed for TM_MODULE_METHODS expansion
+#define LINEAR_WEIGHT_CHILDREN(X)
+
+#define LINEAR_WEIGHT_PARAMS(X)                                                                                        \
+    X(weight)                                                                                                          \
+    X(bias)                                                                                                            \
+    X(scales)                                                                                                          \
+    X(zeros)
+
 TM_MODULE_METHODS(LinearWeight, LINEAR_WEIGHT_CHILDREN, LINEAR_WEIGHT_PARAMS)
+
+#undef LINEAR_WEIGHT_CHILDREN
+#undef LINEAR_WEIGHT_PARAMS
 
 }  // namespace turbomind
