@@ -13,6 +13,8 @@ after each iteration and it's included in prompts for context.
 - **Builder pattern for module creation**: Python builders (TextModelBuilder, DecoderLayerBuilder, etc.) in `lmdeploy/turbomind/builders/` coordinate C++ module creation via `create_module(Config)`, then commit tensors via `add_*` methods.
 - **ModelWeight root children**: `output` (LinearWeight), `norm` (NormWeight), `layers` (ModuleList<DecoderLayerWeight>), plus `tok_embeddings` param. Defined in `MODEL_WEIGHT_CHILDREN` / `MODEL_WEIGHT_PARAMS` macros.
 - **ModuleList is the only container**: All repeated modules (layers, experts) go through `ModuleList`, which maintains both named and indexed access.
+- **AttentionWeight uses fused QKV (w_qkv)**: Python `AttentionBuilder.add_qkv_proj()` fuses separate q/k/v weights into a single `w_qkv` child. C++ must create `w_qkv` instead of separate `q_proj`/`k_proj`/`v_proj`. The fused shape is `[q_out + k_out + v_out, hidden]`. HF stores separate weights with `[hidden, out]` shape that need transposition during fusion.
+- **byte_size function**: Use `turbomind::byte_size(dtype)` (not `DataTypeSize`) to get element byte size. Defined in `src/turbomind/core/data_type.h`.
 
 ---
 
@@ -48,4 +50,41 @@ after each iteration and it's included in prompts for context.
   - Python builders coordinate C++ module creation - C API needs to replicate this flow
   - ModuleList is the single container for all repeated modules (layers, experts)
   - ModelWeight derives data_type, hidden_units, vocab_size from children in prepare()
+---
+
+## 2026-05-22 - lmdeploy-85l
+- Analyzed C++ engine AWQ loading failure: `TM][FATAL] Check failed: data_type_ == kBfloat16 || data_type_ == kHalf`
+- **Root cause identified**: `EngineConfig::data_type` field had no default value, zero-initializing to `kNull` (0) instead of `kHalf` (66826)
+- **Key findings**:
+  - `ENGINE_FIELDS(X)` macro in `engine_config.h` line 15: `X(DataType, data_type)` - no default specified
+  - `TM_MEMBER(Type, name, ...)` expands to `Type name{__VA_ARGS__}` → `Type name{}` when empty → zero initialization
+  - `DataType::kNull = 0` is neither `kBfloat16` (67591) nor `kHalf` (66826), causing check failure
+  - C API enum `TM_DATATYPE_FP16` (10) correctly converts to C++ `kFloat16` (66826) via `FromCDataType`
+  - `kHalf = kFloat16` by definition, so conversion was correct but default was missing
+- **Files changed**:
+  - `src/turbomind/engine/engine_config.h`: Added `kHalf` default to `data_type` field
+  - `src/turbomind/capi/turbomind_c.cc`: Removed redundant explicit assignment (now uses default)
+- **Learnings**:
+  - X-macro fields without defaults become zero-initialized, not undefined
+  - C++ `DataType` uses encoded values (sign<<16 | exponent<<8 | mantissa), not sequential integers
+  - C API `TM_DataType` uses sequential integers (0, 1, 2, ...) - must convert via `FromCDataType`
+  - `kHalf = kFloat16` alias means both names refer to same encoded value (66826)
+  - AWQ weights use `kUint4` storage but compute in `kHalf` - data_type is activation dtype, not weight dtype
+---
+
+## 2026-05-22 - lmdeploy-4rt
+- Fixed weight loading path mapping: HF q_proj/k_proj/v_proj → TM fused w_qkv
+- **Files changed**:
+  - `src/turbomind/capi/turbomind_c.cc`:
+    - Changed `InitFromPath` to create `w_qkv` (fused QKV) instead of separate `q_proj`, `k_proj`, `v_proj`
+    - Updated `MapHuggingFaceWeightToTurboMind` to map `.q_proj.`, `.k_proj.`, `.v_proj.` to `.w_qkv.`
+    - Added QKV fusion logic in `LoadWeightsFromSafetensors` to accumulate Q/K/V tensors and fuse them
+    - Fixed data type references (use `turbomind::DataType` and `turbomind::byte_size`)
+- **Learnings**:
+  - Python `AttentionBuilder.add_qkv_proj()` fuses separate q/k/v into single `w_qkv` child
+  - `AttentionWeight` class defines `w_qkv` (fused), not separate `k_proj`/`v_proj` children
+  - Fused shape: `[q_out + k_out + v_out, hidden]`, where HF stores `[hidden, out]` each
+  - QKV fusion requires transpose during concatenation (HF column-major → TM row-major)
+  - Must accumulate all 3 tensors before allocating fused GPU memory
+
 ---

@@ -158,10 +158,8 @@ TM_EngineConfig* TM_EngineConfig_Create(void)
         auto* cfg = new TM_EngineConfig{};
         cfg->config.enable_prefix_caching = false;
         cfg->config.enable_metrics = false;
-        // Default to kFloat16 (same as kHalf) to pass the dtype check in TurboMind::Impl.
-        // Python path resolves dtype via get_tm_config() which maps to 'float16' or 'bfloat16'.
-        // The C API caller should explicitly override via TM_EngineConfig_SetDataType() if BF16 is desired.
-        cfg->config.data_type = turbomind::DataType::kFloat16;
+        // data_type defaults to kHalf via EngineConfig default; callers may
+        // override via TM_EngineConfig_SetDataType() (e.g. BF16 on supported hardware).
         return cfg;
     }
     catch (const std::exception& e) {
@@ -933,6 +931,22 @@ static void LoadWeightsFromSafetensors(
         std::vector<Transfer> transfers;
         transfers.reserve(reader.num_tensors());
 
+        // Temporary storage for fused QKV loading
+        // HF stores separate q_proj/k_proj/v_proj, but TM uses fused w_qkv
+        struct QKVAccumulator {
+            std::vector<uint8_t> q_data;
+            std::vector<uint8_t> k_data;
+            std::vector<uint8_t> v_data;
+            std::vector<size_t> q_shape;
+            std::vector<size_t> k_shape;
+            std::vector<size_t> v_shape;
+            turbomind::DataType dtype = turbomind::DataType::kNull;
+            bool q_loaded = false;
+            bool k_loaded = false;
+            bool v_loaded = false;
+        };
+        std::unordered_map<std::string, QKVAccumulator> qkv_accumulators;
+
         for (size_t i = 0; i < reader.num_tensors(); ++i) {
             fprintf(stderr, "[C-API] [%zu/174] tensor_name='%s'...", i, reader.tensor_name(i).c_str());
             fflush(stderr);
@@ -944,6 +958,23 @@ static void LoadWeightsFromSafetensors(
             if (tm_path.empty()) {
                 ++skip_count;
                 continue;
+            }
+
+            // Check if this is a QKV projection that needs to be fused
+            // Detect pattern: .w_qkv. suffix (after our mapping from q/k/v_proj)
+            bool is_qkv_proj = (tm_path.find(".w_qkv.") != std::string::npos);
+            std::string qkv_key;  // e.g., "layers.0.attention" for qkv accumulator
+
+            if (is_qkv_proj) {
+                // Extract the attention module path as key
+                // tm_path like "layers.0.attention.w_qkv.weight" -> "layers.0.attention"
+                size_t last_dot = tm_path.rfind('.');
+                if (last_dot != std::string::npos) {
+                    size_t second_last_dot = tm_path.rfind('.', last_dot - 1);
+                    if (second_last_dot != std::string::npos) {
+                        qkv_key = tm_path.substr(0, second_last_dot);
+                    }
+                }
             }
 
             // Parse the TurboMind path to find the module and param
@@ -988,6 +1019,51 @@ static void LoadWeightsFromSafetensors(
             turbomind::core::Param target_param = current->param(param_name);
             fprintf(stderr, " param '%s' lookup done...", param_name.c_str());
             fflush(stderr);
+
+            // For QKV projections, accumulate instead of direct load
+            // They'll be fused later
+            if (is_qkv_proj && !qkv_key.empty()) {
+                auto& acc = qkv_accumulators[qkv_key];
+                std::string proj_type = param_name;  // "w_qkv.weight"
+                // Determine which projection this is based on original tensor name
+                // We need to check the original HF tensor name before mapping
+                // The mapped path still has "w_qkv" for all 3, so we track by original name
+
+                // Get original HF tensor name to determine Q/K/V type
+                // Original names are like "model.layers.0.self_attn.q_proj.weight"
+                bool is_q = (tensor_name.find(".q_proj.") != std::string::npos);
+                bool is_k = (tensor_name.find(".k_proj.") != std::string::npos);
+                bool is_v = (tensor_name.find(".v_proj.") != std::string::npos);
+
+                if (is_q || is_k || is_v) {
+                    // Read tensor data from safetensors
+                    std::vector<uint8_t> tensor_data = reader.read_tensor(tensor_name);
+
+                    if (is_q && acc.q_data.empty()) {
+                        acc.q_data = std::move(tensor_data);
+                        acc.q_shape = meta.shape;
+                        acc.dtype = meta.dtype;
+                        acc.q_loaded = true;
+                        fprintf(stderr, " Q-accumulated...");
+                    } else if (is_k && acc.k_data.empty()) {
+                        acc.k_data = std::move(tensor_data);
+                        acc.k_shape = meta.shape;
+                        acc.dtype = meta.dtype;
+                        acc.k_loaded = true;
+                        fprintf(stderr, " K-accumulated...");
+                    } else if (is_v && acc.v_data.empty()) {
+                        acc.v_data = std::move(tensor_data);
+                        acc.v_shape = meta.shape;
+                        acc.dtype = meta.dtype;
+                        acc.v_loaded = true;
+                        fprintf(stderr, " V-accumulated...");
+                    }
+                    ++loaded_count;
+                    fprintf(stderr, " QKV_ACCUM\n");
+                    fflush(stderr);
+                    continue;
+                }
+            }
 
             if (!target_param) {
                 ++skip_count;
@@ -1061,6 +1137,98 @@ static void LoadWeightsFromSafetensors(
                 auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - load_start);
                 fprintf(stderr, "[C-API] Allocated %zu/%zu tensors (%.0fs elapsed) from %s\n", progress_count, reader.num_tensors(), elapsed.count() / 1000.0, safetensors_path);
                 fflush(stderr);
+            }
+        }
+
+        // Phase 1.5: Fuse accumulated QKV tensors and add to transfers
+        if (!qkv_accumulators.empty()) {
+            fprintf(stderr, "[C-API] Fusing %zu QKV tensors...\n", qkv_accumulators.size());
+            fflush(stderr);
+
+            for (const auto& [key, acc] : qkv_accumulators) {
+                if (!acc.q_loaded || !acc.k_loaded || !acc.v_loaded) {
+                    fprintf(stderr, "[C-API] WARNING: Incomplete QKV for %s (q=%d,k=%d,v=%d)\n",
+                            key.c_str(), acc.q_loaded, acc.k_loaded, acc.v_loaded);
+                    continue;
+                }
+
+                // Navigate to the attention module
+                turbomind::core::Module* attn_module = model_weight;
+                parts.clear();
+                size_t start = 0;
+                size_t dot_pos;
+                while ((dot_pos = key.find('.', start)) != std::string::npos) {
+                    parts.push_back(key.substr(start, dot_pos - start));
+                    start = dot_pos + 1;
+                }
+                parts.push_back(key.substr(start));
+
+                for (size_t j = 0; j < parts.size() && attn_module; ++j) {
+                    attn_module = attn_module->child(parts[j]);
+                }
+
+                if (!attn_module) {
+                    fprintf(stderr, "[C-API] ERROR: Cannot find attn module for QKV fusion: %s\n", key.c_str());
+                    continue;
+                }
+
+                // Allocate w_qkv tensor
+                turbomind::core::Param w_qkv_param = attn_module->param("w_qkv.weight");
+                if (!w_qkv_param) {
+                    fprintf(stderr, "[C-API] ERROR: Cannot find w_qkv.weight param for %s\n", key.c_str());
+                    continue;
+                }
+
+                // Calculate fused shape
+                // HF: q=[hidden, q_out], k=[hidden, k_out], v=[hidden, v_out]
+                // TM: w_qkv=[q_out + k_out + v_out, hidden]
+                const size_t hidden = acc.q_shape[0];
+                const size_t q_out = acc.q_shape[1];
+                const size_t k_out = acc.k_shape[1];
+                const size_t v_out = acc.v_shape[1];
+                const size_t fused_out = q_out + k_out + v_out;
+
+                // Data size calculation
+                const size_t elem_size = turbomind::byte_size(acc.dtype);
+                const size_t q_bytes = acc.q_data.size();
+                const size_t k_bytes = acc.k_data.size();
+                const size_t v_bytes = acc.v_data.size();
+
+                // Allocate fused tensor on GPU
+                std::vector<size_t> fused_shape = {fused_out, hidden};
+                auto fused_tensor = w_qkv_param.alloc(fused_shape, acc.dtype);
+
+                if (!fused_tensor || !fused_tensor.raw_data()) {
+                    fprintf(stderr, "[C-API] ERROR: Failed to allocate w_qkv for %s\n", key.c_str());
+                    continue;
+                }
+
+                // Fuse on CPU first, then transfer to GPU
+                std::vector<uint8_t> fused_data(fused_tensor.byte_size());
+
+                // Copy in order: Q, K, V
+                // Each weight is transposed: HF uses [hidden, out] but TM uses [out, hidden]
+                // So we need to transpose each weight during fusion
+                for (size_t h = 0; h < hidden; ++h) {
+                    // Copy Q row (transposed)
+                    size_t q_offset = h * q_out * elem_size;
+                    size_t fused_q_offset = h * elem_size;
+                    std::memcpy(&fused_data[fused_q_offset], &acc.q_data[q_offset], q_out * elem_size);
+
+                    // Copy K row (transposed)
+                    size_t k_offset = h * k_out * elem_size;
+                    size_t fused_k_offset = (q_out + h) * elem_size;
+                    std::memcpy(&fused_data[fused_k_offset], &acc.k_data[k_offset], k_out * elem_size);
+
+                    // Copy V row (transposed)
+                    size_t v_offset = h * v_out * elem_size;
+                    size_t fused_v_offset = (q_out + k_out + h) * elem_size;
+                    std::memcpy(&fused_data[fused_v_offset], &acc.v_data[v_offset], v_out * elem_size);
+                }
+
+                // Copy fused data to GPU
+                std::memcpy(fused_tensor.raw_data(), fused_data.data(), fused_data.size());
+                fprintf(stderr, "[C-API] Fused QKV for %s: [%zu,%zu]\n", key.c_str(), fused_out, hidden);
             }
         }
 
@@ -1288,15 +1456,17 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
         result.replace(pos, 24, ".ffn_norm");
     }
 
-    // QKV projections
+    // Map HF q_proj/k_proj/v_proj to TM fused w_qkv
+    // HF stores separate Q/K/V weights, but TM uses a fused w_qkv weight
+    // Each of q_proj, k_proj, v_proj maps to w_qkv for weight loading
     while ((pos = result.find(".q_proj.")) != std::string::npos) {
-        result.replace(pos, 8, ".q_proj.");
+        result.replace(pos, 8, ".w_qkv.");
     }
     while ((pos = result.find(".k_proj.")) != std::string::npos) {
-        result.replace(pos, 8, ".k_proj.");
+        result.replace(pos, 8, ".w_qkv.");
     }
     while ((pos = result.find(".v_proj.")) != std::string::npos) {
-        result.replace(pos, 8, ".v_proj.");
+        result.replace(pos, 8, ".w_qkv.");
     }
 
     // o_proj -> wo
@@ -1576,31 +1746,17 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             if (attn_module) {
                 auto* attn = static_cast<turbomind::AttentionWeight*>(attn_module.get());
 
-                // Create q_proj LinearWeight child
-                auto q_proj_cfg = CreateAwqLinearConfig(
-                    hf_config.hidden_size, hf_config.num_attention_heads * head_dim,
+                // Create fused w_qkv LinearWeight child (matches TurboMind's AttentionWeight)
+                // HF uses separate q_proj/k_proj/v_proj, but TM uses fused w_qkv
+                // The fused output dimension = num_q_heads * head_dim + 2 * num_kv_heads * head_dim
+                const int qkv_out_dim = hf_config.num_attention_heads * head_dim
+                                      + 2 * hf_config.num_key_value_heads * head_dim;
+                auto w_qkv_cfg = CreateAwqLinearConfig(
+                    hf_config.hidden_size, qkv_out_dim,
                     weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
-                auto q_proj_module = turbomind::core::Module::create(q_proj_cfg);
-                if (q_proj_module) {
-                    attn->add_child("q_proj", std::move(q_proj_module));
-                }
-
-                // Create k_proj LinearWeight child
-                auto k_proj_cfg = CreateAwqLinearConfig(
-                    hf_config.hidden_size, hf_config.num_key_value_heads * head_dim,
-                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
-                auto k_proj_module = turbomind::core::Module::create(k_proj_cfg);
-                if (k_proj_module) {
-                    attn->add_child("k_proj", std::move(k_proj_module));
-                }
-
-                // Create v_proj LinearWeight child
-                auto v_proj_cfg = CreateAwqLinearConfig(
-                    hf_config.hidden_size, hf_config.num_key_value_heads * head_dim,
-                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
-                auto v_proj_module = turbomind::core::Module::create(v_proj_cfg);
-                if (v_proj_module) {
-                    attn->add_child("v_proj", std::move(v_proj_module));
+                auto w_qkv_module = turbomind::core::Module::create(w_qkv_cfg);
+                if (w_qkv_module) {
+                    attn->add_child("w_qkv", std::move(w_qkv_module));
                 }
 
                 // Create wo LinearWeight child
