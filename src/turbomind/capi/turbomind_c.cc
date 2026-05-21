@@ -27,6 +27,7 @@ static void debug_log(const char* msg) {
 #include <vector>
 
 #include "src/turbomind/core/module.h"
+#include "src/turbomind/core/allocator.h"
 #include "src/turbomind/models/model_root.h"
 #include "src/turbomind/models/model_weight.h"
 #include "src/turbomind/models/decoder_layer_weight.h"
@@ -832,20 +833,14 @@ static void LoadWeightsFromSafetensors(
     const char* safetensors_path,
     const HfModelConfig& hf_config)
 {
-    // DEBUG: Check if ContextGuard was properly set up by caller
-    fprintf(stderr, "[DEBUG] LoadWeightsFromSafetensors ENTRY: checking Context::device_alloc()...\n");
+    // Push a CUDA managed memory allocator to allow weight loading without CUDA OOM
+    // cudaMallocManaged uses unified memory that can be oversubscribed on systems
+    // with more system RAM than GPU VRAM
+    turbomind::core::Allocator managed_allocator{turbomind::core::CreateCudaManagedAllocator()};
+    auto managed_guard = turbomind::core::ContextGuard{managed_allocator};
+
+    fprintf(stderr, "[C-API] LoadWeightsFromSafetensors: Using CUDA managed memory allocator for OOM-safe loading\n");
     fflush(stderr);
-    {
-        auto& alloc = turbomind::core::Context::device_alloc();
-        fprintf(stderr, "[DEBUG] device_alloc valid=%d type=%d",
-                (bool)alloc, (int)(alloc->device().type));
-        if (alloc) {
-            fprintf(stderr, " device_id=%d\n", alloc->device().id);
-        } else {
-            fprintf(stderr, " INVALID_ALLOCATOR - ctx_guard NOT properly set up!\n");
-        }
-        fflush(stderr);
-    }
 
     // DIRECT FILE WRITE for diagnostics - bypass all buffering
     static int call_count = 0;

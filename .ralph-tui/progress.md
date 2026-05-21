@@ -14,6 +14,18 @@ after each iteration and it's included in prompts for context.
 - **MTP-specific params:** `mtp.norm`, `mtp.fc`, `mtp.pre_fc_norm_*` are NOT shared with main model - currently skipped (MTP speculative decoding not fully implemented in C++)
 - **File:** `src/turbomind/capi/turbomind_c.cc:MapHuggingFaceWeightToTurboMind()`
 
+### Context Stack for Allocators
+- **Pattern:** The TurboMind `Context` class maintains thread-local stacks for device/host/pinned allocators
+- **ContextGuard:** RAII pattern that pushes items (Stream, Allocator) onto the context stack, pops on destruction
+- **device_alloc()** returns the top of the device allocator stack - useful for intercepting allocations
+- **Key insight:** By pushing a custom allocator (e.g., CudaManagedAllocator) via ContextGuard before weight loading, all subsequent `Context::device_alloc()` calls return it
+- **File:** `src/turbomind/core/context.h` and `src/turbomind/core/context.cc`
+
+### X-Macro Pattern for Module Registration
+- **Pattern:** X-macros (`TM_MODULE_DECLARE`, `TM_MODULE_METHODS`) generate add_child(), child(), param() methods from child/param lists
+- **Usage:** Modules declare children via `TM_MODULE_DECLARE`, implementation via `TM_MODULE_METHODS`
+- **Files:** `src/turbomind/core/module.h` for the base pattern, individual model weight files for concrete implementations
+
 ## [2026-05-21] - lmdeploy-gg4
 - Fixed MTP safetensors weight path mapping to preserve "layers." prefix in module path
 - **Bug:** `mtp.layers.0.mlp.experts.0.gate_proj.weight` was incorrectly mapped to `0.moe_ffn.experts.0.w1.weight` (missing "layers" prefix)
@@ -85,4 +97,26 @@ after each iteration and it's included in prompts for context.
   - Uses shared state (`streaming_tensors`, `streaming_state`) for polling
   - `AtomicRequestState::exchange(nullptr)` pattern ensures one-time consumption
   - `ModelRequest::Forward` accepts callback and returns `OutputParam` with tensors/state/metrics
+---
+
+## [2026-05-22] - lmdeploy-zm7
+- **Fixed:** CUDA OOM in safetensors weight loading for large models
+- **Implementation:**
+  1. Added `kMANAGED` to `DeviceType` enum in `allocator.h`
+  2. Created `CudaManagedAllocator` class using `cudaMallocManaged` for unified memory
+  3. Modified `Param::alloc()` in `module.h` to use `Context::device_alloc()` instead of hardcoded `kDEVICE`
+  4. Modified `LoadWeightsFromSafetensors()` in `turbomind_c.cc` to push `CudaManagedAllocator` via `ContextGuard`
+- **How it works:** `cudaMallocManaged` allocates unified memory that can be oversubscribed (use more than GPU VRAM by leveraging system RAM). By pushing a `CudaManagedAllocator` via `ContextGuard`, all weight tensor allocations during loading use managed memory instead of direct GPU memory.
+- **Files changed:**
+  - `src/turbomind/core/allocator.h` - Added kMANAGED type and CreateCudaManagedAllocator() declaration
+  - `src/turbomind/core/allocator.cc` - Added CudaManagedAllocator class implementation
+  - `src/turbomind/core/module.h` - Modified Param::alloc() to use Context::device_alloc()
+  - `src/turbomind/capi/turbomind_c.cc` - LoadWeightsFromSafetensors now pushes managed allocator
+- **Build verification:** turbomind_c compiled successfully at 100%
+- **Learnings:**
+  - Context class maintains thread-local allocator stacks via ContextGuard pattern
+  - By pushing a custom allocator before weight loading, all subsequent `device_alloc()` calls return it
+  - `cudaMallocManaged` allows memory oversubscription on systems with more RAM than VRAM
+  - The Tensor constructor with Device type internally calls `Context::alloc(device)` which uses `device_alloc()` when device.type == kDEVICE
+  - Changed Param::alloc() to use `Context::device_alloc()` instead of hardcoded `kDEVICE` to enable dynamic allocation behavior based on context
 ---

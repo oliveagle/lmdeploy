@@ -135,6 +135,42 @@ public:
     }
 };
 
+class CudaManagedAllocator: public AllocatorImpl {
+public:
+    CudaManagedAllocator()
+    {
+        TM_CUDA_CHECK(cudaGetDevice(&device_.id));
+        device_.type = kMANAGED;
+    }
+
+    void* allocate(ssize_t size) override
+    {
+        void* ptr{};
+        // Use cudaMallocManaged for unified memory accessible from both CPU and GPU
+        // This allows oversubscription - can allocate more than physical GPU memory
+        TM_CUDA_CHECK(cudaMallocManaged(&ptr, size));
+        return ptr;
+    }
+
+    void deallocate(void* p, ssize_t) override
+    {
+        TM_CUDA_CHECK(cudaFree(p));
+    }
+
+    Device device() const noexcept override
+    {
+        return device_;
+    }
+
+private:
+    Device device_{kMANAGED, 0};
+};
+
+std::shared_ptr<AllocatorImpl> CreateCudaManagedAllocator()
+{
+    return std::make_shared<CudaManagedAllocator>();
+}
+
 Allocator::Allocator(DeviceType type)
 {
     impl_ = [&]() -> shared_ptr<AllocatorImpl> {

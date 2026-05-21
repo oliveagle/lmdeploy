@@ -15,12 +15,14 @@ enum class DeviceType : int
 {
     kCPU,
     kCPUpinned,
-    kDEVICE
+    kDEVICE,
+    kMANAGED  // CUDA managed memory (cudaMallocManaged) - accessible from CPU and GPU
 };
 
 inline constexpr DeviceType kCPU       = DeviceType::kCPU;
 inline constexpr DeviceType kCPUpinned = DeviceType::kCPUpinned;
 inline constexpr DeviceType kDEVICE    = DeviceType::kDEVICE;
+inline constexpr DeviceType kMANAGED   = DeviceType::kMANAGED;
 
 constexpr const char* to_string(DeviceType device)
 {
@@ -31,6 +33,8 @@ constexpr const char* to_string(DeviceType device)
             return "cpu_pinned";
         case kDEVICE:
             return "device";
+        case kMANAGED:
+            return "managed";
     }
     return "";
 }
@@ -116,6 +120,10 @@ public:
 private:
     shared_ptr<AllocatorImpl> impl_;
 };
+
+/// Create a CUDA managed memory allocator (cudaMallocManaged).
+/// Allows weight oversubscription - can allocate more memory than physical GPU VRAM.
+std::shared_ptr<AllocatorImpl> CreateCudaManagedAllocator();
 
 class StackAllocatorImpl: public AllocatorImpl {
 public:

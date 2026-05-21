@@ -12,6 +12,7 @@
 
 #include "src/turbomind/core/allocator.h"
 #include "src/turbomind/core/check.h"
+#include "src/turbomind/core/context.h"
 #include "src/turbomind/core/data_type.h"
 #include "src/turbomind/core/registry.h"
 #include "src/turbomind/core/tensor.h"
@@ -168,7 +169,8 @@ public:
     {
         TM_CHECK(slot_ != nullptr);
         auto layout = Layout{std::vector<ssize_t>(shape.begin(), shape.end())};
-        *slot_      = Tensor{std::move(layout), dtype, kDEVICE};
+        auto& alloc = Context::device_alloc();
+        *slot_      = Tensor{std::move(layout), dtype, alloc};
         return *slot_;
     }
 
