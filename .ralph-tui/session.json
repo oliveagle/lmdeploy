@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "sessionId": "7e0c1cda-b346-48a4-93d7-bbf7db1fe91d",
+  "sessionId": "ca693866-2af1-4c3f-ba25-d89a873020a1",
   "status": "running",
-  "startedAt": "2026-05-21T18:05:27.001Z",
-  "updatedAt": "2026-05-21T18:24:19.340Z",
-  "currentIteration": 2,
+  "startedAt": "2026-05-21T18:47:59.641Z",
+  "updatedAt": "2026-05-21T18:51:13.216Z",
+  "currentIteration": 0,
   "maxIterations": 50,
-  "tasksCompleted": 1,
+  "tasksCompleted": 0,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -65,7 +65,7 @@
       {
         "id": "lmdeploy-h2w",
         "title": "修复 LinearWeight::param() 返回空的问题",
-        "status": "open",
+        "status": "in_progress",
         "completedInSession": false
       },
       {
@@ -305,7 +305,7 @@
       {
         "id": "lmdeploy-m9v",
         "title": "Rust FFI 绑定: 实现纯 Rust C API 调用",
-        "status": "open",
+        "status": "completed",
         "completedInSession": false
       },
       {
@@ -318,7 +318,7 @@
         "id": "lmdeploy-82u",
         "title": "在 C++ 层构建完整 ModelWeight 层级结构",
         "status": "completed",
-        "completedInSession": true
+        "completedInSession": false
       },
       {
         "id": "lmdeploy-6l2",
@@ -466,32 +466,9 @@
       }
     ]
   },
-  "iterations": [
-    {
-      "iteration": 1,
-      "status": "completed",
-      "taskId": "lmdeploy-5wx",
-      "taskTitle": "分析 Python TurboMind 权重加载流程，构建 ModelWeight 子模块树",
-      "taskCompleted": false,
-      "durationMs": 296481,
-      "startedAt": "2026-05-21T18:05:27.174Z",
-      "endedAt": "2026-05-21T18:10:23.655Z"
-    },
-    {
-      "iteration": 2,
-      "status": "completed",
-      "taskId": "lmdeploy-82u",
-      "taskTitle": "在 C++ 层构建完整 ModelWeight 层级结构",
-      "taskCompleted": true,
-      "durationMs": 537126,
-      "startedAt": "2026-05-21T18:10:24.795Z",
-      "endedAt": "2026-05-21T18:19:21.921Z"
-    }
-  ],
+  "iterations": [],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
-  "activeTaskIds": [
-    "lmdeploy-5wx"
-  ],
+  "activeTaskIds": [],
   "subagentPanelVisible": false
 }

@@ -1,14 +1,14 @@
 {
-  "id": "7e0c1cda-b346-48a4-93d7-bbf7db1fe91d",
+  "id": "ca693866-2af1-4c3f-ba25-d89a873020a1",
   "status": "running",
-  "startedAt": "2026-05-21T18:05:26.853Z",
-  "updatedAt": "2026-05-21T18:19:22.277Z",
+  "startedAt": "2026-05-21T18:47:59.503Z",
+  "updatedAt": "2026-05-21T18:47:59.503Z",
   "agentPlugin": "claude",
   "trackerPlugin": "beads-rust",
   "executionScopes": [],
-  "currentIteration": 2,
+  "currentIteration": 0,
   "maxIterations": 50,
   "totalTasks": 0,
-  "tasksCompleted": 1,
+  "tasksCompleted": 0,
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy"
 }

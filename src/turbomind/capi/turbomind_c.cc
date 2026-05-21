@@ -158,6 +158,10 @@ TM_EngineConfig* TM_EngineConfig_Create(void)
         auto* cfg = new TM_EngineConfig{};
         cfg->config.enable_prefix_caching = false;
         cfg->config.enable_metrics = false;
+        // Default to kFloat16 (same as kHalf) to pass the dtype check in TurboMind::Impl.
+        // Python path resolves dtype via get_tm_config() which maps to 'float16' or 'bfloat16'.
+        // The C API caller should explicitly override via TM_EngineConfig_SetDataType() if BF16 is desired.
+        cfg->config.data_type = turbomind::DataType::kFloat16;
         return cfg;
     }
     catch (const std::exception& e) {
@@ -1122,25 +1126,23 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     // MTP (Multi-Token Prediction) paths
     // ========================================================
     // MTP shares weights with main model layers (mtp.layers.X.* -> layers.X.*)
-    // MTP-specific params (norm, fc, pre_fc_norm_*) use mtp.* prefix
+    // MTP-specific params (norm, fc, pre_fc_norm_*) are NOT supported in C++ engine
+    // since there's no mtp module - skip them by returning empty string
     bool is_mtp = result.find("mtp.") == 0;
     if (is_mtp) {
         // Remove mtp prefix for mapping
         result = result.substr(4);  // Remove "mtp." prefix
 
         // MTP-specific top-level params: mtp.norm, mtp.fc, mtp.pre_fc_norm_*
-        // Map to mtp_top_level.* namespace
-        if (result == "norm.weight") {
-            return "mtp.norm.weight";
-        }
-        if (result == "norm") {
-            return "mtp.norm";
+        // Skip these since C++ engine has no mtp module
+        if (result == "norm.weight" || result == "norm") {
+            return "";  // Skip MTP-specific norm
         }
         if (result.find("fc.") == 0) {
-            return "mtp." + result;
+            return "";  // Skip MTP-specific fc
         }
         if (result.find("pre_fc_norm_") == 0) {
-            return "mtp." + result;
+            return "";  // Skip MTP-specific pre_fc_norm_*
         }
 
         // MTP layers share weights with main model: layers.X.*
@@ -1184,7 +1186,7 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
             return result;  // Map to main model layers
         }
 
-        return result;
+        return "";  // Skip unknown MTP params
     }
 
     // ========================================================
