@@ -141,7 +141,7 @@ lib/libturbomind_c.so: lib/libcuda_utils.a
 lib/libturbomind_c.so: /usr/local/cuda-12.5/targets/x86_64-linux/lib/libcudart.so
 lib/libturbomind_c.so: /usr/local/cuda-12.5/targets/x86_64-linux/lib/stubs/libcuda.so
 lib/libturbomind_c.so: /usr/lib/x86_64-linux-gnu/librt.a
-lib/libturbomind_c.so: _deps/fmt-build/libfmtd.a
+lib/libturbomind_c.so: _deps/fmt-build/libfmt.a
 lib/libturbomind_c.so: src/turbomind/capi/CMakeFiles/turbomind_c.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX shared library ../../../lib/libturbomind_c.so"
 	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/capi && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/turbomind_c.dir/link.txt --verbose=$(VERBOSE)

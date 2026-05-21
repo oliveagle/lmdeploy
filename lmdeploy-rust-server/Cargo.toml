@@ -57,8 +57,16 @@ assert-json-diff = "2.0"
 criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bin]]
+name = "diagnostic"
+path = "src/bin/diagnostic.rs"
+
+[[bin]]
 name = "cpp_engine_test"
 path = "bin/cpp_engine_test.rs"
+
+[[bin]]
+name = "cpp_4b_test"
+path = "bin/cpp_4b_test.rs"
 
 [[bin]]
 name = "lmdeploy-server"

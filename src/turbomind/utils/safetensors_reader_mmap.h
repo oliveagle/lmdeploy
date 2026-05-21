@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -77,7 +78,8 @@ public:
     SafetensorsReaderMmap& operator=(const SafetensorsReaderMmap&) = delete;
     SafetensorsReaderMmap(SafetensorsReaderMmap&& other) noexcept
         : fd_(other.fd_), mapped_data_(other.mapped_data_), file_size_(other.file_size_),
-          header_size_(other.header_size_), metas_(std::move(other.metas_))
+          header_size_(other.header_size_), metas_(std::move(other.metas_)),
+          meta_map_(std::move(other.meta_map_))
     {
         other.fd_ = -1;
         other.mapped_data_ = nullptr;
@@ -98,6 +100,7 @@ public:
             file_size_ = other.file_size_;
             header_size_ = other.header_size_;
             metas_ = std::move(other.metas_);
+            meta_map_ = std::move(other.meta_map_);
             other.fd_ = -1;
             other.mapped_data_ = nullptr;
             other.file_size_ = 0;
@@ -118,31 +121,26 @@ public:
     /// Get all tensor metadata
     const std::vector<TensorMeta>& tensors() const { return metas_; }
 
-    /// Check if a tensor exists
+    /// Check if a tensor exists (O(1) hash lookup)
     bool has_tensor(const std::string& name) const
     {
-        for (const auto& m : metas_) {
-            if (m.name == name) return true;
-        }
-        return false;
-    }
-
-    /// Find tensor index by name, returns -1 if not found
-    int find_tensor(const std::string& name) const
-    {
-        for (size_t i = 0; i < metas_.size(); ++i) {
-            if (metas_[i].name == name) return static_cast<int>(i);
-        }
-        return -1;
+        return meta_map_.find(name) != meta_map_.end();
     }
 
     /// Get tensor metadata by name (returns nullptr if not found)
+    /// O(1) hash table lookup - much faster than linear search
     const TensorMeta* get_tensor_meta(const std::string& name) const
     {
-        for (const auto& m : metas_) {
-            if (m.name == name) return &m;
-        }
-        return nullptr;
+        auto it = meta_map_.find(name);
+        return it != meta_map_.end() ? &it->second : nullptr;
+    }
+
+    /// Find tensor index by name, returns -1 if not found
+    /// O(1) hash table lookup
+    int find_tensor(const std::string& name) const
+    {
+        auto it = meta_map_.find(name);
+        return it != meta_map_.end() ? static_cast<int>(&it->second - &metas_[0]) : -1;
     }
 
     /// Read tensor data directly from mmap (zero-copy!)
@@ -445,15 +443,18 @@ private:
                 }
             }
 
-            metas_.push_back(meta);
+                        metas_.push_back(meta);
+            // Also add to hash map for O(1) lookup by name
+            meta_map_.insert({metas_.back().name, metas_.back()});
         }
     }
 
-    int fd_;                              // File descriptor
-    const uint8_t* mapped_data_;          // Mapped file data
-    size_t file_size_;                    // Total file size
-    size_t header_size_;                  // JSON header size
-    std::vector<TensorMeta> metas_;       // Tensor metadata
+    int fd_;                                         // File descriptor
+    const uint8_t* mapped_data_;                     // Mapped file data
+    size_t file_size_;                               // Total file size
+    size_t header_size_;                             // JSON header size
+    std::vector<TensorMeta> metas_;                  // Tensor metadata (index → TensorMeta)
+    std::unordered_map<std::string, TensorMeta> meta_map_;  // O(1) name → TensorMeta lookup
 };
 
 }  // namespace turbomind

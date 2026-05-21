@@ -7,11 +7,11 @@ CUDA_DEFINES = -DBUILD_MULTI_GPU=1 -DENABLE_BF16 -DGEMM2_ARCH_90_ENABLED -DUSE_N
 
 CUDA_INCLUDES = --options-file CMakeFiles/gemm2.dir/includes_CUDA.rsp
 
-CUDA_FLAGS =  -Xcompiler -Wall -ldl --expt-extended-lambda --expt-relaxed-constexpr --std=c++17 --diag-suppress=128 --diag-suppress=27 -g -O0 -G -Xcompiler -Wall -std=c++17 "--generate-code=arch=compute_70,code=[sm_70]" "--generate-code=arch=compute_75,code=[sm_75]" "--generate-code=arch=compute_80,code=[sm_80]" "--generate-code=arch=compute_86,code=[sm_86]" "--generate-code=arch=compute_89,code=[sm_89]" "--generate-code=arch=compute_90a,code=[sm_90a]" -Xcompiler=-fPIC -Xptxas=-v --generate-line-info --threads 16
+CUDA_FLAGS =  -Xcompiler -Wall -ldl --expt-extended-lambda --expt-relaxed-constexpr --std=c++17 --diag-suppress=128 --diag-suppress=27  -g -DNDEBUG -O3 --use_fast_math -std=c++17 "--generate-code=arch=compute_70,code=[sm_70]" "--generate-code=arch=compute_75,code=[sm_75]" "--generate-code=arch=compute_80,code=[sm_80]" "--generate-code=arch=compute_86,code=[sm_86]" "--generate-code=arch=compute_89,code=[sm_89]" "--generate-code=arch=compute_90a,code=[sm_90a]" -Xcompiler=-fPIC -Xptxas=-v --generate-line-info --threads 16
 
 CXX_DEFINES = -DBUILD_MULTI_GPU=1 -DENABLE_BF16 -DGEMM2_ARCH_90_ENABLED -DUSE_NVTX
 
 CXX_INCLUDES = -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/fmt-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy -I/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/repo-cutlass-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/repo-cutlass-build/include -isystem /usr/local/cuda-12.5/include -isystem /usr/local/cuda-12.5/include/cccl -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include
 
-CXX_FLAGS = -g  -Wall -O0 -std=gnu++17 -fPIC
+CXX_FLAGS =  -g -DNDEBUG  -O3 -std=gnu++17 -fPIC
 

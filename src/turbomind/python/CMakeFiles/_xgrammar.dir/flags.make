@@ -6,5 +6,5 @@ CXX_DEFINES = -DBUILD_MULTI_GPU=1 -DENABLE_BF16 -DUSE_NVTX -DXGRAMMAR_ENABLE_CPP
 
 CXX_INCLUDES = -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/fmt-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy -isystem /include
 
-CXX_FLAGS = -g  -Wall -O0 -std=gnu++17 -fPIC -fvisibility=hidden
+CXX_FLAGS =  -g -DNDEBUG  -O3 -std=gnu++17 -fPIC -fvisibility=hidden
 

@@ -102,7 +102,7 @@ lib/_xgrammar.cpython-312-x86_64-linux-gnu.so: lib/libcuda_utils.a
 lib/_xgrammar.cpython-312-x86_64-linux-gnu.so: /usr/local/cuda-12.5/targets/x86_64-linux/lib/libcudart.so
 lib/_xgrammar.cpython-312-x86_64-linux-gnu.so: /usr/local/cuda-12.5/targets/x86_64-linux/lib/stubs/libcuda.so
 lib/_xgrammar.cpython-312-x86_64-linux-gnu.so: /usr/lib/x86_64-linux-gnu/librt.a
-lib/_xgrammar.cpython-312-x86_64-linux-gnu.so: _deps/fmt-build/libfmtd.a
+lib/_xgrammar.cpython-312-x86_64-linux-gnu.so: _deps/fmt-build/libfmt.a
 lib/_xgrammar.cpython-312-x86_64-linux-gnu.so: src/turbomind/python/CMakeFiles/_xgrammar.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX shared module ../../../lib/_xgrammar.cpython-312-x86_64-linux-gnu.so"
 	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/python && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/_xgrammar.dir/link.txt --verbose=$(VERBOSE)
