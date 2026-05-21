@@ -141,3 +141,29 @@ after each iteration and it's included in prompts for context.
   - The Tensor constructor with Device type internally calls `Context::alloc(device)` which uses `device_alloc()` when device.type == kDEVICE
   - Changed Param::alloc() to use `Context::device_alloc()` instead of hardcoded `kDEVICE` to enable dynamic allocation behavior based on context
 ---
+
+## [2026-05-22] - lmdeploy-fcp
+- **Work status:** Pure Rust Tokenizer already implemented and integrated
+- **Implementation verified:**
+  - `LMTokenizer` in `lmdeploy-rust-server/src/tokenizer.rs` - complete implementation (208 lines)
+  - Uses HuggingFace `tokenizers` crate (version 0.21) - pure Rust, no Python dependency
+  - Supports `tokenizer.json` and `tokenizer.model` (SentencePiece) formats
+  - Methods: `encode()`, `decode()`, `encode_batch()`, `encode_raw()`, `id_to_token()`, `decode_token()`
+  - Tracks BOS/EOS token IDs, vocabulary size, special tokens
+- **Integration verified:**
+  - Used by `TurboMindCEngine` in `cpp_engine.rs` for encode/decode
+  - Tokenizer loaded in `TurboMindCEngine::new()` at line 141-150
+  - Used in `generate()` for prompt tokenization (line 307-318)
+  - Used in `generate_stream()` for streaming decode (line 402-419)
+  - Used for output decoding after inference (line 372-382)
+- **Tests:** All 4 tokenizer unit tests pass
+- **Files:** `lmdeploy-rust-server/src/tokenizer.rs`, `src/model/cpp_engine.rs`, `Cargo.toml`
+- **Learnings:**
+  - The HuggingFace `tokenizers` crate provides a complete Rust implementation
+  - No Python/transformers dependency needed for tokenization
+  - Tokenizer loads directly from `tokenizer.json` or `tokenizer.model` files
+  - Integration pattern: tokenizer is optional field, loaded during engine initialization
+  - The C++ TurboMind engine expects pre-tokenized integer token IDs, not text
+  - Tokenizer is only used at the Rust layer boundaries (input prompt → tokens, output tokens → text)
+
+---
