@@ -99,6 +99,27 @@ after each iteration and it's included in prompts for context.
   - `ModelRequest::Forward` accepts callback and returns `OutputParam` with tensors/state/metrics
 ---
 
+## [2026-05-22] - lmdeploy-hr0
+- **Work status:** Optimized weight loading performance using BatchCopy
+- **Implementation details:**
+  - Added `#include "src/turbomind/core/copy.h"` for BatchCopy support
+  - Modified `LoadWeightsFromSafetensors()` to use two-phase approach:
+    - Phase 1: Allocate GPU memory and collect transfer metadata
+    - Phase 2: Run all transfers in batch using `BatchCopy::group()` + `Run()`
+  - Removed per-tensor `cudaMemcpyAsync` calls and `cudaStreamCreate`/`Synchronize`/`Destroy`
+  - Uses existing `BatchCopy` class which wraps `cuMemcpyBatchAsync` driver API for optimal batching
+- **Files changed:** `src/turbomind/capi/turbomind_c.cc`
+- **Build verification:** turbomind_c target compiled successfully at 100%
+- **Learnings:**
+  - BatchCopy uses RAII pattern with `Group` class for automatic batch management
+  - cuMemcpyBatchAsync can batch multiple small transfers into a single GPU operation
+  - Two-phase approach (allocate all first, then batch copy) reduces GPU memory fragmentation
+  - `BatchCopy::operator()(src, size, dst)` adds transfers to current batch group
+  - `BatchCopy::group()` creates RAII group, `Run()` executes batched transfers
+- **Potential future optimization:** Could use prefetch/hints for even better performance on multi-GPU setups
+
+---
+
 ## [2026-05-22] - lmdeploy-zm7
 - **Fixed:** CUDA OOM in safetensors weight loading for large models
 - **Implementation:**

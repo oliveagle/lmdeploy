@@ -6,5 +6,5 @@ CXX_DEFINES = -DBUILD_MULTI_GPU=1 -DENABLE_BF16 -DUSE_NVTX
 
 CXX_INCLUDES = -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/fmt-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy -I/include -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include
 
-CXX_FLAGS =  -g -DNDEBUG  -O3 -std=gnu++17 -fPIC
+CXX_FLAGS = -O3 -DNDEBUG         -O3 -std=gnu++17 -fPIC
 

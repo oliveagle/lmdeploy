@@ -28,6 +28,7 @@ static void debug_log(const char* msg) {
 
 #include "src/turbomind/core/module.h"
 #include "src/turbomind/core/allocator.h"
+#include "src/turbomind/core/copy.h"
 #include "src/turbomind/models/model_root.h"
 #include "src/turbomind/models/model_weight.h"
 #include "src/turbomind/models/decoder_layer_weight.h"
@@ -898,17 +899,17 @@ static void LoadWeightsFromSafetensors(
         // Set CUDA device before creating stream
         cudaSetDevice(0);
 
-        fprintf(stderr, "[C-API] Before cudaStreamCreate...\n");
+        fprintf(stderr, "[C-API] Creating BatchCopy for batched transfers...\n");
         fflush(stderr);
 
-        // Create CUDA stream for async transfers
-        cudaStream_t copy_stream;
-        cudaStreamCreate(&copy_stream);
+        // Create BatchCopy for batched transfers
+        turbomind::core::BatchCopy batch_copy;
 
-        fprintf(stderr, "[C-API] cudaStreamCreate completed.\n");
+        fprintf(stderr, "[C-API] BatchCopy created.\n");
         fflush(stderr);
 
-        // Phase 1: Iterate tensors, map names, and directly transfer via mmap zero-copy
+        // Phase 1: Iterate tensors, map names, allocate memory, and collect transfers
+        // We'll collect all transfers first, then run them in a single batch
         size_t progress_count = 0;
         fprintf(stderr, "[C-API] Before reader.tensors() call...\n");
         fflush(stderr);
@@ -918,6 +919,15 @@ static void LoadWeightsFromSafetensors(
 
         fprintf(stderr, "[C-API] Starting tensor processing loop (%zu tensors)...\n", reader.num_tensors());
         fflush(stderr);
+
+        // Structure to hold transfer info
+        struct Transfer {
+            const uint8_t* src;
+            void* dst;
+            size_t size;
+        };
+        std::vector<Transfer> transfers;
+        transfers.reserve(reader.num_tensors());
 
         for (size_t i = 0; i < reader.num_tensors(); ++i) {
             fprintf(stderr, "[C-API] [%zu/174] tensor_name='%s'...", i, reader.tensor_name(i).c_str());
@@ -1035,19 +1045,7 @@ static void LoadWeightsFromSafetensors(
 
             if (tensor.raw_data()) {
                 size_t copy_size = std::min(meta.size, static_cast<size_t>(tensor.byte_size()));
-                auto memcpy_start = std::chrono::high_resolution_clock::now();
-                cudaError_t err = cudaMemcpyAsync(tensor.raw_data(), src_data, copy_size,
-                               cudaMemcpyHostToDevice, copy_stream);
-                if (err != cudaSuccess) {
-                    fprintf(stderr, " cudaMemcpyAsync FAILED: %s\n", cudaGetErrorString(err));
-                    fflush(stderr);
-                } else {
-                    auto memcpy_end = std::chrono::high_resolution_clock::now();
-                    auto memcpy_ms = std::chrono::duration_cast<std::chrono::microseconds>(memcpy_end - memcpy_start);
-                    if (memcpy_ms.count() > 1000) {
-                        fprintf(stderr, " cudaMemcpy took %ldus...", memcpy_ms.count());
-                    }
-                }
+                transfers.push_back({src_data, tensor.raw_data(), copy_size});
                 ++loaded_count;
             }
             fprintf(stderr, " DONE\n");
@@ -1057,14 +1055,30 @@ static void LoadWeightsFromSafetensors(
             if (progress_count % 200 == 0 || i == reader.num_tensors() - 1) {
                 auto now = std::chrono::high_resolution_clock::now();
                 auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - load_start);
-                fprintf(stderr, "[C-API] Transfer %zu/%zu tensors (%.0fs elapsed) from %s\n", progress_count, reader.num_tensors(), elapsed.count() / 1000.0, safetensors_path);
+                fprintf(stderr, "[C-API] Allocated %zu/%zu tensors (%.0fs elapsed) from %s\n", progress_count, reader.num_tensors(), elapsed.count() / 1000.0, safetensors_path);
                 fflush(stderr);
             }
         }
 
-        // Synchronize all async copies
-        cudaStreamSynchronize(copy_stream);
-        cudaStreamDestroy(copy_stream);
+        // Phase 2: Run all transfers in batched mode for better performance
+        fprintf(stderr, "[C-API] Running batched transfers for %d tensors...\n", loaded_count);
+        fflush(stderr);
+
+        auto batch_start = std::chrono::high_resolution_clock::now();
+        {
+            auto group = batch_copy.group();
+            for (const auto& transfer : transfers) {
+                batch_copy(reinterpret_cast<const char*>(transfer.src), transfer.size,
+                          reinterpret_cast<char*>(transfer.dst));
+            }
+        }
+        // Group goes out of scope, then run the batch
+        batch_copy.Run();
+
+        auto batch_end = std::chrono::high_resolution_clock::now();
+        auto batch_ms = std::chrono::duration_cast<std::chrono::milliseconds>(batch_end - batch_start);
+        fprintf(stderr, "[C-API] Batched transfers completed in %ldms\n", batch_ms.count());
+        fflush(stderr);
 
         fprintf(stderr, "[C-API] Loaded %d tensors, skipped %d from %s\n", loaded_count, skip_count, safetensors_path);
         fflush(stderr);
