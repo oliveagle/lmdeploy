@@ -15,9 +15,25 @@ after each iteration and it's included in prompts for context.
 - **ModuleList indexing**: ModuleList children are added with string indices ("0", "1", etc.), not numeric indices. Access via `layers_list->add_child(std::to_string(layer_idx), ...)` or `layers->child("0")`.
 - **ModelRoot child naming**: ModelWeight is attached to ModelRoot as "text_model" child via `model_root->add_child("text_model", ...)`. Get back via `model_root->text_model_ptr()`.
 
+- **Rust FFI Naming Convention**: FFI type enums use C-style `TM_DATATYPE_*` naming (not Rust camelCase) to match C++ symbols. Clippy warnings are expected but acceptable for C interop.
+- **TurboMind Init Lifecycle**: C API `InitFromPath()` performs full initialization: `CreateContext → CreateRoot → Build ModelWeight tree → Load safetensors → ProcessWeights (GPU transfer) → CreateEngine`. Single call handles everything.
+- **AWQ Detection**: Engine auto-detects AWQ quantization by reading `config.json` for `"quant_method": "awq"` pattern, then sets `quant_policy=4` automatically.
+
 ---
 
-## 2026-05-22 - lmdeploy-82u
+## 2026-05-22 - lmdeploy-m9v
+- Verified Rust FFI bindings already fully implemented in `turbomind_c.rs` (1278 lines)
+- All C API types wrapped in RAII Rust types: `EngineConfig`, `TurboMind`, `TensorMap`, `GenConfig`, `ModelRequest`, `SafetensorsHandle`
+- `cpp_engine.rs` integrates FFI bindings for pure C++ inference (no Python dependency)
+- Streaming generation support via `forward_async` + polling loop
+- Code compiles cleanly, tests pass
+- **Files changed**: N/A (verified existing implementation, no changes needed)
+- **Learnings:**
+  - FFI types intentionally use C-style naming (`TM_DATATYPE_*`) to match C++ ABI
+  - `ModelRequest::forward()` accepts mutable `TensorMap` for output results
+  - Streaming tokens read via `get_stream_token()` + `get_streaming_state()` polling
+  - AWQ models auto-detected at load time from `config.json`
+---
 - Analyzed and verified the complete ModelWeight module tree structure implemented in C++ InitFromPath
 - Verified: ModelWeight creates tok_embeddings param, norm child (NormWeight), output child (LinearWeight), layers ModuleList
 - Verified: Each DecoderLayerWeight creates attention_norm, ffn_norm, attention (AttentionWeight with q_proj/k_proj/v_proj/wo), feed_forward (FfnWeight with w1/w2/w3)
