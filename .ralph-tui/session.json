@@ -3,10 +3,10 @@
   "sessionId": "e2e9b065-81ca-4f10-b321-9c0112e471a7",
   "status": "running",
   "startedAt": "2026-05-22T10:40:12.453Z",
-  "updatedAt": "2026-05-22T10:55:25.868Z",
-  "currentIteration": 1,
+  "updatedAt": "2026-05-22T11:35:14.749Z",
+  "currentIteration": 3,
   "maxIterations": 50,
-  "tasksCompleted": 1,
+  "tasksCompleted": 2,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -95,8 +95,8 @@
       {
         "id": "lmdeploy-4rt",
         "title": "修复权重加载路径映射",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "lmdeploy-is8",
@@ -482,10 +482,32 @@
       "durationMs": 839219,
       "startedAt": "2026-05-22T10:40:12.642Z",
       "endedAt": "2026-05-22T10:54:11.861Z"
+    },
+    {
+      "iteration": 2,
+      "status": "completed",
+      "taskId": "lmdeploy-4rt",
+      "taskTitle": "修复权重加载路径映射",
+      "taskCompleted": true,
+      "durationMs": 72568,
+      "startedAt": "2026-05-22T10:54:13.288Z",
+      "endedAt": "2026-05-22T10:55:25.856Z"
+    },
+    {
+      "iteration": 3,
+      "status": "completed",
+      "taskId": "lmdeploy-s8l",
+      "taskTitle": "测试 C++ 引擎端到端推理",
+      "taskCompleted": false,
+      "durationMs": 854161,
+      "startedAt": "2026-05-22T10:55:27.274Z",
+      "endedAt": "2026-05-22T11:09:41.435Z"
     }
   ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
-  "activeTaskIds": [],
+  "activeTaskIds": [
+    "lmdeploy-s8l"
+  ],
   "subagentPanelVisible": false
 }

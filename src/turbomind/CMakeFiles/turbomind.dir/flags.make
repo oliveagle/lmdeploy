@@ -6,5 +6,5 @@ CXX_DEFINES = -DBUILD_MULTI_GPU=1 -DENABLE_BF16 -DUSE_NVTX -DXGRAMMAR_ENABLE_CPP
 
 CXX_INCLUDES = -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/fmt-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy -I/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/concurrentqueue-src -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/repo-cutlass-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/repo-cutlass-build/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/gloo-src -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/gloo-build -I/mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/xgrammar-src/include -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include -isystem /usr/local/cuda-12.5/include -isystem /usr/local/cuda-12.5/include/cccl -isystem /mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/xgrammar-src/3rdparty/picojson -isystem /mnt/eaget-4tb/data/llm_server/lmdeploy/_deps/xgrammar-src/3rdparty/dlpack/include
 
-CXX_FLAGS = -O3 -DNDEBUG         -O3 -std=gnu++17 -fPIC
+CXX_FLAGS = -g  -Wall -O0 -std=gnu++17 -fPIC
 

@@ -6,5 +6,5 @@ CUDA_DEFINES = -DBUILD_MULTI_GPU=1 -DCUTE_SM90_EXTENDED_MMA_SHAPES_ENABLED -DENA
 
 CUDA_INCLUDES = --options-file CMakeFiles/gemm2_sm90.dir/includes_CUDA.rsp
 
-CUDA_FLAGS =  -Xcompiler -Wall -ldl --expt-extended-lambda --expt-relaxed-constexpr --std=c++17 --diag-suppress=128 --diag-suppress=27 -O3 -DNDEBUG        -O3        --use_fast_math -std=c++17 "--generate-code=arch=compute_90a,code=[sm_90a]" -Xcompiler=-fPIC -Xptxas=-v --generate-line-info --threads 16
+CUDA_FLAGS =  -Xcompiler -Wall -ldl --expt-extended-lambda --expt-relaxed-constexpr --std=c++17 --diag-suppress=128 --diag-suppress=27 -g -O0 -G -Xcompiler -Wall -std=c++17 "--generate-code=arch=compute_90a,code=[sm_90a]" -Xcompiler=-fPIC -Xptxas=-v --generate-line-info --threads 16
 
