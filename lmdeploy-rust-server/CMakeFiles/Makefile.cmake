@@ -290,4 +290,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "src/turbomind/python/CMakeFiles/_turbomind.dir/DependInfo.cmake"
   "src/turbomind/python/CMakeFiles/_xgrammar.dir/DependInfo.cmake"
   "src/turbomind/capi/CMakeFiles/turbomind_c.dir/DependInfo.cmake"
+  "src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/DependInfo.cmake"
   )

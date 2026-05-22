@@ -142,7 +142,7 @@ extern "C" {
     pub fn TM_TurboMind_Create(model_dir: *const c_char, config: *mut TM_EngineConfig) -> *mut TM_TurboMind;
     pub fn TM_TurboMind_Destroy(tm: *mut TM_TurboMind);
     pub fn TM_TurboMind_InitFromPath(tm: *mut TM_TurboMind, device_id: c_int, model_dir: *const c_char, trust_remote_code: c_int) -> c_int;
-    pub fn TM_TurboMind_InitFromHF(tm: *mut TM_TurboMind, device_id: c_int, model_dir: *const c_char, output_dir: *const c_char) -> c_int;
+    pub fn TM_TurboMind_InitFromHF(tm: *mut TM_TurboMind, device_id: c_int, model_dir: *const c_char, trust_remote_code: c_int, session_len: c_int) -> c_int;
     pub fn TM_TurboMind_CreateContext(tm: *mut TM_TurboMind, index: c_int);
     pub fn TM_TurboMind_CreateRoot(tm: *mut TM_TurboMind, index: c_int);
     pub fn TM_TurboMind_ProcessWeights(tm: *mut TM_TurboMind, index: c_int);
@@ -540,11 +540,10 @@ impl TurboMind {
         unsafe { TM_TurboMind_CreateEngine(self.0, index) }
     }
 
-    pub fn init_from_hf(&self, device_id: c_int, model_dir: &str, output_dir: &str) -> FFResult<()> {
+    pub fn init_from_hf(&self, device_id: c_int, model_dir: &str, trust_remote_code: bool, session_len: c_int) -> FFResult<()> {
         unsafe {
             let model_dir_c = std::ffi::CString::new(model_dir).unwrap();
-            let output_dir_c = std::ffi::CString::new(output_dir).unwrap();
-            let ret = TM_TurboMind_InitFromHF(self.0, device_id, model_dir_c.as_ptr(), output_dir_c.as_ptr());
+            let ret = TM_TurboMind_InitFromHF(self.0, device_id, model_dir_c.as_ptr(), if trust_remote_code { 1 } else { 0 }, session_len);
             if ret != 0 {
                 return Err(FFError::from_last_error().unwrap_or(FFError {
                     code: TM_ErrorCode::TM_ERR_RUNTIME,

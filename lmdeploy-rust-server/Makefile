@@ -1170,6 +1170,19 @@ turbomind_c/fast:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/turbomind_c.dir/build.make src/turbomind/capi/CMakeFiles/turbomind_c.dir/build
 .PHONY : turbomind_c/fast
 
+#=============================================================================
+# Target rules for targets named test_initfrompath_stepby
+
+# Build rule for target.
+test_initfrompath_stepby: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_initfrompath_stepby
+.PHONY : test_initfrompath_stepby
+
+# fast build rule for target.
+test_initfrompath_stepby/fast:
+	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build
+.PHONY : test_initfrompath_stepby/fast
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -1250,6 +1263,7 @@ help:
 	@echo "... sampling_topk_kernels"
 	@echo "... sampling_topp_kernels"
 	@echo "... stop_criteria"
+	@echo "... test_initfrompath_stepby"
 	@echo "... test_ipc_comm"
 	@echo "... turbomind"
 	@echo "... turbomind_c"
