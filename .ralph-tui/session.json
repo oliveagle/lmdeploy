@@ -3,10 +3,10 @@
   "sessionId": "e2e9b065-81ca-4f10-b321-9c0112e471a7",
   "status": "running",
   "startedAt": "2026-05-22T10:40:12.453Z",
-  "updatedAt": "2026-05-22T10:54:11.874Z",
-  "currentIteration": 0,
+  "updatedAt": "2026-05-22T10:55:25.868Z",
+  "currentIteration": 1,
   "maxIterations": 50,
-  "tasksCompleted": 0,
+  "tasksCompleted": 1,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -107,8 +107,8 @@
       {
         "id": "lmdeploy-85l",
         "title": "分析 C++ 引擎 AWQ 加载失败根因",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "lmdeploy-zmu",
@@ -472,7 +472,18 @@
       }
     ]
   },
-  "iterations": [],
+  "iterations": [
+    {
+      "iteration": 1,
+      "status": "completed",
+      "taskId": "lmdeploy-85l",
+      "taskTitle": "分析 C++ 引擎 AWQ 加载失败根因",
+      "taskCompleted": true,
+      "durationMs": 839219,
+      "startedAt": "2026-05-22T10:40:12.642Z",
+      "endedAt": "2026-05-22T10:54:11.861Z"
+    }
+  ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
   "activeTaskIds": [],
