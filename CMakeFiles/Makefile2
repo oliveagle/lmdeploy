@@ -505,10 +505,12 @@ src/turbomind/clean: src/turbomind/capi/clean
 
 # Recursive "all" directory target.
 src/turbomind/capi/all: src/turbomind/capi/CMakeFiles/turbomind_c.dir/all
+src/turbomind/capi/all: src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all
 .PHONY : src/turbomind/capi/all
 
 # Recursive "codegen" directory target.
 src/turbomind/capi/codegen: src/turbomind/capi/CMakeFiles/turbomind_c.dir/codegen
+src/turbomind/capi/codegen: src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/codegen
 .PHONY : src/turbomind/capi/codegen
 
 # Recursive "preinstall" directory target.
@@ -517,6 +519,7 @@ src/turbomind/capi/preinstall:
 
 # Recursive "clean" directory target.
 src/turbomind/capi/clean: src/turbomind/capi/CMakeFiles/turbomind_c.dir/clean
+src/turbomind/capi/clean: src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/clean
 .PHONY : src/turbomind/capi/clean
 
 #=============================================================================
@@ -886,12 +889,12 @@ src/turbomind/utils/clean: src/turbomind/utils/CMakeFiles/weight_serializer.dir/
 _deps/fmt-build/CMakeFiles/fmt.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/fmt-build/CMakeFiles/fmt.dir/build.make _deps/fmt-build/CMakeFiles/fmt.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/fmt-build/CMakeFiles/fmt.dir/build.make _deps/fmt-build/CMakeFiles/fmt.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Built target fmt"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=30 "Built target fmt"
 .PHONY : _deps/fmt-build/CMakeFiles/fmt.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/fmt-build/CMakeFiles/fmt.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/fmt-build/CMakeFiles/fmt.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : _deps/fmt-build/CMakeFiles/fmt.dir/rule
@@ -903,7 +906,7 @@ fmt: _deps/fmt-build/CMakeFiles/fmt.dir/rule
 # codegen rule for target.
 _deps/fmt-build/CMakeFiles/fmt.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/fmt-build/CMakeFiles/fmt.dir/build.make _deps/fmt-build/CMakeFiles/fmt.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Finished codegen for target fmt"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=30 "Finished codegen for target fmt"
 .PHONY : _deps/fmt-build/CMakeFiles/fmt.dir/codegen
 
 # clean rule for target.
@@ -1878,12 +1881,12 @@ _deps/repo-cutlass-build/CMakeFiles/test_all.dir/clean:
 _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/build.make _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/build.make _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=88,89,90,91,92,93,94,95,96,97,98 "Built target yaml-cpp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=89,90,91,92,93,94,95,96,97,98 "Built target yaml-cpp"
 .PHONY : _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 11
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 10
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/rule
@@ -1895,7 +1898,7 @@ yaml-cpp: _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/rule
 # codegen rule for target.
 _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/build.make _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=88,89,90,91,92,93,94,95,96,97,98 "Finished codegen for target yaml-cpp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=89,90,91,92,93,94,95,96,97,98 "Finished codegen for target yaml-cpp"
 .PHONY : _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/codegen
 
 # clean rule for target.
@@ -1915,7 +1918,7 @@ _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/all: _deps/yaml-cpp-bu
 
 # Build rule for subdir invocation for target.
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 12
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 11
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/rule
@@ -1947,7 +1950,7 @@ _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/all: _deps/yaml-cpp-buil
 
 # Build rule for subdir invocation for target.
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 11
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 10
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/rule
@@ -1979,7 +1982,7 @@ _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/all: _deps/yaml-cpp-build
 
 # Build rule for subdir invocation for target.
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 12
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 11
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/rule
@@ -2006,12 +2009,12 @@ _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/clean:
 _deps/xgrammar-build/CMakeFiles/xgrammar.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/xgrammar-build/CMakeFiles/xgrammar.dir/build.make _deps/xgrammar-build/CMakeFiles/xgrammar.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/xgrammar-build/CMakeFiles/xgrammar.dir/build.make _deps/xgrammar-build/CMakeFiles/xgrammar.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=83,84,85,86,87 "Built target xgrammar"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=83,84,85,86,87,88 "Built target xgrammar"
 .PHONY : _deps/xgrammar-build/CMakeFiles/xgrammar.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/xgrammar-build/CMakeFiles/xgrammar.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 5
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 6
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/xgrammar-build/CMakeFiles/xgrammar.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : _deps/xgrammar-build/CMakeFiles/xgrammar.dir/rule
@@ -2023,7 +2026,7 @@ xgrammar: _deps/xgrammar-build/CMakeFiles/xgrammar.dir/rule
 # codegen rule for target.
 _deps/xgrammar-build/CMakeFiles/xgrammar.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/xgrammar-build/CMakeFiles/xgrammar.dir/build.make _deps/xgrammar-build/CMakeFiles/xgrammar.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=83,84,85,86,87 "Finished codegen for target xgrammar"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=83,84,85,86,87,88 "Finished codegen for target xgrammar"
 .PHONY : _deps/xgrammar-build/CMakeFiles/xgrammar.dir/codegen
 
 # clean rule for target.
@@ -2072,12 +2075,12 @@ src/turbomind/CMakeFiles/turbomind.dir/all: src/turbomind/models/CMakeFiles/mode
 src/turbomind/CMakeFiles/turbomind.dir/all: src/turbomind/engine/CMakeFiles/engine.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/CMakeFiles/turbomind.dir/build.make src/turbomind/CMakeFiles/turbomind.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/CMakeFiles/turbomind.dir/build.make src/turbomind/CMakeFiles/turbomind.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Built target turbomind"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=80 "Built target turbomind"
 .PHONY : src/turbomind/CMakeFiles/turbomind.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/CMakeFiles/turbomind.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 82
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 85
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/CMakeFiles/turbomind.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/CMakeFiles/turbomind.dir/rule
@@ -2089,7 +2092,7 @@ turbomind: src/turbomind/CMakeFiles/turbomind.dir/rule
 # codegen rule for target.
 src/turbomind/CMakeFiles/turbomind.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/CMakeFiles/turbomind.dir/build.make src/turbomind/CMakeFiles/turbomind.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Finished codegen for target turbomind"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=80 "Finished codegen for target turbomind"
 .PHONY : src/turbomind/CMakeFiles/turbomind.dir/codegen
 
 # clean rule for target.
@@ -2109,7 +2112,7 @@ src/turbomind/utils/CMakeFiles/cuda_utils.dir/all: _deps/fmt-build/CMakeFiles/fm
 
 # Build rule for subdir invocation for target.
 src/turbomind/utils/CMakeFiles/cuda_utils.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 2
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/cuda_utils.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/utils/CMakeFiles/cuda_utils.dir/rule
@@ -2169,12 +2172,12 @@ src/turbomind/utils/CMakeFiles/memory_utils.dir/all: _deps/fmt-build/CMakeFiles/
 src/turbomind/utils/CMakeFiles/memory_utils.dir/all: src/turbomind/utils/CMakeFiles/cuda_utils.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/memory_utils.dir/build.make src/turbomind/utils/CMakeFiles/memory_utils.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/memory_utils.dir/build.make src/turbomind/utils/CMakeFiles/memory_utils.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=62 "Built target memory_utils"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=61 "Built target memory_utils"
 .PHONY : src/turbomind/utils/CMakeFiles/memory_utils.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/utils/CMakeFiles/memory_utils.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 3
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/memory_utils.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/utils/CMakeFiles/memory_utils.dir/rule
@@ -2186,7 +2189,7 @@ memory_utils: src/turbomind/utils/CMakeFiles/memory_utils.dir/rule
 # codegen rule for target.
 src/turbomind/utils/CMakeFiles/memory_utils.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/memory_utils.dir/build.make src/turbomind/utils/CMakeFiles/memory_utils.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=62 "Finished codegen for target memory_utils"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=61 "Finished codegen for target memory_utils"
 .PHONY : src/turbomind/utils/CMakeFiles/memory_utils.dir/codegen
 
 # clean rule for target.
@@ -2207,7 +2210,7 @@ src/turbomind/utils/CMakeFiles/anomaly_handler.dir/all: src/turbomind/utils/CMak
 
 # Build rule for subdir invocation for target.
 src/turbomind/utils/CMakeFiles/anomaly_handler.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 3
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/anomaly_handler.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/utils/CMakeFiles/anomaly_handler.dir/rule
@@ -2234,12 +2237,12 @@ src/turbomind/utils/CMakeFiles/anomaly_handler.dir/clean:
 src/turbomind/utils/CMakeFiles/parser.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/parser.dir/build.make src/turbomind/utils/CMakeFiles/parser.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/parser.dir/build.make src/turbomind/utils/CMakeFiles/parser.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=72 "Built target parser"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Built target parser"
 .PHONY : src/turbomind/utils/CMakeFiles/parser.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/utils/CMakeFiles/parser.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/parser.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/utils/CMakeFiles/parser.dir/rule
@@ -2251,7 +2254,7 @@ parser: src/turbomind/utils/CMakeFiles/parser.dir/rule
 # codegen rule for target.
 src/turbomind/utils/CMakeFiles/parser.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/parser.dir/build.make src/turbomind/utils/CMakeFiles/parser.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=72 "Finished codegen for target parser"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Finished codegen for target parser"
 .PHONY : src/turbomind/utils/CMakeFiles/parser.dir/codegen
 
 # clean rule for target.
@@ -2298,7 +2301,7 @@ src/turbomind/utils/CMakeFiles/weight_serializer.dir/all: src/turbomind/models/C
 
 # Build rule for subdir invocation for target.
 src/turbomind/utils/CMakeFiles/weight_serializer.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 61
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 64
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/weight_serializer.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/utils/CMakeFiles/weight_serializer.dir/rule
@@ -2331,7 +2334,7 @@ src/turbomind/core/CMakeFiles/core.dir/all: src/turbomind/utils/CMakeFiles/cuda_
 
 # Build rule for subdir invocation for target.
 src/turbomind/core/CMakeFiles/core.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 6
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 7
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/core/CMakeFiles/core.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/core/CMakeFiles/core.dir/rule
@@ -2486,7 +2489,7 @@ src/turbomind/kernels/CMakeFiles/activation.dir/clean:
 src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=73 "Built target quantization_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=72 "Built target quantization_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/all
 
 # Build rule for subdir invocation for target.
@@ -2503,7 +2506,7 @@ quantization_kernels: src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=73 "Finished codegen for target quantization_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=72 "Finished codegen for target quantization_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/codegen
 
 # clean rule for target.
@@ -2518,12 +2521,12 @@ src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/clean:
 src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=61 "Built target logprob_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Built target logprob_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/rule
@@ -2535,7 +2538,7 @@ logprob_kernels: src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=61 "Finished codegen for target logprob_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Finished codegen for target logprob_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/codegen
 
 # clean rule for target.
@@ -2876,7 +2879,7 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/all: src/turbomind/kernels/gemm/
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 12
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 11
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/rule
@@ -2908,7 +2911,7 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/all: src/turbomind/utils/CM
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 3
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 2
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/rule
@@ -2935,12 +2938,12 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/clean:
 src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/build.make src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/build.make src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Built target rms_norm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=73 "Built target rms_norm"
 .PHONY : src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/rule
@@ -2952,7 +2955,7 @@ rms_norm: src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/build.make src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Finished codegen for target rms_norm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=73 "Finished codegen for target rms_norm"
 .PHONY : src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/codegen
 
 # clean rule for target.
@@ -2974,7 +2977,7 @@ src/turbomind/comm/CMakeFiles/host_comm.dir/all: src/turbomind/core/CMakeFiles/c
 
 # Build rule for subdir invocation for target.
 src/turbomind/comm/CMakeFiles/host_comm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 7
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 8
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/comm/CMakeFiles/host_comm.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/comm/CMakeFiles/host_comm.dir/rule
@@ -3008,7 +3011,7 @@ src/turbomind/comm/CMakeFiles/device_comm.dir/all: src/turbomind/core/CMakeFiles
 
 # Build rule for subdir invocation for target.
 src/turbomind/comm/CMakeFiles/device_comm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 7
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 8
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/comm/CMakeFiles/device_comm.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/comm/CMakeFiles/device_comm.dir/rule
@@ -3047,7 +3050,7 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/all: _deps/gloo-build/g
 
 # Build rule for subdir invocation for target.
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 28
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 31
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/rule
@@ -3084,7 +3087,7 @@ src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/all: _deps/gloo-build/gloo/CMak
 
 # Build rule for subdir invocation for target.
 src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 26
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 28
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/rule
@@ -3122,7 +3125,7 @@ src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/all: _deps/gloo-build/gloo/
 
 # Build rule for subdir invocation for target.
 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 27
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 29
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/rule
@@ -3190,7 +3193,7 @@ src/turbomind/generation/CMakeFiles/guided_decoding.dir/all: src/turbomind/kerne
 
 # Build rule for subdir invocation for target.
 src/turbomind/generation/CMakeFiles/guided_decoding.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 12
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 14
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/generation/CMakeFiles/guided_decoding.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/generation/CMakeFiles/guided_decoding.dir/rule
@@ -3234,7 +3237,7 @@ src/turbomind/generation/CMakeFiles/generation.dir/all: src/turbomind/generation
 
 # Build rule for subdir invocation for target.
 src/turbomind/generation/CMakeFiles/generation.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 21
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 23
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/generation/CMakeFiles/generation.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/generation/CMakeFiles/generation.dir/rule
@@ -3287,12 +3290,12 @@ src/turbomind/models/CMakeFiles/models.dir/all: src/turbomind/generation/CMakeFi
 src/turbomind/models/CMakeFiles/models.dir/all: src/turbomind/generation/CMakeFiles/generation.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/models/CMakeFiles/models.dir/build.make src/turbomind/models/CMakeFiles/models.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/models/CMakeFiles/models.dir/build.make src/turbomind/models/CMakeFiles/models.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=63,64,65,66,67,68,69,70 "Built target models"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=62,63,64,65,66,67,68,69,70 "Built target models"
 .PHONY : src/turbomind/models/CMakeFiles/models.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/models/CMakeFiles/models.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 60
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 63
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/models/CMakeFiles/models.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/models/CMakeFiles/models.dir/rule
@@ -3304,7 +3307,7 @@ models: src/turbomind/models/CMakeFiles/models.dir/rule
 # codegen rule for target.
 src/turbomind/models/CMakeFiles/models.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/models/CMakeFiles/models.dir/build.make src/turbomind/models/CMakeFiles/models.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=63,64,65,66,67,68,69,70 "Finished codegen for target models"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=62,63,64,65,66,67,68,69,70 "Finished codegen for target models"
 .PHONY : src/turbomind/models/CMakeFiles/models.dir/codegen
 
 # clean rule for target.
@@ -3322,12 +3325,12 @@ src/turbomind/engine/CMakeFiles/engine.dir/all: src/turbomind/utils/CMakeFiles/c
 src/turbomind/engine/CMakeFiles/engine.dir/all: src/turbomind/core/CMakeFiles/core.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/engine/CMakeFiles/engine.dir/build.make src/turbomind/engine/CMakeFiles/engine.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/engine/CMakeFiles/engine.dir/build.make src/turbomind/engine/CMakeFiles/engine.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=28,29,30 "Built target engine"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=28,29 "Built target engine"
 .PHONY : src/turbomind/engine/CMakeFiles/engine.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/engine/CMakeFiles/engine.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 14
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 15
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/engine/CMakeFiles/engine.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/engine/CMakeFiles/engine.dir/rule
@@ -3339,7 +3342,7 @@ engine: src/turbomind/engine/CMakeFiles/engine.dir/rule
 # codegen rule for target.
 src/turbomind/engine/CMakeFiles/engine.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/engine/CMakeFiles/engine.dir/build.make src/turbomind/engine/CMakeFiles/engine.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=28,29,30 "Finished codegen for target engine"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=28,29 "Finished codegen for target engine"
 .PHONY : src/turbomind/engine/CMakeFiles/engine.dir/codegen
 
 # clean rule for target.
@@ -3394,7 +3397,7 @@ src/turbomind/python/CMakeFiles/_turbomind.dir/all: src/turbomind/engine/CMakeFi
 
 # Build rule for subdir invocation for target.
 src/turbomind/python/CMakeFiles/_turbomind.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 82
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 85
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/python/CMakeFiles/_turbomind.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/python/CMakeFiles/_turbomind.dir/rule
@@ -3429,7 +3432,7 @@ src/turbomind/python/CMakeFiles/_xgrammar.dir/all: src/turbomind/core/CMakeFiles
 
 # Build rule for subdir invocation for target.
 src/turbomind/python/CMakeFiles/_xgrammar.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 12
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 14
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/python/CMakeFiles/_xgrammar.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/python/CMakeFiles/_xgrammar.dir/rule
@@ -3492,12 +3495,12 @@ src/turbomind/capi/CMakeFiles/turbomind_c.dir/all: src/turbomind/models/CMakeFil
 src/turbomind/capi/CMakeFiles/turbomind_c.dir/all: src/turbomind/engine/CMakeFiles/engine.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/turbomind_c.dir/build.make src/turbomind/capi/CMakeFiles/turbomind_c.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/turbomind_c.dir/build.make src/turbomind/capi/CMakeFiles/turbomind_c.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=80 "Built target turbomind_c"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Built target turbomind_c"
 .PHONY : src/turbomind/capi/CMakeFiles/turbomind_c.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/capi/CMakeFiles/turbomind_c.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 84
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 86
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/capi/CMakeFiles/turbomind_c.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
 .PHONY : src/turbomind/capi/CMakeFiles/turbomind_c.dir/rule
@@ -3509,13 +3512,82 @@ turbomind_c: src/turbomind/capi/CMakeFiles/turbomind_c.dir/rule
 # codegen rule for target.
 src/turbomind/capi/CMakeFiles/turbomind_c.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/turbomind_c.dir/build.make src/turbomind/capi/CMakeFiles/turbomind_c.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num=80 "Finished codegen for target turbomind_c"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Finished codegen for target turbomind_c"
 .PHONY : src/turbomind/capi/CMakeFiles/turbomind_c.dir/codegen
 
 # clean rule for target.
 src/turbomind/capi/CMakeFiles/turbomind_c.dir/clean:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/turbomind_c.dir/build.make src/turbomind/capi/CMakeFiles/turbomind_c.dir/clean
 .PHONY : src/turbomind/capi/CMakeFiles/turbomind_c.dir/clean
+
+#=============================================================================
+# Target rules for target src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir
+
+# All Build rule for target.
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: _deps/fmt-build/CMakeFiles/fmt.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: _deps/xgrammar-build/CMakeFiles/xgrammar.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/CMakeFiles/turbomind.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/utils/CMakeFiles/cuda_utils.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/utils/CMakeFiles/nvtx_utils.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/utils/CMakeFiles/memory_utils.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/utils/CMakeFiles/anomaly_handler.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/utils/CMakeFiles/parser.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/utils/CMakeFiles/weight_serializer.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/core/CMakeFiles/core.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/stop_criteria.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/activation_kernels.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/activation.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/attention/CMakeFiles/attention.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/comm/CMakeFiles/host_comm.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/comm/CMakeFiles/device_comm.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: _deps/gloo-build/gloo/CMakeFiles/gloo.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/generation/CMakeFiles/guided_decoding.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/generation/CMakeFiles/generation.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/models/CMakeFiles/models.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/engine/CMakeFiles/engine.dir/all
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/capi/CMakeFiles/turbomind_c.dir/all
+	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/depend
+	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Built target test_initfrompath_stepby"
+.PHONY : src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all
+
+# Build rule for subdir invocation for target.
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 86
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles 0
+.PHONY : src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/rule
+
+# Convenience name for target.
+test_initfrompath_stepby: src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/rule
+.PHONY : test_initfrompath_stepby
+
+# codegen rule for target.
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/CMakeFiles --progress-num= "Finished codegen for target test_initfrompath_stepby"
+.PHONY : src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/codegen
+
+# clean rule for target.
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/clean:
+	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/clean
+.PHONY : src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

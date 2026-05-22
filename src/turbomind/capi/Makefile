@@ -196,6 +196,44 @@ turbomind_c/fast:
 	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/turbomind_c.dir/build.make src/turbomind/capi/CMakeFiles/turbomind_c.dir/build
 .PHONY : turbomind_c/fast
 
+# Convenience name for target.
+src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/rule:
+	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/rule
+.PHONY : src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/rule
+
+# Convenience name for target.
+test_initfrompath_stepby: src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/rule
+.PHONY : test_initfrompath_stepby
+
+# fast build rule for target.
+test_initfrompath_stepby/fast:
+	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build
+.PHONY : test_initfrompath_stepby/fast
+
+test_initfrompath_stepby.o: test_initfrompath_stepby.cc.o
+.PHONY : test_initfrompath_stepby.o
+
+# target to build an object file
+test_initfrompath_stepby.cc.o:
+	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/test_initfrompath_stepby.cc.o
+.PHONY : test_initfrompath_stepby.cc.o
+
+test_initfrompath_stepby.i: test_initfrompath_stepby.cc.i
+.PHONY : test_initfrompath_stepby.i
+
+# target to preprocess a source file
+test_initfrompath_stepby.cc.i:
+	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/test_initfrompath_stepby.cc.i
+.PHONY : test_initfrompath_stepby.cc.i
+
+test_initfrompath_stepby.s: test_initfrompath_stepby.cc.s
+.PHONY : test_initfrompath_stepby.s
+
+# target to generate assembly for a file
+test_initfrompath_stepby.cc.s:
+	cd /mnt/eaget-4tb/data/llm_server/lmdeploy && $(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/test_initfrompath_stepby.cc.s
+.PHONY : test_initfrompath_stepby.cc.s
+
 turbomind_c.o: turbomind_c.cc.o
 .PHONY : turbomind_c.o
 
@@ -234,7 +272,11 @@ help:
 	@echo "... package"
 	@echo "... package_source"
 	@echo "... rebuild_cache"
+	@echo "... test_initfrompath_stepby"
 	@echo "... turbomind_c"
+	@echo "... test_initfrompath_stepby.o"
+	@echo "... test_initfrompath_stepby.i"
+	@echo "... test_initfrompath_stepby.s"
 	@echo "... turbomind_c.o"
 	@echo "... turbomind_c.i"
 	@echo "... turbomind_c.s"

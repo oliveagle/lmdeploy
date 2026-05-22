@@ -1,1 +1,1 @@
-  -L"/usr/local/cuda-12.5/targets/x86_64-linux/lib/stubs"  -L"/usr/local/cuda-12.5/targets/x86_64-linux/lib"  ../../../lib/libguided_decoding.a  "../../../_deps/xgrammar-build/libxgrammar.a" -ldl "/usr/lib/x86_64-linux-gnu/librt.a" "../../../_deps/fmt-build/libfmtd.a" -lcudadevrt -lcudart 
+  -L"/usr/local/cuda-12.5/targets/x86_64-linux/lib/stubs"  -L"/usr/local/cuda-12.5/targets/x86_64-linux/lib"  ../../../lib/libguided_decoding.a  "../../../_deps/xgrammar-build/libxgrammar.a" -ldl "/usr/lib/x86_64-linux-gnu/librt.a" "../../../_deps/fmt-build/libfmt.a" -lcudadevrt -lcudart 
