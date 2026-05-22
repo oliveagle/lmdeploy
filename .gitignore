@@ -92,3 +92,36 @@ CLAUDE.local.md
 
 # bv (beads viewer) local config and caches
 .bv/
+
+# CMake build artifacts
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+cmake/
+build/
+_deps/
+
+# Build artifacts in sub-projects
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/Makefile
+**/cmake/
+**/build/
+**/_deps/
+lmdeploy-rust-server/CMakeFiles/
+lmdeploy-rust-server/CMakeCache.txt
+lmdeploy-rust-server/cmake_install.cmake
+lmdeploy-rust-server/Makefile
+lmdeploy-rust-server/_deps/
+lmdeploy-rust-server/build/
+lmdeploy-moonbit-server/CMakeFiles/
+lmdeploy-moonbit-server/CMakeCache.txt
+lmdeploy-moonbit-server/cmake_install.cmake
+lmdeploy-moonbit-server/Makefile
+lmdeploy-moonbit-server/_deps/
+lmdeploy-moonbit-server/build/
+
+# ralph-tui session state
+.ralph-tui/
