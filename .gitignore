@@ -118,3 +118,10 @@ lmdeploy-rust-server/_deps/
 lmdeploy-rust-server/build/
 # ralph-tui session state
 .ralph-tui/
+
+# Rust build artifacts
+**/target/
+*.rlib
+*.rmeta
+*.d
+**/*.d
