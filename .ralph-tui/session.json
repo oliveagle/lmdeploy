@@ -3,7 +3,7 @@
   "sessionId": "2047db2d-89c9-438f-bded-4357981a3d52",
   "status": "running",
   "startedAt": "2026-05-22T13:56:55.053Z",
-  "updatedAt": "2026-05-22T15:10:41.907Z",
+  "updatedAt": "2026-05-22T15:35:47.551Z",
   "currentIteration": 4,
   "maxIterations": 50,
   "tasksCompleted": 3,
@@ -553,8 +553,7 @@
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
   "activeTaskIds": [
-    "lmdeploy-6gm",
-    "lmdeploy-tox"
+    "lmdeploy-6gm"
   ],
   "subagentPanelVisible": false
 }

@@ -7,6 +7,12 @@ after each iteration and it is included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
+- C++ 引擎通过 `GenerationConfig::output_last_hidden_state` 控制隐藏状态输出：`0` = 无，`1` = 全部token（kAll），`2` = 仅生成token（kGeneration，只返回最后一个token的隐藏状态）
+- `output_last_hidden_state=kAll` 与 prefix_caching 不兼容，引擎会跳过这类请求并报错（见 `engine.cc:316`）
+- Embedding 实现策略：对输入文本进行 forward pass，设置 `max_new_tokens=1` + `output_last_hidden_state=2`，从 `last_hidden_state` 输出张量提取最后一个token的向量，按 `dimensions` 参数截断
+- `parse_hidden_size` 函数解析 `config.json` 时，需要处理嵌套配置（`text_config` 或 `model_config` 内）
+- `spawn_blocking` 中使用的数据必须是 `'static` 生命周期，需要通过 `Arc::clone` 克隆 pool 引用
+
 - `TM_TurboMind_InitFromHF` 纯 C++ 实现：当函数签名与 InitFromPath 功能相同时，直接委托调用 `TM_TurboMind_InitFromPath`，避免重复代码
 - Rust FFI 签名必须严格匹配 C 头文件声明。`init_from_hf` 的签名从 `output_dir: &str` 改为 `trust_remote_code: bool, session_len: c_int`
 
@@ -60,3 +66,26 @@ after each iteration and it is included in prompts for context.
 
 ---
 
+## [2026-05-22] - lmdeploy-tox
+- 实现 C++ Engine Embeddings API，通过 `output_last_hidden_state` 获取文本嵌入向量
+- **Files changed**:
+  - `lmdeploy-rust-server/src/model/cpp_engine.rs`:
+    - 新增 `hidden_size` 字段到 `TurboMindCEngine` 和 `ModelInfo`
+    - 新增 `parse_hidden_size()` 函数从 config.json 解析 hidden_size
+    - 实现 `TurboMindCEngine::embed()` 方法，使用 `output_last_hidden_state=2` 获取最后一个token的隐藏状态
+    - 添加 `TM_SessionParam` 到 imports
+  - `lmdeploy-rust-server/src/model/manager.rs`:
+    - 更新 `ModelInfo` 初始化包含 `hidden_size` 字段
+- **API 行为**:
+  - 输入：`text: &str, dimensions: Option<usize>`
+  - 输出：`Vec<f32>` - 文本的嵌入向量，默认长度为模型的 hidden_size，可按 dimensions 参数截断
+  - 使用 `spawn_blocking` 在阻塞任务中运行 FFI 调用
+  - 设置 `max_new_tokens=1`, `temperature=0.0`, `output_last_hidden_state=2`（kGeneration = 最后一个token）
+  - 从 `last_hidden_state` 输出张量提取嵌入向量
+- **Learnings:**
+  - `output_last_hidden_state` 的值：`0`=无，`1`=全部tokens，`2`=仅最后一个token（kGeneration）
+  - `spawn_blocking` 要求闭包捕获的数据是 `'static` 生命周期，需要 `Arc::clone` pool
+  - config.json 中 hidden_size 可能在嵌套结构中（`text_config` 或 `model_config`）
+  - C++ 引擎的 last_hidden_state 输出形状：单token为 `[hidden_dim]`，多token为 `[N, hidden_dim]`
+
+---

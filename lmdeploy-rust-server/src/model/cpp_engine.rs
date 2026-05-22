@@ -17,7 +17,7 @@ use std::time::Instant;
 use crate::error::{AppError, Result};
 use crate::tokenizer::LMTokenizer;
 use crate::turbomind_c::{
-    EngineConfig, GenConfig, ModelRequest, ScheduleMetrics, TensorMap, TurboMind,
+    EngineConfig, GenConfig, ModelRequest, ScheduleMetrics, TensorMap, TM_SessionParam, TurboMind,
 };
 
 /// Default number of concurrent inference requests
@@ -115,12 +115,11 @@ fn parse_hidden_size(model_path: &std::path::Path) -> usize {
                 .ok()
                 .and_then(|v| {
                     // Handle nested configs (text_config, model_config)
-                    let hidden = v.get("text_config")
+                    let config = v.get("text_config")
                         .or_else(|| v.get("model_config"))
-                        .or_else(|| v.as_object())
-                        .and_then(|c| c.get("hidden_size"));
+                        .unwrap_or(&v);
 
-                    hidden.and_then(|h| h.as_u64()).map(|u| u as usize)
+                    config.get("hidden_size").and_then(|h| h.as_u64()).map(|u| u as usize)
                 })
         })
         .unwrap_or(4096) // Default fallback
@@ -330,6 +329,7 @@ impl TurboMindCEngine {
             loaded_at: self.loaded_at,
             engine_type: self.engine_type,
             quant_policy: self.quant_policy,
+            hidden_size: Some(self.hidden_size),
         }
     }
 
@@ -427,7 +427,6 @@ impl TurboMindCEngine {
         gen_cfg.set_top_k(50);
 
         // Prepare session parameters (use unique ID for each request)
-        use crate::turbomind_c::TM_SessionParam;
         let session = TM_SessionParam {
             id: unix_timestamp() as u64,
             step: 0,
@@ -668,10 +667,9 @@ impl TurboMindCEngine {
         let batch_size = input_ids_i64.len();
 
         // Get hidden size from model config (stored during init)
-        let hidden_size = self
-            .model_info
-            .hidden_size
-            .unwrap_or(4096); // Default fallback
+        let hidden_size = self.hidden_size;
+
+        // Default to full hidden size, truncate if dimensions requested
 
         let target_dims = dimensions.unwrap_or(hidden_size).min(hidden_size);
 
@@ -682,9 +680,9 @@ impl TurboMindCEngine {
             "embed: prepared input tensors"
         );
 
-        // Acquire a ModelRequest from the pool
+        // Acquire a ModelRequest from the pool (must clone Arc for spawn_blocking 'static)
         let pool = match &self.request_pool {
-            Some(p) => p,
+            Some(p) => Arc::clone(p),
             None => {
                 tracing::error!("Request pool not initialized");
                 return Vec::new();

@@ -211,6 +211,7 @@ impl ModelManager {
                         loaded_at: i.loaded_at,
                         engine_type: i.engine_type,
                         quant_policy: i.quant_policy,
+                        hidden_size: i.hidden_size,
                     }
                 }
             };
@@ -233,6 +234,7 @@ impl ModelManager {
                     loaded_at: i.loaded_at,
                     engine_type: i.engine_type,
                     quant_policy: i.quant_policy,
+                    hidden_size: i.hidden_size,
                 }
             }
         };
