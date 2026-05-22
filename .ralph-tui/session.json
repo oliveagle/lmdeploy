@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "sessionId": "3bcc4ab0-4868-4754-a8ff-5c88734a6d98",
+  "sessionId": "e2e9b065-81ca-4f10-b321-9c0112e471a7",
   "status": "running",
-  "startedAt": "2026-05-22T10:03:13.721Z",
-  "updatedAt": "2026-05-22T10:36:34.004Z",
-  "currentIteration": 1,
+  "startedAt": "2026-05-22T10:40:12.453Z",
+  "updatedAt": "2026-05-22T10:54:11.874Z",
+  "currentIteration": 0,
   "maxIterations": 50,
   "tasksCompleted": 0,
   "isPaused": false,
@@ -65,7 +65,7 @@
       {
         "id": "lmdeploy-h2w",
         "title": "修复 LinearWeight::param() 返回空的问题",
-        "status": "in_progress",
+        "status": "open",
         "completedInSession": false
       },
       {
@@ -83,7 +83,7 @@
       {
         "id": "lmdeploy-gg4",
         "title": "修复 safetensors 权重路径映射 - 添加 mtp.layers.* 别名支持",
-        "status": "open",
+        "status": "completed",
         "completedInSession": false
       },
       {
@@ -95,7 +95,7 @@
       {
         "id": "lmdeploy-4rt",
         "title": "修复权重加载路径映射",
-        "status": "in_progress",
+        "status": "open",
         "completedInSession": false
       },
       {
@@ -179,7 +179,7 @@
       {
         "id": "lmdeploy-64a",
         "title": "安装 NCCL 运行时库以支持 C++ 引擎",
-        "status": "in_progress",
+        "status": "completed",
         "completedInSession": false
       },
       {
@@ -472,22 +472,9 @@
       }
     ]
   },
-  "iterations": [
-    {
-      "iteration": 1,
-      "status": "completed",
-      "taskId": "lmdeploy-85l",
-      "taskTitle": "分析 C++ 引擎 AWQ 加载失败根因",
-      "taskCompleted": false,
-      "durationMs": 1233950,
-      "startedAt": "2026-05-22T10:03:13.927Z",
-      "endedAt": "2026-05-22T10:23:47.877Z"
-    }
-  ],
+  "iterations": [],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
-  "activeTaskIds": [
-    "lmdeploy-85l"
-  ],
+  "activeTaskIds": [],
   "subagentPanelVisible": false
 }

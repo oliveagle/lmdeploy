@@ -318,6 +318,10 @@ TM_TurboMind* TM_TurboMind_Create(const char* model_dir, TM_EngineConfig* config
     }
 
     try {
+        fprintf(stderr, "[C-API] TM_TurboMind_Create: config.data_type=%d (expect kHalf=%d or kBfloat16=%d)\n",
+                (int)config->config.data_type, (int)turbomind::DataType::kHalf, (int)turbomind::DataType::kBfloat16);
+        fflush(stderr);
+
         auto* tm = new TM_TurboMind{};
 
         // Create a simple GIL factory (no-op for C API)
@@ -327,6 +331,9 @@ TM_TurboMind* TM_TurboMind_Create(const char* model_dir, TM_EngineConfig* config
             model_dir,
             std::move(config->config),
             std::move(gil_factory));
+
+        fprintf(stderr, "[C-API] TM_TurboMind_Create: instance created successfully\n");
+        fflush(stderr);
 
         return tm;
     }
