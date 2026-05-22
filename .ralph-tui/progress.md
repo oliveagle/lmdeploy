@@ -1,90 +1,175 @@
 # Ralph Progress Log
 
 This file tracks progress across iterations. Agents update this file
-after each iteration and it's included in prompts for context.
+after each iteration and it is included in prompts for context.
 
 ## Codebase Patterns (Study These First)
 
-- **E2E test structure**: Multi-layered test structure: `tests/` (CPU-only unit/integration tests), `examples/` (GPU e2e tests), `bin/` (quick binary tests), Python integration tests
-- **Test layering principle**: CPU-only tests in `tests/` for quick feedback; GPU tests in `examples/` and `bin/` require model paths
-- **C API integration pattern**: All C++ engine tests follow: `EngineConfig` → `TurboMind` → `ModelRequest` → `TensorMap` → inference
-- **Phase-based test design**: All e2e tests use phase-based logging ([Phase 1], [Phase 2], etc.)
-- **Module tree uses X-macros**: All module types (ModelWeight, DecoderLayerWeight, AttentionWeight, etc.) use `TM_MODULE_DECLARE` / `TM_MODULE_METHODS` X-macro pattern for declaring children and params. Children are `unique_ptr<T>`, params are `core::Tensor`. Key file: `src/turbomind/core/module.h`.
-- **Builder pattern for module creation**: Python builders (TextModelBuilder, DecoderLayerBuilder, etc.) in `lmdeploy/turbomind/builders/` coordinate C++ module creation via `create_module(Config)`, then commit tensors via `add_*` methods.
-- **ModelWeight root children**: `output` (LinearWeight), `norm` (NormWeight), `layers` (ModuleList<DecoderLayerWeight>), plus `tok_embeddings` param. Defined in `MODEL_WEIGHT_CHILDREN` / `MODEL_WEIGHT_PARAMS` macros.
-- **ModuleList is the only container**: All repeated modules (layers, experts) go through `ModuleList`, which maintains both named and indexed access.
-- **AttentionWeight uses fused QKV (w_qkv)**: Python `AttentionBuilder.add_qkv_proj()` fuses separate q/k/v weights into a single `w_qkv` child. C++ must create `w_qkv` instead of separate `q_proj`/`k_proj`/`v_proj`. The fused shape is `[q_out + k_out + v_out, hidden]`. HF stores separate weights with `[hidden, out]` shape that need transposition during fusion.
-- **byte_size function**: Use `turbomind::byte_size(dtype)` (not `DataTypeSize`) to get element byte size. Defined in `src/turbomind/core/data_type.h`.
+*Add reusable patterns discovered during development here.*
+
+### Safetensors Weight Path Mapping (`MapHuggingFaceWeightToTurboMind`)
+
+There are **two copies** of `turbomind_c.cc`:
+1. `src/turbomind/capi/turbomind_c.cc` — main C++ library (canonical, most complete)
+2. `lmdeploy-rust-server/src/turbomind/capi/turbomind_c.cc` — Rust server copy (may lag behind)
+
+Always check both copies when modifying weight mapping logic.
+
+**MTP (Multi-Token Prediction) mapping pattern**: `mtp.layers.X.*` → `layers.X.*` (alias, share weights with main model)
+- Strip `mtp.` prefix, skip MTP-specific params (`mtp.norm`, `mtp.fc`, `mtp.pre_fc_norm_*`)
+- Keep `layers.` path and apply standard mappings
 
 ---
 
-## 2026-05-22 - lmdeploy-zk3
-- Verified complete e2e test infrastructure for pure Rust+C++ inference
-- **Files checked**:
-  - `tests/e2e_test.rs`: Rust unit/integration tests (CPU-only, no GPU)
-  - `examples/e2e_test.rs`: Full GPU e2e test with C++ engine
-  - `tests/e2e_integration.py`: Python integration tests (tokenizer, config)
-  - `bin/cpp_engine_test.rs`: Quick C++ engine test binary
-- **Test coverage**:
-  - Tokenizer loading and encode/decode roundtrip
-  - Model config parsing (AWQ detection)
-  - Engine type selection (PythonBridge vs PureCpp)
-  - ModelState transitions
-  - Full C++ engine initialization (TurboMind)
-- **Verification**: All tests compile with `cargo build`
-- **Learnings**:
-  - Test files follow phase-based logging pattern for easy debugging
-  - CPU-only tests are prioritized in `tests/` directory for quick feedback
-  - GPU tests live in `examples/` and `bin/` which require model paths
+## [2026-05-22] - lmdeploy-85l
 
+### What was implemented
+- 分析了 C++ 引擎 AWQ 加载失败的根因
+- 定位了 `turbomind.cc:152` 的 data_type 检查逻辑
+- 理解了 InitFromPath 权重加载流程
+- 确认了 AWQ 权重格式与 C++ 引擎期望格式的差异
+
+### Files analyzed
+- `src/turbomind/turbomind.cc` - TurboMind::Impl 构造函数中的 data_type 检查
+- `src/turbomind/engine/engine_config.h` - EngineConfig 结构定义
+- `src/turbomind/core/data_type.h` - DataType 枚举定义
+- `src/turbomind/capi/turbomind_c.cc` - C API 实现
+- `lmdeploy-rust-server/src/model/cpp_engine.rs` - Rust C++ 引擎封装
+
+### Learnings
+
+#### 1. data_type 检查逻辑 (turbomind.cc:152)
+
+```cpp
+TurboMind::Impl::Impl(string model_dir, EngineConfig config, FFICtxFactory ffi_ctx_factory):
+    data_type_{}, engine_param_{}, ffi_ctx_factory_{ffi_ctx_factory}
+{
+    data_type_ = config.data_type;
+    TM_CHECK(data_type_ == kBfloat16 || data_type_ == kHalf);
+    // ...
+}
+```
+
+**关键发现**：
+- `data_type_` 是**激活/计算数据类型**，不是权重数据类型
+- 检查只允许 `kBfloat16` (67591) 或 `kHalf` (66826)
+- `kHalf` 是 `kFloat16` 的别名，值相同
+
+#### 2. 数据类型编码系统
+
+```cpp
+// encode_data_type(sign, exponent, mantissa)
+kFloat16  = (1 << 16) | (5 << 8) | 10 = 66826
+kBfloat16 = (1 << 16) | (8 << 8) | 7  = 67591
+kUint4    = (0 << 16) | (0 << 8) | 4  = 4
+```
+
+C API 到 C++ 的转换：
+```cpp
+// C API
+TM_DATATYPE_FP16 = 10
+TM_DATATYPE_BF16 = 13
+
+// FromCDataType 转换
+case TM_DATATYPE_FP16: return DT::kFloat16;  // 10 -> 66826
+case TM_DATATYPE_BF16: return DT::kBfloat16; // 13 -> 67591
+```
+
+#### 3. AWQ 权重格式 vs 引擎期望
+
+| 概念 | 数据类型 | 说明 |
+|------|----------|------|
+| **激活 dtype** | kHalf/kBfloat16 | GEMM 计算的数据类型 |
+| **权重 dtype** | kUint4 (AWQ) | AWQ 量化权重存储格式 |
+| **Scale dtype** | kHalf/kBfloat16 | AWQ 量化系数 |
+
+**关键理解**：AWQ 模型的权重是 `kUint4` 格式，但：
+1. 引擎的 `data_type_` (激活 dtype) 必须是 `kHalf` 或 `kBfloat16`
+2. 权重的 `kUint4` 格式通过 `LinearWeight.format` 单独处理
+3. Rust 代码正确设置了 `TM_DATATYPE_FP16` -> `kHalf`，检查应该通过
+
+#### 4. InitFromPath 流程
+
+```
+TM_TurboMind_InitFromPath (turbomind_c.cc:1571)
+├── CreateContext(index)        // 创建 CUDA 上下文
+├── CreateRoot(index)           // 创建 ModelRoot sentinel
+├── ParseHfConfig()             // 解析 HuggingFace config.json
+├── Build ModelWeight tree      // 构建完整权重模块树
+│   ├── tok_embeddings (Param)
+│   ├── norm (NormWeight)
+│   ├── layers (ModuleList)
+│   │   └── decoder_layer (DecoderLayerWeight)
+│   │       ├── attention_norm (NormWeight)
+│   │       ├── attention (AttentionWeight)
+│   │       │   └── w_qkv/w_o (LinearWeight, AWQ format)
+│   │       └── ffn_norm + feed_forward (FfnWeight)
+│   │           └── w1/w2/w3 (LinearWeight, AWQ format)
+│   └── output (LinearWeight)
+├── LoadWeightsFromSafetensors() // 加载权重数据
+├── ProcessWeights(index)       // GPU 转移 + prepare()
+└── CreateEngine(index)         // 创建推理引擎
+```
+
+#### 5. Rust C++ 引擎配置 (cpp_engine.rs)
+
+```rust
+// 正确：data_type 设置为 FP16（激活 dtype）
+engine_config.set_data_type(TM_DataType::TM_DATATYPE_FP16);
+
+// AWQ 检测和 quant_policy 设置
+let is_awq = detect_awq_quantization(&model_path_obj);
+let quant_policy = if is_awq { 4 } else { 0 };
+engine_config.set_quant_policy(quant_policy);
+```
+
+**配置正确性**：
+- ✅ `data_type` = FP16 (激活 dtype)
+- ✅ `quant_policy` = 4 (AWQ)
+- ✅ 权重的 AWQ 格式通过 `LinearConfig.format` 处理
+
+### 结论
+
+**data_type 检查失败的可能原因**：
+
+1. **配置未正确传递** - `config.data_type` 在传递给构造函数前被修改或未初始化
+2. **ABI 不匹配** - 编译的 `libturbomind_c.so` 与头文件定义不一致
+3. **内存损坏** - `EngineConfig` 对象在传递过程中被破坏
+4. **默认值问题** - `EngineConfig` 的默认 `data_type` 可能不是 `kHalf`
+
+**推荐修复方向**：
+
+1. **验证配置传递** - 在 `TM_EngineConfig_SetDataType` 中添加日志，确认 `data_type` 被正确设置
+2. **检查编译一致性** - 确保 `libturbomind_c.so` 是从当前源码重新编译的
 ---
 
-## 2026-05-22 - lmdeploy-5wx
-- Analyzed ModelWeight complete module tree structure
-- Documented full hierarchy: ModelWeight → layers[] → DecoderLayerWeight → {attention_norm, attention, ffn_norm, feed_forward/moe_ffn}
-- Identified 5 missing steps in C API: module tree creation, tensor slot allocation, weight data loading, prepare(), verify()
-- Created model_weight_tree.md with structure diagram and reference file list
-- **Files changed**: `.ralph-tui/model_weight_tree.md` (created)
-- **Learnings:**
-  - Module tree uses X-macros (TM_MODULE_DECLARE / TM_MODULE_METHODS) - all modules follow same pattern
-  - Python builders coordinate C++ module creation - C API needs to replicate this flow
-  - ModuleList is the single container for all repeated modules (layers, experts)
-  - ModelWeight derives data_type, hidden_units, vocab_size from children in prepare()
----
+## [2026-05-22] - lmdeploy-gg4
 
-## 2026-05-22 - lmdeploy-85l
-- Analyzed C++ engine AWQ loading failure: `TM][FATAL] Check failed: data_type_ == kBfloat16 || data_type_ == kHalf`
-- **Root cause identified**: `EngineConfig::data_type` field had no default value, zero-initializing to `kNull` (0) instead of `kHalf` (66826)
-- **Key findings**:
-  - `ENGINE_FIELDS(X)` macro in `engine_config.h` line 15: `X(DataType, data_type)` - no default specified
-  - `TM_MEMBER(Type, name, ...)` expands to `Type name{__VA_ARGS__}` → `Type name{}` when empty → zero initialization
-  - `DataType::kNull = 0` is neither `kBfloat16` (67591) nor `kHalf` (66826), causing check failure
-  - C API enum `TM_DATATYPE_FP16` (10) correctly converts to C++ `kFloat16` (66826) via `FromCDataType`
-  - `kHalf = kFloat16` by definition, so conversion was correct but default was missing
-- **Files changed**:
-  - `src/turbomind/engine/engine_config.h`: Added `kHalf` default to `data_type` field
-  - `src/turbomind/capi/turbomind_c.cc`: Removed redundant explicit assignment (now uses default)
-- **Learnings**:
-  - X-macro fields without defaults become zero-initialized, not undefined
-  - C++ `DataType` uses encoded values (sign<<16 | exponent<<8 | mantissa), not sequential integers
-  - C API `TM_DataType` uses sequential integers (0, 1, 2, ...) - must convert via `FromCDataType`
-  - `kHalf = kFloat16` alias means both names refer to same encoded value (66826)
-  - AWQ weights use `kUint4` storage but compute in `kHalf` - data_type is activation dtype, not weight dtype
----
+### What was implemented
+- Added `mtp.layers.*` alias support to Rust server's `turbomind_c.cc`
+- Fixed QKV projection mapping (`.q_proj/.k_proj/.v_proj` → `.w_qkv` for fusion)
+- Added MoE mappings (`.mlp.experts.` → `.moe_ffn.experts.`, `.mlp.gate.` → `.moe_ffn.gate.`)
+- Added DeltaNet mappings (`.self_attn.in_proj.*` → `.linear_attn.in_proj_*`)
+- Simplified code using single `size_t pos` variable
 
-## 2026-05-22 - lmdeploy-4rt
-- Fixed weight loading path mapping: HF q_proj/k_proj/v_proj → TM fused w_qkv
-- **Files changed**:
-  - `src/turbomind/capi/turbomind_c.cc`:
-    - Changed `InitFromPath` to create `w_qkv` (fused QKV) instead of separate `q_proj`, `k_proj`, `v_proj`
-    - Updated `MapHuggingFaceWeightToTurboMind` to map `.q_proj.`, `.k_proj.`, `.v_proj.` to `.w_qkv.`
-    - Added QKV fusion logic in `LoadWeightsFromSafetensors` to accumulate Q/K/V tensors and fuse them
-    - Fixed data type references (use `turbomind::DataType` and `turbomind::byte_size`)
-- **Learnings**:
-  - Python `AttentionBuilder.add_qkv_proj()` fuses separate q/k/v into single `w_qkv` child
-  - `AttentionWeight` class defines `w_qkv` (fused), not separate `k_proj`/`v_proj` children
-  - Fused shape: `[q_out + k_out + v_out, hidden]`, where HF stores `[hidden, out]` each
-  - QKV fusion requires transpose during concatenation (HF column-major → TM row-major)
-  - Must accumulate all 3 tensors before allocating fused GPU memory
+### Files changed
+- `lmdeploy-rust-server/src/turbomind/capi/turbomind_c.cc` — Added MTP support and aligned with main `src/turbomind/capi/turbomind_c.cc`
+
+### Learnings
+
+#### 1. Dual `turbomind_c.cc` copies
+There are two copies of the C API file:
+- `src/turbomind/capi/turbomind_c.cc` — canonical version
+- `lmdeploy-rust-server/src/turbomind/capi/turbomind_c.cc` — Rust server copy (may lag)
+
+#### 2. MTP weight mapping pattern
+- `mtp.layers.X.*` → `layers.X.*` (alias to main model layers)
+- Skip MTP-specific params (`mtp.norm`, `mtp.fc`, `mtp.pre_fc_norm_*`) since C++ engine has no mtp module
+
+#### 3. QKV fusion mapping
+HF stores separate Q/K/V, TM uses fused `w_qkv`:
+- `.q_proj.` → `.w_qkv.`
+- `.k_proj.` → `.w_qkv.`
+- `.v_proj.` → `.w_qkv.`
 
 ---

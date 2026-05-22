@@ -476,7 +476,23 @@ static HfModelConfig ParseHfConfig(const std::string& model_dir)
     config.num_experts_per_tok = get_int("num_experts_per_tok", 0);
 
     // DeltaNet / Linear Attention
+    // Check for use_linear_attn boolean flag (older models)
     config.use_linear_attn = get_bool("use_linear_attn", false);
+
+    // For Qwen3.5+, check if layer_types array contains "linear_attention"
+    if (!config.use_linear_attn) {
+        auto layer_types_val = config_source.get("layer_types");
+        if (layer_types_val.is_array() && layer_types_val.size() > 0) {
+            // Check if any layer uses "linear_attention"
+            for (size_t i = 0; i < layer_types_val.size(); ++i) {
+                auto layer_type = layer_types_val.get(i);
+                if (layer_type.is_string() && layer_type.as_string() == "linear_attention") {
+                    config.use_linear_attn = true;
+                    break;
+                }
+            }
+        }
+    }
 
     // RoPE configuration
     config.rope_dim = get_int("rope_dim", 0);
@@ -888,112 +904,173 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
         result = result.substr(0, lang_pos) + result.substr(lang_pos + 17);
     }
 
-    // Replace common patterns
-    // self_attn -> attention
-    size_t self_attn_pos = result.find(".self_attn.");
-    while (self_attn_pos != std::string::npos) {
-        result.replace(self_attn_pos, 11, ".attention.");
-        self_attn_pos = result.find(".self_attn.");
+    // ========================================================
+    // MTP (Multi-Token Prediction) paths
+    // ========================================================
+    // MTP shares weights with main model layers (mtp.layers.X.* -> layers.X.*)
+    // MTP-specific params (norm, fc, pre_fc_norm_*) are NOT supported in C++ engine
+    // since there's no mtp module - skip them by returning empty string
+    if (result.find("mtp.") == 0) {
+        // Remove mtp prefix for mapping
+        result = result.substr(4);  // Remove "mtp." prefix
+
+        // MTP-specific top-level params: mtp.norm, mtp.fc, mtp.pre_fc_norm_*
+        // Skip these since C++ engine has no mtp module
+        if (result == "norm.weight" || result == "norm") {
+            return "";  // Skip MTP-specific norm
+        }
+        if (result.find("fc.") == 0) {
+            return "";  // Skip MTP-specific fc
+        }
+        if (result.find("pre_fc_norm_") == 0) {
+            return "";  // Skip MTP-specific pre_fc_norm_*
+        }
+
+        // MTP layers share weights with main model: layers.X.*
+        // Keep "layers." in the path and apply standard mappings below
+        if (result.find("layers.") != 0) {
+            return "";  // Skip unknown MTP params that don't start with "layers."
+        }
+        // Continue with standard mappings for mtp.layers.X.* paths
     }
 
-    // mlp -> feed_forward
-    size_t mlp_pos = result.find(".mlp.");
-    while (mlp_pos != std::string::npos) {
-        result.replace(mlp_pos, 5, ".feed_forward.");
-        mlp_pos = result.find(".mlp.");
+    // Helper variable for string replacements
+    size_t pos;
+
+    // ========================================================
+    // MoE-specific mappings (must be before general mlp -> feed_forward)
+    // ========================================================
+    // Handle MoE expert paths: .mlp.experts.N.<proj> -> .moe_ffn.experts.N.<proj>
+    // This pattern matches: layers.X.mlp.experts.Y.gate_proj.weight
+    while ((pos = result.find(".mlp.experts.")) != std::string::npos) {
+        result.replace(pos, 13, ".moe_ffn.experts.");
+    }
+
+    // Handle MoE gate: .mlp.gate.weight -> .moe_ffn.gate.weight
+    // (This is the router gate, not to be confused with gate_proj)
+    // Pattern: layers.X.mlp.gate.weight -> layers.X.moe_ffn.gate.weight
+    while ((pos = result.find(".mlp.gate.")) != std::string::npos) {
+        if (result.substr(pos).find(".gate_proj.") == std::string::npos &&
+            result.find("weight", pos) < result.find(".", pos + 10)) {
+            result.replace(pos, 10, ".moe_ffn.gate.");
+        } else {
+            break;
+        }
+    }
+
+    // ========================================================
+    // DeltaNet (linear_attn) specific mappings
+    // ========================================================
+    // Map HF DeltaNet layer paths to TurboMind linear_attn paths
+    // Apply these BEFORE the general self_attn -> attention replacement
+    while ((pos = result.find(".self_attn.in_proj.qkv.")) != std::string::npos) {
+        result.replace(pos, 21, ".linear_attn.in_proj_qkv.");
+    }
+    while ((pos = result.find(".self_attn.in_proj.z.")) != std::string::npos) {
+        result.replace(pos, 20, ".linear_attn.in_proj_z.");
+    }
+    while ((pos = result.find(".self_attn.in_proj.a.")) != std::string::npos) {
+        result.replace(pos, 20, ".linear_attn.in_proj_a.");
+    }
+    while ((pos = result.find(".self_attn.in_proj.b.")) != std::string::npos) {
+        result.replace(pos, 20, ".linear_attn.in_proj_b.");
+    }
+    while ((pos = result.find(".self_attn.in_proj.weight")) != std::string::npos) {
+        result.replace(pos, 22, ".linear_attn.in_proj_all.weight");
+    }
+    while ((pos = result.find(".linear_attn.linear_out_proj.")) != std::string::npos) {
+        result.replace(pos, 29, ".linear_attn.out_proj.");
+    }
+    while ((pos = result.find(".self_attn.linear_out_proj.")) != std::string::npos) {
+        result.replace(pos, 25, ".linear_attn.out_proj.");
+    }
+
+    // DeltaNet direct parameters (conv1d, A_log, dt_bias)
+    size_t conv_pos = result.find(".linear_attn.conv1d.weight");
+    while (conv_pos != std::string::npos) {
+        result.replace(conv_pos, 20, ".linear_attn.conv1d");
+        conv_pos = result.find(".linear_attn.conv1d.weight");
+    }
+
+    // self_attn -> attention (for standard full attention layers)
+    while ((pos = result.find(".self_attn.")) != std::string::npos) {
+        result.replace(pos, 11, ".attention.");
+    }
+
+    // mlp -> feed_forward (skip if already moe_ffn)
+    while ((pos = result.find(".mlp.")) != std::string::npos) {
+        if (result.find(".moe_ffn.", pos - 5) != pos - 5) {
+            result.replace(pos, 5, ".feed_forward.");
+        } else {
+            break;
+        }
     }
 
     // input_layernorm -> attention_norm
-    size_t input_ln_pos = result.find(".input_layernorm");
-    while (input_ln_pos != std::string::npos) {
-        result.replace(input_ln_pos, 16, ".attention_norm");
-        input_ln_pos = result.find(".input_layernorm");
+    while ((pos = result.find(".input_layernorm")) != std::string::npos) {
+        result.replace(pos, 16, ".attention_norm");
     }
 
     // post_attention_layernorm -> ffn_norm
-    size_t post_ln_pos = result.find(".post_attention_layernorm");
-    while (post_ln_pos != std::string::npos) {
-        result.replace(post_ln_pos, 24, ".ffn_norm");
-        post_ln_pos = result.find(".post_attention_layernorm");
+    while ((pos = result.find(".post_attention_layernorm")) != std::string::npos) {
+        result.replace(pos, 24, ".ffn_norm");
     }
 
+    // ========================================================
     // QKV projection handling
-    // q_proj, k_proj, v_proj -> w_qkv (fused)
-    // This is complex because we need to fuse multiple tensors
-    // For now, just map individual names
-    size_t q_proj_pos = result.find(".q_proj.");
-    if (q_proj_pos != std::string::npos) {
-        result.replace(q_proj_pos, 9, ".q_proj.");
+    // HF stores separate Q/K/V weights, but TM uses a fused w_qkv weight
+    // ========================================================
+    while ((pos = result.find(".q_proj.")) != std::string::npos) {
+        result.replace(pos, 8, ".w_qkv.");
+    }
+    while ((pos = result.find(".k_proj.")) != std::string::npos) {
+        result.replace(pos, 8, ".w_qkv.");
+    }
+    while ((pos = result.find(".v_proj.")) != std::string::npos) {
+        result.replace(pos, 8, ".w_qkv.");
     }
 
-    size_t k_proj_pos = result.find(".k_proj.");
-    if (k_proj_pos != std::string::npos) {
-        result.replace(k_proj_pos, 9, ".k_proj.");
+    // o_proj -> wo
+    while ((pos = result.find(".o_proj.")) != std::string::npos) {
+        result.replace(pos, 8, ".wo.");
     }
 
-    size_t v_proj_pos = result.find(".v_proj.");
-    if (v_proj_pos != std::string::npos) {
-        result.replace(v_proj_pos, 9, ".v_proj.");
+    // FFN projections (applies to both standard FFN and MoE experts)
+    while ((pos = result.find(".gate_proj.")) != std::string::npos) {
+        result.replace(pos, 11, ".w1.");
+    }
+    while ((pos = result.find(".up_proj.")) != std::string::npos) {
+        result.replace(pos, 9, ".w3.");
+    }
+    while ((pos = result.find(".down_proj.")) != std::string::npos) {
+        result.replace(pos, 11, ".w2.");
     }
 
-    size_t o_proj_pos = result.find(".o_proj.");
-    if (o_proj_pos != std::string::npos) {
-        result.replace(o_proj_pos, 9, ".wo.");
-    }
-
-    // FFN layers
-    size_t gate_proj_pos = result.find(".gate_proj.");
-    if (gate_proj_pos != std::string::npos) {
-        result.replace(gate_proj_pos, 12, ".w1.");
-    }
-
-    size_t up_proj_pos = result.find(".up_proj.");
-    if (up_proj_pos != std::string::npos) {
-        result.replace(up_proj_pos, 9, ".w3.");
-    }
-
-    size_t down_proj_pos = result.find(".down_proj.");
-    if (down_proj_pos != std::string::npos) {
-        result.replace(down_proj_pos, 11, ".w2.");
-    }
-
-    // AWQ quantization parameters
+    // AWQ quantization parameters (must be last so .weight suffix is already established)
     // qweight -> weight (AWQ 4-bit packed weight)
-    size_t qweight_pos = result.find(".qweight");
-    while (qweight_pos != std::string::npos) {
-        result.replace(qweight_pos, 8, ".weight");
-        qweight_pos = result.find(".qweight");
+    while ((pos = result.find(".qweight")) != std::string::npos) {
+        result.replace(pos, 8, ".weight");
     }
 
     // qzeros -> zeros (AWQ quantized zero points)
-    size_t qzeros_pos = result.find(".qzeros");
-    while (qzeros_pos != std::string::npos) {
-        result.replace(qzeros_pos, 7, ".zeros");
-        qzeros_pos = result.find(".qzeros");
+    while ((pos = result.find(".qzeros")) != std::string::npos) {
+        result.replace(pos, 7, ".zeros");
     }
 
     // weight_scale -> scales, weight_zero -> zeros (legacy naming)
-    size_t scale_pos = result.find(".weight_scale");
-    while (scale_pos != std::string::npos) {
-        result.replace(scale_pos, 13, ".scales");
-        scale_pos = result.find(".weight_scale");
+    while ((pos = result.find(".weight_scale")) != std::string::npos) {
+        result.replace(pos, 13, ".scales");
     }
-
-    size_t zero_pos = result.find(".weight_zero");
-    while (zero_pos != std::string::npos) {
-        result.replace(zero_pos, 12, ".zeros");
-        zero_pos = result.find(".weight_zero");
+    while ((pos = result.find(".weight_zero")) != std::string::npos) {
+        result.replace(pos, 12, ".zeros");
     }
 
     // Embeddings
-    size_t embed_pos = result.find(".embed_tokens.");
-    if (embed_pos != std::string::npos) {
-        result.replace(embed_pos, 14, ".tok_embeddings.");
+    if ((pos = result.find(".embed_tokens.")) != std::string::npos) {
+        result.replace(pos, 14, ".tok_embeddings.");
     }
-
-    size_t lm_head_pos = result.find(".lm_head.");
-    if (lm_head_pos != std::string::npos) {
-        result.replace(lm_head_pos, 9, ".output.");
+    if ((pos = result.find(".lm_head.")) != std::string::npos) {
+        result.replace(pos, 9, ".output.");
     }
 
     return result;

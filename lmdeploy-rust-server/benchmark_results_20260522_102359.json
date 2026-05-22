@@ -1,0 +1,142 @@
+{
+  "all_results": [
+    {
+      "context_length": 921,
+      "decode_speed_tps": 58.24607618487846,
+      "decode_time_ms": 8790.29169921875,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 244.47425336192148,
+      "prefill_time_ms": 3767.26787109375,
+      "total_time_ms": 12557.5595703125,
+      "ttft_ms": 1506.9071484375
+    },
+    {
+      "context_length": 921,
+      "decode_speed_tps": 58.288640369057035,
+      "decode_time_ms": 8783.87275390625,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 244.6529065490304,
+      "prefill_time_ms": 3764.51689453125,
+      "total_time_ms": 12548.3896484375,
+      "ttft_ms": 1505.8067578125
+    },
+    {
+      "context_length": 921,
+      "decode_speed_tps": 58.42006510303672,
+      "decode_time_ms": 8764.112109375,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 245.20453106723815,
+      "prefill_time_ms": 3756.0480468749997,
+      "total_time_ms": 12520.16015625,
+      "ttft_ms": 1502.41921875
+    },
+    {
+      "context_length": 3651,
+      "decode_speed_tps": 55.61365557688587,
+      "decode_time_ms": 9206.37197265625,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 925.3373669130679,
+      "prefill_time_ms": 3945.5879882812496,
+      "total_time_ms": 13151.9599609375,
+      "ttft_ms": 1578.2351953124999
+    },
+    {
+      "context_length": 3651,
+      "decode_speed_tps": 55.66859416285876,
+      "decode_time_ms": 9197.286328125,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 926.2514720183472,
+      "prefill_time_ms": 3941.694140625,
+      "total_time_ms": 13138.98046875,
+      "ttft_ms": 1576.67765625
+    },
+    {
+      "context_length": 3651,
+      "decode_speed_tps": 55.5362127115926,
+      "decode_time_ms": 9219.20986328125,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 924.0488204883933,
+      "prefill_time_ms": 3951.0899414062496,
+      "total_time_ms": 13170.2998046875,
+      "ttft_ms": 1580.4359765625
+    },
+    {
+      "context_length": 7291,
+      "decode_speed_tps": 52.0749460548124,
+      "decode_time_ms": 9831.98330078125,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 1730.3053527340242,
+      "prefill_time_ms": 4213.70712890625,
+      "total_time_ms": 14045.6904296875,
+      "ttft_ms": 1685.4828515625
+    },
+    {
+      "context_length": 7291,
+      "decode_speed_tps": 51.96816818858182,
+      "decode_time_ms": 9852.18486328125,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 1726.7574217712568,
+      "prefill_time_ms": 4222.36494140625,
+      "total_time_ms": 14074.5498046875,
+      "ttft_ms": 1688.9459765625002
+    },
+    {
+      "context_length": 7291,
+      "decode_speed_tps": 51.913799020439534,
+      "decode_time_ms": 9862.503027343751,
+      "iteration": 1,
+      "output_length": 512,
+      "prefill_speed_tps": 1724.9508858113109,
+      "prefill_time_ms": 4226.787011718749,
+      "total_time_ms": 14089.2900390625,
+      "ttft_ms": 1690.7148046875
+    }
+  ],
+  "engine": "LMDeploy TurboMind",
+  "gpu_memory_used_gb": 0.0,
+  "model": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ",
+  "summary": [
+    {
+      "avg_decode_speed_tps": 58.31826055232407,
+      "avg_prefill_speed_tps": 244.77723032606335,
+      "avg_total_time_ms": 12542.036458333334,
+      "avg_ttft_ms": 1505.0443750000002,
+      "context_length": 1024,
+      "iterations": 3,
+      "max_ttft_ms": 1506.9071484375,
+      "min_ttft_ms": 1502.41921875,
+      "output_length": 512
+    },
+    {
+      "avg_decode_speed_tps": 55.60615415044574,
+      "avg_prefill_speed_tps": 925.2125531399361,
+      "avg_total_time_ms": 13153.746744791666,
+      "avg_ttft_ms": 1578.4496093749997,
+      "context_length": 4096,
+      "iterations": 3,
+      "max_ttft_ms": 1580.4359765625,
+      "min_ttft_ms": 1576.67765625,
+      "output_length": 512
+    },
+    {
+      "avg_decode_speed_tps": 51.985637754611254,
+      "avg_prefill_speed_tps": 1727.3378867721974,
+      "avg_total_time_ms": 14069.843424479166,
+      "avg_ttft_ms": 1688.3812109375,
+      "context_length": 8192,
+      "iterations": 3,
+      "max_ttft_ms": 1690.7148046875,
+      "min_ttft_ms": 1685.4828515625,
+      "output_length": 512
+    }
+  ],
+  "timestamp": "2026-05-22T10:23:59.425372029+00:00"
+}

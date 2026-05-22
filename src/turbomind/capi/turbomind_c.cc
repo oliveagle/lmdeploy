@@ -1396,10 +1396,8 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     }
 
     // ========================================================
-    // Layer-level replacements
-    // Do these in order: module name -> sub-module name -> param suffix
-    // ========================================================
     // DeltaNet (linear_attn) specific mappings
+    // ========================================================
     // Map HF DeltaNet layer paths to TurboMind linear_attn paths
     // HF format: layers.X.self_attn.in_proj.qkv.weight
     // TM format: layers.X.linear_attn.in_proj_qkv.weight
@@ -1429,6 +1427,20 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     while ((pos = result.find(".self_attn.linear_out_proj.")) != std::string::npos) {
         result.replace(pos, 25, ".linear_attn.out_proj.");
     }
+
+    // DeltaNet direct parameters (conv1d, A_log, dt_bias)
+    // These are PARAMS on DeltaNetWeight, not child modules
+    // HF format: .linear_attn.conv1d.weight
+    // TM format: .linear_attn.conv1d (direct param, no weight suffix)
+    size_t conv_pos = result.find(".linear_attn.conv1d.weight");
+    while (conv_pos != std::string::npos) {
+        result.replace(conv_pos, 20, ".linear_attn.conv1d");
+        conv_pos = result.find(".linear_attn.conv1d.weight");
+    }
+
+    // Handle A_log and dt_bias (they don't have .weight suffix, just keep as is)
+    // A_log is handled directly as a param: layers.X.linear_attn.A_log
+    // dt_bias is handled directly as a param: layers.X.linear_attn.dt_bias
 
     // self_attn -> attention (for standard full attention layers)
     while ((pos = result.find(".self_attn.")) != std::string::npos) {
