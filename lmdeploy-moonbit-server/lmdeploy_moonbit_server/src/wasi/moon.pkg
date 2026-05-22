@@ -1,4 +1,0 @@
-// Build configuration for Wasm edge deployment
-{
-  "name": "username/lmdeploy_moonbit_server/src/wasi"
-}

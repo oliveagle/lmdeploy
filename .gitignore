@@ -116,12 +116,5 @@ lmdeploy-rust-server/cmake_install.cmake
 lmdeploy-rust-server/Makefile
 lmdeploy-rust-server/_deps/
 lmdeploy-rust-server/build/
-lmdeploy-moonbit-server/CMakeFiles/
-lmdeploy-moonbit-server/CMakeCache.txt
-lmdeploy-moonbit-server/cmake_install.cmake
-lmdeploy-moonbit-server/Makefile
-lmdeploy-moonbit-server/_deps/
-lmdeploy-moonbit-server/build/
-
 # ralph-tui session state
 .ralph-tui/
