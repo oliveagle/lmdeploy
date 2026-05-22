@@ -3,10 +3,10 @@
   "sessionId": "ff3890aa-b3b8-48b0-9f1f-1dce36a0ad8c",
   "status": "running",
   "startedAt": "2026-05-22T13:26:21.436Z",
-  "updatedAt": "2026-05-22T13:40:33.609Z",
-  "currentIteration": 0,
+  "updatedAt": "2026-05-22T13:40:35.056Z",
+  "currentIteration": 1,
   "maxIterations": 50,
-  "tasksCompleted": 0,
+  "tasksCompleted": 1,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -185,8 +185,8 @@
       {
         "id": "lmdeploy-v3k",
         "title": "Investigate C++ InitFromPath hang with gdb",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "lmdeploy-zks",
@@ -472,9 +472,22 @@
       }
     ]
   },
-  "iterations": [],
+  "iterations": [
+    {
+      "iteration": 1,
+      "status": "completed",
+      "taskId": "lmdeploy-v3k",
+      "taskTitle": "Investigate C++ InitFromPath hang with gdb",
+      "taskCompleted": true,
+      "durationMs": 851984,
+      "startedAt": "2026-05-22T13:26:21.612Z",
+      "endedAt": "2026-05-22T13:40:33.596Z"
+    }
+  ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
-  "activeTaskIds": [],
+  "activeTaskIds": [
+    "lmdeploy-109"
+  ],
   "subagentPanelVisible": false
 }
