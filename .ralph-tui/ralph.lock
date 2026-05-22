@@ -1,7 +1,7 @@
 {
-  "pid": 3576963,
-  "sessionId": "e2e9b065-81ca-4f10-b321-9c0112e471a7",
-  "acquiredAt": "2026-05-22T10:40:12.298Z",
+  "pid": 28256,
+  "sessionId": "ff3890aa-b3b8-48b0-9f1f-1dce36a0ad8c",
+  "acquiredAt": "2026-05-22T13:26:21.290Z",
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
   "hostname": "oleNucBoxEVOX2"
 }

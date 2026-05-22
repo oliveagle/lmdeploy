@@ -714,6 +714,11 @@ static void LoadWeightsFromSafetensors(
     const char* safetensors_path,
     const HfModelConfig& hf_config);
 
+// Forward declarations for debugging
+namespace turbomind {
+core::Param LinearWeight_debug_param(class LinearWeight* lw, const std::string& name);
+}
+
 // Read an integer value from config.json (kept for backward compatibility with non-critical reads)
 static int ReadIntFromConfig(const std::string& model_dir, const std::string& key, int default_val)
 {
@@ -962,6 +967,7 @@ static void LoadWeightsFromSafetensors(
 
             // Map HF weight names to TurboMind module paths
             std::string tm_path = MapHuggingFaceWeightToTurboMind(tensor_name);
+            fprintf(stderr, " tm_path.size=%zu", tm_path.size());
             if (tm_path.empty()) {
                 ++skip_count;
                 continue;
@@ -995,6 +1001,12 @@ static void LoadWeightsFromSafetensors(
             }
             parts.push_back(tm_path.substr(start));
 
+            fprintf(stderr, " path='");
+            for (size_t ii = 0; ii < tm_path.size(); ++ii) {
+                fprintf(stderr, "%c", tm_path[ii]);
+            }
+            fprintf(stderr, "' size=%zu", tm_path.size());
+            fflush(stderr);
             fprintf(stderr, " path parsed to %zu parts...", parts.size());
             fflush(stderr);
 
@@ -1008,23 +1020,48 @@ static void LoadWeightsFromSafetensors(
                 for (size_t j = 0; j < parts.size() - 1; ++j) {
                     if (!current) break;
                     current = current->child(parts[j]);
+                    fprintf(stderr, " [%s] child='%s' -> %p", parts[j].c_str(), parts[j].c_str(), static_cast<void*>(current));
                 }
             }
 
-            fprintf(stderr, " module traversed...");
+            fprintf(stderr, " module traversed (current=%p type=%s)...", static_cast<void*>(current), current->type());
             fflush(stderr);
 
             if (!current) {
                 ++skip_count;
-                fprintf(stderr, " SKIP_MODULE\n");
+                fprintf(stderr, " SKIP_MODULE (path: ");
+                for (size_t j = 0; j < parts.size(); ++j) {
+                    if (j > 0) fprintf(stderr, ".");
+                    fprintf(stderr, "%s", parts[j].c_str());
+                }
+                fprintf(stderr, ")\n");
                 fflush(stderr);
                 continue;
             }
 
             // Use param() for O(1) lookup instead of for_each_param() iteration
             const std::string& param_name = parts.back();
+
+            // Debug: check if we're actually calling param on the right object
+            if (strcmp(current->type(), "LinearWeight") == 0) {
+                auto* lw = static_cast<turbomind::LinearWeight*>(current);
+                fprintf(stderr, " [DEBUG] Calling debug_param on LinearWeight=%p", static_cast<void*>(lw));
+                auto debug_result = LinearWeight_debug_param(lw, param_name);
+                fprintf(stderr, " result bool=%d", static_cast<bool>(debug_result));
+            }
+
             turbomind::core::Param target_param = current->param(param_name);
-            fprintf(stderr, " param '%s' lookup done...", param_name.c_str());
+
+            // Debug: also try for_each_param to see what params are available
+            if (!target_param) {
+                fprintf(stderr, " [DEBUG] available params: ");
+                current->for_each_param([](const char* name, const turbomind::core::Tensor& t) {
+                    fprintf(stderr, "%s ", name);
+                });
+                fprintf(stderr, "; ");
+            }
+
+            fprintf(stderr, " param '%s' lookup done (bool=%d)...", param_name.c_str(), static_cast<bool>(target_param));
             fflush(stderr);
 
             // For QKV projections, accumulate instead of direct load
@@ -1275,6 +1312,11 @@ static void LoadWeightsFromSafetensors(
 
     fprintf(stderr, "[C-API] LoadWeightsFromSafetensors EXIT: %s\n", safetensors_path);
     fflush(stderr);
+}
+
+// Forward declarations for debugging
+namespace turbomind {
+core::Param LinearWeight_debug_param(class LinearWeight* lw, const std::string& name);
 }
 
 // Map HuggingFace weight names to TurboMind module paths

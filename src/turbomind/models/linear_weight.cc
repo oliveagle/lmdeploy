@@ -284,4 +284,14 @@ TM_MODULE_METHODS(LinearWeight, LINEAR_WEIGHT_CHILDREN, LINEAR_WEIGHT_PARAMS)
 #undef LINEAR_WEIGHT_CHILDREN
 #undef LINEAR_WEIGHT_PARAMS
 
+// Debug: Add a direct test function
+namespace turbomind {
+core::Param LinearWeight_debug_param(LinearWeight* lw, const std::string& name)
+{
+    fprintf(stderr, "[DEBUG] LinearWeight_debug_param: name='%s' len=%zu\n", name.c_str(), name.size());
+    fflush(stderr);
+    return lw->param(name);
+}
+}
+
 }  // namespace turbomind

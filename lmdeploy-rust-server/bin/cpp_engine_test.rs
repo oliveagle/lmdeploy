@@ -8,7 +8,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_max_level(tracing::Level::INFO)
         .init();
 
-    let model_path = "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___5-9B-AWQ";
+    let model_path = "/mnt/eaget-4tb/modelscope_models/Qwen/Qwen3.5-9B-TextOnly";
     
     println!("Initializing C++ engine with model: {}", model_path);
     
