@@ -160,7 +160,7 @@ impl RequestPool {
 pub struct TurboMindCEngine {
     pub(super) model_path: String,
     pub model_name: String,
-    pub state: ModelState,
+    state: ModelState,
     pub loaded_at: Option<i64>,
     pub is_ready: std::sync::atomic::AtomicBool,
     pub engine_type: EngineType,
@@ -812,6 +812,20 @@ impl TurboMindCEngine {
         tm.get_schedule_metrics(0).map_err(|e| {
             AppError::InferenceFailed(format!("Failed to get metrics: {:?}", e))
         })
+    }
+}
+
+impl std::fmt::Debug for TurboMindCEngine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TurboMindCEngine")
+            .field("model_path", &self.model_path)
+            .field("model_name", &self.model_name)
+            .field("state", &self.state)
+            .field("loaded_at", &self.loaded_at)
+            .field("engine_type", &self.engine_type)
+            .field("quant_policy", &self.quant_policy)
+            .field("hidden_size", &self.hidden_size)
+            .finish()
     }
 }
 
