@@ -7,6 +7,20 @@ after each iteration and it is included in prompts for context.
 
 *Add reusable patterns discovered during development here.*
 
+- `TM_TurboMind_InitFromHF` 纯 C++ 实现：当函数签名与 InitFromPath 功能相同时，直接委托调用 `TM_TurboMind_InitFromPath`，避免重复代码
+- Rust FFI 签名必须严格匹配 C 头文件声明。`init_from_hf` 的签名从 `output_dir: &str` 改为 `trust_remote_code: bool, session_len: c_int`
+
+---
+
+## [2026-05-22] - lmdeploy-529
+- 实现 TM_TurboMind_InitFromHF 纯 C++ 版本，移除 Python 桥接依赖
+- **Files changed**:
+  - `lmdeploy-rust-server/src/turbomind/capi/turbomind_c.cc` - 替换 Python 桥接为纯 C++ 调用 `TM_TurboMind_InitFromPath`
+  - `lmdeploy-rust-server/src/turbomind_c.rs` - 修复 FFI 签名：`output_dir` → `trust_remote_code, session_len`，同步 Rust wrapper 方法签名
+- **Learnings:**
+  - `TM_TurboMind_InitFromHF` 与 `TM_TurboMind_InitFromPath` 功能相同（都解析 HF config.json + 加载 safetensors），所以 InitFromHF 直接委托给 InitFromPath 实现
+  - Rust FFI 签名必须与 C 头文件 `include/turbomind_c.h` 完全一致，否则链接时会报签名不匹配
+
 ---
 
 ## [2026-05-22] - lmdeploy-mdk
