@@ -15,3 +15,12 @@ set_property(TARGET turbomind_c APPEND PROPERTY LINK_OPTIONS
 set_target_properties(turbomind_c PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
+
+# Step-by-step InitFromPath test binary for debugging hangs
+if(BUILD_C_FFI)
+    add_executable(test_initfrompath_stepby test_initfrompath_stepby.cc)
+    target_link_libraries(test_initfrompath_stepby PRIVATE turbomind_c)
+    set_target_properties(test_initfrompath_stepby PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+    )
+endif()
