@@ -3,10 +3,10 @@
   "sessionId": "2047db2d-89c9-438f-bded-4357981a3d52",
   "status": "running",
   "startedAt": "2026-05-22T13:56:55.053Z",
-  "updatedAt": "2026-05-22T15:10:39.406Z",
-  "currentIteration": 3,
+  "updatedAt": "2026-05-22T15:10:41.907Z",
+  "currentIteration": 4,
   "maxIterations": 50,
-  "tasksCompleted": 2,
+  "tasksCompleted": 3,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -538,12 +538,23 @@
       "durationMs": 1217920,
       "startedAt": "2026-05-22T14:30:47.238Z",
       "endedAt": "2026-05-22T14:51:05.158Z"
+    },
+    {
+      "iteration": 4,
+      "status": "completed",
+      "taskId": "lmdeploy-529",
+      "taskTitle": "lmdeploy-rust 实现 TM_TurboMind_InitFromHF 纯 C++ 版本",
+      "taskCompleted": true,
+      "durationMs": 1144189,
+      "startedAt": "2026-05-22T14:51:35.194Z",
+      "endedAt": "2026-05-22T15:10:39.383Z"
     }
   ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
   "activeTaskIds": [
-    "lmdeploy-6gm"
+    "lmdeploy-6gm",
+    "lmdeploy-tox"
   ],
   "subagentPanelVisible": false
 }

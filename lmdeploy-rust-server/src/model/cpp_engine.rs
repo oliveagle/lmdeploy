@@ -66,6 +66,8 @@ pub struct ModelInfo {
     pub loaded_at: Option<i64>,
     pub engine_type: EngineType,
     pub quant_policy: i32,
+    /// Model hidden dimension (used for embeddings)
+    pub hidden_size: Option<usize>,
 }
 
 impl Default for ModelInfo {
@@ -77,6 +79,7 @@ impl Default for ModelInfo {
             loaded_at: None,
             engine_type: EngineType::default(),
             quant_policy: 0,
+            hidden_size: None,
         }
     }
 }
@@ -95,6 +98,32 @@ fn detect_awq_quantization(model_path: &std::path::Path) -> bool {
             content_lower.contains("\"quant_method\"") && content_lower.contains("\"awq\"")
         })
         .unwrap_or(false)
+}
+
+/// Parse hidden_size from config.json
+fn parse_hidden_size(model_path: &std::path::Path) -> usize {
+    let config_path = model_path.join("config.json");
+    if !config_path.exists() {
+        return 4096; // Default fallback
+    }
+
+    std::fs::read_to_string(&config_path)
+        .ok()
+        .and_then(|content| {
+            // Parse config.json as JSON to extract hidden_size
+            serde_json::from_str::<serde_json::Value>(&content)
+                .ok()
+                .and_then(|v| {
+                    // Handle nested configs (text_config, model_config)
+                    let hidden = v.get("text_config")
+                        .or_else(|| v.get("model_config"))
+                        .or_else(|| v.as_object())
+                        .and_then(|c| c.get("hidden_size"));
+
+                    hidden.and_then(|h| h.as_u64()).map(|u| u as usize)
+                })
+        })
+        .unwrap_or(4096) // Default fallback
 }
 
 /// Pool of ModelRequest instances for concurrent inference.
@@ -151,6 +180,9 @@ pub struct TurboMindCEngine {
     session_len: i32,
     max_batch_size: i32,
     quant_policy: i32,
+
+    /// Model hidden dimension (from config.json), used for embeddings
+    hidden_size: usize,
 }
 
 impl TurboMindCEngine {
@@ -173,9 +205,12 @@ impl TurboMindCEngine {
         let is_awq = detect_awq_quantization(&model_path_obj);
         let quant_policy = if is_awq { 4 } else { 0 };
 
+        // Parse hidden_size from config.json (needed for embeddings)
+        let hidden_size = parse_hidden_size(&model_path_obj);
         if is_awq {
             tracing::info!("Detected AWQ quantized model, enabling quant_policy=4");
         }
+        tracing::info!(hidden_size, "Model config parsed");
 
         // Load tokenizer first
         tracing::info!("Loading tokenizer...");
@@ -277,6 +312,7 @@ impl TurboMindCEngine {
             session_len: 65536,
             max_batch_size: 32,
             quant_policy,
+            hidden_size,
         })
     }
 
@@ -591,10 +627,185 @@ impl TurboMindCEngine {
         self.tokenizer.as_ref()
     }
 
-    /// Generate embeddings (not supported by C++ engine yet)
-    pub async fn embed(&self, _text: &str, _dimensions: Option<usize>) -> Vec<f32> {
-        tracing::warn!("Embeddings not supported by C++ engine yet");
-        Vec::new()
+    /// Generate embeddings for text by running token embedding lookup + forward pass.
+    ///
+    /// Uses `output_last_hidden_state=2` (kGeneration = last token only) to extract
+    /// the final hidden state, which represents the semantic embedding of the input.
+    ///
+    /// Note: This performs a minimal forward pass to get hidden states only. The model
+    /// still needs to be fully initialized. If `dimensions` is specified and smaller
+    /// than the model's hidden size, returns the first `dimensions` dimensions.
+    pub async fn embed(&self, text: &str, dimensions: Option<usize>) -> Vec<f32> {
+        let tm = match &self.tm {
+            Some(t) => t,
+            None => {
+                tracing::error!("TurboMind not initialized");
+                return Vec::new();
+            }
+        };
+
+        // Tokenize input
+        let input_ids = match &self.tokenizer {
+            Some(tokenizer) => match tokenizer.encode(text, false, false) {
+                Ok(ids) => ids,
+                Err(e) => {
+                    tracing::error!(error = %e, "Tokenization failed for embed");
+                    return Vec::new();
+                }
+            },
+            None => {
+                tracing::error!("Tokenizer not available for embed");
+                return Vec::new();
+            }
+        };
+
+        if input_ids.is_empty() {
+            tracing::warn!("Empty input for embed");
+            return Vec::new();
+        }
+
+        let input_ids_i64: Vec<i64> = input_ids.iter().map(|&id| id as i64).collect();
+        let batch_size = input_ids_i64.len();
+
+        // Get hidden size from model config (stored during init)
+        let hidden_size = self
+            .model_info
+            .hidden_size
+            .unwrap_or(4096); // Default fallback
+
+        let target_dims = dimensions.unwrap_or(hidden_size).min(hidden_size);
+
+        tracing::debug!(
+            batch_size,
+            hidden_size,
+            target_dims,
+            "embed: prepared input tensors"
+        );
+
+        // Acquire a ModelRequest from the pool
+        let pool = match &self.request_pool {
+            Some(p) => p,
+            None => {
+                tracing::error!("Request pool not initialized");
+                return Vec::new();
+            }
+        };
+
+        // Use blocking task for FFI calls
+        let embedding_result = tokio::task::spawn_blocking(move || {
+            let mut pool_guard = pool.acquire();
+            let request = pool_guard.get_mut(0).expect("request not found");
+
+            // Prepare input tensors
+            let mut input_tensors = match TensorMap::new() {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to create tensor map");
+                    return Vec::new();
+                }
+            };
+            let shape = [batch_size as i64];
+            input_tensors.set_int64("input_ids", &input_ids_i64, &shape);
+            input_tensors.set_int32("sequence_length", &[batch_size as i32], &[1]);
+
+            // Prepare generation config with output_last_hidden_state=2 (kGeneration = last token)
+            let mut gen_cfg = match GenConfig::new() {
+                Ok(g) => g,
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to create gen config");
+                    return Vec::new();
+                }
+            };
+            gen_cfg.set_max_new_tokens(1);
+            gen_cfg.set_temperature(0.0);
+            gen_cfg.set_output_last_hidden_state(2); // kGeneration = last token only
+
+            // Session parameters
+            let session = TM_SessionParam {
+                id: unix_timestamp() as u64,
+                step: 0,
+                start_flag: true,
+                end_flag: true,
+            };
+
+            // Prepare output tensors
+            let mut output_tensors = match TensorMap::new() {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to create output tensor map");
+                    return Vec::new();
+                }
+            };
+
+            // Run inference to get last_hidden_state
+            if let Err(e) = request.forward(
+                &mut input_tensors,
+                &session,
+                &gen_cfg,
+                false, // stream_output
+                false, // enable_metrics
+                &mut output_tensors,
+            ) {
+                tracing::error!(error = ?e, "embed forward failed");
+                return Vec::new();
+            }
+
+            // Extract last_hidden_state from output
+            let (data_ptr, size) = match request.get_output("last_hidden_state") {
+                Ok((ptr, sz)) => (ptr, sz),
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to get last_hidden_state output");
+                    return Vec::new();
+                }
+            };
+
+            let elem_count = size / 4; // float32 = 4 bytes
+            if elem_count == 0 {
+                tracing::warn!("Empty last_hidden_state output");
+                return Vec::new();
+            }
+
+            tracing::debug!(elem_count, "last_hidden_state raw data");
+
+            // The hidden state is [batch_size, hidden_dim] but we only asked for kGeneration
+            // (last token), so we should get [1, hidden_dim]
+            // However, if output_last_hidden_state=2 returns last prompt token (not generated token),
+            // we need to extract correctly. Let's check the actual shape.
+            //
+            // If we have [1, hidden_dim], extract first `target_dims` elements
+            // If we have [batch_size, hidden_dim], extract the LAST row's first `target_dims` elements
+
+            let embedding = if elem_count == hidden_size {
+                // Single vector: [hidden_dim]
+                let slice = unsafe { std::slice::from_raw_parts(data_ptr as *const f32, elem_count) };
+                slice[..target_dims].to_vec()
+            } else if elem_count > hidden_size {
+                // Multiple vectors: [N, hidden_dim] - take the LAST one (last token)
+                let num_vectors = elem_count / hidden_size;
+                let start_idx = (num_vectors - 1) * hidden_size;
+                let slice = unsafe {
+                    std::slice::from_raw_parts(
+                        data_ptr.add(start_idx) as *const f32,
+                        hidden_size,
+                    )
+                };
+                slice[..target_dims].to_vec()
+            } else {
+                tracing::warn!(
+                    elem_count,
+                    hidden_size,
+                    "Unexpected last_hidden_state size"
+                );
+                Vec::new()
+            };
+
+            tracing::debug!(embedding_len = embedding.len(), "embed: returning embedding");
+            embedding
+        })
+        .await
+        .unwrap_or_default();
+
+        embedding_result
     }
 
     /// Get schedule metrics
