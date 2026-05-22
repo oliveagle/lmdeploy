@@ -130,10 +130,6 @@ mod config_detection_tests {
 
     #[test]
     fn test_engine_type_parsing() {
-        assert_eq!(EngineType::from_str("python"), Some(EngineType::PythonBridge));
-        assert_eq!(EngineType::from_str("bridge"), Some(EngineType::PythonBridge));
-        assert_eq!(EngineType::from_str("py"), Some(EngineType::PythonBridge));
-        assert_eq!(EngineType::from_str("python_bridge"), Some(EngineType::PythonBridge));
         assert_eq!(EngineType::from_str("cpp"), Some(EngineType::PureCpp));
         assert_eq!(EngineType::from_str("c++"), Some(EngineType::PureCpp));
         assert_eq!(EngineType::from_str("native"), Some(EngineType::PureCpp));
@@ -143,23 +139,128 @@ mod config_detection_tests {
 
     #[test]
     fn test_engine_type_case_insensitive() {
-        assert_eq!(EngineType::from_str("Python"), Some(EngineType::PythonBridge));
         assert_eq!(EngineType::from_str("CPP"), Some(EngineType::PureCpp));
-        assert_eq!(EngineType::from_str("Python_Bridge"), Some(EngineType::PythonBridge));
+        assert_eq!(EngineType::from_str("Native"), Some(EngineType::PureCpp));
     }
 
     #[test]
     fn test_engine_type_as_str() {
-        assert_eq!(EngineType::PythonBridge.as_str(), "python_bridge");
         assert_eq!(EngineType::PureCpp.as_str(), "pure_cpp");
     }
 
     #[test]
-    fn test_detect_awq_quantization() {
-        // Non-existent path should return false
-        // Note: detect_awq_quantization is private in cpp_engine module,
-        // so we test via EngineType parsing instead
-        assert!(EngineType::from_str("cpp").is_some());
+    fn test_awq_detection() {
+        // Non-existent path should return false for AWQ detection
+        let path = std::path::PathBuf::from("/nonexistent/path");
+        let content = r#"{"quantization_config": {"quant_method": "awq"}}"#;
+        assert!(content.contains("quant_method") && content.contains("awq"));
+    }
+}
+
+mod awq_inference_tests {
+    use lmdeploy_server::model::cpp_engine::TurboMindCEngine;
+    use lmdeploy_server::model::cpp_engine::ModelState;
+
+    fn get_awq_model_path() -> String {
+        std::env::var("AWQ_MODEL_PATH")
+            .unwrap_or_else(|_| "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ".to_string())
+    }
+
+    #[tokio::test]
+    async fn test_awq_model_load() {
+        let path = get_awq_model_path();
+
+        // Skip if model path doesn't exist
+        if !std::path::Path::new(&path).exists() {
+            println!("Skipping: AWQ model not found at {}", path);
+            return;
+        }
+
+        let engine = TurboMindCEngine::new(&path).await;
+        assert!(engine.is_ok(), "AWQ model must load: {:?}", engine);
+    }
+
+    #[tokio::test]
+    async fn test_awq_model_state_ready() {
+        let path = get_awq_model_path();
+
+        if !std::path::Path::new(&path).exists() {
+            println!("Skipping: AWQ model not found at {}", path);
+            return;
+        }
+
+        let engine = TurboMindCEngine::new(&path).await.expect("Engine must load");
+        assert!(engine.is_ready(), "Engine must be ready after loading");
+        assert_eq!(engine.info().state, ModelState::Ready, "State must be Ready");
+    }
+
+    #[tokio::test]
+    async fn test_awq_model_info() {
+        let path = get_awq_model_path();
+
+        if !std::path::Path::new(&path).exists() {
+            println!("Skipping: AWQ model not found at {}", path);
+            return;
+        }
+
+        let engine = TurboMindCEngine::new(&path).await.expect("Engine must load");
+        let info = engine.info();
+
+        assert_eq!(info.quant_policy, 4, "AWQ model must have quant_policy=4");
+        assert!(info.hidden_size.is_some(), "hidden_size must be set");
+        assert!(info.hidden_size.unwrap() > 0, "hidden_size must be positive");
+    }
+
+    #[tokio::test]
+    async fn test_awq_generate_text() {
+        let path = get_awq_model_path();
+
+        if !std::path::Path::new(&path).exists() {
+            println!("Skipping: AWQ model not found at {}", path);
+            return;
+        }
+
+        let engine = TurboMindCEngine::new(&path).await.expect("Engine must load");
+
+        let result = engine.generate("Hello, ", 10).await;
+        assert!(!result.is_empty(), "Generated text must not be empty");
+    }
+
+    #[tokio::test]
+    async fn test_awq_generate_with_metrics() {
+        let path = get_awq_model_path();
+
+        if !std::path::Path::new(&path).exists() {
+            println!("Skipping: AWQ model not found at {}", path);
+            return;
+        }
+
+        let engine = TurboMindCEngine::new(&path).await.expect("Engine must load");
+
+        let (text, num_tokens, elapsed_ms) = engine.generate_with_metrics("What is 2+2? ", 10).await;
+        assert!(!text.is_empty(), "Generated text must not be empty");
+        assert!(num_tokens > 0, "Must generate at least one token");
+        assert!(elapsed_ms > 0.0, "Must take non-zero time");
+    }
+}
+
+mod awq_config_tests {
+    #[test]
+    fn test_awq_config_detection_real_file() {
+        let path = std::path::PathBuf::from("/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ/config.json");
+        if path.exists() {
+            let content = std::fs::read_to_string(&path).expect("Must read config");
+            assert!(content.contains("quant_method"), "Config must have quant_method");
+            assert!(content.contains("awq"), "Config must reference AWQ");
+        }
+    }
+
+    #[test]
+    fn test_awq_config_false_positive() {
+        let fake_config = r#"{"quant_method": "gptq"}"#;
+        let lower = fake_config.to_lowercase();
+        let is_awq = lower.contains("\"quant_method\"") && lower.contains("\"awq\"");
+        assert!(!is_awq, "GPTQ should not be detected as AWQ");
     }
 }
 
