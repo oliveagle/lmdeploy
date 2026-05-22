@@ -125,3 +125,4 @@ lmdeploy-rust-server/build/
 *.rmeta
 *.d
 **/*.d
+.beads/
