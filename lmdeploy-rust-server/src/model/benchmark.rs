@@ -4,11 +4,11 @@
 //! prefill speed, and decode speed across different context lengths.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::engine::TurboMindEngine;
+use crate::model::cpp_engine::TurboMindCEngine;
 
 /// Benchmark configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,13 +98,13 @@ pub struct BenchmarkReport {
 
 /// Benchmark runner
 pub struct BenchmarkRunner {
-    engine: Arc<TurboMindEngine>,
+    engine: Arc<TurboMindCEngine>,
     config: BenchmarkConfig,
 }
 
 impl BenchmarkRunner {
     /// Create a new benchmark runner
-    pub fn new(engine: Arc<TurboMindEngine>, config: BenchmarkConfig) -> Self {
+    pub fn new(engine: Arc<TurboMindCEngine>, config: BenchmarkConfig) -> Self {
         Self { engine, config }
     }
 

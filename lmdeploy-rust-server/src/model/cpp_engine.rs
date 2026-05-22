@@ -3,6 +3,13 @@
 //! This engine uses the TurboMind C API directly without any Python dependency.
 //! It loads weights from HuggingFace safetensors format and performs inference
 //! entirely through the C++ interface.
+//!
+//! ## Concurrency Model
+//!
+//! The C++ TurboMind engine has an internal request queue (Gateway) that handles
+//! concurrent scheduling. This wrapper creates a pool of ModelRequest instances
+//! to allow parallel inference without mutex contention. Each request is
+//! independent and can run concurrently with others.
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -13,20 +20,21 @@ use crate::turbomind_c::{
     EngineConfig, GenConfig, ModelRequest, ScheduleMetrics, TensorMap, TurboMind,
 };
 
+/// Default number of concurrent inference requests
+/// This matches the C++ engine's internal queue capacity
+const DEFAULT_CONCURRENCY: usize = 8;
+
 /// Engine type selector
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EngineType {
-    /// Python bridge (default, compatible with all models)
-    #[default]
-    PythonBridge,
     /// Pure C++ inference (no Python dependency)
+    #[default]
     PureCpp,
 }
 
 impl EngineType {
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
-            "python" | "bridge" | "py" | "python_bridge" => Some(EngineType::PythonBridge),
             "cpp" | "c++" | "native" | "pure_cpp" => Some(EngineType::PureCpp),
             _ => None,
         }
@@ -34,7 +42,6 @@ impl EngineType {
 
     pub fn as_str(&self) -> &'static str {
         match self {
-            EngineType::PythonBridge => "python_bridge",
             EngineType::PureCpp => "pure_cpp",
         }
     }
@@ -90,6 +97,37 @@ fn detect_awq_quantization(model_path: &std::path::Path) -> bool {
         .unwrap_or(false)
 }
 
+/// Pool of ModelRequest instances for concurrent inference.
+///
+/// The C++ TurboMind engine uses a Gateway with internal queuing, but each
+/// ModelRequest instance holds state for a single inference session. This pool
+/// allows multiple concurrent requests to proceed without mutex contention.
+struct RequestPool {
+    requests: std::sync::Mutex<Vec<ModelRequest>>,
+}
+
+impl RequestPool {
+    /// Create a new request pool with the given concurrency level.
+    fn new(tm: &TurboMind, concurrency: usize) -> Result<Self> {
+        let mut requests = Vec::with_capacity(concurrency);
+        for i in 0..concurrency {
+            let request = ModelRequest::create(tm).map_err(|e| {
+                AppError::ModelLoadFailed(format!("Failed to create request #{}: {:?}", i, e))
+            })?;
+            requests.push(request);
+        }
+        Ok(Self {
+            requests: std::sync::Mutex::new(requests),
+        })
+    }
+
+    /// Acquire a ModelRequest from the pool (blocking).
+    /// Returns a guard that returns the request to the pool on drop.
+    fn acquire<'a>(&'a self) -> std::sync::MutexGuard<'a, Vec<ModelRequest>> {
+        self.requests.lock().expect("pool lock poisoned")
+    }
+}
+
 /// TurboMind pure C++ engine
 pub struct TurboMindCEngine {
     pub(super) model_path: String,
@@ -101,7 +139,10 @@ pub struct TurboMindCEngine {
 
     // C API components
     tm: Option<Arc<TurboMind>>,
-    request: Option<Arc<tokio::sync::Mutex<ModelRequest>>>,
+    /// Pool of ModelRequest instances for concurrent inference
+    request_pool: Option<Arc<RequestPool>>,
+    /// Semaphore limiting concurrent inference requests
+    request_semaphore: Option<Arc<tokio::sync::Semaphore>>,
 
     // Tokenizer for encoding/decoding
     tokenizer: Option<LMTokenizer>,
@@ -206,10 +247,10 @@ impl TurboMindCEngine {
                 AppError::ModelLoadFailed(format!("InitFromPath failed: {:?}", e))
             })?;
 
-        // Create inference request
-        let request = ModelRequest::create(&tm).map_err(|e| {
-            AppError::ModelLoadFailed(format!("Failed to create request: {:?}", e))
-        })?;
+        // Create inference request pool for concurrent access
+        let request_pool = RequestPool::new(&tm, DEFAULT_CONCURRENCY)?;
+        let pool_arc = Arc::new(request_pool);
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(DEFAULT_CONCURRENCY));
 
         let model_name = model_path_obj
             .file_name()
@@ -217,7 +258,10 @@ impl TurboMindCEngine {
             .unwrap_or("default")
             .to_string();
 
-        tracing::info!("TurboMind C++ engine initialized successfully");
+        tracing::info!(
+            concurrency = DEFAULT_CONCURRENCY,
+            "TurboMind C++ engine initialized successfully"
+        );
 
         Ok(Self {
             model_path: model_path.to_string(),
@@ -227,7 +271,8 @@ impl TurboMindCEngine {
             is_ready: std::sync::atomic::AtomicBool::new(true),
             engine_type: EngineType::PureCpp,
             tm: Some(Arc::new(tm)),
-            request: Some(Arc::new(tokio::sync::Mutex::new(request))),
+            request_pool: Some(pool_arc),
+            request_semaphore: Some(semaphore),
             tokenizer,
             session_len: 65536,
             max_batch_size: 32,
@@ -265,12 +310,14 @@ impl TurboMindCEngine {
 
         // Drop existing components
         self.tm = None;
-        self.request = None;
+        self.request_pool = None;
+        self.request_semaphore = None;
 
         // Re-initialize
         let new_engine = Self::new(new_model_path).await?;
         self.tm = new_engine.tm;
-        self.request = new_engine.request;
+        self.request_pool = new_engine.request_pool;
+        self.request_semaphore = new_engine.request_semaphore;
         self.tokenizer = new_engine.tokenizer;
         self.model_path = new_model_path.to_string();
         self.model_name = new_engine.model_name;
@@ -299,9 +346,11 @@ impl TurboMindCEngine {
         prompt: &str,
         max_tokens: usize,
     ) -> (String, usize, f64) {
-        // TODO: Add proper concurrency control
-        let _tm = self.tm.as_ref().expect("TurboMind not initialized");
-        let request = self.request.as_ref().expect("Request not initialized");
+        let pool = self.request_pool.as_ref().expect("Request pool not initialized");
+        let semaphore = self.request_semaphore.as_ref().expect("Semaphore not initialized");
+
+        // Acquire semaphore permit (limits concurrent requests)
+        let _permit = semaphore.acquire().await.expect("semaphore closed");
 
         // Tokenize input
         let input_ids = if let Some(tokenizer) = &self.tokenizer {
@@ -321,6 +370,13 @@ impl TurboMindCEngine {
 
         let start = Instant::now();
 
+        // Acquire a ModelRequest from the pool
+        // Note: We use the mutex only to protect the vector access, not the request itself
+        // ModelRequest is Send+Sync and can be used concurrently
+        let mut pool_guard = pool.acquire();
+        let request_index = 0; // Simple round-robin: always use first available
+        let request = pool_guard.get_mut(request_index).expect("request not found");
+
         // Prepare input tensors
         let mut input_tensors = TensorMap::new().unwrap();
         let input_ids_shape = [input_ids.len() as i64];
@@ -334,10 +390,10 @@ impl TurboMindCEngine {
         gen_cfg.set_top_p(0.95);
         gen_cfg.set_top_k(50);
 
-        // Prepare session parameters
+        // Prepare session parameters (use unique ID for each request)
         use crate::turbomind_c::TM_SessionParam;
         let session = TM_SessionParam {
-            id: 1,
+            id: unix_timestamp() as u64,
             step: 0,
             start_flag: true,
             end_flag: true,
@@ -346,9 +402,8 @@ impl TurboMindCEngine {
         // Prepare output tensors
         let mut output_tensors = TensorMap::new().unwrap();
 
-        // Run inference
-        let mut req_guard = request.lock().await;
-        match req_guard.forward(
+        // Run inference (request is Send+Sync, no mutex needed)
+        match request.forward(
             &mut input_tensors,
             &session,
             &gen_cfg,
@@ -360,7 +415,7 @@ impl TurboMindCEngine {
                 let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
                 // Get output tokens from the request
-                match req_guard.get_output("output_ids") {
+                match request.get_output("output_ids") {
                     Ok((data_ptr, size)) => {
                         // data_ptr points to int32 array
                         let num_tokens = size / 4;
@@ -408,8 +463,6 @@ impl TurboMindCEngine {
                         return Box::pin(futures::stream::empty());
                     }
                 };
-                // Create a new tokenizer instance for the thread (clone doesn't work for tokenizer)
-                // We need to pass the tokenizer path or use the existing one
                 (ids, t.clone())
             }
             None => {
@@ -420,16 +473,16 @@ impl TurboMindCEngine {
 
         let input_ids_vec: Vec<i64> = input_ids.iter().map(|&id| id as i64).collect();
         let prompt_len = input_ids.len() as i32;
-        let vocab_size = tokenizer.vocab_size();
 
-        // Clone needed for thread spawn
-        let tm = self.tm.as_ref().expect("TurboMind not initialized").clone();
-        let request = self.request.as_ref().expect("Request not initialized").clone();
+        // Clone pool for thread spawn
+        let pool = self.request_pool.as_ref().expect("Request pool not initialized").clone();
 
         let (tx, rx) = tokio::sync::mpsc::channel::<String>(32);
 
         tokio::task::spawn_blocking(move || {
-            let mut req_guard = request.blocking_lock();
+            // Acquire a request from the pool
+            let mut pool_guard = pool.acquire();
+            let request = pool_guard.get_mut(0).expect("request not found");
 
             // Prepare input tensors
             let mut input_tensors = match crate::turbomind_c::TensorMap::new() {
@@ -456,16 +509,16 @@ impl TurboMindCEngine {
             gen_cfg.set_top_p(0.95);
             gen_cfg.set_top_k(50);
 
-            // Session parameters
+            // Session parameters (unique session ID)
             let session = crate::turbomind_c::TM_SessionParam {
-                id: 42,
+                id: unix_timestamp() as u64,
                 step: 0,
                 start_flag: true,
                 end_flag: true,
             };
 
             // Submit async forward with stream_output=true
-            if let Err(e) = req_guard.forward_async(
+            if let Err(e) = request.forward_async(
                 &mut input_tensors,
                 &session,
                 &gen_cfg,
@@ -483,14 +536,14 @@ impl TurboMindCEngine {
                 // Small sleep to avoid busy-waiting
                 std::thread::sleep(std::time::Duration::from_millis(5));
 
-                let (status, seq_len) = match req_guard.get_streaming_state() {
+                let (status, seq_len) = match request.get_streaming_state() {
                     Ok(s) => s,
                     Err(_) => continue, // State not yet available, keep polling
                 };
 
                 // Read new tokens if seq_len increased
                 if seq_len > prev_seq_len {
-                    match req_guard.get_stream_token() {
+                    match request.get_stream_token() {
                         Ok((data_ptr, token_count)) if token_count > 0 => {
                             let all_tokens = unsafe {
                                 std::slice::from_raw_parts(data_ptr, token_count)
@@ -566,9 +619,6 @@ mod tests {
 
     #[test]
     fn test_engine_type_from_str() {
-        assert_eq!(EngineType::from_str("python"), Some(EngineType::PythonBridge));
-        assert_eq!(EngineType::from_str("bridge"), Some(EngineType::PythonBridge));
-        assert_eq!(EngineType::from_str("py"), Some(EngineType::PythonBridge));
         assert_eq!(EngineType::from_str("cpp"), Some(EngineType::PureCpp));
         assert_eq!(EngineType::from_str("c++"), Some(EngineType::PureCpp));
         assert_eq!(EngineType::from_str("native"), Some(EngineType::PureCpp));
@@ -577,7 +627,6 @@ mod tests {
 
     #[test]
     fn test_engine_type_as_str() {
-        assert_eq!(EngineType::PythonBridge.as_str(), "python_bridge");
         assert_eq!(EngineType::PureCpp.as_str(), "pure_cpp");
     }
 

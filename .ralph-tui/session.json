@@ -3,10 +3,10 @@
   "sessionId": "2047db2d-89c9-438f-bded-4357981a3d52",
   "status": "running",
   "startedAt": "2026-05-22T13:56:55.053Z",
-  "updatedAt": "2026-05-22T14:12:29.206Z",
-  "currentIteration": 0,
+  "updatedAt": "2026-05-22T14:51:05.173Z",
+  "currentIteration": 2,
   "maxIterations": 50,
-  "tasksCompleted": 0,
+  "tasksCompleted": 1,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -17,8 +17,8 @@
       {
         "id": "lmdeploy-109",
         "title": "实现 C++ 引擎 AWQ 权重加载支持",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "lmdeploy-zhu",
@@ -508,9 +508,32 @@
       }
     ]
   },
-  "iterations": [],
+  "iterations": [
+    {
+      "iteration": 1,
+      "status": "completed",
+      "taskId": "lmdeploy-109",
+      "taskTitle": "实现 C++ 引擎 AWQ 权重加载支持",
+      "taskCompleted": true,
+      "durationMs": 933924,
+      "startedAt": "2026-05-22T13:56:55.267Z",
+      "endedAt": "2026-05-22T14:12:29.191Z"
+    },
+    {
+      "iteration": 2,
+      "status": "completed",
+      "taskId": "lmdeploy-6gm",
+      "taskTitle": "lmdeploy-rust 并发推理支持: 移除 Arc<Mutex<>> 序列化瓶颈",
+      "taskCompleted": false,
+      "durationMs": 1095333,
+      "startedAt": "2026-05-22T14:12:30.692Z",
+      "endedAt": "2026-05-22T14:30:46.025Z"
+    }
+  ],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
-  "activeTaskIds": [],
+  "activeTaskIds": [
+    "lmdeploy-6gm"
+  ],
   "subagentPanelVisible": false
 }

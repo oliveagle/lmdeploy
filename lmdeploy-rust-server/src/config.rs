@@ -142,8 +142,7 @@ pub struct ModelConfig {
     pub model_name: String,
     pub max_context_length: usize,
     pub max_batch_size: usize,
-    /// Engine type: "pure_cpp" (default) or "python_bridge"
-    /// Pure C++ has no Python dependency, python bridge is more compatible
+    /// Engine type: "pure_cpp" (only supported type)
     #[serde(default = "default_engine_type")]
     pub engine_type: String,
 }
@@ -183,7 +182,7 @@ fn default_metrics_port() -> u16 { 9090 }
 pub struct ModelEntry {
     pub name: String,
     pub path: String,
-    /// Engine type: "pure_cpp" (default) or "python_bridge"
+    /// Engine type: "pure_cpp" (only supported type)
     #[serde(default = "default_model_engine_type")]
     pub engine_type: String,
 }
