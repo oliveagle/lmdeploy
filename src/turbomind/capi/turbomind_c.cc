@@ -854,82 +854,40 @@ static void LoadWeightsFromSafetensors(
     turbomind::core::Allocator managed_allocator{turbomind::core::CreateCudaManagedAllocator()};
     auto managed_guard = turbomind::core::ContextGuard{managed_allocator};
 
-    fprintf(stderr, "[C-API] LoadWeightsFromSafetensors: Using CUDA managed memory allocator for OOM-safe loading\n");
-    fflush(stderr);
-
-    // DIRECT FILE WRITE for diagnostics - bypass all buffering
-    static int call_count = 0;
-    char diag_fn[256];
-    snprintf(diag_fn, sizeof(diag_fn), "/tmp/diag_step_%d.txt", ++call_count);
-
-    FILE* diag_file = fopen(diag_fn, "w");
-    if (diag_file) {
-        fprintf(diag_file, "[%d] LoadWeightsFromSafetensors ENTER: %s\n", call_count, safetensors_path);
-        fclose(diag_file);
-    }
-
-    fprintf(stderr, "[C-API] LoadWeightsFromSafetensors ENTER: %s\n", safetensors_path);
+    fprintf(stderr, "[C-API] LoadWeightsFromSafetensors: %s\n", safetensors_path);
     fflush(stderr);
 
     try {
         auto load_start = std::chrono::high_resolution_clock::now();
 
-        fprintf(stderr, "[C-API] About to create SafetensorsReaderMmap...\n");
-        fflush(stderr);
-
         // Use mmap-based reader for zero-copy tensor access
         turbomind::SafetensorsReaderMmap reader(safetensors_path);
-
-        fprintf(stderr, "[C-API] SafetensorsReaderMmap created successfully\n");
-        fflush(stderr);
 
         auto mmap_done = std::chrono::high_resolution_clock::now();
         auto mmap_ms = std::chrono::duration_cast<std::chrono::milliseconds>(mmap_done - load_start);
         fprintf(stderr, "[C-API] mmap took: %ldms, Loading safetensors: %s (%zu tensors)\n", mmap_ms.count(), safetensors_path, reader.num_tensors());
         fflush(stderr);
 
-        fprintf(stderr, "[C-API] After mmap message, about to set up vectors...\n");
-        fflush(stderr);
-
         // Pre-allocated vectors (reused for all tensors to avoid heap allocations)
         std::vector<std::string> parts;
         parts.reserve(8);  // Typical path: layers.X.attention.w1.weight = 5 parts
-        fprintf(stderr, "[C-API] parts vector created\n");
-        fflush(stderr);
 
         std::vector<size_t> shape_vec;
         shape_vec.reserve(4);  // Typical tensor rank <= 4
-        fprintf(stderr, "[C-API] shape_vec vector created\n");
-        fflush(stderr);
 
         int loaded_count = 0;
         int skip_count = 0;
-        fprintf(stderr, "[C-API] About cudaSetDevice...\n");
-        fflush(stderr);
-
-        fprintf(stderr, "[C-API] Before cudaSetDevice(0)...\n");
-        fflush(stderr);
 
         // Set CUDA device before creating stream
         cudaSetDevice(0);
 
-        fprintf(stderr, "[C-API] Creating BatchCopy for batched transfers...\n");
-        fflush(stderr);
-
         // Create BatchCopy for batched transfers
         turbomind::core::BatchCopy batch_copy;
-
-        fprintf(stderr, "[C-API] BatchCopy created.\n");
-        fflush(stderr);
 
         // Phase 1: Iterate tensors, map names, allocate memory, and collect transfers
         // We'll collect all transfers first, then run them in a single batch
         size_t progress_count = 0;
-        fprintf(stderr, "[C-API] Before reader.tensors() call...\n");
-        fflush(stderr);
         const auto& tensors = reader.tensors();  // Direct reference to avoid re-lookup
-        fprintf(stderr, "[C-API] reader.tensors() call completed.\n");
-        fflush(stderr);
 
         fprintf(stderr, "[C-API] Starting tensor processing loop (%zu tensors)...\n", reader.num_tensors());
         fflush(stderr);
@@ -960,14 +918,11 @@ static void LoadWeightsFromSafetensors(
         std::unordered_map<std::string, QKVAccumulator> qkv_accumulators;
 
         for (size_t i = 0; i < reader.num_tensors(); ++i) {
-            fprintf(stderr, "[C-API] [%zu/174] tensor_name='%s'...", i, reader.tensor_name(i).c_str());
-            fflush(stderr);
             const auto& meta = tensors[i];  // Direct reference, no extra lookup
             const std::string& tensor_name = meta.name;
 
             // Map HF weight names to TurboMind module paths
             std::string tm_path = MapHuggingFaceWeightToTurboMind(tensor_name);
-            fprintf(stderr, " tm_path.size=%zu", tm_path.size());
             if (tm_path.empty()) {
                 ++skip_count;
                 continue;
@@ -1001,15 +956,6 @@ static void LoadWeightsFromSafetensors(
             }
             parts.push_back(tm_path.substr(start));
 
-            fprintf(stderr, " path='");
-            for (size_t ii = 0; ii < tm_path.size(); ++ii) {
-                fprintf(stderr, "%c", tm_path[ii]);
-            }
-            fprintf(stderr, "' size=%zu", tm_path.size());
-            fflush(stderr);
-            fprintf(stderr, " path parsed to %zu parts...", parts.size());
-            fflush(stderr);
-
             if (parts.empty()) {
                 continue;
             }
@@ -1020,49 +966,17 @@ static void LoadWeightsFromSafetensors(
                 for (size_t j = 0; j < parts.size() - 1; ++j) {
                     if (!current) break;
                     current = current->child(parts[j]);
-                    fprintf(stderr, " [%s] child='%s' -> %p", parts[j].c_str(), parts[j].c_str(), static_cast<void*>(current));
                 }
             }
 
-            fprintf(stderr, " module traversed (current=%p type=%s)...", static_cast<void*>(current), current->type());
-            fflush(stderr);
-
             if (!current) {
                 ++skip_count;
-                fprintf(stderr, " SKIP_MODULE (path: ");
-                for (size_t j = 0; j < parts.size(); ++j) {
-                    if (j > 0) fprintf(stderr, ".");
-                    fprintf(stderr, "%s", parts[j].c_str());
-                }
-                fprintf(stderr, ")\n");
-                fflush(stderr);
                 continue;
             }
 
             // Use param() for O(1) lookup instead of for_each_param() iteration
             const std::string& param_name = parts.back();
-
-            // Debug: check if we're actually calling param on the right object
-            if (strcmp(current->type(), "LinearWeight") == 0) {
-                auto* lw = static_cast<turbomind::LinearWeight*>(current);
-                fprintf(stderr, " [DEBUG] Calling debug_param on LinearWeight=%p", static_cast<void*>(lw));
-                auto debug_result = LinearWeight_debug_param(lw, param_name);
-                fprintf(stderr, " result bool=%d", static_cast<bool>(debug_result));
-            }
-
             turbomind::core::Param target_param = current->param(param_name);
-
-            // Debug: also try for_each_param to see what params are available
-            if (!target_param) {
-                fprintf(stderr, " [DEBUG] available params: ");
-                current->for_each_param([](const char* name, const turbomind::core::Tensor& t) {
-                    fprintf(stderr, "%s ", name);
-                });
-                fprintf(stderr, "; ");
-            }
-
-            fprintf(stderr, " param '%s' lookup done (bool=%d)...", param_name.c_str(), static_cast<bool>(target_param));
-            fflush(stderr);
 
             // For QKV projections, accumulate instead of direct load
             // They'll be fused later
@@ -1088,31 +1002,24 @@ static void LoadWeightsFromSafetensors(
                         acc.q_shape = meta.shape;
                         acc.dtype = meta.dtype;
                         acc.q_loaded = true;
-                        fprintf(stderr, " Q-accumulated...");
                     } else if (is_k && acc.k_data.empty()) {
                         acc.k_data = std::move(tensor_data);
                         acc.k_shape = meta.shape;
                         acc.dtype = meta.dtype;
                         acc.k_loaded = true;
-                        fprintf(stderr, " K-accumulated...");
                     } else if (is_v && acc.v_data.empty()) {
                         acc.v_data = std::move(tensor_data);
                         acc.v_shape = meta.shape;
                         acc.dtype = meta.dtype;
                         acc.v_loaded = true;
-                        fprintf(stderr, " V-accumulated...");
                     }
                     ++loaded_count;
-                    fprintf(stderr, " QKV_ACCUM\n");
-                    fflush(stderr);
                     continue;
                 }
             }
 
             if (!target_param) {
                 ++skip_count;
-                fprintf(stderr, " SKIP_PARAM\n");
-                fflush(stderr);
                 continue;
             }
 
@@ -1123,12 +1030,14 @@ static void LoadWeightsFromSafetensors(
                 src_data = reader.get_tensor_data(tensor_name);
             } catch (const std::exception& e) {
                 fprintf(stderr, "[C-API] get_tensor_data failed for %s: %s\n", tensor_name.c_str(), e.what());
+                fflush(stderr);
                 ++skip_count;
                 continue;
             }
 
             if (!src_data) {
                 fprintf(stderr, "[C-API] NULL data pointer for %s\n", tensor_name.c_str());
+                fflush(stderr);
                 ++skip_count;
                 continue;
             }
@@ -1140,40 +1049,18 @@ static void LoadWeightsFromSafetensors(
             }
 
             // Allocate GPU memory and transfer directly from mmap'd region
-            fprintf(stderr, " allocating GPU memory...");
-            fflush(stderr);
-
-            // DEBUG: Verify allocator is available BEFORE tensor construction
-            {
-                auto& alloc = turbomind::core::Context::device_alloc();
-                fprintf(stderr, "[DEBUG] Before alloc: device_alloc valid=%d type=%d ",
-                        (bool)alloc, (int)(alloc->device().type));
-                if (alloc) {
-                    fprintf(stderr, "device_id=%d\n", alloc->device().id);
-                } else {
-                    fprintf(stderr, "INVALID_ALLOCATOR\n");
-                }
-                fflush(stderr);
-            }
-
             auto tensor = target_param.alloc(shape_vec, meta.dtype);
 
             if (!tensor) {
-                fprintf(stderr, " alloc() FAILED\n");
-                fflush(stderr);
                 ++skip_count;
                 continue;
             }
-            fprintf(stderr, " alloc OK...");
-            fflush(stderr);
 
             if (tensor.raw_data()) {
                 size_t copy_size = std::min(meta.size, static_cast<size_t>(tensor.byte_size()));
                 transfers.push_back({src_data, tensor.raw_data(), copy_size});
                 ++loaded_count;
             }
-            fprintf(stderr, " DONE\n");
-            fflush(stderr);
 
             ++progress_count;
             if (progress_count % 200 == 0 || i == reader.num_tensors() - 1) {
