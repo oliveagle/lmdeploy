@@ -2003,9 +2003,12 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
                     // These will be fused into in_proj_all during prepare()
                     char log_buf_dn[512];
 
+                    // Linear attention layers use BF16 weights (not AWQ quantized).
+                    // AWQ config has "modules_to_not_convert" including "linear_attn",
+                    // so these layers must use plain format, not AWQ kUint4 format.
                     auto in_proj_qkv_cfg = CreateAwqLinearConfig(
                         hf_config.hidden_size, qkv_out,
-                        weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                        weight_cfg.data_type, false, hf_config.awq_group_size);
                     auto in_proj_qkv_module = turbomind::core::Module::create(in_proj_qkv_cfg);
                     snprintf(log_buf_dn, sizeof(log_buf_dn),
                         "[DeltaNet] layer=%d Module::create(in_proj_qkv) -> %p\n",

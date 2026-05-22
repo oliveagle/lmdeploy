@@ -1,18 +1,18 @@
 {
   "version": 1,
-  "sessionId": "ff3890aa-b3b8-48b0-9f1f-1dce36a0ad8c",
+  "sessionId": "2047db2d-89c9-438f-bded-4357981a3d52",
   "status": "running",
-  "startedAt": "2026-05-22T13:26:21.436Z",
-  "updatedAt": "2026-05-22T13:40:35.056Z",
-  "currentIteration": 1,
+  "startedAt": "2026-05-22T13:56:55.053Z",
+  "updatedAt": "2026-05-22T13:56:55.317Z",
+  "currentIteration": 0,
   "maxIterations": 50,
-  "tasksCompleted": 1,
+  "tasksCompleted": 0,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
     "plugin": "beads-rust",
     "executionScopes": [],
-    "totalTasks": 76,
+    "totalTasks": 82,
     "tasks": [
       {
         "id": "lmdeploy-109",
@@ -165,6 +165,12 @@
         "completedInSession": false
       },
       {
+        "id": "lmdeploy-6gm",
+        "title": "lmdeploy-rust 并发推理支持: 移除 Arc<Mutex<>> 序列化瓶颈",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
         "id": "lmdeploy-p5u",
         "title": "验证/运行 Rust Server 现有 benchmark 并准备完整报告",
         "status": "open",
@@ -186,7 +192,7 @@
         "id": "lmdeploy-v3k",
         "title": "Investigate C++ InitFromPath hang with gdb",
         "status": "completed",
-        "completedInSession": true
+        "completedInSession": false
       },
       {
         "id": "lmdeploy-zks",
@@ -393,6 +399,18 @@
         "completedInSession": false
       },
       {
+        "id": "lmdeploy-kut",
+        "title": "lmdeploy-rust 真正的批量推理: C++ 端批量 API 而非循环调用",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "lmdeploy-5hd",
+        "title": "lmdeploy-rust embeddings 支持: 实现 C API embeddings 接口",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
         "id": "lmdeploy-xso",
         "title": "lmdeploy-862: Fix Python bridge script path in Rust server",
         "status": "completed",
@@ -469,21 +487,28 @@
         "title": "LMDeploy Rust Server - TurboMind C API Integration",
         "status": "completed",
         "completedInSession": false
+      },
+      {
+        "id": "lmdeploy-v02",
+        "title": "lmdeploy-rust 错误恢复增强: C API 错误传播和重试逻辑",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "lmdeploy-laz",
+        "title": "lmdeploy-rust 高级采样算法: beam search、nucleus sampling 变体",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "lmdeploy-9ec",
+        "title": "lmdeploy-rust 模型格式扩展: 支持 GGUF、GPTQ 等量化格式",
+        "status": "open",
+        "completedInSession": false
       }
     ]
   },
-  "iterations": [
-    {
-      "iteration": 1,
-      "status": "completed",
-      "taskId": "lmdeploy-v3k",
-      "taskTitle": "Investigate C++ InitFromPath hang with gdb",
-      "taskCompleted": true,
-      "durationMs": 851984,
-      "startedAt": "2026-05-22T13:26:21.612Z",
-      "endedAt": "2026-05-22T13:40:33.596Z"
-    }
-  ],
+  "iterations": [],
   "skippedTaskIds": [],
   "cwd": "/mnt/eaget-4tb/data/llm_server/lmdeploy",
   "activeTaskIds": [
