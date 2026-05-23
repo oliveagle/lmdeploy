@@ -29,7 +29,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use clap::Parser;
-use lmdeploy_server::model::benchmark::{BenchmarkConfig, BenchmarkRunner};
+use lmdeploy_server::model::benchmark::{
+    BatchBenchmarkConfig, BatchBenchmarkRunner, BenchmarkConfig, BenchmarkRunner,
+};
 use lmdeploy_server::model::GenerationParams;
 use lmdeploy_server::model::TurboMindCEngine;
 use tabled::{Table, Tabled};
@@ -90,6 +92,14 @@ struct Args {
     /// Quick benchmark (only 1K, 4K, 8K)
     #[arg(long = "quick")]
     quick_mode: bool,
+
+    /// Batch throughput benchmark mode
+    #[arg(long = "batch-mode")]
+    batch_mode: bool,
+
+    /// Batch sizes to test for batch mode (comma-separated)
+    #[arg(long = "batch-sizes", value_delimiter = ',', default_values_t = vec![1, 2, 4, 8, 16])]
+    batch_sizes: Vec<usize>,
 }
 
 /// Get context lengths based on CLI options
@@ -121,6 +131,25 @@ struct BenchmarkTableRow {
     total_ms: String,
 }
 
+/// Batch benchmark result entry for table output
+#[derive(Tabled)]
+struct BatchBenchmarkTableRow {
+    #[tabled(rename = "Context")]
+    context_label: String,
+    #[tabled(rename = "Batch")]
+    batch_size: String,
+    #[tabled(rename = "Throughput (t/s)")]
+    throughput_tps: String,
+    #[tabled(rename = "Avg Latency (ms)")]
+    avg_latency_ms: String,
+    #[tabled(rename = "P95 Latency (ms)")]
+    p95_latency_ms: String,
+    #[tabled(rename = "Total Time (ms)")]
+    total_time_ms: String,
+    #[tabled(rename = "Speedup")]
+    speedup: String,
+}
+
 /// Concurrent test result
 #[derive(Debug, Clone, serde::Serialize)]
 struct ConcurrentResult {
@@ -150,7 +179,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== LMDeploy Performance Benchmark ===");
     println!("Model: {}", args.model_path);
     println!("Quantization: {}", args.quantization);
-    if args.awq_mode {
+    if args.batch_mode {
+        println!("Mode: Batch Throughput (Vectorization Test)");
+        println!("Batch sizes: {}", format_batch_sizes(&args.batch_sizes));
+    } else if args.awq_mode {
         println!("Mode: AWQ Optimized");
     } else if args.quick_mode {
         println!("Mode: Quick Test");
@@ -163,7 +195,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!("Output length: {} tokens", args.output_length);
     println!("Iterations: {}", args.iterations);
-    println!("Concurrent requests: {}", args.concurrent_requests);
+    if !args.batch_mode {
+        println!("Concurrent requests: {}", args.concurrent_requests);
+    }
     println!("======================================\n");
 
     // Detect quantization type
@@ -182,6 +216,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Get initial GPU memory
     let initial_memory = get_gpu_memory().unwrap_or(0.0);
+
+    // Run batch throughput benchmark if requested
+    if args.batch_mode {
+        let batch_report = run_batch_benchmarks(&engine, &args).await?;
+        output_batch_results(&batch_report, initial_memory, &args)?;
+        return Ok(());
+    }
 
     // Run sequential benchmarks
     let report = run_sequential_benchmarks(&engine, &args).await?;
@@ -263,6 +304,11 @@ fn format_context_lengths(lengths: &[usize]) -> String {
         .join(", ")
 }
 
+/// Format batch sizes for display
+fn format_batch_sizes(sizes: &[usize]) -> String {
+    sizes.iter().map(|&s| format!("{}", s)).collect::<Vec<_>>().join(", ")
+}
+
 /// Run sequential benchmarks
 async fn run_sequential_benchmarks(
     engine: &Arc<TurboMindCEngine>,
@@ -279,6 +325,30 @@ async fn run_sequential_benchmarks(
     };
 
     let runner = BenchmarkRunner::new(Arc::clone(engine), config);
+    let report = runner
+        .run()
+        .await
+        .map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+    Ok(report)
+}
+
+/// Run batch throughput benchmarks
+async fn run_batch_benchmarks(
+    engine: &Arc<TurboMindCEngine>,
+    args: &Args,
+) -> Result<lmdeploy_server::model::benchmark::BatchBenchmarkReport, Box<dyn std::error::Error>> {
+    println!("=== Running Batch Throughput Benchmarks ===");
+
+    let context_lengths = get_context_lengths(args);
+    let config = BatchBenchmarkConfig {
+        context_lengths,
+        output_length: args.output_length,
+        batch_sizes: args.batch_sizes.clone(),
+        iterations: args.iterations,
+        warmup_iterations: args.warmup_iterations,
+    };
+
+    let runner = BatchBenchmarkRunner::new(Arc::clone(engine), config);
     let report = runner
         .run()
         .await
@@ -463,5 +533,131 @@ fn get_gpu_memory() -> Option<f64> {
         Some(memory_mb / 1024.0)
     } else {
         None
+    }
+}
+
+/// Output batch benchmark results
+fn output_batch_results(
+    report: &lmdeploy_server::model::benchmark::BatchBenchmarkReport,
+    initial_memory_gb: f64,
+    args: &Args,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let format = args.output_format.to_lowercase();
+
+    if format == "json" || format == "both" {
+        output_batch_json(report, initial_memory_gb, args)?;
+    }
+
+    if format == "table" || format == "both" {
+        output_batch_table(report, initial_memory_gb);
+    }
+
+    Ok(())
+}
+
+/// Output batch results as JSON
+fn output_batch_json(
+    report: &lmdeploy_server::model::benchmark::BatchBenchmarkReport,
+    initial_memory_gb: f64,
+    args: &Args,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let output = serde_json::json!({
+        "model": report.model_path,
+        "engine": report.engine_name,
+        "quantization": args.quantization,
+        "gpu_memory_used_gb": initial_memory_gb,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "config": {
+            "context_lengths": report.config.context_lengths,
+            "output_length": report.config.output_length,
+            "batch_sizes": report.config.batch_sizes,
+            "iterations": report.config.iterations,
+        },
+        "results": report.results,
+        "summaries": report.summaries,
+    });
+
+    let json_str = serde_json::to_string_pretty(&output)?;
+
+    if let Some(ref file) = args.output_file {
+        std::fs::write(file, json_str)?;
+        println!("\nJSON results saved to: {}", file);
+    } else if args.output_format == "json" {
+        let filename = format!(
+            "batch_benchmark_results_{}.json",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S")
+        );
+        std::fs::write(&filename, json_str)?;
+        println!("\nJSON results saved to: {}", filename);
+    } else {
+        println!("\n=== JSON Output ===");
+        println!("{}", json_str);
+    }
+
+    Ok(())
+}
+
+/// Output batch results as table
+fn output_batch_table(
+    report: &lmdeploy_server::model::benchmark::BatchBenchmarkReport,
+    memory_used_gb: f64,
+) {
+    println!("\n=== Batch Throughput Summary ===");
+    println!("GPU Memory: {:.2} GB", memory_used_gb);
+    println!();
+
+    // Calculate speedup: throughput at max batch size / throughput at batch size 1
+    for context_length in &report.config.context_lengths {
+        println!("--- Context: {} tokens ---", context_length);
+
+        let mut rows = Vec::new();
+        let mut baseline_tps = None;
+
+        for summary in &report.summaries {
+            if summary.context_length == *context_length {
+                let context_label = if summary.context_length >= 1024 {
+                    format!("{}K", summary.context_length / 1024)
+                } else {
+                    format!("{}", summary.context_length)
+                };
+
+                if summary.batch_size == 1 {
+                    baseline_tps = Some(summary.avg_throughput_tps);
+                }
+
+                let speedup = match baseline_tps {
+                    Some(bp) if bp > 0.0 => format!("{:.2}x", summary.avg_throughput_tps / bp),
+                    _ => "1.00x".to_string(),
+                };
+
+                rows.push(BatchBenchmarkTableRow {
+                    context_label,
+                    batch_size: format!("{}", summary.batch_size),
+                    throughput_tps: format!("{:.2}", summary.avg_throughput_tps),
+                    avg_latency_ms: format!("{:.2}", summary.avg_request_latency_ms),
+                    p95_latency_ms: format!("{:.2}", summary.p95_request_latency_ms),
+                    total_time_ms: format!("{:.2}", {
+                        // Average total time from individual results matching this config
+                        let matching: Vec<_> = report.results.iter()
+                            .filter(|r| {
+                                (r.context_length as isize - *context_length as isize).abs() < 500
+                                    && r.batch_size == summary.batch_size
+                            })
+                            .collect();
+                        if matching.is_empty() {
+                            0.0
+                        } else {
+                            matching.iter().map(|r| r.total_time_ms).sum::<f64>() / matching.len() as f64
+                        }
+                    }),
+                    speedup,
+                });
+            }
+        }
+
+        if !rows.is_empty() {
+            println!("{}", Table::new(rows).to_string());
+        }
+        println!();
     }
 }

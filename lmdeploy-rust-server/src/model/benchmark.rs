@@ -2,13 +2,14 @@
 //!
 //! Provides performance measurement utilities for TTFT (Time To First Token),
 //! prefill speed, and decode speed across different context lengths.
+//! Also supports batch throughput benchmarking to verify vectorized inference.
 
 use std::sync::Arc;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::cpp_engine::TurboMindCEngine;
+use crate::model::cpp_engine::{BatchItem, TurboMindCEngine};
 use crate::model::GenerationParams;
 use futures::StreamExt;
 
@@ -329,6 +330,287 @@ impl BenchmarkRunner {
                 avg_decode_speed_tps: avg_decode,
                 avg_total_time_ms: avg_total,
             });
+        }
+
+        summaries
+    }
+}
+
+/// Batch throughput benchmark configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchBenchmarkConfig {
+    /// Context lengths to test (in tokens)
+    pub context_lengths: Vec<usize>,
+    /// Output length (in tokens)
+    pub output_length: usize,
+    /// Batch sizes to test (number of concurrent requests)
+    pub batch_sizes: Vec<usize>,
+    /// Number of iterations per test
+    pub iterations: usize,
+    /// Warmup iterations (not counted in results)
+    pub warmup_iterations: usize,
+}
+
+impl Default for BatchBenchmarkConfig {
+    fn default() -> Self {
+        Self {
+            context_lengths: vec![512, 2048, 4096],
+            output_length: 128,
+            batch_sizes: vec![1, 2, 4, 8, 16],
+            iterations: 3,
+            warmup_iterations: 1,
+        }
+    }
+}
+
+/// Result for a single batch throughput measurement
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchBenchmarkResult {
+    /// Context length (in tokens)
+    pub context_length: usize,
+    /// Output length (in tokens)
+    pub output_length: usize,
+    /// Batch size (number of concurrent requests)
+    pub batch_size: usize,
+    /// Iteration number (1-indexed)
+    pub iteration: usize,
+    /// Total time for all batch requests to complete (milliseconds)
+    pub total_time_ms: f64,
+    /// Total tokens generated (all requests combined)
+    pub total_tokens: usize,
+    /// Throughput in tokens per second (total_tokens / total_time)
+    pub throughput_tps: f64,
+    /// Average per-request latency (milliseconds)
+    pub avg_request_latency_ms: f64,
+    /// Min per-request latency (milliseconds)
+    pub min_request_latency_ms: f64,
+    /// Max per-request latency (milliseconds)
+    pub max_request_latency_ms: f64,
+    /// Average output tokens per request
+    pub avg_output_tokens: usize,
+}
+
+/// Aggregated batch throughput summary
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchBenchmarkSummary {
+    /// Context length (in tokens)
+    pub context_length: usize,
+    /// Output length (in tokens)
+    pub output_length: usize,
+    /// Batch size
+    pub batch_size: usize,
+    /// Number of iterations
+    pub iterations: usize,
+    /// Average throughput (tokens/second)
+    pub avg_throughput_tps: f64,
+    /// Max throughput (tokens/second)
+    pub max_throughput_tps: f64,
+    /// Average per-request latency (milliseconds)
+    pub avg_request_latency_ms: f64,
+    /// P95 per-request latency (milliseconds)
+    pub p95_request_latency_ms: f64,
+}
+
+/// Full batch benchmark report
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchBenchmarkReport {
+    /// Engine info
+    pub engine_name: String,
+    pub model_path: String,
+    /// Test configuration
+    pub config: BatchBenchmarkConfig,
+    /// Individual results
+    pub results: Vec<BatchBenchmarkResult>,
+    /// Summaries by context length and batch size
+    pub summaries: Vec<BatchBenchmarkSummary>,
+    /// Timestamp
+    pub timestamp: i64,
+}
+
+/// Batch benchmark runner
+pub struct BatchBenchmarkRunner {
+    engine: Arc<TurboMindCEngine>,
+    config: BatchBenchmarkConfig,
+}
+
+impl BatchBenchmarkRunner {
+    /// Create a new batch benchmark runner
+    pub fn new(engine: Arc<TurboMindCEngine>, config: BatchBenchmarkConfig) -> Self {
+        Self { engine, config }
+    }
+
+    /// Run all batch throughput benchmarks
+    pub async fn run(&self) -> Result<BatchBenchmarkReport, String> {
+        let mut all_results = Vec::new();
+
+        for &context_length in &self.config.context_lengths {
+            for &batch_size in &self.config.batch_sizes {
+                // Warmup
+                for _ in 0..self.config.warmup_iterations {
+                    let _ = self
+                        .run_batch_benchmark(context_length, batch_size, self.config.output_length, 0)
+                        .await;
+                }
+
+                // Measured runs
+                for iter in 1..=self.config.iterations {
+                    let result = self
+                        .run_batch_benchmark(context_length, batch_size, self.config.output_length, iter)
+                        .await?;
+                    all_results.push(result);
+                }
+            }
+        }
+
+        let summaries = self.generate_batch_summaries(&all_results);
+
+        Ok(BatchBenchmarkReport {
+            engine_name: "LMDeploy TurboMind C++ (batch)".to_string(),
+            model_path: self.engine.model_path.clone(),
+            config: self.config.clone(),
+            results: all_results,
+            summaries,
+            timestamp: unix_timestamp(),
+        })
+    }
+
+    /// Run a single batch throughput benchmark
+    async fn run_batch_benchmark(
+        &self,
+        context_length: usize,
+        batch_size: usize,
+        output_length: usize,
+        iteration: usize,
+    ) -> Result<BatchBenchmarkResult, String> {
+        let prompt = generate_prompt(context_length * 4);
+
+        // Tokenize to get actual input token count
+        let input_ids = match self.engine.tokenizer() {
+            Some(t) => match t.encode(&prompt, false, false) {
+                Ok(ids) => ids,
+                Err(e) => return Err(format!("Tokenization failed: {}", e)),
+            },
+            None => return Err("Tokenizer not available".to_string()),
+        };
+        let actual_input_tokens = input_ids.len();
+
+        // Build batch items
+        let items: Vec<BatchItem> = (0..batch_size)
+            .map(|i| BatchItem {
+                request_id: i as u64,
+                prompt: prompt.clone(),
+                params: GenerationParams {
+                    max_tokens: Some(output_length),
+                    ..Default::default()
+                },
+                need_logprobs: false,
+            })
+            .collect();
+
+        let start = Instant::now();
+        let results = self.engine.generate_batch(items).await;
+        let total_time_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+        let total_tokens: usize = results.iter().map(|r| r.num_tokens).sum();
+        let throughputs: Vec<f64> = results
+            .iter()
+            .filter(|r| r.elapsed_ms > 0.0)
+            .map(|r| (r.num_tokens as f64 * 1000.0) / r.elapsed_ms)
+            .collect();
+
+        let avg_throughput = if !throughputs.is_empty() {
+            throughputs.iter().sum::<f64>() / throughputs.len() as f64
+        } else {
+            0.0
+        };
+
+        let request_latencies: Vec<f64> = results.iter().map(|r| r.elapsed_ms).collect();
+        let avg_latency = if !request_latencies.is_empty() {
+            request_latencies.iter().sum::<f64>() / request_latencies.len() as f64
+        } else {
+            0.0
+        };
+        let min_latency = request_latencies.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+        let max_latency = request_latencies
+            .iter()
+            .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+
+        let avg_output = if !results.is_empty() {
+            total_tokens / results.len()
+        } else {
+            0
+        };
+
+        Ok(BatchBenchmarkResult {
+            context_length: actual_input_tokens,
+            output_length,
+            batch_size,
+            iteration,
+            total_time_ms,
+            total_tokens,
+            throughput_tps: avg_throughput,
+            avg_request_latency_ms: avg_latency,
+            min_request_latency_ms: min_latency,
+            max_request_latency_ms: max_latency,
+            avg_output_tokens: avg_output,
+        })
+    }
+
+    /// Generate summaries from batch results
+    fn generate_batch_summaries(
+        &self,
+        results: &[BatchBenchmarkResult],
+    ) -> Vec<BatchBenchmarkSummary> {
+        let mut summaries = Vec::new();
+
+        for &target_context in &self.config.context_lengths {
+            let tolerance = match target_context {
+                0..=4096 => 200,
+                4097..=16384 => 1000,
+                _ => 3000,
+            };
+
+            for &batch_size in &self.config.batch_sizes {
+                let filtered: Vec<_> = results
+                    .iter()
+                    .filter(|r| {
+                        r.batch_size == batch_size
+                            && (r.context_length as isize - target_context as isize).abs() < tolerance
+                    })
+                    .collect();
+
+                if filtered.is_empty() {
+                    continue;
+                }
+
+                let count = filtered.len();
+                let avg_throughput =
+                    filtered.iter().map(|r| r.throughput_tps).sum::<f64>() / count as f64;
+                let max_throughput = filtered
+                    .iter()
+                    .map(|r| r.throughput_tps)
+                    .fold(f64::NEG_INFINITY, f64::max);
+                let avg_latency =
+                    filtered.iter().map(|r| r.avg_request_latency_ms).sum::<f64>() / count as f64;
+
+                let mut sorted_latencies: Vec<f64> =
+                    filtered.iter().map(|r| r.avg_request_latency_ms).collect();
+                sorted_latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let p95_latency = *sorted_latencies
+                    .get((sorted_latencies.len() as f64 * 0.95) as usize)
+                    .unwrap_or(&0.0);
+
+                summaries.push(BatchBenchmarkSummary {
+                    context_length: target_context,
+                    output_length: self.config.output_length,
+                    batch_size,
+                    iterations: count,
+                    avg_throughput_tps: avg_throughput,
+                    max_throughput_tps: max_throughput,
+                    avg_request_latency_ms: avg_latency,
+                    p95_request_latency_ms: p95_latency,
+                });
+            }
         }
 
         summaries
