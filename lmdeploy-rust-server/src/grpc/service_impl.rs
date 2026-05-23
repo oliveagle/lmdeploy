@@ -523,11 +523,11 @@ impl LmDeployService for LmDeployServiceImpl {
             .into_iter()
             .map(|r| {
                 let logprobs = r.logprobs.unwrap_or_default().into_iter().map(|lp| LogprobEntry {
-                    token_id: 0, // TODO: extract token_id from TokenLogprob
+                    token_id: lp.token_id as i64,
                     token: lp.token,
                     logprob: lp.logprob as f32,
                     top_logprobs: lp.top_logprobs.into_iter().map(|tlp| TopLogprobEntry {
-                        token_id: 0,
+                        token_id: tlp.token_id as i64,
                         token: tlp.token,
                         logprob: tlp.logprob as f32,
                     }).collect(),

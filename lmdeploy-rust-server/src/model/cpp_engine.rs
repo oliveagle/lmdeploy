@@ -26,6 +26,7 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 pub struct TokenLogprob {
     pub token: String,
+    pub token_id: u32,
     pub logprob: f64,
     pub bytes: Vec<u8>,
     pub top_logprobs: Vec<TopLogprob>,
@@ -35,6 +36,7 @@ pub struct TokenLogprob {
 #[derive(Debug, Clone, Serialize)]
 pub struct TopLogprob {
     pub token: String,
+    pub token_id: u32,
     pub logprob: f64,
     pub bytes: Vec<u8>,
 }
@@ -513,6 +515,7 @@ fn extract_logprobs(
                     .ok()
                     .filter(|s| !s.is_empty())
                     .unwrap_or_default(),
+                token_id: token_id as u32,
                 logprob: 0.0,
                 bytes: Vec::new(),
                 top_logprobs: Vec::new(),
@@ -539,6 +542,7 @@ fn extract_logprobs(
 
             top_logprobs.push(TopLogprob {
                 token: token_text.clone(),
+                token_id: tok_id as u32,
                 logprob: lp,
                 bytes: bytes_vec.clone(),
             });
@@ -562,6 +566,7 @@ fn extract_logprobs(
 
         result.push(TokenLogprob {
             token: token_text.clone(),
+            token_id: token_id as u32,
             logprob: selected_logprob,
             bytes: token_text.as_bytes().to_vec(),
             top_logprobs,
