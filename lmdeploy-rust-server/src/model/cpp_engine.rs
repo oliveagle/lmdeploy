@@ -634,6 +634,16 @@ impl TurboMindCEngine {
         // AWQ weights are kUint4 but computations happen in fp16.
         engine_config.set_data_type(crate::turbomind_c::TM_DataType::TM_DATATYPE_FP16);
         engine_config.set_session_len(65536);
+
+        // CRITICAL: max_prefill_token_num controls prefill performance
+        // Default 0 causes max_forward_token_num = max_batch_size (32 tokens)
+        // Setting to 8192 allows single-pass prefill for most contexts
+        // This matches Python's TurbomindEngineConfig default
+        engine_config.set_max_prefill_token_num(8192);
+
+        // max_batch_size: higher values improve throughput but use more memory
+        // Python uses get_max_batch_size('cuda'): A100=384, H100=1024, default=128
+        // We use a moderate default to balance memory and throughput
         engine_config.set_max_batch_size(32);
         engine_config.set_cache_block_seq_len(64);
         engine_config.set_cache_max_block_count(0.8);
