@@ -241,6 +241,41 @@ void TM_GenerationConfig_SetOutputLastHiddenState(TM_GenerationConfig* config, i
 void TM_GenerationConfig_SetOutputLogits(TM_GenerationConfig* config, int value);
 
 // ============================================================
+// Guided Decoding / Structured Output (xgrammar)
+// ============================================================
+
+// Opaque handle for compiled grammar
+typedef struct TM_CompiledGrammar TM_CompiledGrammar;
+
+// Create a compiled grammar from JSON schema string
+// json_schema: JSON schema string (e.g., '{"type":"object","properties":{...}}')
+// Returns NULL on error
+TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema);
+
+// Create a compiled grammar from EBNF string
+// ebnf_string: EBNF grammar string
+// Returns NULL on error
+TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string);
+
+// Create a compiled grammar from regex pattern
+// regex: Regular expression string
+// Returns NULL on error
+TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex);
+
+// Get built-in JSON grammar (pre-compiled for general JSON output)
+// Returns a grammar that must NOT be destroyed (singleton)
+TM_CompiledGrammar* TM_Grammar_GetBuiltinJSON(void);
+
+// Destroy a compiled grammar (except builtin from TM_Grammar_GetBuiltinJSON)
+void TM_Grammar_Destroy(TM_CompiledGrammar* grammar);
+
+// Attach grammar to ModelRequest for guided decoding
+// Must be called before TM_ModelRequest_Forward / TM_ModelRequest_ForwardAsync
+// The grammar is NOT owned by the request and must remain valid until forward completes
+// Returns 0 on success, negative on error
+int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, TM_CompiledGrammar* grammar);
+
+// ============================================================
 // Session parameters
 // ============================================================
 

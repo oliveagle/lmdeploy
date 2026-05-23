@@ -17,6 +17,7 @@ use crate::cache::compute_hash;
 use crate::metrics::StreamMetricsSnapshot;
 use crate::model::GenerationParams;
 use crate::server::{AppState, BatchItem, BatchStatsResponse};
+use crate::turbomind_c::CompiledGrammar;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ChatCompletionsRequest {
@@ -37,6 +38,38 @@ pub struct ChatCompletionsRequest {
     pub logprobs: Option<bool>,
     pub top_logprobs: Option<u32>,
     pub user: Option<String>,
+    /// Response format for structured output (guided decoding)
+    pub response_format: Option<ResponseFormat>,
+}
+
+/// Response format for structured output (guided decoding).
+/// Follows OpenAI's response_format specification.
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ResponseFormat {
+    /// Text response (no constraints)
+    Text,
+    /// JSON object output (constrained to valid JSON)
+    JsonObject,
+    /// JSON schema constrained output
+    JsonSchema {
+        json_schema: JsonSchemaSpec,
+    },
+    /// Regex constrained output
+    RegexSchema {
+        regex_schema: String,
+    },
+}
+
+/// JSON schema specification for structured output.
+/// Mirrors the OpenAI JSON schema format.
+#[derive(Debug, Deserialize, Clone)]
+pub struct JsonSchemaSpec {
+    pub name: String,
+    /// The actual JSON schema definition
+    pub schema: serde_json::Value,
+    pub strict: Option<bool>,
+    pub description: Option<String>,
 }
 
 /// Stop sequence(s) - can be a string or array of strings
@@ -235,6 +268,7 @@ async fn chat_completions_stream_impl(
     let final_model = model.to_string();
     let prompt_len = prompt.len();
 
+    let grammar = response_format_to_grammar(&req.response_format);
     let params = GenerationParams::from_chat_request(
         req.temperature,
         req.top_p,
@@ -247,6 +281,7 @@ async fn chat_completions_stream_impl(
         req.stop.clone(),
         req.logprobs,
         req.top_logprobs,
+        grammar,
     );
 
     // Spawn a task that generates tokens and sends them through the channel
@@ -357,6 +392,7 @@ async fn fallback_chat_completion(
     };
     drop(mm);
 
+    let grammar = response_format_to_grammar(&req.response_format);
     let params = GenerationParams::from_chat_request(
         req.temperature,
         req.top_p,
@@ -369,6 +405,7 @@ async fn fallback_chat_completion(
         req.stop.clone(),
         req.logprobs,
         req.top_logprobs,
+        grammar,
     );
 
     let eng = engine.read().await;
@@ -445,6 +482,7 @@ pub struct CompletionsRequest {
     pub logit_bias: Option<std::collections::HashMap<u32, f32>>,
     pub best_of: Option<u32>,
     pub user: Option<String>,
+    pub response_format: Option<ResponseFormat>,
 }
 
 /// Prompt - can be a string or array of strings
@@ -510,6 +548,7 @@ pub async fn completions(
                 logprobs: None,
                 top_logprobs: None,
                 user: req.user.clone(),
+                response_format: req.response_format.clone(),
             },
             tx,
         };
@@ -1412,6 +1451,55 @@ pub async fn model_load_progress(
                 message: "Model loading operation not found".to_string(),
             }),
         ),
+    }
+}
+
+/// Convert ResponseFormat to a CompiledGrammar for guided decoding.
+///
+/// This function converts the OpenAI-compatible `response_format` parameter
+/// into a grammar constraint that can be applied to the C++ engine.
+///
+/// # Arguments
+/// * `response_format` - The optional response format from the request
+///
+/// # Returns
+/// * `Some(Arc<CompiledGrammar>)` - If a valid grammar constraint is specified
+/// * `None` - If no constraint should be applied (text mode or error)
+pub fn response_format_to_grammar(response_format: &Option<ResponseFormat>) -> Option<Arc<CompiledGrammar>> {
+    match response_format {
+        Some(ResponseFormat::Text) => None,
+        Some(ResponseFormat::JsonObject) => {
+            // No custom schema - use built-in JSON grammar
+            Some(Arc::new(CompiledGrammar::builtin_json()))
+        }
+        Some(ResponseFormat::JsonSchema { json_schema }) => {
+            // Custom JSON schema - serialize and compile
+            let schema_str = json_schema.schema.to_string();
+            match CompiledGrammar::from_json_schema(&schema_str) {
+                Ok(grammar) => {
+                    tracing::debug!(schema = %json_schema.name, "Created JSON schema grammar");
+                    Some(Arc::new(grammar))
+                }
+                Err(e) => {
+                    tracing::warn!(error = ?e, schema = %json_schema.name, "Failed to create JSON schema grammar, falling back to builtin JSON");
+                    Some(Arc::new(CompiledGrammar::builtin_json()))
+                }
+            }
+        }
+        Some(ResponseFormat::RegexSchema { regex_schema }) => {
+            // Regex constraint - compile via xgrammar
+            match CompiledGrammar::from_regex(regex_schema) {
+                Ok(grammar) => {
+                    tracing::debug!("Created regex grammar");
+                    Some(Arc::new(grammar))
+                }
+                Err(e) => {
+                    tracing::warn!(error = ?e, "Failed to create regex grammar");
+                    None
+                }
+            }
+        }
+        None => None,
     }
 }
 

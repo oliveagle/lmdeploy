@@ -17,8 +17,8 @@ use std::time::Instant;
 use crate::error::{AppError, Result};
 use crate::tokenizer::LMTokenizer;
 use crate::turbomind_c::{
-    c_int, c_void, EngineConfig, GenConfig, ModelRequest, ScheduleMetrics, TM_SessionParam,
-    TensorMap, TurboMind,
+    c_int, c_void, CompiledGrammar, EngineConfig, GenConfig, ModelRequest, ScheduleMetrics,
+    TM_SessionParam, TensorMap, TurboMind,
 };
 use serde::Serialize;
 
@@ -39,10 +39,20 @@ pub struct TopLogprob {
     pub bytes: Vec<u8>,
 }
 
+/// Compiled grammar for guided decoding.
+///
+/// Represents a constraint that the generation must follow.
+/// Created from JSON schema, regex pattern, or EBNF grammar.
+pub struct GuidedGrammar {
+    /// The compiled grammar, stored as an Arc so it can be shared
+    /// across multiple generation calls and passed to the C++ engine.
+    pub grammar: Arc<CompiledGrammar>,
+}
+
 /// Generation parameters from HTTP/gRPC requests.
 ///
 /// These parameters are applied to the GenConfig when calling the C++ engine.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct GenerationParams {
     /// Maximum number of new tokens to generate.
     pub max_tokens: Option<usize>,
@@ -65,6 +75,8 @@ pub struct GenerationParams {
     pub logprobs: Option<bool>,
     /// Number of top log probabilities to return per token. Default: 0 (none)
     pub top_logprobs: Option<u32>,
+    /// Guided decoding grammar constraint. None = unconstrained.
+    pub grammar: Option<Arc<CompiledGrammar>>,
 }
 
 impl GenerationParams {
@@ -88,6 +100,7 @@ impl GenerationParams {
             stop: None,
             logprobs: None,
             top_logprobs: None,
+            grammar: None,
         }
     }
 
@@ -113,6 +126,7 @@ impl GenerationParams {
             stop: None,
             logprobs,
             top_logprobs,
+            grammar: None,
         }
     }
 
@@ -129,6 +143,7 @@ impl GenerationParams {
         stop: Option<crate::handlers::http::Stop>,
         logprobs: Option<bool>,
         top_logprobs: Option<u32>,
+        grammar: Option<Arc<CompiledGrammar>>,
     ) -> Self {
         let repetition_penalty =
             Self::compute_repetition_penalty(presence_penalty, frequency_penalty);
@@ -146,6 +161,7 @@ impl GenerationParams {
             }),
             logprobs,
             top_logprobs,
+            grammar,
         }
     }
 
@@ -804,6 +820,14 @@ impl TurboMindCEngine {
         // Prepare output tensors
         let mut output_tensors = TensorMap::new().unwrap();
 
+        // Attach grammar for guided decoding if provided
+        if let Some(grammar) = &params.grammar {
+            if let Err(e) = request.set_grammar(grammar) {
+                tracing::warn!(error = ?e, "Failed to attach grammar");
+                return (String::new(), 0, 0.0);
+            }
+        }
+
         // Run inference. The request is Send+Sync and the C++ engine handles
         // its own internal synchronization, so we can proceed without holding
         // the tokio mutex during the blocking FFI call.
@@ -922,6 +946,14 @@ impl TurboMindCEngine {
         };
 
         let mut output_tensors = TensorMap::new().unwrap();
+
+        // Attach grammar for guided decoding if provided
+        if let Some(grammar) = &params.grammar {
+            if let Err(e) = request.set_grammar(grammar) {
+                tracing::warn!(error = ?e, "Failed to attach grammar");
+                return (String::new(), 0, 0.0, None);
+            }
+        }
 
         match request.forward(
             &mut input_tensors,
@@ -1068,6 +1100,15 @@ impl TurboMindCEngine {
                 start_flag: true,
                 end_flag: true,
             };
+
+            // Attach grammar for guided decoding if provided
+            if let Some(grammar) = &params_for_blocking.grammar {
+                if let Err(e) = request.set_grammar(grammar) {
+                    tracing::warn!(error = ?e, "Failed to attach grammar for stream");
+                    let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
+                    return;
+                }
+            }
 
             // Submit async forward with stream_output=true
             if let Err(e) = request.forward_async(
@@ -1543,6 +1584,13 @@ impl TurboMindCEngine {
                     start_flag: true,
                     end_flag: true,
                 };
+
+                // Attach grammar for guided decoding if provided
+                if let Some(ref grammar) = item.params.grammar {
+                    if let Err(e) = request.set_grammar(grammar) {
+                        tracing::warn!(error = ?e, request_id, "Failed to attach grammar for batch");
+                    }
+                }
 
                 // Submit async forward request - this adds to the C++ gateway queue
                 // The gateway will batch multiple requests together for GPU execution

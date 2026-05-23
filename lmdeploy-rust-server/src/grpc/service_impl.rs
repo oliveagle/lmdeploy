@@ -10,6 +10,7 @@ use crate::cache::TokenizeCache;
 use crate::error::AppError;
 use crate::model::ModelManager;
 use crate::model::{BatchItem, BatchResult, GenerationParams, ModelEngine};
+use crate::turbomind_c::CompiledGrammar;
 
 use super::lmdeploy::v1::{
     generate_stream_response, lm_deploy_service_server::LmDeployService, BatchGenerateRequest,
@@ -17,6 +18,39 @@ use super::lmdeploy::v1::{
     HealthRequest, HealthResponse, LogprobEntry, ModelInfoRequest, ModelInfoResponse, StreamChunk,
     TokenizeRequest, TokenizeResponse, TopLogprobEntry,
 };
+
+/// Convert guided decoding fields from gRPC request to a CompiledGrammar.
+fn build_grammar_from_grpc(req: &GenerateRequest) -> Option<Arc<CompiledGrammar>> {
+    if !req.json_schema.is_empty() {
+        match CompiledGrammar::from_json_schema(&req.json_schema) {
+            Ok(grammar) => Some(Arc::new(grammar)),
+            Err(e) => {
+                tracing::warn!("Failed to compile JSON schema from gRPC request: {}", e);
+                None
+            }
+        }
+    } else if !req.ebnf_grammar.is_empty() {
+        match CompiledGrammar::from_ebnf(&req.ebnf_grammar) {
+            Ok(grammar) => Some(Arc::new(grammar)),
+            Err(e) => {
+                tracing::warn!("Failed to compile EBNF grammar from gRPC request: {}", e);
+                None
+            }
+        }
+    } else if !req.regex_pattern.is_empty() {
+        match CompiledGrammar::from_regex(&req.regex_pattern) {
+            Ok(grammar) => Some(Arc::new(grammar)),
+            Err(e) => {
+                tracing::warn!("Failed to compile regex from gRPC request: {}", e);
+                None
+            }
+        }
+    } else if req.builtin_json_grammar {
+        Some(Arc::new(CompiledGrammar::builtin_json()))
+    } else {
+        None
+    }
+}
 
 /// Helper to get the default engine from model manager
 /// This should be called with &model_manager (not a read guard)
@@ -91,7 +125,10 @@ impl LmDeployService for LmDeployServiceImpl {
         let engine = engine_ref.read().await;
         let eng = &*engine;
 
-        // Build GenerationParams with logprobs support
+        // Build grammar from guided decoding fields
+        let grammar = build_grammar_from_grpc(&req);
+
+        // Build GenerationParams with logprobs and grammar support
         let need_logprobs = req.logprobs || req.top_logprobs > 0;
         let mut params = GenerationParams::from_grpc_request_with_logprobs(
             if req.max_tokens > 0 { Some(req.max_tokens as usize) } else { None },
@@ -103,6 +140,9 @@ impl LmDeployService for LmDeployServiceImpl {
             if req.logprobs { Some(true) } else { None },
             if req.top_logprobs > 0 { Some(req.top_logprobs as u32) } else { None },
         );
+
+        // Apply grammar constraint if provided
+        params.grammar = grammar;
 
         // Run inference with or without logprobs
         let (text, num_tokens, elapsed_ms, logprobs) = if need_logprobs {
@@ -425,18 +465,26 @@ impl LmDeployService for LmDeployServiceImpl {
             .requests
             .into_iter()
             .enumerate()
-            .map(|(idx, gen_req)| BatchItem {
-                request_id: idx as u64,
-                prompt: gen_req.prompt,
-                params: GenerationParams::from_grpc_request(
+            .map(|(idx, gen_req)| {
+                let grammar = build_grammar_from_grpc(&gen_req);
+                let need_logprobs = gen_req.logprobs || gen_req.top_logprobs > 0;
+                let mut params = GenerationParams::from_grpc_request_with_logprobs(
                     if gen_req.max_tokens > 0 { Some(gen_req.max_tokens as usize) } else { None },
                     if gen_req.temperature > 0.0 { Some(gen_req.temperature) } else { None },
                     if gen_req.top_p > 0.0 { Some(gen_req.top_p) } else { None },
                     if gen_req.top_k > 0 { Some(gen_req.top_k) } else { None },
                     if gen_req.repetition_penalty > 0 { Some(gen_req.repetition_penalty as f32) } else { None },
                     if gen_req.seed > 0 { Some(gen_req.seed as u64) } else { None },
-                ),
-                need_logprobs: false,
+                    if gen_req.logprobs { Some(true) } else { None },
+                    if gen_req.top_logprobs > 0 { Some(gen_req.top_logprobs as u32) } else { None },
+                );
+                params.grammar = grammar;
+                BatchItem {
+                    request_id: idx as u64,
+                    prompt: gen_req.prompt,
+                    params,
+                    need_logprobs,
+                }
             })
             .collect();
 

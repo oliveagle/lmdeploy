@@ -40,6 +40,11 @@ message GenerateRequest {
   int32 repetition_penalty = 10;
   bool logprobs = 11;
   int32 top_logprobs = 12;
+  // Guided decoding / structured output
+  string json_schema = 13;          // JSON schema string for constrained generation
+  string ebnf_grammar = 14;         // EBNF grammar string
+  string regex_pattern = 15;        // Regex pattern for constrained generation
+  bool builtin_json_grammar = 16;   // Use builtin JSON grammar (accepts any valid JSON)
 }
 
 // Generation response

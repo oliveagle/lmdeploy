@@ -83,6 +83,11 @@ pub struct TM_GenerationConfig {
 }
 
 #[repr(C)]
+pub struct TM_CompiledGrammar {
+    _private: [u8; 0],
+}
+
+#[repr(C)]
 pub struct TM_ModelRequest {
     _private: [u8; 0],
 }
@@ -344,6 +349,14 @@ extern "C" {
         cb: TM_TokenCallback,
         user_data: *mut c_void,
     ) -> c_int;
+
+    // Guided Decoding / Structured Output (xgrammar)
+    pub fn TM_Grammar_CreateFromJSONSchema(json_schema: *const c_char) -> *mut TM_CompiledGrammar;
+    pub fn TM_Grammar_CreateFromEBNF(ebnf_string: *const c_char) -> *mut TM_CompiledGrammar;
+    pub fn TM_Grammar_CreateFromRegex(regex: *const c_char) -> *mut TM_CompiledGrammar;
+    pub fn TM_Grammar_GetBuiltinJSON() -> *const TM_CompiledGrammar;
+    pub fn TM_Grammar_Destroy(grammar: *mut TM_CompiledGrammar);
+    pub fn TM_ModelRequest_SetGrammar(req: *mut TM_ModelRequest, grammar: *const TM_CompiledGrammar) -> c_int;
 }
 
 /// Result type for FFI operations
@@ -794,6 +807,109 @@ impl Drop for GenConfig {
     }
 }
 
+/// Compiled grammar for guided decoding.
+///
+/// Created from JSON schema, EBNF grammar, or regex pattern via the
+/// xgrammar integration in the C++ engine. Attach to a ModelRequest
+/// via `ModelRequest::set_grammar` before calling forward.
+pub struct CompiledGrammar {
+    ptr: *mut TM_CompiledGrammar,
+    builtin: bool,
+}
+
+impl fmt::Debug for CompiledGrammar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CompiledGrammar")
+            .field("ptr", &self.ptr)
+            .field("builtin", &self.builtin)
+            .finish()
+    }
+}
+
+// Safety: The underlying C++ grammar is immutable after creation
+unsafe impl Send for CompiledGrammar {}
+unsafe impl Sync for CompiledGrammar {}
+
+impl CompiledGrammar {
+    /// Create a compiled grammar from a JSON schema string.
+    pub fn from_json_schema(schema: &str) -> FFResult<Self> {
+        let schema_c = std::ffi::CString::new(schema).map_err(|e| FFError {
+            code: TM_ErrorCode::TM_ERR_INVALID_ARG,
+            message: format!("Invalid JSON schema string: {}", e),
+        })?;
+        unsafe {
+            let ptr = TM_Grammar_CreateFromJSONSchema(schema_c.as_ptr());
+            if ptr.is_null() {
+                return Err(FFError::from_last_error().unwrap_or(FFError {
+                    code: TM_ErrorCode::TM_ERR_RUNTIME,
+                    message: "Failed to create grammar from JSON schema".into(),
+                }));
+            }
+            Ok(CompiledGrammar { ptr, builtin: false })
+        }
+    }
+
+    /// Create a compiled grammar from an EBNF grammar string.
+    pub fn from_ebnf(grammar: &str) -> FFResult<Self> {
+        let grammar_c = std::ffi::CString::new(grammar).map_err(|e| FFError {
+            code: TM_ErrorCode::TM_ERR_INVALID_ARG,
+            message: format!("Invalid EBNF grammar string: {}", e),
+        })?;
+        unsafe {
+            let ptr = TM_Grammar_CreateFromEBNF(grammar_c.as_ptr());
+            if ptr.is_null() {
+                return Err(FFError::from_last_error().unwrap_or(FFError {
+                    code: TM_ErrorCode::TM_ERR_RUNTIME,
+                    message: "Failed to create grammar from EBNF".into(),
+                }));
+            }
+            Ok(CompiledGrammar { ptr, builtin: false })
+        }
+    }
+
+    /// Create a compiled grammar from a regex pattern.
+    pub fn from_regex(pattern: &str) -> FFResult<Self> {
+        let pattern_c = std::ffi::CString::new(pattern).map_err(|e| FFError {
+            code: TM_ErrorCode::TM_ERR_INVALID_ARG,
+            message: format!("Invalid regex pattern: {}", e),
+        })?;
+        unsafe {
+            let ptr = TM_Grammar_CreateFromRegex(pattern_c.as_ptr());
+            if ptr.is_null() {
+                return Err(FFError::from_last_error().unwrap_or(FFError {
+                    code: TM_ErrorCode::TM_ERR_RUNTIME,
+                    message: "Failed to create grammar from regex".into(),
+                }));
+            }
+            Ok(CompiledGrammar { ptr, builtin: false })
+        }
+    }
+
+    /// Get the built-in JSON grammar (accepts any valid JSON output).
+    pub fn builtin_json() -> Self {
+        unsafe {
+            let ptr = TM_Grammar_GetBuiltinJSON();
+            CompiledGrammar {
+                ptr: ptr as *mut _,
+                builtin: true,
+            }
+        }
+    }
+
+    /// Get the raw C pointer for passing to C functions.
+    pub fn as_ptr(&self) -> *const TM_CompiledGrammar {
+        self.ptr
+    }
+}
+
+impl Drop for CompiledGrammar {
+    fn drop(&mut self) {
+        if !self.builtin {
+            unsafe { TM_Grammar_Destroy(self.ptr) }
+        }
+    }
+}
+
 /// RAII wrapper for TM_TensorMap
 pub struct TensorMap(*mut TM_TensorMap);
 
@@ -1082,6 +1198,23 @@ impl ModelRequest {
             }));
         }
         Ok(())
+    }
+
+    /// Attach a compiled grammar for guided decoding.
+    ///
+    /// Must be called before `forward` or `forward_async`. The grammar is not
+    /// owned by the request and must remain valid until the forward completes.
+    pub fn set_grammar(&mut self, grammar: &CompiledGrammar) -> FFResult<()> {
+        unsafe {
+            let ret = TM_ModelRequest_SetGrammar(self.0, grammar.as_ptr());
+            if ret != 0 {
+                return Err(FFError::from_last_error().unwrap_or(FFError {
+                    code: TM_ErrorCode::TM_ERR_RUNTIME,
+                    message: "Failed to attach grammar to request".into(),
+                }));
+            }
+            Ok(())
+        }
     }
 }
 

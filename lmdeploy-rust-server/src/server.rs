@@ -33,7 +33,7 @@ use crate::handlers::http::{
     chat_completions_stream, clear_cache, completions, embeddings, health_check, list_models,
     model_load, model_load_progress, model_reload, model_unload, rate_limit_status, stream_metrics,
     tokenize, ChatCompletionsRequest, ChatCompletionsResponse, Choice, ChoiceLogprobs, Message,
-    TopLogprobEntry, Usage,
+    response_format_to_grammar, TopLogprobEntry, Usage,
 };
 use crate::metrics::{init_metrics, AppMetrics};
 use crate::model::{ModelLoadTracker, ModelManager};
@@ -584,6 +584,7 @@ async fn flush_batch(
                     let need_logprobs = item.req.logprobs.unwrap_or(false)
                         || item.req.top_logprobs.unwrap_or(0) > 0;
 
+                    let grammar = response_format_to_grammar(&item.req.response_format);
                     let params = GenerationParams::from_chat_request(
                         item.req.temperature,
                         item.req.top_p,
@@ -596,6 +597,7 @@ async fn flush_batch(
                         item.req.stop.clone(),
                         item.req.logprobs,
                         item.req.top_logprobs,
+                        grammar,
                     );
 
                     // Call the actual engine

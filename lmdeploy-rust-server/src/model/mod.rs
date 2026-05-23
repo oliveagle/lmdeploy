@@ -8,7 +8,7 @@ mod manager;
 
 // Re-export common types
 pub use cpp_engine::{
-    BatchItem, BatchResult, EngineType, GenerationParams, ModelInfo, ModelState, TokenLogprob,
-    TopLogprob, TurboMindCEngine,
+    BatchItem, BatchResult, EngineType, GenerationParams, GuidedGrammar, ModelInfo, ModelState,
+    TokenLogprob, TopLogprob, TurboMindCEngine,
 };
 pub use manager::{ModelEngine, ModelLoadProgress, ModelLoadTracker, ModelManager};

@@ -2276,6 +2276,130 @@ void TM_TensorMap_SetBytes(TM_TensorMap* map, const char* name, const void* data
 }
 
 // ============================================================
+// Guided Decoding / Structured Output (xgrammar)
+// ============================================================
+
+#include "xgrammar/compiler.h"
+
+namespace {
+
+// Singleton builtin JSON grammar (created once, reused)
+TM_CompiledGrammar* g_builtin_json_grammar = nullptr;
+std::once_flag g_builtin_json_init_flag;
+
+// Initialize the builtin JSON grammar
+void InitBuiltinJSONGrammar() {
+    try {
+        auto grammar = xgrammar::Grammar::BuiltinJSONGrammar();
+        auto compiled = xgrammar::GrammarCompiler::CompileBuiltinJSONGrammar();
+        g_builtin_json_grammar = reinterpret_cast<TM_CompiledGrammar*>(new xgrammar::CompiledGrammar(std::move(compiled)));
+    }
+    catch (const std::exception& e) {
+        fprintf(stderr, "[C-API] Failed to initialize builtin JSON grammar: %s\n", e.what());
+    }
+}
+
+}  // anonymous namespace
+
+struct TM_CompiledGrammar {
+    std::shared_ptr<xgrammar::CompiledGrammar> grammar;
+};
+
+TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema)
+{
+    if (!json_schema) {
+        SetError(TM_ERR_INVALID_ARG, "json_schema must not be NULL");
+        return nullptr;
+    }
+
+    try {
+        auto grammar = xgrammar::Grammar::FromJSONSchema(json_schema);
+        auto compiler = xgrammar::GrammarCompiler();
+        auto compiled = compiler.CompileJSONSchema(json_schema);
+        auto* wrapper = new TM_CompiledGrammar{};
+        wrapper->grammar = std::make_shared<xgrammar::CompiledGrammar>(std::move(compiled));
+        return wrapper;
+    }
+    catch (const std::exception& e) {
+        SetError(TM_ERR_RUNTIME, e.what());
+        return nullptr;
+    }
+}
+
+TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string)
+{
+    if (!ebnf_string) {
+        SetError(TM_ERR_INVALID_ARG, "ebnf_string must not be NULL");
+        return nullptr;
+    }
+
+    try {
+        auto grammar = xgrammar::Grammar::FromEBNF(ebnf_string);
+        auto compiler = xgrammar::GrammarCompiler();
+        auto compiled = compiler.CompileEBNF(ebnf_string);
+        auto* wrapper = new TM_CompiledGrammar{};
+        wrapper->grammar = std::make_shared<xgrammar::CompiledGrammar>(std::move(compiled));
+        return wrapper;
+    }
+    catch (const std::exception& e) {
+        SetError(TM_ERR_RUNTIME, e.what());
+        return nullptr;
+    }
+}
+
+TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex)
+{
+    if (!regex) {
+        SetError(TM_ERR_INVALID_ARG, "regex must not be NULL");
+        return nullptr;
+    }
+
+    try {
+        auto grammar = xgrammar::Grammar::FromRegex(regex);
+        auto compiler = xgrammar::GrammarCompiler();
+        auto compiled = compiler.CompileRegex(regex);
+        auto* wrapper = new TM_CompiledGrammar{};
+        wrapper->grammar = std::make_shared<xgrammar::CompiledGrammar>(std::move(compiled));
+        return wrapper;
+    }
+    catch (const std::exception& e) {
+        SetError(TM_ERR_RUNTIME, e.what());
+        return nullptr;
+    }
+}
+
+TM_CompiledGrammar* TM_Grammar_GetBuiltinJSON(void)
+{
+    std::call_once(g_builtin_json_init_flag, InitBuiltinJSONGrammar);
+    return g_builtin_json_grammar;
+}
+
+void TM_Grammar_Destroy(TM_CompiledGrammar* grammar)
+{
+    // Don't destroy the builtin singleton
+    if (grammar && grammar != g_builtin_json_grammar) {
+        delete grammar;
+    }
+}
+
+int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, TM_CompiledGrammar* grammar)
+{
+    if (!req || !grammar) {
+        SetError(TM_ERR_INVALID_ARG, "req and grammar must not be NULL");
+        return TM_ERR_INVALID_ARG;
+    }
+
+    try {
+        req->req->setGrammar(*grammar->grammar);
+        return TM_OK;
+    }
+    catch (const std::exception& e) {
+        SetError(TM_ERR_RUNTIME, e.what());
+        return TM_ERR_RUNTIME;
+    }
+}
+
+// ============================================================
 // Weight Export / Import
 // ============================================================
 
