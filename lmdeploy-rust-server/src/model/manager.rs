@@ -66,6 +66,18 @@ impl ModelEngine {
         }
     }
 
+    /// Generate with pre-tokenized input for lower TTFT
+    pub async fn generate_stream_with_ids(
+        &self,
+        prompt: &str,
+        input_ids: Vec<u32>,
+        params: GenerationParams,
+    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+        match self {
+            ModelEngine::PureCpp(e) => e.generate_stream_with_ids(prompt, input_ids, params).await,
+        }
+    }
+
     pub async fn embed(&self, text: &str, dimensions: Option<usize>) -> Vec<f32> {
         match self {
             ModelEngine::PureCpp(e) => e.embed(text, dimensions).await,

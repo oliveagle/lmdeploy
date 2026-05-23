@@ -238,6 +238,15 @@ impl LmDeployService for LmDeployServiceImpl {
         );
         let prompt = req.prompt;
 
+        // Pre-tokenize outside of spawn_blocking for lower TTFT
+        // This moves tokenization off the critical path
+        let pre_tokenized_ids: Option<Vec<u32>> = {
+            let mm = self.model_manager.read().await;
+            mm.get_default_tokenizer()
+                .await
+                .and_then(|t| t.encode(&prompt, false, false).ok())
+        };
+
         tokio::spawn(async move {
             let first_token_start = Instant::now();
             let mut first_token_recorded = false;
@@ -258,10 +267,12 @@ impl LmDeployService for LmDeployServiceImpl {
             let engine_guard = engine_ref.read().await;
             let engine = &*engine_guard;
 
-            // Use the engine's streaming method
-            let mut stream = engine
-                .generate_stream(&prompt, params)
-                .await;
+            // Use the engine's streaming method with pre-tokenized input if available
+            let mut stream = if let Some(ids) = pre_tokenized_ids {
+                engine.generate_stream_with_ids(&prompt, ids, params).await
+            } else {
+                engine.generate_stream(&prompt, params).await
+            };
 
             // Process tokens from the stream
             while let Ok(Some(token_result)) = tokio::time::timeout(

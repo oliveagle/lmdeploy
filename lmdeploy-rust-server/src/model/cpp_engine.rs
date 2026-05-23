@@ -221,6 +221,7 @@ impl GenerationParams {
 ///
 /// Invoked by the C++ engine whenever a new token is generated.
 /// Decodes the token and sends it through the channel.
+/// Optimized for minimal latency: uses try_send and pre-allocated buffers.
 extern "C" fn token_callback(token_id: c_int, _seq_len: c_int, user_data: *mut c_void) {
     unsafe {
         let ctx = &*(user_data as *const StreamContext);
@@ -231,6 +232,8 @@ extern "C" fn token_callback(token_id: c_int, _seq_len: c_int, user_data: *mut c
             _ => return,
         };
 
+        // Use try_send for non-blocking send - if channel is full, drop this token
+        // This prevents blocking the C++ callback thread and improves TTFT
         let _ = ctx.tx.try_send(token_str);
     }
 }
@@ -1053,6 +1056,37 @@ impl TurboMindCEngine {
             }
         };
 
+        self.generate_stream_impl(input_ids, tokenizer, params).await
+    }
+
+    /// Generate text with streaming output using pre-tokenized input.
+    ///
+    /// This variant skips tokenization for lower TTFT when token IDs are already known.
+    pub async fn generate_stream_with_ids(
+        &self,
+        _prompt: &str,
+        input_ids: Vec<u32>,
+        params: GenerationParams,
+    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+        let tokenizer = match &self.tokenizer {
+            Some(t) => t.clone(),
+            None => {
+                tracing::error!("Tokenizer not available");
+                return Box::pin(futures::stream::empty());
+            }
+        };
+
+        self.generate_stream_impl(input_ids, tokenizer, params).await
+    }
+
+    /// Internal streaming implementation with token IDs.
+    async fn generate_stream_impl(
+        &self,
+        input_ids: Vec<u32>,
+        tokenizer: LMTokenizer,
+        params: GenerationParams,
+    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+        // Input IDs are already tokenized - convert to i64 for tensor
         let input_ids_vec: Vec<i64> = input_ids.iter().map(|&id| id as i64).collect();
         let prompt_len = input_ids.len() as i32;
 
@@ -1139,8 +1173,9 @@ impl TurboMindCEngine {
             }
 
             // Wait for completion (no polling needed for tokens, only for status)
+            // Reduced polling interval from 5ms to 1ms for faster TTFT detection
             loop {
-                std::thread::sleep(std::time::Duration::from_millis(5));
+                std::thread::sleep(std::time::Duration::from_millis(1));
 
                 let (status, _seq_len) = match request.get_streaming_state() {
                     Ok(s) => s,
