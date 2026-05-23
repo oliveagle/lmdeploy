@@ -862,19 +862,28 @@ pub async fn tokenize(
     let hash = compute_hash(&req.text);
     let start = std::time::Instant::now();
 
+    let state_clone = state.clone();
     let token_ids = state
         .tokenizer_cache
         .get_or_tokenize(&req.text, |text| {
             let owned = text.to_string();
             async move {
-                let mock_tokens: Vec<u32> = owned.chars().map(|c| c as u32).collect();
-                Ok(mock_tokens)
+                let mgr = state_clone.model_manager.read().await;
+                if let Some(tokenizer) = mgr.get_default_tokenizer().await {
+                    tokenizer.encode(&owned, false, false)
+                        .map_err(|e| crate::error::AppError::Other(format!("Tokenization failed: {}", e)))
+                } else {
+                    Err(crate::error::AppError::Other("No tokenizer available - model may not be loaded yet".to_string()))
+                }
             }
         })
         .await
-        .unwrap_or_else(|_| req.text.chars().map(|c| c as u32).collect());
+        .unwrap_or_else(|e| {
+            tracing::error!(error = %e, "Tokenization failed, falling back to mock");
+            req.text.chars().map(|c| c as u32).collect()
+        });
 
-    let cached = start.elapsed().as_millis() < 1; // Fast response = cache hit
+    let cached = start.elapsed().as_millis() < 1;
 
     tracing::info!(
         text_len = req.text.len(),

@@ -3,9 +3,12 @@ use std::time::Instant;
 
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use tokio::sync::RwLock;
 use tonic::{Request, Response, Status, Streaming};
 
 use crate::cache::TokenizeCache;
+use crate::model::ModelManager;
+use crate::error::AppError;
 
 use super::lmdeploy::v1::{
     lm_deploy_service_server::LmDeployService,
@@ -21,6 +24,7 @@ use super::lmdeploy::v1::{
 pub struct LmDeployServiceImpl {
     pub version: String,
     pub tokenizer_cache: Arc<TokenizeCache>,
+    pub model_manager: Arc<RwLock<ModelManager>>,
 }
 
 #[tonic::async_trait]
@@ -250,9 +254,43 @@ impl LmDeployService for LmDeployServiceImpl {
         tracing::info!(text_len = req.text.len(), "gRPC Tokenize request");
 
         let hash = crate::cache::compute_hash(&req.text);
-        let token_ids: Vec<u32> = req.text.chars().map(|c| c as u32).collect();
-        let tokens: Vec<String> = req.text.split_whitespace().map(String::from).collect();
+        let start = std::time::Instant::now();
+
+        let token_ids = self
+            .tokenizer_cache
+            .get_or_tokenize(&req.text, |text| {
+                let owned = text.to_string();
+                let mm = self.model_manager.clone();
+                async move {
+                    let manager = mm.read().await;
+                    if let Some(tokenizer) = manager.get_default_tokenizer().await {
+                        tokenizer.encode(&owned, false, false)
+                            .map_err(|e| AppError::Other(format!("Tokenization failed: {}", e)))
+                    } else {
+                        Err(AppError::Other("No tokenizer available".to_string()))
+                    }
+                }
+            })
+            .await
+            .unwrap_or_else(|e| {
+                tracing::error!(error = %e, "gRPC tokenization failed, falling back to mock");
+                req.text.chars().map(|c| c as u32).collect()
+            });
+
         let length = token_ids.len();
+        let latency_ms = start.elapsed().as_millis() as f64;
+
+        // Decode tokens back to string representation
+        let tokens = {
+            let manager = self.model_manager.read().await;
+            if let Some(tokenizer) = manager.get_default_tokenizer().await {
+                token_ids.iter()
+                    .map(|&id| tokenizer.id_to_token(id).unwrap_or_else(|| format!("<id:{}>", id)))
+                    .collect()
+            } else {
+                req.text.split_whitespace().map(String::from).collect()
+            }
+        };
 
         let resp = TokenizeResponse {
             token_ids,
@@ -260,6 +298,12 @@ impl LmDeployService for LmDeployServiceImpl {
             length: length as i32,
             hash,
         };
+
+        tracing::info!(
+            token_count = length,
+            latency_ms = latency_ms,
+            "gRPC Tokenize response"
+        );
 
         Ok(Response::new(resp))
     }

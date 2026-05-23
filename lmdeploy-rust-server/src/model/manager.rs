@@ -13,6 +13,7 @@ use tokio::sync::RwLock;
 
 use crate::error::{AppError, Result};
 use crate::model::cpp_engine::{EngineType, ModelState, ModelInfo, TurboMindCEngine, GenerationParams, TokenLogprob};
+use crate::tokenizer::LMTokenizer;
 
 /// Unified engine enum - Pure C++ only
 pub enum ModelEngine {
@@ -70,6 +71,12 @@ impl ModelEngine {
     pub fn info(&self) -> ModelInfo {
         match self {
             ModelEngine::PureCpp(e) => e.info(),
+        }
+    }
+
+    pub fn tokenizer(&self) -> Option<&LMTokenizer> {
+        match self {
+            ModelEngine::PureCpp(e) => e.tokenizer(),
         }
     }
 }
@@ -259,6 +266,22 @@ impl ModelManager {
     /// Get the number of loaded models
     pub fn model_count(&self) -> usize {
         self.models.len()
+    }
+
+    /// Get tokenizer for a model by name (or default if not specified)
+    pub async fn get_model_tokenizer(&self, model_name: Option<&str>) -> Option<LMTokenizer> {
+        let engine = self.get_model(model_name)?;
+        let eng = engine.read().await;
+        match &*eng {
+            ModelEngine::PureCpp(e) => {
+                e.tokenizer().cloned()
+            }
+        }
+    }
+
+    /// Get the default model's tokenizer
+    pub async fn get_default_tokenizer(&self) -> Option<LMTokenizer> {
+        self.get_model_tokenizer(Some(&self.default_model)).await
     }
 }
 

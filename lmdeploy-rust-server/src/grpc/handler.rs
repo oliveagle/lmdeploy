@@ -2,8 +2,10 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tonic::transport::Server;
+use tokio::sync::RwLock;
 
 use crate::cache::TokenizeCache;
+use crate::model::ModelManager;
 
 use super::service_impl::LmDeployServiceImpl;
 use super::LmDeployServiceServer;
@@ -12,10 +14,12 @@ pub async fn start_grpc_server(
     addr: SocketAddr,
     version: String,
     tokenizer_cache: Arc<TokenizeCache>,
+    model_manager: Arc<RwLock<ModelManager>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let service = LmDeployServiceImpl {
         version,
         tokenizer_cache,
+        model_manager,
     };
 
     tracing::info!(%addr, "Starting gRPC server");

@@ -141,6 +141,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
     let model_manager = Arc::new(RwLock::new(
         ModelManager::with_default_model_and_type(&config.model.model_path, engine_type).await?,
     ));
+    let grpc_model_manager = model_manager.clone();
 
     // Log default model info
     {
@@ -302,7 +303,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
 
     // Spawn gRPC server
     let grpc_handle = tokio::spawn(async move {
-        crate::grpc::start_grpc_server(grpc_addr, env!("CARGO_PKG_VERSION").to_string(), tokenizer_cache).await
+        crate::grpc::start_grpc_server(grpc_addr, env!("CARGO_PKG_VERSION").to_string(), tokenizer_cache, grpc_model_manager).await
     });
 
     // Spawn SIGHUP handler for hot reload
