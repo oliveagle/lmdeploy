@@ -14,16 +14,17 @@ use crate::model::{BatchItem, BatchResult, GenerationParams, ModelEngine};
 use super::lmdeploy::v1::{
     generate_stream_response, lm_deploy_service_server::LmDeployService, BatchGenerateRequest,
     BatchGenerateResponse, GenerateRequest, GenerateResponse, GenerateStreamResponse,
-    HealthRequest, HealthResponse, ModelInfoRequest, ModelInfoResponse, StreamChunk,
-    TokenizeRequest, TokenizeResponse,
+    HealthRequest, HealthResponse, LogprobEntry, ModelInfoRequest, ModelInfoResponse, StreamChunk,
+    TokenizeRequest, TokenizeResponse, TopLogprobEntry,
 };
 
 /// Helper to get the default engine from model manager
+/// This should be called with &model_manager (not a read guard)
 fn get_default_engine(
-    manager: &Arc<RwLock<ModelManager>>,
+    model_manager: &Arc<RwLock<ModelManager>>,
 ) -> Option<std::sync::Arc<tokio::sync::RwLock<ModelEngine>>> {
     // Note: This returns a clone of the Arc, not a borrow to the internal model
-    manager.blocking_read().get_model(None)
+    model_manager.blocking_read().get_model(None)
 }
 
 #[derive(Clone)]
@@ -60,9 +61,16 @@ impl LmDeployService for LmDeployServiceImpl {
 
         tracing::info!(prompt_len = req.prompt.len(), "gRPC Generate request");
 
+        // Check if logprobs are requested
+        let need_logprobs = req.logprobs || req.top_logprobs > 0;
+        let top_logprobs = if req.top_logprobs > 0 {
+            Some(req.top_logprobs as u32)
+        } else {
+            None
+        };
+
         // Get the engine from model manager
-        let manager = self.model_manager.read().await;
-        let engine_ref = match get_default_engine(&manager) {
+        let engine_ref = match get_default_engine(&self.model_manager) {
             Some(e) => e,
             None => {
                 let resp = GenerateResponse {
@@ -74,6 +82,7 @@ impl LmDeployService for LmDeployServiceImpl {
                     error: "No model loaded".to_string(),
                     latency_ms: 0.0,
                     tokens_per_second: 0.0,
+                    logprobs: vec![],
                 };
                 return Ok(Response::new(resp));
             }
@@ -82,33 +91,72 @@ impl LmDeployService for LmDeployServiceImpl {
         let engine = engine_ref.read().await;
         let eng = &*engine;
 
-        let params = GenerationParams::from_grpc_request(
+        // Build GenerationParams with logprobs support
+        let need_logprobs = req.logprobs || req.top_logprobs > 0;
+        let mut params = GenerationParams::from_grpc_request_with_logprobs(
             if req.max_tokens > 0 { Some(req.max_tokens as usize) } else { None },
             if req.temperature > 0.0 { Some(req.temperature) } else { None },
             if req.top_p > 0.0 { Some(req.top_p) } else { None },
             if req.top_k > 0 { Some(req.top_k) } else { None },
             if req.repetition_penalty > 0 { Some(req.repetition_penalty as f32) } else { None },
             if req.seed > 0 { Some(req.seed as u64) } else { None },
+            if req.logprobs { Some(true) } else { None },
+            if req.top_logprobs > 0 { Some(req.top_logprobs as u32) } else { None },
         );
 
-        let (text, num_tokens, elapsed_ms) = eng
-            .generate_with_metrics(&req.prompt, params)
-            .await;
+        // Run inference with or without logprobs
+        let (text, num_tokens, elapsed_ms, logprobs) = if need_logprobs {
+            let (t, nt, el, lp) = eng.generate_with_logprobs(&req.prompt, params).await;
+            (t, nt, el, lp)
+        } else {
+            let t = eng.generate(&req.prompt, params).await;
+            (t, 0, 0.0, None)
+        };
+
+        // Recalculate elapsed_ms for non-logprobs path
+        let elapsed = if need_logprobs { elapsed_ms } else {
+            // Use a simple estimate if we didn't get metrics
+            let _ = num_tokens; // suppress unused warning
+            0.0
+        };
 
         // Calculate tokens per second
-        let tokens_per_second = if elapsed_ms > 0.0 && num_tokens > 0 {
-            (num_tokens as f64 / elapsed_ms) * 1000.0
+        let tokens_per_second = if elapsed > 0.0 && num_tokens > 0 {
+            (num_tokens as f64 / elapsed) * 1000.0
         } else {
             0.0
         };
 
         // Count prompt tokens if we have a tokenizer
-        let prompt_tokens = manager
+        let prompt_tokens = self
+            .model_manager
+            .read()
+            .await
             .get_default_tokenizer()
             .await
             .and_then(|t| t.encode(&req.prompt, false, false).ok())
             .map(|ids| ids.len())
             .unwrap_or(0);
+
+        // Convert TokenLogprob to gRPC LogprobEntry
+        let logprobs_entries = logprobs.map(|lp| {
+            lp.iter()
+                .map(|t| LogprobEntry {
+                    token_id: 0, // Will be filled from token_ids if needed
+                    token: t.token.clone(),
+                    logprob: t.logprob as f32,
+                    top_logprobs: t
+                        .top_logprobs
+                        .iter()
+                        .map(|tp| TopLogprobEntry {
+                            token_id: 0,
+                            token: tp.token.clone(),
+                            logprob: tp.logprob as f32,
+                        })
+                        .collect(),
+                })
+                .collect()
+        }).unwrap_or_default();
 
         let is_empty = text.is_empty();
         let resp = GenerateResponse {
@@ -118,8 +166,9 @@ impl LmDeployService for LmDeployServiceImpl {
             completion_tokens: num_tokens as i32,
             finish_reason: if !is_empty { 0.0 } else { 2.0 },
             error: String::new(),
-            latency_ms: elapsed_ms as f32,
+            latency_ms: elapsed as f32,
             tokens_per_second: tokens_per_second as f32,
+            logprobs: logprobs_entries,
         };
 
         Ok(Response::new(resp))
@@ -357,8 +406,7 @@ impl LmDeployService for LmDeployServiceImpl {
             "gRPC GenerateBatch request"
         );
 
-        let manager = self.model_manager.read().await;
-        let engine_ref = match get_default_engine(&manager) {
+        let engine_ref = match get_default_engine(&self.model_manager) {
             Some(e) => e,
             None => {
                 let error_resp = BatchGenerateResponse {
@@ -425,15 +473,28 @@ impl LmDeployService for LmDeployServiceImpl {
         // Convert BatchResults to GenerateResponse
         let responses: Vec<GenerateResponse> = batch_results
             .into_iter()
-            .map(|r| GenerateResponse {
-                text: r.text,
-                token_ids: vec![],
-                prompt_tokens: 0,
-                completion_tokens: r.num_tokens as i32,
-                finish_reason: if r.error.is_none() { 0.0 } else { 2.0 },
-                error: r.error.unwrap_or_default(),
-                latency_ms: r.elapsed_ms as f32,
-                tokens_per_second: 0.0,
+            .map(|r| {
+                let logprobs = r.logprobs.unwrap_or_default().into_iter().map(|lp| LogprobEntry {
+                    token_id: 0, // TODO: extract token_id from TokenLogprob
+                    token: lp.token,
+                    logprob: lp.logprob as f32,
+                    top_logprobs: lp.top_logprobs.into_iter().map(|tlp| TopLogprobEntry {
+                        token_id: 0,
+                        token: tlp.token,
+                        logprob: tlp.logprob as f32,
+                    }).collect(),
+                }).collect();
+                GenerateResponse {
+                    text: r.text,
+                    token_ids: vec![],
+                    prompt_tokens: 0,
+                    completion_tokens: r.num_tokens as i32,
+                    finish_reason: if r.error.is_none() { 0.0 } else { 2.0 },
+                    error: r.error.unwrap_or_default(),
+                    latency_ms: r.elapsed_ms as f32,
+                    tokens_per_second: 0.0,
+                    logprobs,
+                }
             })
             .collect();
 
@@ -519,10 +580,8 @@ impl LmDeployService for LmDeployServiceImpl {
         &self,
         _request: Request<HealthRequest>,
     ) -> Result<Response<HealthResponse>, Status> {
-        let manager = self.model_manager.read().await;
-
         // Get actual model name from the loaded engine
-        let model_name = match get_default_engine(&manager) {
+        let model_name = match get_default_engine(&self.model_manager) {
             Some(engine_ref) => {
                 let engine = engine_ref.read().await;
                 match &*engine {
@@ -548,14 +607,12 @@ impl LmDeployService for LmDeployServiceImpl {
         &self,
         _request: Request<ModelInfoRequest>,
     ) -> Result<Response<ModelInfoResponse>, Status> {
-        let manager = self.model_manager.read().await;
-
-        let resp = match get_default_engine(&manager) {
+        let resp = match get_default_engine(&self.model_manager) {
             Some(engine_ref) => {
                 let engine = engine_ref.read().await;
                 match &*engine {
                     ModelEngine::PureCpp(e) => {
-                        let tokenizer = manager.get_default_tokenizer().await;
+                        let tokenizer = self.model_manager.read().await.get_default_tokenizer().await;
                         let vocab_size = tokenizer.as_ref().map(|t| t.vocab_size()).unwrap_or(0);
                         let info = e.info();
 

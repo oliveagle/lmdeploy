@@ -91,6 +91,31 @@ impl GenerationParams {
         }
     }
 
+    /// Create GenerationParams from gRPC request with logprobs support.
+    pub fn from_grpc_request_with_logprobs(
+        max_tokens: Option<usize>,
+        temperature: Option<f32>,
+        top_p: Option<f32>,
+        top_k: Option<i32>,
+        repetition_penalty: Option<f32>,
+        seed: Option<u64>,
+        logprobs: Option<bool>,
+        top_logprobs: Option<u32>,
+    ) -> Self {
+        Self {
+            max_tokens,
+            temperature: temperature.filter(|&t| t > 0.0),
+            top_p: top_p.filter(|&p| p > 0.0),
+            top_k,
+            min_p: None,
+            repetition_penalty,
+            seed,
+            stop: None,
+            logprobs,
+            top_logprobs,
+        }
+    }
+
     /// Create GenerationParams from ChatCompletionsRequest fields.
     pub fn from_chat_request(
         temperature: Option<f32>,

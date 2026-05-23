@@ -38,6 +38,8 @@ message GenerateRequest {
   bool echo = 8;
   int32 seed = 9;
   int32 repetition_penalty = 10;
+  bool logprobs = 11;
+  int32 top_logprobs = 12;
 }
 
 // Generation response
@@ -50,6 +52,22 @@ message GenerateResponse {
   string error = 6;
   float latency_ms = 7;
   float tokens_per_second = 8;
+  repeated LogprobEntry logprobs = 9;
+}
+
+// Single token logprob entry
+message LogprobEntry {
+  uint32 token_id = 1;
+  string token = 2;
+  float logprob = 3;
+  repeated TopLogprobEntry top_logprobs = 4;
+}
+
+// One of the top logprobs for a token
+message TopLogprobEntry {
+  uint32 token_id = 1;
+  string token = 2;
+  float logprob = 3;
 }
 
 // Streaming response chunk
