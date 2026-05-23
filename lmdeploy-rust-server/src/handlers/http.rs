@@ -311,6 +311,7 @@ async fn chat_completions_stream_impl(
     });
 
     // Convert channel into SSE stream with usage tracking
+    // Optimized serialization: use pre-allocated buffers to reduce per-token allocations
     let stream = ReceiverStream::new(rx)
         .enumerate()
         .map(move |(idx, chunk_text)| {
@@ -336,7 +337,16 @@ async fn chat_completions_stream_impl(
                     total_tokens: prompt_tokens + completion_tokens,
                 }),
             };
-            let json = serde_json::to_string(&chunk).unwrap_or_default();
+            // Optimized: use serde_json::to_writer to avoid intermediate allocation
+            // Write directly into a pre-allocated buffer, then convert to String
+            let mut buf = Vec::with_capacity(256);
+            let mut writer = serde_json::Serializer::new(&mut buf);
+            let json = if chunk.serialize(&mut writer).is_ok() {
+                // SAFETY: serde_json always produces valid UTF-8
+                unsafe { String::from_utf8_unchecked(buf) }
+            } else {
+                "{}".into()
+            };
             let event = Event::default().event("chat.completion.chunk").data(json);
             Ok::<_, std::convert::Infallible>(event)
         })
@@ -361,7 +371,15 @@ async fn chat_completions_stream_impl(
                     total_tokens: prompt_tokens,
                 }),
             };
-            let json = serde_json::to_string(&final_chunk).unwrap_or_default();
+            // Optimized: serialize directly into buffer for efficiency
+            let mut buf = Vec::with_capacity(256);
+            let mut writer = serde_json::Serializer::new(&mut buf);
+            let json = if final_chunk.serialize(&mut writer).is_ok() {
+                // SAFETY: serde_json always produces valid UTF-8
+                unsafe { String::from_utf8_unchecked(buf) }
+            } else {
+                "{}".into()
+            };
             Ok(Event::default().event("chat.completion.chunk").data(json))
         }));
 
@@ -781,7 +799,8 @@ pub async fn batch_chat_completions(
     drop(mm);
 
     let eng = engine.read().await;
-    let mut choices = Vec::new();
+    // Optimized: pre-allocate with capacity hint to reduce reallocations
+    let mut choices = Vec::with_capacity(req.messages.len());
     let mut total_prompt_tokens = 0;
     let mut total_completion_tokens = 0;
 
@@ -852,7 +871,8 @@ pub async fn batch_completions(
     drop(mm);
 
     let eng = engine.read().await;
-    let mut choices = Vec::new();
+    // Optimized: pre-allocate with capacity hint to reduce reallocations
+    let mut choices = Vec::with_capacity(req.prompts.len());
     let mut total_prompt_tokens = 0;
     let mut total_completion_tokens = 0;
 
@@ -1267,7 +1287,8 @@ pub async fn embeddings(
     drop(mm);
 
     let eng = engine.read().await;
-    let mut data = Vec::new();
+    // Optimized: pre-allocate with capacity hint to reduce reallocations
+    let mut data = Vec::with_capacity(inputs.len());
     let mut total_tokens = 0;
     let dimensions = req.dimensions.map(|d| d as usize);
 
