@@ -356,6 +356,7 @@ pub struct ModelInfo {
     pub loaded_at: Option<i64>,
     pub engine_type: EngineType,
     pub quant_policy: i32,
+    pub prefix_cache_enabled: bool,
     /// Model hidden dimension (used for embeddings)
     pub hidden_size: Option<usize>,
 }
@@ -369,6 +370,7 @@ impl Default for ModelInfo {
             loaded_at: None,
             engine_type: EngineType::default(),
             quant_policy: 0,
+            prefix_cache_enabled: false,
             hidden_size: None,
         }
     }
@@ -427,6 +429,7 @@ pub struct TurboMindCEngine {
     pub loaded_at: Option<i64>,
     pub is_ready: std::sync::atomic::AtomicBool,
     pub engine_type: EngineType,
+    pub prefix_cache_enabled: bool,
 
     // C API components
     tm: Option<Arc<TurboMind>>,
@@ -571,6 +574,11 @@ fn extract_logprobs(
 impl TurboMindCEngine {
     /// Create a new C++ engine and initialize via C API
     pub async fn new(model_path: &str) -> Result<Self> {
+        Self::new_with_prefix_caching(model_path, false).await
+    }
+
+    /// Create a new C++ engine with prefix caching control
+    pub async fn new_with_prefix_caching(model_path: &str, prefix_cache_enabled: bool) -> Result<Self> {
         tracing::info!(model_path, "Initializing TurboMind C++ engine");
 
         let model_path_obj = std::path::PathBuf::from(model_path);
@@ -621,7 +629,7 @@ impl TurboMindCEngine {
         engine_config.set_max_batch_size(32);
         engine_config.set_cache_block_seq_len(64);
         engine_config.set_cache_max_block_count(0.8);
-        engine_config.set_enable_prefix_caching(false);
+        engine_config.set_enable_prefix_caching(prefix_cache_enabled);
         engine_config.set_enable_metrics(true);
         engine_config.set_quant_policy(quant_policy);
 
@@ -684,6 +692,7 @@ impl TurboMindCEngine {
             loaded_at: Some(unix_timestamp()),
             is_ready: std::sync::atomic::AtomicBool::new(true),
             engine_type: EngineType::PureCpp,
+            prefix_cache_enabled,
             tm: Some(Arc::new(tm)),
             request_pool: Some(request_pool),
             tokenizer,
@@ -708,6 +717,7 @@ impl TurboMindCEngine {
             loaded_at: self.loaded_at,
             engine_type: self.engine_type,
             quant_policy: self.quant_policy,
+            prefix_cache_enabled: self.prefix_cache_enabled,
             hidden_size: Some(self.hidden_size),
         }
     }

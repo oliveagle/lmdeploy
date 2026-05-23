@@ -114,10 +114,21 @@ impl ModelManager {
         model_path: &str,
         engine_type: EngineType,
     ) -> Result<Self> {
+        Self::with_default_model_and_type_and_prefix_cache(model_path, engine_type, false).await
+    }
+
+    /// Create a new ModelManager with a default model loaded and prefix caching control
+    pub async fn with_default_model_and_type_and_prefix_cache(
+        model_path: &str,
+        engine_type: EngineType,
+        prefix_cache_enabled: bool,
+    ) -> Result<Self> {
         let mut manager = Self::new();
         let model_engine = match engine_type {
             EngineType::PureCpp => {
-                let cpp_engine = TurboMindCEngine::new(model_path).await?;
+                let cpp_engine =
+                    TurboMindCEngine::new_with_prefix_caching(model_path, prefix_cache_enabled)
+                        .await?;
                 ModelEngine::PureCpp(cpp_engine)
             }
         };
@@ -148,6 +159,23 @@ impl ModelManager {
         model_path: &str,
         engine_type: EngineType,
     ) -> Result<()> {
+        self.load_model_with_type_and_prefix_cache(
+            model_name,
+            model_path,
+            engine_type,
+            false,
+        )
+        .await
+    }
+
+    /// Load a new model with specified engine type and prefix caching control
+    pub async fn load_model_with_type_and_prefix_cache(
+        &mut self,
+        model_name: &str,
+        model_path: &str,
+        engine_type: EngineType,
+        prefix_cache_enabled: bool,
+    ) -> Result<()> {
         if self.models.contains_key(model_name) {
             return Err(AppError::ModelAlreadyLoaded(model_name.to_string()));
         }
@@ -156,12 +184,15 @@ impl ModelManager {
             model_name = %model_name,
             model_path = %model_path,
             engine_type = %engine_type.as_str(),
+            prefix_cache_enabled,
             "Loading new model"
         );
 
         let model_engine = match engine_type {
             EngineType::PureCpp => {
-                let cpp_engine = TurboMindCEngine::new(model_path).await?;
+                let cpp_engine =
+                    TurboMindCEngine::new_with_prefix_caching(model_path, prefix_cache_enabled)
+                        .await?;
                 ModelEngine::PureCpp(cpp_engine)
             }
         };
@@ -250,6 +281,7 @@ impl ModelManager {
                         loaded_at: i.loaded_at,
                         engine_type: i.engine_type,
                         quant_policy: i.quant_policy,
+                        prefix_cache_enabled: i.prefix_cache_enabled,
                         hidden_size: i.hidden_size,
                     }
                 }
@@ -273,6 +305,7 @@ impl ModelManager {
                     loaded_at: i.loaded_at,
                     engine_type: i.engine_type,
                     quant_policy: i.quant_policy,
+                    prefix_cache_enabled: i.prefix_cache_enabled,
                     hidden_size: i.hidden_size,
                 }
             }

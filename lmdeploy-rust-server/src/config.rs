@@ -185,10 +185,17 @@ pub struct ModelConfig {
     /// Engine type: "pure_cpp" (only supported type)
     #[serde(default = "default_engine_type")]
     pub engine_type: String,
+    /// Enable prefix caching at engine initialization
+    #[serde(default = "default_prefix_caching")]
+    pub prefix_cache_enabled: bool,
 }
 
 fn default_engine_type() -> String {
     "pure_cpp".to_string()
+}
+
+fn default_prefix_caching() -> bool {
+    false
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -231,6 +238,9 @@ pub struct ModelEntry {
     /// Engine type: "pure_cpp" (only supported type)
     #[serde(default = "default_model_engine_type")]
     pub engine_type: String,
+    /// Enable prefix caching for this model (optional, uses global default if not set)
+    #[serde(default)]
+    pub prefix_cache_enabled: Option<bool>,
 }
 
 fn default_model_engine_type() -> String {
@@ -277,6 +287,7 @@ impl Default for AppConfig {
                 max_context_length: 8192,
                 max_batch_size: 8,
                 engine_type: default_engine_type(),
+                prefix_cache_enabled: default_prefix_caching(),
             },
             cache: CacheConfig {
                 tokenizer_cache_size: 1000,

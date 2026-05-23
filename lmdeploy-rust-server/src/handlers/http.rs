@@ -1032,6 +1032,72 @@ pub async fn clear_cache(
     )
 }
 
+/// Request to set prefix caching mode
+#[derive(Debug, Deserialize)]
+pub struct SetPrefixCacheRequest {
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SetPrefixCacheResponse {
+    pub status: String,
+    pub message: String,
+    pub prefix_cache_enabled: bool,
+}
+
+/// Set prefix caching mode (takes effect on next model reload)
+pub async fn set_prefix_cache(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<SetPrefixCacheRequest>,
+) -> (StatusCode, Json<SetPrefixCacheResponse>) {
+    let mut config = state.config.write().await;
+    config.model.prefix_cache_enabled = req.enabled;
+
+    tracing::info!(
+        prefix_cache_enabled = req.enabled,
+        "Prefix caching mode updated via API"
+    );
+
+    (
+        StatusCode::OK,
+        Json(SetPrefixCacheResponse {
+            status: "ok".into(),
+            message: if req.enabled {
+                "Prefix caching enabled. Reload model to apply changes.".into()
+            } else {
+                "Prefix caching disabled. Reload model to apply changes.".into()
+            },
+            prefix_cache_enabled: req.enabled,
+        }),
+    )
+}
+
+#[derive(Debug, Serialize)]
+pub struct PrefixCacheStatusResponse {
+    pub prefix_cache_enabled: bool,
+    pub message: String,
+}
+
+/// Get current prefix caching status
+pub async fn get_prefix_cache_status(
+    State(state): State<Arc<AppState>>,
+) -> (StatusCode, Json<PrefixCacheStatusResponse>) {
+    let config = state.config.read().await;
+    let enabled = config.model.prefix_cache_enabled;
+
+    (
+        StatusCode::OK,
+        Json(PrefixCacheStatusResponse {
+            prefix_cache_enabled: enabled,
+            message: if enabled {
+                "Prefix caching is enabled".into()
+            } else {
+                "Prefix caching is disabled".into()
+            },
+        }),
+    )
+}
+
 /// Batch statistics endpoint
 pub async fn batch_stats(
     State(state): State<Arc<AppState>>,

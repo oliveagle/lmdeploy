@@ -30,9 +30,10 @@ use crate::config::AppConfig;
 use crate::error::{AppError, Result};
 use crate::handlers::http::{
     batch_chat_completions, batch_completions, batch_stats, cache_metrics, chat_completions,
-    chat_completions_stream, clear_cache, completions, embeddings, health_check, list_models,
-    model_load, model_load_progress, model_reload, model_unload, rate_limit_status, stream_metrics,
-    tokenize, ChatCompletionsRequest, ChatCompletionsResponse, Choice, ChoiceLogprobs, Message,
+    chat_completions_stream, clear_cache, completions, embeddings, get_prefix_cache_status,
+    health_check, list_models, model_load, model_load_progress, model_reload, model_unload,
+    rate_limit_status, set_prefix_cache, stream_metrics, tokenize,
+    ChatCompletionsRequest, ChatCompletionsResponse, Choice, ChoiceLogprobs, Message,
     response_format_to_grammar, TopLogprobEntry, Usage,
 };
 use crate::metrics::{init_metrics, AppMetrics};
@@ -138,9 +139,17 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
     let engine_type = crate::model::cpp_engine::EngineType::from_str(&config.model.engine_type)
         .unwrap_or(crate::model::cpp_engine::EngineType::PureCpp);
 
+    // Read prefix caching config
+    let prefix_cache_enabled = config.model.prefix_cache_enabled;
+
     // Initialize ModelManager with default model using specified engine type
     let model_manager = Arc::new(RwLock::new(
-        ModelManager::with_default_model_and_type(&config.model.model_path, engine_type).await?,
+        ModelManager::with_default_model_and_type_and_prefix_cache(
+            &config.model.model_path,
+            engine_type,
+            prefix_cache_enabled,
+        )
+        .await?,
     ));
     let grpc_model_manager = model_manager.clone();
 
@@ -160,14 +169,22 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
                     model_name = %entry.name,
                     model_path = %entry.path,
                     engine_type = %entry.engine_type,
+                    prefix_cache_enabled = entry.prefix_cache_enabled.unwrap_or(config.model.prefix_cache_enabled),
                     "Loading additional model from config"
                 );
                 let entry_engine_type =
                     crate::model::cpp_engine::EngineType::from_str(&entry.engine_type)
                         .unwrap_or(crate::model::cpp_engine::EngineType::PureCpp);
+                let entry_prefix_cache_enabled =
+                    entry.prefix_cache_enabled.unwrap_or(config.model.prefix_cache_enabled);
                 let mut mm = model_manager.write().await;
                 if let Err(e) = mm
-                    .load_model_with_type(&entry.name, &entry.path, entry_engine_type)
+                    .load_model_with_type_and_prefix_cache(
+                        &entry.name,
+                        &entry.path,
+                        entry_engine_type,
+                        entry_prefix_cache_enabled,
+                    )
                     .await
                 {
                     tracing::warn!(
@@ -409,6 +426,8 @@ fn create_router(state: Arc<AppState>) -> Router {
         .route("/v1/tokenize", post(tokenize))
         .route("/v1/cache/metrics", get(cache_metrics))
         .route("/v1/cache/clear", post(clear_cache))
+        .route("/v1/cache/prefix-cache", get(get_prefix_cache_status))
+        .route("/v1/cache/prefix-cache", post(set_prefix_cache))
         .route("/v1/metrics/stream", get(stream_metrics))
         .route("/v1/batch/stats", get(batch_stats))
         .route("/v1/config/reload", post(reload_config))
