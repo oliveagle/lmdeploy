@@ -2,6 +2,7 @@
 // C API implementation for TurboMind inference engine
 
 #include "turbomind_c.h"
+#include <cuda_runtime.h>
 
 #include <algorithm>
 #include <atomic>
@@ -870,11 +871,12 @@ static void LoadWeightsFromSafetensors(
 
                 param.alloc(meta->shape, tm_dtype);
 
-                // Copy data (TODO: handle device placement)
+                // Copy data: host to GPU via cudaMemcpyAsync
                 auto tensor = param.get();
                 if (tensor && tensor.raw_data()) {
                     size_t copy_size = std::min(data.size(), static_cast<size_t>(tensor.byte_size()));
-                    std::memcpy(tensor.raw_data(), data.data(), copy_size);
+                    cudaMemcpyAsync(tensor.raw_data(), data.data(), copy_size, cudaMemcpyHostToDevice, turbomind::core::stream());
+                    cudaStreamSynchronize(turbomind::core::stream().handle());
                 }
             }
         }
