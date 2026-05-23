@@ -191,7 +191,10 @@ pub async fn chat_completions(
         fallback_chat_completion(&state, &req, &model).await
     };
 
-    tracing::info!(latency_ms = start.elapsed().as_millis(), "Chat completions done");
+    tracing::info!(
+        latency_ms = start.elapsed().as_millis(),
+        "Chat completions done"
+    );
     Json(response).into_response()
 }
 
@@ -202,7 +205,12 @@ async fn chat_completions_stream_impl(
 ) -> Response {
     let id = format!("chatcmpl-{}", uuid_simple());
     let created = unix_timestamp();
-    let keepalive_interval_ms = state.config.read().await.server.stream_keepalive_interval_ms;
+    let keepalive_interval_ms = state
+        .config
+        .read()
+        .await
+        .server
+        .stream_keepalive_interval_ms;
 
     tracing::info!(model = %model, "Chat completions stream request");
 
@@ -294,9 +302,7 @@ async fn chat_completions_stream_impl(
                 }),
             };
             let json = serde_json::to_string(&chunk).unwrap_or_default();
-            let event = Event::default()
-                .event("chat.completion.chunk")
-                .data(json);
+            let event = Event::default().event("chat.completion.chunk").data(json);
             Ok::<_, std::convert::Infallible>(event)
         })
         .chain(futures::stream::once(async move {
@@ -308,7 +314,10 @@ async fn chat_completions_stream_impl(
                 model: final_model,
                 choices: vec![DeltaChoice {
                     index: 0,
-                    delta: Delta { content: None, role: None },
+                    delta: Delta {
+                        content: None,
+                        role: None,
+                    },
                     finish_reason: Some("stop".into()),
                 }],
                 usage: Some(ChunkUsage {
@@ -318,15 +327,13 @@ async fn chat_completions_stream_impl(
                 }),
             };
             let json = serde_json::to_string(&final_chunk).unwrap_or_default();
-            Ok(Event::default()
-                .event("chat.completion.chunk")
-                .data(json))
+            Ok(Event::default().event("chat.completion.chunk").data(json))
         }));
 
     Sse::new(stream)
         .keep_alive(
             axum::response::sse::KeepAlive::new()
-                .interval(Duration::from_millis(keepalive_interval_ms))
+                .interval(Duration::from_millis(keepalive_interval_ms)),
         )
         .into_response()
 }
@@ -385,11 +392,12 @@ async fn fallback_chat_completion(
                 content: text.clone(),
             },
             finish_reason: "stop".into(),
-            logprobs: logprobs.map(|lp| {
-                ChoiceLogprobs {
-                    tokens: lp.iter().map(|t| t.token.clone()).collect(),
-                    token_logprobs: lp.iter().map(|t| t.logprob).collect(),
-                    top_logprobs: lp.iter().map(|t| {
+            logprobs: logprobs.map(|lp| ChoiceLogprobs {
+                tokens: lp.iter().map(|t| t.token.clone()).collect(),
+                token_logprobs: lp.iter().map(|t| t.logprob).collect(),
+                top_logprobs: lp
+                    .iter()
+                    .map(|t| {
                         if !t.top_logprobs.is_empty() {
                             let first = t.top_logprobs.first().unwrap();
                             Some(TopLogprobEntry {
@@ -400,9 +408,9 @@ async fn fallback_chat_completion(
                         } else {
                             None
                         }
-                    }).collect(),
-                    top_tokens: Vec::new(),
-                }
+                    })
+                    .collect(),
+                top_tokens: Vec::new(),
             }),
         }],
         usage: Usage {
@@ -515,11 +523,15 @@ pub async fn completions(
                         object: "text_completion".into(),
                         created: chat_resp.created,
                         model: chat_resp.model,
-                        choices: chat_resp.choices.iter().map(|c| CompletionChoice {
-                            text: c.message.content.clone(),
-                            index: c.index,
-                            finish_reason: c.finish_reason.clone(),
-                        }).collect(),
+                        choices: chat_resp
+                            .choices
+                            .iter()
+                            .map(|c| CompletionChoice {
+                                text: c.message.content.clone(),
+                                index: c.index,
+                                finish_reason: c.finish_reason.clone(),
+                            })
+                            .collect(),
                         usage: chat_resp.usage,
                     }
                 }
@@ -617,9 +629,7 @@ pub struct ModelInfo {
     pub owned_by: String,
 }
 
-pub async fn list_models(
-    State(state): State<Arc<AppState>>,
-) -> (StatusCode, Json<ModelsResponse>) {
+pub async fn list_models(State(state): State<Arc<AppState>>) -> (StatusCode, Json<ModelsResponse>) {
     let models = state.model_manager.read().await.list_models().await;
 
     let data: Vec<ModelInfo> = models
@@ -632,10 +642,13 @@ pub async fn list_models(
         })
         .collect();
 
-    (StatusCode::OK, Json(ModelsResponse {
-        object: "list".into(),
-        data,
-    }))
+    (
+        StatusCode::OK,
+        Json(ModelsResponse {
+            object: "list".into(),
+            data,
+        }),
+    )
 }
 
 /// Batch chat completions request
@@ -770,7 +783,10 @@ pub async fn batch_chat_completions(
         },
     };
 
-    tracing::info!(latency_ms = start.elapsed().as_millis(), "Batch chat completions done");
+    tracing::info!(
+        latency_ms = start.elapsed().as_millis(),
+        "Batch chat completions done"
+    );
     (StatusCode::OK, Json(response))
 }
 
@@ -833,7 +849,10 @@ pub async fn batch_completions(
         },
     };
 
-    tracing::info!(latency_ms = start.elapsed().as_millis(), "Batch completions done");
+    tracing::info!(
+        latency_ms = start.elapsed().as_millis(),
+        "Batch completions done"
+    );
     (StatusCode::OK, Json(response))
 }
 
@@ -844,10 +863,13 @@ pub struct HealthResponse {
 }
 
 pub async fn health_check() -> (StatusCode, Json<HealthResponse>) {
-    (StatusCode::OK, Json(HealthResponse {
-        status: "ok".into(),
-        version: env!("CARGO_PKG_VERSION").into(),
-    }))
+    (
+        StatusCode::OK,
+        Json(HealthResponse {
+            status: "ok".into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+        }),
+    )
 }
 
 #[derive(Debug, Deserialize)]
@@ -878,10 +900,13 @@ pub async fn tokenize(
             async move {
                 let mgr = state_clone.model_manager.read().await;
                 if let Some(tokenizer) = mgr.get_default_tokenizer().await {
-                    tokenizer.encode(&owned, false, false)
-                        .map_err(|e| crate::error::AppError::Other(format!("Tokenization failed: {}", e)))
+                    tokenizer.encode(&owned, false, false).map_err(|e| {
+                        crate::error::AppError::Other(format!("Tokenization failed: {}", e))
+                    })
                 } else {
-                    Err(crate::error::AppError::Other("No tokenizer available - model may not be loaded yet".to_string()))
+                    Err(crate::error::AppError::Other(
+                        "No tokenizer available - model may not be loaded yet".to_string(),
+                    ))
                 }
             }
         })
@@ -1022,31 +1047,41 @@ pub async fn rate_limit_status(
     let config = state.config.read().await;
     let rl_config = &config.server.rate_limit;
 
-    let (global_total, global_limited, per_ip_total, per_ip_limited, tracked_ips) = if let Some(rl) = &state.global_rate_limiter {
-        let gt = rl.total_requests();
-        let gl = rl.rate_limited();
-        if let Some(per_ip) = &state.per_ip_rate_limiter {
-            (gt, gl, per_ip.total_requests(), per_ip.rate_limited(), per_ip.tracked_ips())
+    let (global_total, global_limited, per_ip_total, per_ip_limited, tracked_ips) =
+        if let Some(rl) = &state.global_rate_limiter {
+            let gt = rl.total_requests();
+            let gl = rl.rate_limited();
+            if let Some(per_ip) = &state.per_ip_rate_limiter {
+                (
+                    gt,
+                    gl,
+                    per_ip.total_requests(),
+                    per_ip.rate_limited(),
+                    per_ip.tracked_ips(),
+                )
+            } else {
+                (gt, gl, 0, 0, 0)
+            }
         } else {
-            (gt, gl, 0, 0, 0)
-        }
-    } else {
-        (0, 0, 0, 0, 0)
-    };
+            (0, 0, 0, 0, 0)
+        };
 
-    (StatusCode::OK, Json(RateLimitStatusResponse {
-        rate_limiting_enabled: rl_config.enabled,
-        global_requests_per_second: rl_config.requests_per_second,
-        global_burst_size: rl_config.burst_size,
-        per_ip_enabled: rl_config.per_ip.enabled,
-        per_ip_requests_per_second: rl_config.per_ip.requests_per_second,
-        per_ip_burst_size: rl_config.per_ip.burst_size,
-        global_total_requests: global_total,
-        global_rate_limited: global_limited,
-        per_ip_total_requests: per_ip_total,
-        per_ip_rate_limited: per_ip_limited,
-        tracked_ips,
-    }))
+    (
+        StatusCode::OK,
+        Json(RateLimitStatusResponse {
+            rate_limiting_enabled: rl_config.enabled,
+            global_requests_per_second: rl_config.requests_per_second,
+            global_burst_size: rl_config.burst_size,
+            per_ip_enabled: rl_config.per_ip.enabled,
+            per_ip_requests_per_second: rl_config.per_ip.requests_per_second,
+            per_ip_burst_size: rl_config.per_ip.burst_size,
+            global_total_requests: global_total,
+            global_rate_limited: global_limited,
+            per_ip_total_requests: per_ip_total,
+            per_ip_rate_limited: per_ip_limited,
+            tracked_ips,
+        }),
+    )
 }
 
 // ============================================================================
@@ -1102,7 +1137,10 @@ pub async fn embeddings(
     Json(req): Json<EmbeddingsRequest>,
 ) -> (StatusCode, Json<EmbeddingsResponse>) {
     let start = std::time::Instant::now();
-    let model = req.model.clone().unwrap_or_else(|| "default-embedding-model".to_string());
+    let model = req
+        .model
+        .clone()
+        .unwrap_or_else(|| "default-embedding-model".to_string());
 
     tracing::info!(
         model = %model,
@@ -1215,16 +1253,22 @@ pub async fn model_load(
         "Model load request"
     );
 
-    let result = state.model_manager.write().await.load_model(&req.name, &req.path).await;
+    let result = state
+        .model_manager
+        .write()
+        .await
+        .load_model(&req.name, &req.path)
+        .await;
 
     match result {
-        Ok(()) => {
-            (StatusCode::OK, Json(ModelLoadResponse {
+        Ok(()) => (
+            StatusCode::OK,
+            Json(ModelLoadResponse {
                 status: "success".to_string(),
                 model_name: req.name,
                 message: "Model loaded successfully".to_string(),
-            }))
-        }
+            }),
+        ),
         Err(e) => {
             tracing::error!(error = %e, "Failed to load model");
             let status = if matches!(e, crate::error::AppError::ModelAlreadyLoaded(_)) {
@@ -1232,11 +1276,14 @@ pub async fn model_load(
             } else {
                 StatusCode::INTERNAL_SERVER_ERROR
             };
-            (status, Json(ModelLoadResponse {
-                status: "error".to_string(),
-                model_name: req.name,
-                message: e.to_string(),
-            }))
+            (
+                status,
+                Json(ModelLoadResponse {
+                    status: "error".to_string(),
+                    model_name: req.name,
+                    message: e.to_string(),
+                }),
+            )
         }
     }
 }
@@ -1248,16 +1295,22 @@ pub async fn model_unload(
 ) -> (StatusCode, Json<ModelLoadResponse>) {
     tracing::info!(model_name = %req.name, "Model unload request");
 
-    let result = state.model_manager.write().await.unload_model(&req.name).await;
+    let result = state
+        .model_manager
+        .write()
+        .await
+        .unload_model(&req.name)
+        .await;
 
     match result {
-        Ok(()) => {
-            (StatusCode::OK, Json(ModelLoadResponse {
+        Ok(()) => (
+            StatusCode::OK,
+            Json(ModelLoadResponse {
                 status: "success".to_string(),
                 model_name: req.name,
                 message: "Model unloaded successfully".to_string(),
-            }))
-        }
+            }),
+        ),
         Err(e) => {
             tracing::error!(error = %e, "Failed to unload model");
             let status = if matches!(e, crate::error::AppError::CannotUnloadDefaultModel) {
@@ -1267,11 +1320,14 @@ pub async fn model_unload(
             } else {
                 StatusCode::INTERNAL_SERVER_ERROR
             };
-            (status, Json(ModelLoadResponse {
-                status: "error".to_string(),
-                model_name: req.name,
-                message: e.to_string(),
-            }))
+            (
+                status,
+                Json(ModelLoadResponse {
+                    status: "error".to_string(),
+                    model_name: req.name,
+                    message: e.to_string(),
+                }),
+            )
         }
     }
 }
@@ -1287,16 +1343,22 @@ pub async fn model_reload(
         "Model reload request"
     );
 
-    let result = state.model_manager.write().await.reload_model(&req.name, &req.path).await;
+    let result = state
+        .model_manager
+        .write()
+        .await
+        .reload_model(&req.name, &req.path)
+        .await;
 
     match result {
-        Ok(()) => {
-            (StatusCode::OK, Json(ModelLoadResponse {
+        Ok(()) => (
+            StatusCode::OK,
+            Json(ModelLoadResponse {
                 status: "success".to_string(),
                 model_name: req.name.clone(),
                 message: format!("Model '{}' reloaded successfully", req.name),
-            }))
-        }
+            }),
+        ),
         Err(e) => {
             tracing::error!(error = %e, "Failed to reload model");
             let status = if matches!(e, crate::error::AppError::ModelNotFound(_)) {
@@ -1304,11 +1366,14 @@ pub async fn model_reload(
             } else {
                 StatusCode::INTERNAL_SERVER_ERROR
             };
-            (status, Json(ModelLoadResponse {
-                status: "error".to_string(),
-                model_name: req.name,
-                message: e.to_string(),
-            }))
+            (
+                status,
+                Json(ModelLoadResponse {
+                    status: "error".to_string(),
+                    model_name: req.name,
+                    message: e.to_string(),
+                }),
+            )
         }
     }
 }
@@ -1328,21 +1393,25 @@ pub async fn model_load_progress(
                 crate::model::ModelState::Ready => "ready",
                 crate::model::ModelState::Failed(_) => "failed",
             };
-            (StatusCode::OK, Json(ModelLoadProgressResponse {
-                model_name: p.model_name,
-                progress: p.progress,
-                state: state_str.to_string(),
-                message: p.message,
-            }))
+            (
+                StatusCode::OK,
+                Json(ModelLoadProgressResponse {
+                    model_name: p.model_name,
+                    progress: p.progress,
+                    state: state_str.to_string(),
+                    message: p.message,
+                }),
+            )
         }
-        None => {
-            (StatusCode::NOT_FOUND, Json(ModelLoadProgressResponse {
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(ModelLoadProgressResponse {
                 model_name: req.name,
                 progress: 0.0,
                 state: "not_found".to_string(),
                 message: "Model loading operation not found".to_string(),
-            }))
-        }
+            }),
+        ),
     }
 }
 

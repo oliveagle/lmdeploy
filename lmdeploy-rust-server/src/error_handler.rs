@@ -10,7 +10,8 @@ use crate::error::{AppError, ErrorResponse};
 
 /// Error response wrapper for Axum handlers
 pub fn error_response(err: &AppError) -> (StatusCode, Json<ErrorResponse>) {
-    let status = StatusCode::from_u16(err.status_code()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let status =
+        StatusCode::from_u16(err.status_code()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     let error_resp = ErrorResponse::from(err);
     tracing::error!(
         status = status.as_u16(),
@@ -76,10 +77,7 @@ where
                 Ok(Ok(resp)) => Ok(resp),
                 Ok(Err(e)) => Err(e.into()),
                 Err(_) => {
-                    tracing::warn!(
-                        duration_ms = duration.as_millis(),
-                        "Request timeout"
-                    );
+                    tracing::warn!(duration_ms = duration.as_millis(), "Request timeout");
                     Err(AppError::RequestTimeout)
                 }
             }

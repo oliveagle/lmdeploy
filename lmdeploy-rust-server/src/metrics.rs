@@ -57,7 +57,9 @@ pub struct RequestTimer {
 
 impl RequestTimer {
     pub fn new() -> Self {
-        Self { start: Instant::now() }
+        Self {
+            start: Instant::now(),
+        }
     }
 
     /// Record the request and return elapsed seconds
@@ -89,7 +91,9 @@ impl Clone for StreamMetrics {
     fn clone(&self) -> Self {
         Self {
             total_streams: AtomicU64::new(self.total_streams.load(Ordering::Relaxed)),
-            first_token_latency_ms: AtomicU64::new(self.first_token_latency_ms.load(Ordering::Relaxed)),
+            first_token_latency_ms: AtomicU64::new(
+                self.first_token_latency_ms.load(Ordering::Relaxed),
+            ),
             total_chunks_sent: AtomicU64::new(self.total_chunks_sent.load(Ordering::Relaxed)),
             stream_timeouts: AtomicU64::new(self.stream_timeouts.load(Ordering::Relaxed)),
             total_stream_tokens: AtomicU64::new(self.total_stream_tokens.load(Ordering::Relaxed)),
@@ -111,7 +115,8 @@ impl StreamMetrics {
     /// Record a stream start with first token latency
     pub fn record_stream_start(&self, latency_ms: u64) {
         self.total_streams.fetch_add(1, Ordering::Relaxed);
-        self.first_token_latency_ms.fetch_add(latency_ms, Ordering::Relaxed);
+        self.first_token_latency_ms
+            .fetch_add(latency_ms, Ordering::Relaxed);
         // Record to Prometheus histogram as well
         metrics::histogram!("first_token_latency_seconds").record(latency_ms as f64 / 1000.0);
     }

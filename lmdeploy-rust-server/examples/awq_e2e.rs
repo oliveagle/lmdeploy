@@ -89,7 +89,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   Inference time: {:.2}ms", elapsed_ms);
         println!("   Total time: {:.2}s", total_time.as_secs_f64());
         if num_tokens > 0 && elapsed_ms > 0.0 {
-            println!("   Speed: {:.1} tokens/s", (num_tokens as f64) / (elapsed_ms / 1000.0));
+            println!(
+                "   Speed: {:.1} tokens/s",
+                (num_tokens as f64) / (elapsed_ms / 1000.0)
+            );
         }
     }
 
@@ -102,7 +105,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let embed_time = start.elapsed();
     println!("   Text: '{}'", embed_text);
     println!("   Embedding dim: {}", embedding.len());
-    println!("   First 5 values: {:?}", &embedding[..5.min(embedding.len())]);
+    println!(
+        "   First 5 values: {:?}",
+        &embedding[..5.min(embedding.len())]
+    );
     println!("   Time: {:.2}ms", embed_time.as_secs_f64() * 1000.0);
 
     println!();

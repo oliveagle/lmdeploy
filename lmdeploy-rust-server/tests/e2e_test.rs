@@ -20,14 +20,22 @@ mod tokenizer_tests {
     fn test_tokenizer_load_from_model() {
         let path = get_model_path();
         let tokenizer = LMTokenizer::from_path(&path);
-        assert!(tokenizer.is_ok(), "Failed to load tokenizer: {:?}", tokenizer);
+        assert!(
+            tokenizer.is_ok(),
+            "Failed to load tokenizer: {:?}",
+            tokenizer
+        );
     }
 
     #[test]
     fn test_tokenizer_vocab_size() {
         let path = get_model_path();
         let tokenizer = LMTokenizer::from_path(&path).expect("Tokenizer must load");
-        assert!(tokenizer.vocab_size() > 10000, "Vocab size too small: {}", tokenizer.vocab_size());
+        assert!(
+            tokenizer.vocab_size() > 10000,
+            "Vocab size too small: {}",
+            tokenizer.vocab_size()
+        );
     }
 
     #[test]
@@ -36,10 +44,14 @@ mod tokenizer_tests {
         let tokenizer = LMTokenizer::from_path(&path).expect("Tokenizer must load");
 
         let text = "Hello, world! 你好世界";
-        let encoded = tokenizer.encode(text, false, true).expect("Encoding must succeed");
+        let encoded = tokenizer
+            .encode(text, false, true)
+            .expect("Encoding must succeed");
         assert!(!encoded.is_empty(), "Encoded tokens must not be empty");
 
-        let decoded = tokenizer.decode(&encoded, true).expect("Decoding must succeed");
+        let decoded = tokenizer
+            .decode(&encoded, true)
+            .expect("Decoding must succeed");
         assert!(!decoded.is_empty(), "Decoded text must not be empty");
         assert_eq!(decoded, text, "Roundtrip encode/decode must be lossless");
     }
@@ -50,12 +62,24 @@ mod tokenizer_tests {
         let tokenizer = LMTokenizer::from_path(&path).expect("Tokenizer must load");
 
         let text = "test text";
-        let without_bos = tokenizer.encode(text, false, false).expect("Encoding must succeed");
-        let with_bos = tokenizer.encode(text, true, false).expect("Encoding must succeed");
+        let without_bos = tokenizer
+            .encode(text, false, false)
+            .expect("Encoding must succeed");
+        let with_bos = tokenizer
+            .encode(text, true, false)
+            .expect("Encoding must succeed");
 
         if tokenizer.bos_token_id().is_some() {
-            assert_eq!(with_bos.len(), without_bos.len() + 1, "BOS should add exactly 1 token");
-            assert_eq!(with_bos[0], tokenizer.bos_token_id().unwrap(), "BOS token must be at position 0");
+            assert_eq!(
+                with_bos.len(),
+                without_bos.len() + 1,
+                "BOS should add exactly 1 token"
+            );
+            assert_eq!(
+                with_bos[0],
+                tokenizer.bos_token_id().unwrap(),
+                "BOS token must be at position 0"
+            );
         }
     }
 
@@ -65,10 +89,14 @@ mod tokenizer_tests {
         let tokenizer = LMTokenizer::from_path(&path).expect("Tokenizer must load");
 
         // Tokenize and take first token
-        let encoded = tokenizer.encode("hello", false, true).expect("Encoding must succeed");
+        let encoded = tokenizer
+            .encode("hello", false, true)
+            .expect("Encoding must succeed");
         let first_token = encoded[0];
 
-        let decoded = tokenizer.decode_token(first_token).expect("Decoding must succeed");
+        let decoded = tokenizer
+            .decode_token(first_token)
+            .expect("Decoding must succeed");
         assert!(!decoded.is_empty(), "Single token decode must not be empty");
     }
 
@@ -78,7 +106,9 @@ mod tokenizer_tests {
         let tokenizer = LMTokenizer::from_path(&path).expect("Tokenizer must load");
 
         let text = "raw test input";
-        let raw = tokenizer.encode_raw(text).expect("Raw encoding must succeed");
+        let raw = tokenizer
+            .encode_raw(text)
+            .expect("Raw encoding must succeed");
         assert!(!raw.is_empty(), "Raw tokens must not be empty");
     }
 
@@ -102,7 +132,10 @@ mod tokenizer_tests {
 
         // Test that at least one EOS token is recognized
         let first_eos = eos_ids[0];
-        assert!(tokenizer.is_eos(first_eos), "Known EOS token must be recognized");
+        assert!(
+            tokenizer.is_eos(first_eos),
+            "Known EOS token must be recognized"
+        );
 
         // Test non-EOS token
         assert!(!tokenizer.is_eos(0), "Token ID 0 should not be EOS");
@@ -114,7 +147,9 @@ mod tokenizer_tests {
         let tokenizer = LMTokenizer::from_path(&path).expect("Tokenizer must load");
 
         let texts = vec!["Hello", "World", "Test"];
-        let batch = tokenizer.encode_batch(&texts, false).expect("Batch encoding must succeed");
+        let batch = tokenizer
+            .encode_batch(&texts, false)
+            .expect("Batch encoding must succeed");
         assert_eq!(batch.len(), 3, "Batch must encode 3 texts");
     }
 
@@ -158,12 +193,13 @@ mod config_detection_tests {
 }
 
 mod awq_inference_tests {
-    use lmdeploy_server::model::cpp_engine::TurboMindCEngine;
     use lmdeploy_server::model::cpp_engine::ModelState;
+    use lmdeploy_server::model::cpp_engine::TurboMindCEngine;
 
     fn get_awq_model_path() -> String {
-        std::env::var("AWQ_MODEL_PATH")
-            .unwrap_or_else(|_| "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ".to_string())
+        std::env::var("AWQ_MODEL_PATH").unwrap_or_else(|_| {
+            "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ".to_string()
+        })
     }
 
     #[tokio::test]
@@ -189,9 +225,15 @@ mod awq_inference_tests {
             return;
         }
 
-        let engine = TurboMindCEngine::new(&path).await.expect("Engine must load");
+        let engine = TurboMindCEngine::new(&path)
+            .await
+            .expect("Engine must load");
         assert!(engine.is_ready(), "Engine must be ready after loading");
-        assert_eq!(engine.info().state, ModelState::Ready, "State must be Ready");
+        assert_eq!(
+            engine.info().state,
+            ModelState::Ready,
+            "State must be Ready"
+        );
     }
 
     #[tokio::test]
@@ -203,12 +245,17 @@ mod awq_inference_tests {
             return;
         }
 
-        let engine = TurboMindCEngine::new(&path).await.expect("Engine must load");
+        let engine = TurboMindCEngine::new(&path)
+            .await
+            .expect("Engine must load");
         let info = engine.info();
 
         assert_eq!(info.quant_policy, 4, "AWQ model must have quant_policy=4");
         assert!(info.hidden_size.is_some(), "hidden_size must be set");
-        assert!(info.hidden_size.unwrap() > 0, "hidden_size must be positive");
+        assert!(
+            info.hidden_size.unwrap() > 0,
+            "hidden_size must be positive"
+        );
     }
 
     #[tokio::test]
@@ -220,7 +267,9 @@ mod awq_inference_tests {
             return;
         }
 
-        let engine = TurboMindCEngine::new(&path).await.expect("Engine must load");
+        let engine = TurboMindCEngine::new(&path)
+            .await
+            .expect("Engine must load");
 
         let result = engine.generate("Hello, ", 10).await;
         assert!(!result.is_empty(), "Generated text must not be empty");
@@ -235,9 +284,12 @@ mod awq_inference_tests {
             return;
         }
 
-        let engine = TurboMindCEngine::new(&path).await.expect("Engine must load");
+        let engine = TurboMindCEngine::new(&path)
+            .await
+            .expect("Engine must load");
 
-        let (text, num_tokens, elapsed_ms) = engine.generate_with_metrics("What is 2+2? ", 10).await;
+        let (text, num_tokens, elapsed_ms) =
+            engine.generate_with_metrics("What is 2+2? ", 10).await;
         assert!(!text.is_empty(), "Generated text must not be empty");
         assert!(num_tokens > 0, "Must generate at least one token");
         assert!(elapsed_ms > 0.0, "Must take non-zero time");
@@ -247,10 +299,15 @@ mod awq_inference_tests {
 mod awq_config_tests {
     #[test]
     fn test_awq_config_detection_real_file() {
-        let path = std::path::PathBuf::from("/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ/config.json");
+        let path = std::path::PathBuf::from(
+            "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ/config.json",
+        );
         if path.exists() {
             let content = std::fs::read_to_string(&path).expect("Must read config");
-            assert!(content.contains("quant_method"), "Config must have quant_method");
+            assert!(
+                content.contains("quant_method"),
+                "Config must have quant_method"
+            );
             assert!(content.contains("awq"), "Config must reference AWQ");
         }
     }

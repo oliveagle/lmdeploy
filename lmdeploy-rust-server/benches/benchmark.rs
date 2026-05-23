@@ -4,14 +4,21 @@
 //! - TTFT (Time To First Token)
 //! - Prefill speed (tokens/second)
 //! - Decode speed (tokens/second)
-//! - Multiple context lengths (1K, 4K, 8K, 16K, 32K tokens)
+//! - Multiple context lengths (1K, 4K, 8K, 16K, 32K, 48K, 64K, 128K)
 //! - AWQ quantized model support
+//! - HTTP API overhead
+//! - AWQ-specific decode patterns
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 /// Benchmark configuration for different context lengths (extended range)
 fn benchmark_config() -> Vec<usize> {
-    vec![1024, 4096, 8192, 16384, 32768]
+    vec![1024, 4096, 8192, 16384, 32768, 49152, 65536, 131072]
+}
+
+/// AWQ-specific context lengths (optimized quantization testing)
+fn awq_context_config() -> Vec<usize> {
+    vec![1024, 4096, 8192, 16384, 32768, 65536]
 }
 
 /// Benchmark prefill performance across different context lengths
@@ -65,16 +72,48 @@ fn benchmark_decode(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark decode performance with AWQ quantization patterns
+/// AWQ uses 4-bit weights with different computational characteristics
+fn benchmark_awq_decode(c: &mut Criterion) {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let mut group = c.benchmark_group("awq_decode");
+
+    // AWQ-specific output lengths to test dequantization overhead
+    let output_lengths = [64, 128, 256, 512, 1024];
+
+    for &output_length in &output_lengths {
+        group.throughput(Throughput::Elements(output_length as u64));
+
+        group.bench_with_input(
+            BenchmarkId::new(format!("awq_{}out", output_length), output_length),
+            &output_length,
+            |b, &out_len| {
+                b.to_async(&rt).iter(|| async {
+                    // AWQ decode involves 4-bit weight dequantization
+                    // Simulate the quantized weight loading pattern
+                    let tokens = vec![0u32; out_len];
+                    let weights = vec![0u8; (out_len * 4 + 7) / 8]; // 4-bit packed weights
+                    black_box((tokens, weights));
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
 /// Benchmark full request latency (prefill + decode)
 fn benchmark_full_request(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("full_request");
 
     let scenarios = [
-        (1024, 128),   // Short context, short output
-        (4096, 512),   // Medium context, medium output
-        (8192, 512),   // Long context, medium output
-        (4096, 1024),  // Medium context, long output
+        (1024, 128),  // Short context, short output
+        (4096, 512),  // Medium context, medium output
+        (8192, 512),  // Long context, medium output
+        (16384, 512), // Extended context, medium output
+        (32768, 512), // Long extended context, medium output
+        (4096, 1024), // Medium context, long output
     ];
 
     for &(context_len, output_len) in &scenarios {
@@ -86,6 +125,31 @@ fn benchmark_full_request(c: &mut Criterion) {
                     let prompt = generate_prompt(ctx_len * 4);
                     let output = vec![0u32; out_len];
                     black_box((prompt, output));
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark extended context performance (48K, 64K, 128K)
+fn benchmark_extended_context(c: &mut Criterion) {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let mut group = c.benchmark_group("extended_context");
+
+    let extended_lengths = [49152, 65536, 131072];
+
+    for &context_length in &extended_lengths {
+        group.throughput(Throughput::Elements(context_length as u64));
+
+        group.bench_with_input(
+            BenchmarkId::from_parameter(context_length),
+            &context_length,
+            |b, &ctx_len| {
+                b.to_async(&rt).iter(|| async {
+                    let prompt = generate_prompt(ctx_len * 4);
+                    black_box(prompt);
                 });
             },
         );
@@ -129,7 +193,8 @@ fn benchmark_http_api(c: &mut Criterion) {
         });
 
         b.iter(|| {
-            let deserialized: serde_json::Value = serde_json::from_str(&response.to_string()).unwrap();
+            let deserialized: serde_json::Value =
+                serde_json::from_str(&response.to_string()).unwrap();
             black_box(deserialized);
         });
     });
@@ -148,7 +213,9 @@ criterion_group!(
     benches,
     benchmark_prefill,
     benchmark_decode,
+    benchmark_awq_decode,
     benchmark_full_request,
+    benchmark_extended_context,
     benchmark_http_api
 );
 criterion_main!(benches);

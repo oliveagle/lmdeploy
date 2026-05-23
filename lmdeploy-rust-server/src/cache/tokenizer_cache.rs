@@ -66,11 +66,7 @@ impl TokenizeCache {
     }
 
     /// Get tokenized result from cache, or tokenize using the provided function
-    pub async fn get_or_tokenize<F, Fut>(
-        &self,
-        text: &str,
-        tokenize_fn: F,
-    ) -> Result<Vec<u32>>
+    pub async fn get_or_tokenize<F, Fut>(&self, text: &str, tokenize_fn: F) -> Result<Vec<u32>>
     where
         F: FnOnce(&str) -> Fut + Send,
         Fut: std::future::Future<Output = Result<Vec<u32>>> + Send,
@@ -253,9 +249,7 @@ mod tests {
 
         // First call - cache miss
         let result1 = cache
-            .get_or_tokenize("hello world", |text| async move {
-                Ok(vec![1, 2, 3])
-            })
+            .get_or_tokenize("hello world", |text| async move { Ok(vec![1, 2, 3]) })
             .await
             .unwrap();
         assert_eq!(result1, vec![1, 2, 3]);

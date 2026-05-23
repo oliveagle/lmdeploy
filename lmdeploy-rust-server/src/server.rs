@@ -28,15 +28,16 @@ use tower_http::{
 use crate::cache::TokenizeCache;
 use crate::config::AppConfig;
 use crate::error::{AppError, Result};
-use crate::metrics::{AppMetrics, init_metrics};
-use crate::model::{ModelManager, ModelLoadTracker};
-use crate::rate_limiter::{GlobalRateLimiter, PerIpRateLimiter};
 use crate::handlers::http::{
     batch_chat_completions, batch_completions, batch_stats, cache_metrics, chat_completions,
     chat_completions_stream, clear_cache, completions, embeddings, health_check, list_models,
-    model_load, model_load_progress, model_reload, model_unload, rate_limit_status, stream_metrics, tokenize,
-    ChatCompletionsRequest, ChatCompletionsResponse, Choice, ChoiceLogprobs, Message, TopLogprobEntry, Usage,
+    model_load, model_load_progress, model_reload, model_unload, rate_limit_status, stream_metrics,
+    tokenize, ChatCompletionsRequest, ChatCompletionsResponse, Choice, ChoiceLogprobs, Message,
+    TopLogprobEntry, Usage,
 };
+use crate::metrics::{init_metrics, AppMetrics};
+use crate::model::{ModelLoadTracker, ModelManager};
+use crate::rate_limiter::{GlobalRateLimiter, PerIpRateLimiter};
 
 use crate::metrics::increment_tokens_generated_total;
 use crate::model::GenerationParams;
@@ -161,10 +162,14 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
                     engine_type = %entry.engine_type,
                     "Loading additional model from config"
                 );
-                let entry_engine_type = crate::model::cpp_engine::EngineType::from_str(&entry.engine_type)
-                    .unwrap_or(crate::model::cpp_engine::EngineType::PureCpp);
+                let entry_engine_type =
+                    crate::model::cpp_engine::EngineType::from_str(&entry.engine_type)
+                        .unwrap_or(crate::model::cpp_engine::EngineType::PureCpp);
                 let mut mm = model_manager.write().await;
-                if let Err(e) = mm.load_model_with_type(&entry.name, &entry.path, entry_engine_type).await {
+                if let Err(e) = mm
+                    .load_model_with_type(&entry.name, &entry.path, entry_engine_type)
+                    .await
+                {
                     tracing::warn!(
                         error = %e,
                         model_name = %entry.name,
@@ -209,7 +214,14 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
             per_ip_rps = config.server.rate_limit.per_ip.requests_per_second,
             "Rate limiters initialized"
         );
-        (Some(global), if config.server.rate_limit.per_ip.enabled { Some(per_ip) } else { None })
+        (
+            Some(global),
+            if config.server.rate_limit.per_ip.enabled {
+                Some(per_ip)
+            } else {
+                None
+            },
+        )
     } else {
         tracing::info!("Rate limiting disabled");
         (None, None)
@@ -246,7 +258,14 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
                 timeout_ms = batch_timeout_ms,
                 "Batch processor started"
             );
-            run_batch_processor(batch_rx, batch_size, batch_timeout, stats_clone, manager_clone).await
+            run_batch_processor(
+                batch_rx,
+                batch_size,
+                batch_timeout,
+                stats_clone,
+                manager_clone,
+            )
+            .await
         });
 
         tracing::info!(
@@ -303,7 +322,13 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
 
     // Spawn gRPC server
     let grpc_handle = tokio::spawn(async move {
-        crate::grpc::start_grpc_server(grpc_addr, env!("CARGO_PKG_VERSION").to_string(), tokenizer_cache, grpc_model_manager).await
+        crate::grpc::start_grpc_server(
+            grpc_addr,
+            env!("CARGO_PKG_VERSION").to_string(),
+            tokenizer_cache,
+            grpc_model_manager,
+        )
+        .await
     });
 
     // Spawn SIGHUP handler for hot reload
@@ -434,19 +459,23 @@ pub async fn reload_config(
 ) -> (StatusCode, Json<serde_json::Value>) {
     tracing::info!("Configuration reload requested");
     match state.config_reload_tx.send(()).await {
-        Ok(_) => (StatusCode::OK, Json(serde_json::json!({
-            "status": "config_reload_triggered"
-        }))),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-            "status": "config_reload_failed"
-        }))),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "status": "config_reload_triggered"
+            })),
+        ),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "status": "config_reload_failed"
+            })),
+        ),
     }
 }
 
 /// Get current configuration (called by GET /v1/config)
-pub async fn get_config(
-    State(state): State<Arc<AppState>>,
-) -> Json<AppConfig> {
+pub async fn get_config(State(state): State<Arc<AppState>>) -> Json<AppConfig> {
     let config = state.config.read().await.clone();
     Json(config)
 }
@@ -503,7 +532,11 @@ async fn run_batch_processor(
     tracing::info!(
         batch_count,
         total_requests,
-        avg_batch_size = if batch_count > 0 { total_requests as f64 / batch_count as f64 } else { 0.0 },
+        avg_batch_size = if batch_count > 0 {
+            total_requests as f64 / batch_count as f64
+        } else {
+            0.0
+        },
         "Batch processor shutting down"
     );
 }
@@ -548,7 +581,8 @@ async fn flush_batch(
                 async move {
                     let prompt = messages_to_prompt(&item.req.messages);
 
-                    let need_logprobs = item.req.logprobs.unwrap_or(false) || item.req.top_logprobs.unwrap_or(0) > 0;
+                    let need_logprobs = item.req.logprobs.unwrap_or(false)
+                        || item.req.top_logprobs.unwrap_or(0) > 0;
 
                     let params = GenerationParams::from_chat_request(
                         item.req.temperature,
@@ -586,11 +620,12 @@ async fn flush_batch(
                                 content: text.clone(),
                             },
                             finish_reason: "stop".into(),
-                            logprobs: logprobs.map(|lp| {
-                                ChoiceLogprobs {
-                                    tokens: lp.iter().map(|t| t.token.clone()).collect(),
-                                    token_logprobs: lp.iter().map(|t| t.logprob).collect(),
-                                    top_logprobs: lp.iter().map(|t| {
+                            logprobs: logprobs.map(|lp| ChoiceLogprobs {
+                                tokens: lp.iter().map(|t| t.token.clone()).collect(),
+                                token_logprobs: lp.iter().map(|t| t.logprob).collect(),
+                                top_logprobs: lp
+                                    .iter()
+                                    .map(|t| {
                                         if !t.top_logprobs.is_empty() {
                                             let first = t.top_logprobs.first().unwrap();
                                             Some(TopLogprobEntry {
@@ -601,9 +636,9 @@ async fn flush_batch(
                                         } else {
                                             None
                                         }
-                                    }).collect(),
-                                    top_tokens: Vec::new(),
-                                }
+                                    })
+                                    .collect(),
+                                top_tokens: Vec::new(),
                             }),
                         }],
                         usage: Usage {
@@ -641,7 +676,11 @@ async fn flush_ready_batches(
     }
 }
 
-async fn flush_all_batches(accumulator: &mut HashMap<String, BatchAccumulator>, stats: &Arc<BatchStats>, manager: &Arc<RwLock<ModelManager>>) {
+async fn flush_all_batches(
+    accumulator: &mut HashMap<String, BatchAccumulator>,
+    stats: &Arc<BatchStats>,
+    manager: &Arc<RwLock<ModelManager>>,
+) {
     let models: Vec<_> = accumulator.keys().cloned().collect();
     for model in models {
         flush_batch(model, accumulator, stats, manager.clone()).await;

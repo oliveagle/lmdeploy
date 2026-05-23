@@ -28,9 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let model_path = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| {
-            "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B".to_string()
-        });
+        .unwrap_or_else(|| "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B".to_string());
 
     println!("=== LMDeploy Pure C++ E2E Test ===");
     println!("Model: {}", model_path);
@@ -54,7 +52,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Phase 2: Tokenizer
     println!("\n[Phase 2] Verifying tokenizer...");
     let tokenizer = engine.tokenizer().ok_or("Tokenizer not available")?;
-    println!("OK: Tokenizer loaded (vocab size: {})", tokenizer.vocab_size());
+    println!(
+        "OK: Tokenizer loaded (vocab size: {})",
+        tokenizer.vocab_size()
+    );
 
     // Phase 3: Simple inference
     println!("\n[Phase 3] Running inference...");
@@ -79,7 +80,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Tokens: {}", num_tokens);
     println!("  Time: {:.2}ms", total_ms);
     if num_tokens > 0 {
-        println!("  Speed: {:.2} tokens/s", (num_tokens as f64) / (total_ms / 1000.0));
+        println!(
+            "  Speed: {:.2} tokens/s",
+            (num_tokens as f64) / (total_ms / 1000.0)
+        );
     }
 
     // Phase 4: Longer generation
@@ -101,12 +105,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("OK: Longer generation completed");
-    println!("  Output preview: \"{}\"...",
-        output2.chars().take(100).collect::<String>());
+    println!(
+        "  Output preview: \"{}\"...",
+        output2.chars().take(100).collect::<String>()
+    );
     println!("  Total tokens: {}", tokens2);
     println!("  Time: {:.2}ms", total2);
     if tokens2 > 0 {
-        println!("  Speed: {:.2} tokens/s", (tokens2 as f64) / (total2 / 1000.0));
+        println!(
+            "  Speed: {:.2} tokens/s",
+            (tokens2 as f64) / (total2 / 1000.0)
+        );
     }
 
     // Summary

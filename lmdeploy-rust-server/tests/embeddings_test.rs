@@ -11,9 +11,8 @@ mod embeddings_tests {
 
     /// Helper function to get model path from environment or default
     fn get_model_path() -> String {
-        std::env::var("MODEL_PATH").unwrap_or_else(|_| {
-            "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B".to_string()
-        })
+        std::env::var("MODEL_PATH")
+            .unwrap_or_else(|_| "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B".to_string())
     }
 
     /// Test that embeddings have correct dimensions
@@ -29,7 +28,10 @@ mod embeddings_tests {
         let embedding = engine.embed(text, None).await;
 
         assert!(!embedding.is_empty(), "Embedding should not be empty");
-        assert!(embedding.len() >= 768, "Embedding should have at least 768 dimensions");
+        assert!(
+            embedding.len() >= 768,
+            "Embedding should have at least 768 dimensions"
+        );
     }
 
     /// Test that dimension truncation works correctly
@@ -83,8 +85,14 @@ mod embeddings_tests {
         let emb3 = engine.embed(text, None).await;
 
         // All embeddings should be identical
-        assert_eq!(emb1, emb2, "First and second embeddings should be identical");
-        assert_eq!(emb2, emb3, "Second and third embeddings should be identical");
+        assert_eq!(
+            emb1, emb2,
+            "First and second embeddings should be identical"
+        );
+        assert_eq!(
+            emb2, emb3,
+            "Second and third embeddings should be identical"
+        );
     }
 
     /// Test that different texts produce different embeddings
@@ -110,7 +118,10 @@ mod embeddings_tests {
         let cos_sim_23 = cosine_similarity(&emb2, &emb3);
 
         // Similar texts (cat/dog) should be somewhat similar but not identical
-        assert!(cos_sim_12 > 0.5, "Related texts should have cosine similarity > 0.5");
+        assert!(
+            cos_sim_12 > 0.5,
+            "Related texts should have cosine similarity > 0.5"
+        );
         assert!(cos_sim_12 < 0.99, "Different texts should not be identical");
 
         // Unrelated texts should be less similar
@@ -128,7 +139,10 @@ mod embeddings_tests {
             .expect("Engine should load");
 
         let empty_embedding = engine.embed("", None).await;
-        assert!(empty_embedding.is_empty(), "Empty input should produce empty embedding");
+        assert!(
+            empty_embedding.is_empty(),
+            "Empty input should produce empty embedding"
+        );
 
         let whitespace_embedding = engine.embed("   ", None).await;
         // After tokenization, whitespace might be empty or produce minimal tokens

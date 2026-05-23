@@ -103,4 +103,3 @@ impl From<&AppError> for ErrorResponse {
         }
     }
 }
-

@@ -44,7 +44,7 @@ struct Args {
     model_path: String,
 
     /// Context lengths to test (in tokens)
-    #[arg(long = "context-lengths", value_name = "TOKENS", value_delimiter = ' ', default_values_t = vec![1024, 4096, 8192, 16384, 32768])]
+    #[arg(long = "context-lengths", value_name = "TOKENS", value_delimiter = ' ', default_values_t = vec![1024, 4096, 8192, 16384, 32768, 49152, 65536, 131072])]
     context_lengths: Vec<usize>,
 
     /// Output length (in tokens)
@@ -78,6 +78,32 @@ struct Args {
     /// Verbose output
     #[arg(long, short = 'v')]
     verbose: bool,
+
+    /// AWQ benchmark mode (optimized for AWQ quantized models)
+    #[arg(long = "awq-mode")]
+    awq_mode: bool,
+
+    /// Extended context test (include 48K, 64K, 128K lengths)
+    #[arg(long = "extended-context")]
+    extended_context: bool,
+
+    /// Quick benchmark (only 1K, 4K, 8K)
+    #[arg(long = "quick")]
+    quick_mode: bool,
+}
+
+/// Get context lengths based on CLI options
+fn get_context_lengths(args: &Args) -> Vec<usize> {
+    if args.quick_mode {
+        vec![1024, 4096, 8192]
+    } else if args.extended_context {
+        vec![1024, 4096, 8192, 16384, 32768, 49152, 65536, 131072]
+    } else if args.awq_mode {
+        // AWQ mode: test key AWQ context lengths
+        vec![1024, 4096, 8192, 16384, 32768, 65536]
+    } else {
+        args.context_lengths.clone()
+    }
 }
 
 /// Benchmark result entry for table output
@@ -118,10 +144,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     tracing_subscriber::fmt().with_max_level(log_level).init();
 
+    // Determine context lengths based on mode
+    let context_lengths = get_context_lengths(&args);
+
     println!("=== LMDeploy Performance Benchmark ===");
     println!("Model: {}", args.model_path);
     println!("Quantization: {}", args.quantization);
-    println!("Context lengths: {}", format_context_lengths(&args.context_lengths));
+    if args.awq_mode {
+        println!("Mode: AWQ Optimized");
+    } else if args.quick_mode {
+        println!("Mode: Quick Test");
+    } else if args.extended_context {
+        println!("Mode: Extended Context (48K-128K)");
+    }
+    println!(
+        "Context lengths: {}",
+        format_context_lengths(&context_lengths)
+    );
     println!("Output length: {} tokens", args.output_length);
     println!("Iterations: {}", args.iterations);
     println!("Concurrent requests: {}", args.concurrent_requests);
@@ -136,7 +175,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let engine_start = Instant::now();
     let engine = Arc::new(TurboMindCEngine::new(&args.model_path).await?);
     let engine_init_time = engine_start.elapsed();
-    println!("Engine initialized in {:.2}s\n", engine_init_time.as_secs_f64());
+    println!(
+        "Engine initialized in {:.2}s\n",
+        engine_init_time.as_secs_f64()
+    );
 
     // Get initial GPU memory
     let initial_memory = get_gpu_memory().unwrap_or(0.0);
@@ -151,7 +193,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Run concurrent benchmark if requested
     let concurrent_result = if args.concurrent_requests > 1 {
         println!("\n=== Concurrent Request Benchmark ===");
-        let result = run_concurrent_benchmark(&engine, args.concurrent_requests, args.output_length).await?;
+        let result =
+            run_concurrent_benchmark(&engine, args.concurrent_requests, args.output_length).await?;
         println!("Concurrent requests: {}", result.num_requests);
         println!("Total time: {:.2} ms", result.total_time_ms);
         println!("Average latency: {:.2} ms", result.avg_time_ms);
@@ -170,7 +213,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Detect quantization type from model path or config
-fn detect_quantization(model_path: &str, quant_arg: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn detect_quantization(
+    model_path: &str,
+    quant_arg: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
     if quant_arg != "auto" {
         return Ok(quant_arg.to_string());
     }
@@ -204,8 +250,15 @@ fn detect_quantization(model_path: &str, quant_arg: &str) -> Result<String, Box<
 
 /// Format context lengths for display
 fn format_context_lengths(lengths: &[usize]) -> String {
-    lengths.iter()
-        .map(|&l| if l >= 1024 { format!("{}K", l / 1024) } else { format!("{}", l) })
+    lengths
+        .iter()
+        .map(|&l| {
+            if l >= 1024 {
+                format!("{}K", l / 1024)
+            } else {
+                format!("{}", l)
+            }
+        })
         .collect::<Vec<_>>()
         .join(", ")
 }
@@ -217,15 +270,19 @@ async fn run_sequential_benchmarks(
 ) -> Result<lmdeploy_server::model::benchmark::BenchmarkReport, Box<dyn std::error::Error>> {
     println!("=== Running Sequential Benchmarks ===");
 
+    let context_lengths = get_context_lengths(args);
     let config = BenchmarkConfig {
-        context_lengths: args.context_lengths.clone(),
+        context_lengths,
         output_length: args.output_length,
         iterations: args.iterations,
         warmup_iterations: args.warmup_iterations,
     };
 
     let runner = BenchmarkRunner::new(Arc::clone(engine), config);
-    let report = runner.run().await.map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+    let report = runner
+        .run()
+        .await
+        .map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
     Ok(report)
 }
 
@@ -311,10 +368,13 @@ fn output_json(
         "gpu_memory_used_gb": memory_used_gb,
         "timestamp": chrono::Utc::now().to_rfc3339(),
         "config": {
-            "context_lengths": args.context_lengths,
+            "context_lengths": report.config.context_lengths,
             "output_length": args.output_length,
             "iterations": args.iterations,
             "concurrent_requests": args.concurrent_requests,
+            "awq_mode": args.awq_mode,
+            "extended_context": args.extended_context,
+            "quick_mode": args.quick_mode,
         },
         "sequential": {
             "summary": report.summaries,
@@ -329,8 +389,10 @@ fn output_json(
         std::fs::write(file, json_str)?;
         println!("\nJSON results saved to: {}", file);
     } else if args.output_format == "json" {
-        let filename = format!("benchmark_results_{}.json",
-            chrono::Utc::now().format("%Y%m%d_%H%M%S"));
+        let filename = format!(
+            "benchmark_results_{}.json",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S")
+        );
         std::fs::write(&filename, json_str)?;
         println!("\nJSON results saved to: {}", filename);
     } else {

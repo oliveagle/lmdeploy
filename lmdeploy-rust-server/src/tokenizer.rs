@@ -6,7 +6,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use tokenizers::Tokenizer;
 
 /// LMDeploy tokenizer wrapper
@@ -81,7 +81,8 @@ impl LMTokenizer {
         let vocab_size = vocab.len();
 
         // Get BOS token ID (try multiple common names)
-        let bos_token_id = tokenizer.token_to_id("<s>")
+        let bos_token_id = tokenizer
+            .token_to_id("<s>")
             .or_else(|| tokenizer.token_to_id("<bos>"))
             .or_else(|| tokenizer.token_to_id("<BOS>"));
 
@@ -108,7 +109,8 @@ impl LMTokenizer {
     /// * `add_bos` - Whether to prepend the BOS token
     /// * `add_special_tokens` - Whether to add special tokens (handled by tokenizer)
     pub fn encode(&self, text: &str, add_bos: bool, add_special_tokens: bool) -> Result<Vec<u32>> {
-        let encoding = self.tokenizer
+        let encoding = self
+            .tokenizer
             .encode(text, add_special_tokens)
             .map_err(|e| anyhow!("Encoding failed: {}", e))?;
 
@@ -125,7 +127,8 @@ impl LMTokenizer {
 
     /// Encode without any special token handling (raw tokenization)
     pub fn encode_raw(&self, text: &str) -> Result<Vec<u32>> {
-        let encoding = self.tokenizer
+        let encoding = self
+            .tokenizer
             .encode(text, false)
             .map_err(|e| anyhow!("Encoding failed: {}", e))?;
         Ok(encoding.get_ids().iter().map(|&id| id as u32).collect())
@@ -138,7 +141,8 @@ impl LMTokenizer {
     /// * `skip_special_tokens` - Whether to skip special tokens in output
     pub fn decode(&self, token_ids: &[u32], skip_special_tokens: bool) -> Result<String> {
         let ids: Vec<u32> = token_ids.to_vec();
-        let text = self.tokenizer
+        let text = self
+            .tokenizer
             .decode(&ids, skip_special_tokens)
             .map_err(|e| anyhow!("Decoding failed: {}", e))?;
         Ok(text)
@@ -146,7 +150,8 @@ impl LMTokenizer {
 
     /// Decode a single token ID
     pub fn decode_token(&self, token_id: u32) -> Result<String> {
-        let text = self.tokenizer
+        let text = self
+            .tokenizer
             .decode(&[token_id], true)
             .map_err(|e| anyhow!("Decoding failed: {}", e))?;
         Ok(text)
@@ -179,7 +184,8 @@ impl LMTokenizer {
 
     /// Get batch encode - encodes multiple texts at once for efficiency
     pub fn encode_batch(&self, texts: &[&str], add_bos: bool) -> Result<Vec<Vec<u32>>> {
-        let encodings = self.tokenizer
+        let encodings = self
+            .tokenizer
             .encode_batch(texts.to_vec(), true)
             .map_err(|e| anyhow!("Batch encoding failed: {}", e))?;
 

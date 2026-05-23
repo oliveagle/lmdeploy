@@ -2,15 +2,13 @@
 //!
 //! This module provides a unified interface for C++ TurboMind inference.
 
-mod manager;
-pub mod cpp_engine;
 pub mod benchmark;
+pub mod cpp_engine;
+mod manager;
 
 // Re-export common types
 pub use cpp_engine::{
-    EngineType, TurboMindCEngine, ModelState, ModelInfo, GenerationParams,
-    TokenLogprob, TopLogprob, BatchItem, BatchResult,
+    BatchItem, BatchResult, EngineType, GenerationParams, ModelInfo, ModelState, TokenLogprob,
+    TopLogprob, TurboMindCEngine,
 };
-pub use manager::{
-    ModelEngine, ModelManager, ModelLoadProgress, ModelLoadTracker,
-};
+pub use manager::{ModelEngine, ModelLoadProgress, ModelLoadTracker, ModelManager};

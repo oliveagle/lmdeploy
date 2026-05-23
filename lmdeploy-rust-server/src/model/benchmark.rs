@@ -28,7 +28,7 @@ pub struct BenchmarkConfig {
 impl Default for BenchmarkConfig {
     fn default() -> Self {
         Self {
-            context_lengths: vec![1024, 4096, 8192, 16384, 32768],
+            context_lengths: vec![1024, 4096, 8192, 16384, 32768, 49152, 65536, 131072],
             output_length: 512,
             iterations: 3,
             warmup_iterations: 1,
@@ -156,12 +156,16 @@ impl BenchmarkRunner {
         for &context_length in &self.config.context_lengths {
             // Warmup runs
             for _ in 0..self.config.warmup_iterations {
-                let _ = self.run_streaming_benchmark(context_length, self.config.output_length, 0).await;
+                let _ = self
+                    .run_streaming_benchmark(context_length, self.config.output_length, 0)
+                    .await;
             }
 
             // Measured runs
             for iter in 1..=self.config.iterations {
-                let result = self.run_streaming_benchmark(context_length, self.config.output_length, iter).await?;
+                let result = self
+                    .run_streaming_benchmark(context_length, self.config.output_length, iter)
+                    .await?;
                 all_results.push(result);
             }
         }
@@ -180,7 +184,12 @@ impl BenchmarkRunner {
     }
 
     /// Run a single benchmark iteration using streaming for accurate timing
-    async fn run_streaming_benchmark(&self, context_length: usize, output_length: usize, iteration: usize) -> Result<BenchmarkResult, String> {
+    async fn run_streaming_benchmark(
+        &self,
+        context_length: usize,
+        output_length: usize,
+        iteration: usize,
+    ) -> Result<BenchmarkResult, String> {
         // Generate a prompt of approximately context_length tokens
         let prompt = generate_prompt(context_length * 4);
 
@@ -227,7 +236,7 @@ impl BenchmarkRunner {
         // Calculate inter-token latencies
         let mut itl_ms: Vec<f64> = Vec::new();
         for i in 1..token_times.len() {
-            itl_ms.push(token_times[i] - token_times[i-1]);
+            itl_ms.push(token_times[i] - token_times[i - 1]);
         }
 
         // Calculate prefill time (TTFT for the first output token)
@@ -273,7 +282,8 @@ impl BenchmarkRunner {
             let tolerance = match target_context {
                 0..=4096 => 200,
                 4097..=16384 => 1000,
-                _ => 2000,
+                16385..=65536 => 3000,
+                _ => 5000,
             };
             let context_results: Vec<_> = results
                 .iter()
@@ -285,12 +295,28 @@ impl BenchmarkRunner {
             }
 
             let count = context_results.len();
-            let avg_ttft: f64 = context_results.iter().map(|r| r.ttft_ms).sum::<f64>() / count as f64;
-            let min_ttft: f64 = context_results.iter().map(|r| r.ttft_ms).fold(f64::INFINITY, f64::min);
-            let max_ttft: f64 = context_results.iter().map(|r| r.ttft_ms).fold(f64::NEG_INFINITY, f64::max);
-            let avg_prefill: f64 = context_results.iter().map(|r| r.prefill_speed_tps).sum::<f64>() / count as f64;
-            let avg_decode: f64 = context_results.iter().map(|r| r.decode_speed_tps).sum::<f64>() / count as f64;
-            let avg_total: f64 = context_results.iter().map(|r| r.total_time_ms).sum::<f64>() / count as f64;
+            let avg_ttft: f64 =
+                context_results.iter().map(|r| r.ttft_ms).sum::<f64>() / count as f64;
+            let min_ttft: f64 = context_results
+                .iter()
+                .map(|r| r.ttft_ms)
+                .fold(f64::INFINITY, f64::min);
+            let max_ttft: f64 = context_results
+                .iter()
+                .map(|r| r.ttft_ms)
+                .fold(f64::NEG_INFINITY, f64::max);
+            let avg_prefill: f64 = context_results
+                .iter()
+                .map(|r| r.prefill_speed_tps)
+                .sum::<f64>()
+                / count as f64;
+            let avg_decode: f64 = context_results
+                .iter()
+                .map(|r| r.decode_speed_tps)
+                .sum::<f64>()
+                / count as f64;
+            let avg_total: f64 =
+                context_results.iter().map(|r| r.total_time_ms).sum::<f64>() / count as f64;
 
             summaries.push(BenchmarkSummary {
                 context_length: target_context,
@@ -338,7 +364,10 @@ mod tests {
     #[test]
     fn test_benchmark_config_default() {
         let config = BenchmarkConfig::default();
-        assert_eq!(config.context_lengths, vec![1024, 4096, 8192, 16384, 32768]);
+        assert_eq!(
+            config.context_lengths,
+            vec![1024, 4096, 8192, 16384, 32768, 49152, 65536, 131072]
+        );
         assert_eq!(config.output_length, 512);
         assert_eq!(config.iterations, 3);
         assert_eq!(config.warmup_iterations, 1);

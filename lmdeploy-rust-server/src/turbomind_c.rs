@@ -96,6 +96,7 @@ pub struct TM_SessionParam {
 }
 
 #[repr(i32)]
+#[derive(Debug, Clone, Copy)]
 pub enum TM_RequestStatus {
     TM_STATUS_OK = 0,
     TM_STATUS_INVALID = 1,
@@ -145,10 +146,24 @@ extern "C" {
     pub fn TM_EngineConfig_SetCommunicator(config: *mut TM_EngineConfig, value: *const c_char);
 
     // TurboMind instance
-    pub fn TM_TurboMind_Create(model_dir: *const c_char, config: *mut TM_EngineConfig) -> *mut TM_TurboMind;
+    pub fn TM_TurboMind_Create(
+        model_dir: *const c_char,
+        config: *mut TM_EngineConfig,
+    ) -> *mut TM_TurboMind;
     pub fn TM_TurboMind_Destroy(tm: *mut TM_TurboMind);
-    pub fn TM_TurboMind_InitFromPath(tm: *mut TM_TurboMind, device_id: c_int, model_dir: *const c_char, trust_remote_code: c_int) -> c_int;
-    pub fn TM_TurboMind_InitFromHF(tm: *mut TM_TurboMind, device_id: c_int, model_dir: *const c_char, trust_remote_code: c_int, session_len: c_int) -> c_int;
+    pub fn TM_TurboMind_InitFromPath(
+        tm: *mut TM_TurboMind,
+        device_id: c_int,
+        model_dir: *const c_char,
+        trust_remote_code: c_int,
+    ) -> c_int;
+    pub fn TM_TurboMind_InitFromHF(
+        tm: *mut TM_TurboMind,
+        device_id: c_int,
+        model_dir: *const c_char,
+        trust_remote_code: c_int,
+        session_len: c_int,
+    ) -> c_int;
     pub fn TM_TurboMind_CreateContext(tm: *mut TM_TurboMind, index: c_int);
     pub fn TM_TurboMind_CreateRoot(tm: *mut TM_TurboMind, index: c_int);
     pub fn TM_TurboMind_ProcessWeights(tm: *mut TM_TurboMind, index: c_int);
@@ -250,17 +265,35 @@ extern "C" {
     pub fn TM_GenerationConfig_Destroy(config: *mut TM_GenerationConfig);
     pub fn TM_GenerationConfig_SetMaxNewTokens(config: *mut TM_GenerationConfig, value: c_int);
     pub fn TM_GenerationConfig_SetMinNewTokens(config: *mut TM_GenerationConfig, value: c_int);
-    pub fn TM_GenerationConfig_SetEosIds(config: *mut TM_GenerationConfig, ids: *const c_int, count: c_int);
-    pub fn TM_GenerationConfig_SetStopIds(config: *mut TM_GenerationConfig, ids: *const c_int, count: c_int);
+    pub fn TM_GenerationConfig_SetEosIds(
+        config: *mut TM_GenerationConfig,
+        ids: *const c_int,
+        count: c_int,
+    );
+    pub fn TM_GenerationConfig_SetStopIds(
+        config: *mut TM_GenerationConfig,
+        ids: *const c_int,
+        count: c_int,
+    );
     pub fn TM_GenerationConfig_SetTopP(config: *mut TM_GenerationConfig, value: c_float);
     pub fn TM_GenerationConfig_SetTopK(config: *mut TM_GenerationConfig, value: c_int);
     pub fn TM_GenerationConfig_SetTemperature(config: *mut TM_GenerationConfig, value: c_float);
-    pub fn TM_GenerationConfig_SetRepetitionPenalty(config: *mut TM_GenerationConfig, value: c_float);
+    pub fn TM_GenerationConfig_SetRepetitionPenalty(
+        config: *mut TM_GenerationConfig,
+        value: c_float,
+    );
     pub fn TM_GenerationConfig_SetRandomSeed(config: *mut TM_GenerationConfig, value: u64);
     pub fn TM_GenerationConfig_SetOutputLogprobs(config: *mut TM_GenerationConfig, value: c_int);
     pub fn TM_GenerationConfig_SetOutputLogits(config: *mut TM_GenerationConfig, value: c_int);
-    pub fn TM_GenerationConfig_SetOutputLastHiddenState(config: *mut TM_GenerationConfig, value: c_int);
-    pub fn TM_GenerationConfig_SetBadIds(config: *mut TM_GenerationConfig, ids: *const c_int, count: c_int);
+    pub fn TM_GenerationConfig_SetOutputLastHiddenState(
+        config: *mut TM_GenerationConfig,
+        value: c_int,
+    );
+    pub fn TM_GenerationConfig_SetBadIds(
+        config: *mut TM_GenerationConfig,
+        ids: *const c_int,
+        count: c_int,
+    );
     pub fn TM_GenerationConfig_SetMinP(config: *mut TM_GenerationConfig, value: c_float);
 
     // Model request
@@ -529,10 +562,20 @@ impl TurboMind {
         unsafe { TM_TurboMind_CreateRoot(self.0, index) }
     }
 
-    pub fn init_from_path(&self, index: c_int, model_dir: &str, trust_remote_code: bool) -> FFResult<()> {
+    pub fn init_from_path(
+        &self,
+        index: c_int,
+        model_dir: &str,
+        trust_remote_code: bool,
+    ) -> FFResult<()> {
         unsafe {
             let model_dir_c = std::ffi::CString::new(model_dir).unwrap();
-            let ret = TM_TurboMind_InitFromPath(self.0, index, model_dir_c.as_ptr(), if trust_remote_code { 1 } else { 0 });
+            let ret = TM_TurboMind_InitFromPath(
+                self.0,
+                index,
+                model_dir_c.as_ptr(),
+                if trust_remote_code { 1 } else { 0 },
+            );
             if ret != 0 {
                 return Err(FFError::from_last_error().unwrap_or(FFError {
                     code: TM_ErrorCode::TM_ERR_RUNTIME,
@@ -551,10 +594,22 @@ impl TurboMind {
         unsafe { TM_TurboMind_CreateEngine(self.0, index) }
     }
 
-    pub fn init_from_hf(&self, device_id: c_int, model_dir: &str, trust_remote_code: bool, session_len: c_int) -> FFResult<()> {
+    pub fn init_from_hf(
+        &self,
+        device_id: c_int,
+        model_dir: &str,
+        trust_remote_code: bool,
+        session_len: c_int,
+    ) -> FFResult<()> {
         unsafe {
             let model_dir_c = std::ffi::CString::new(model_dir).unwrap();
-            let ret = TM_TurboMind_InitFromHF(self.0, device_id, model_dir_c.as_ptr(), if trust_remote_code { 1 } else { 0 }, session_len);
+            let ret = TM_TurboMind_InitFromHF(
+                self.0,
+                device_id,
+                model_dir_c.as_ptr(),
+                if trust_remote_code { 1 } else { 0 },
+                session_len,
+            );
             if ret != 0 {
                 return Err(FFError::from_last_error().unwrap_or(FFError {
                     code: TM_ErrorCode::TM_ERR_RUNTIME,
@@ -763,14 +818,26 @@ impl TensorMap {
     pub fn set_int32(&mut self, name: &str, data: &[c_int], shape: &[i64]) {
         unsafe {
             let name_c = std::ffi::CString::new(name).unwrap();
-            TM_TensorMap_SetInt32(self.0, name_c.as_ptr(), data.as_ptr(), shape.len() as c_int, shape.as_ptr());
+            TM_TensorMap_SetInt32(
+                self.0,
+                name_c.as_ptr(),
+                data.as_ptr(),
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
         }
     }
 
     pub fn set_int64(&mut self, name: &str, data: &[i64], shape: &[i64]) {
         unsafe {
             let name_c = std::ffi::CString::new(name).unwrap();
-            TM_TensorMap_SetInt64(self.0, name_c.as_ptr(), data.as_ptr(), shape.len() as c_int, shape.as_ptr());
+            TM_TensorMap_SetInt64(
+                self.0,
+                name_c.as_ptr(),
+                data.as_ptr(),
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
         }
     }
 
@@ -791,28 +858,52 @@ impl TensorMap {
     pub fn set_float32(&mut self, name: &str, data: &[c_float], shape: &[i64]) {
         unsafe {
             let name_c = std::ffi::CString::new(name).unwrap();
-            TM_TensorMap_SetFloat32(self.0, name_c.as_ptr(), data.as_ptr(), shape.len() as c_int, shape.as_ptr());
+            TM_TensorMap_SetFloat32(
+                self.0,
+                name_c.as_ptr(),
+                data.as_ptr(),
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
         }
     }
 
     pub fn set_int32_gpu(&mut self, name: &str, data: *const c_int, shape: &[i64]) {
         unsafe {
             let name_c = std::ffi::CString::new(name).unwrap();
-            TM_TensorMap_SetInt32GPU(self.0, name_c.as_ptr(), data, shape.len() as c_int, shape.as_ptr());
+            TM_TensorMap_SetInt32GPU(
+                self.0,
+                name_c.as_ptr(),
+                data,
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
         }
     }
 
     pub fn set_int64_gpu(&mut self, name: &str, data: *const i64, shape: &[i64]) {
         unsafe {
             let name_c = std::ffi::CString::new(name).unwrap();
-            TM_TensorMap_SetInt64GPU(self.0, name_c.as_ptr(), data, shape.len() as c_int, shape.as_ptr());
+            TM_TensorMap_SetInt64GPU(
+                self.0,
+                name_c.as_ptr(),
+                data,
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
         }
     }
 
     pub fn set_float32_gpu(&mut self, name: &str, data: *const c_float, shape: &[i64]) {
         unsafe {
             let name_c = std::ffi::CString::new(name).unwrap();
-            TM_TensorMap_SetFloat32GPU(self.0, name_c.as_ptr(), data, shape.len() as c_int, shape.as_ptr());
+            TM_TensorMap_SetFloat32GPU(
+                self.0,
+                name_c.as_ptr(),
+                data,
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
         }
     }
 
@@ -940,9 +1031,7 @@ impl ModelRequest {
         let mut out_data: *mut c_void = std::ptr::null_mut();
         let mut out_count: usize = 0;
 
-        let ret = unsafe {
-            TM_ModelRequest_GetStreamToken(self.0, &mut out_data, &mut out_count)
-        };
+        let ret = unsafe { TM_ModelRequest_GetStreamToken(self.0, &mut out_data, &mut out_count) };
 
         if ret != 0 {
             return Err(FFError::from_last_error().unwrap_or(FFError {
@@ -959,9 +1048,8 @@ impl ModelRequest {
         let mut out_status: TM_RequestStatus = TM_RequestStatus::TM_STATUS_OK;
         let mut out_seq_len: c_int = 0;
 
-        let ret = unsafe {
-            TM_ModelRequest_GetStreamingState(self.0, &mut out_status, &mut out_seq_len)
-        };
+        let ret =
+            unsafe { TM_ModelRequest_GetStreamingState(self.0, &mut out_status, &mut out_seq_len) };
 
         if ret != 0 {
             return Err(FFError::from_last_error().unwrap_or(FFError {

@@ -12,7 +12,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::error::{AppError, Result};
-use crate::model::cpp_engine::{EngineType, ModelState, ModelInfo, TurboMindCEngine, GenerationParams, TokenLogprob};
+use crate::model::cpp_engine::{
+    EngineType, GenerationParams, ModelInfo, ModelState, TokenLogprob, TurboMindCEngine,
+};
 use crate::tokenizer::LMTokenizer;
 
 /// Unified engine enum - Pure C++ only
@@ -34,7 +36,11 @@ impl ModelEngine {
         }
     }
 
-    pub async fn generate_with_metrics(&self, prompt: &str, params: GenerationParams) -> (String, usize, f64) {
+    pub async fn generate_with_metrics(
+        &self,
+        prompt: &str,
+        params: GenerationParams,
+    ) -> (String, usize, f64) {
         match self {
             ModelEngine::PureCpp(e) => e.generate_with_metrics(prompt, params).await,
         }
@@ -50,7 +56,11 @@ impl ModelEngine {
         }
     }
 
-    pub async fn generate_stream(&self, prompt: &str, params: GenerationParams) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+    pub async fn generate_stream(
+        &self,
+        prompt: &str,
+        params: GenerationParams,
+    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
         match self {
             ModelEngine::PureCpp(e) => e.generate_stream(prompt, params).await,
         }
@@ -100,7 +110,10 @@ impl ModelManager {
 
     /// Create a new ModelManager with a default model loaded
     /// Uses the PureCpp engine type
-    pub async fn with_default_model_and_type(model_path: &str, engine_type: EngineType) -> Result<Self> {
+    pub async fn with_default_model_and_type(
+        model_path: &str,
+        engine_type: EngineType,
+    ) -> Result<Self> {
         let mut manager = Self::new();
         let model_engine = match engine_type {
             EngineType::PureCpp => {
@@ -120,14 +133,21 @@ impl ModelManager {
             "Loaded default model"
         );
 
-        manager.models.insert(model_name.clone(), Arc::new(RwLock::new(model_engine)));
+        manager
+            .models
+            .insert(model_name.clone(), Arc::new(RwLock::new(model_engine)));
         manager.default_model = model_name;
 
         Ok(manager)
     }
 
     /// Load a new model with specified engine type
-    pub async fn load_model_with_type(&mut self, model_name: &str, model_path: &str, engine_type: EngineType) -> Result<()> {
+    pub async fn load_model_with_type(
+        &mut self,
+        model_name: &str,
+        model_path: &str,
+        engine_type: EngineType,
+    ) -> Result<()> {
         if self.models.contains_key(model_name) {
             return Err(AppError::ModelAlreadyLoaded(model_name.to_string()));
         }
@@ -146,14 +166,16 @@ impl ModelManager {
             }
         };
 
-        self.models.insert(model_name.to_string(), Arc::new(RwLock::new(model_engine)));
+        self.models
+            .insert(model_name.to_string(), Arc::new(RwLock::new(model_engine)));
         tracing::info!(model_name = %model_name, "Model loaded successfully");
         Ok(())
     }
 
     /// Load a new model (defaults to PureCpp engine)
     pub async fn load_model(&mut self, model_name: &str, model_path: &str) -> Result<()> {
-        self.load_model_with_type(model_name, model_path, EngineType::PureCpp).await
+        self.load_model_with_type(model_name, model_path, EngineType::PureCpp)
+            .await
     }
 
     /// Unload a model (release memory)
@@ -273,9 +295,7 @@ impl ModelManager {
         let engine = self.get_model(model_name)?;
         let eng = engine.read().await;
         match &*eng {
-            ModelEngine::PureCpp(e) => {
-                e.tokenizer().cloned()
-            }
+            ModelEngine::PureCpp(e) => e.tokenizer().cloned(),
         }
     }
 

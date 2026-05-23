@@ -1,3 +1,3 @@
 pub mod tokenizer_cache;
 
-pub use tokenizer_cache::{CachedTokens, TokenizeCache, compute_hash};
+pub use tokenizer_cache::{compute_hash, CachedTokens, TokenizeCache};

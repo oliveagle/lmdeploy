@@ -7,8 +7,8 @@ pub mod lmdeploy {
 
 pub use lmdeploy::v1::lm_deploy_service_server::LmDeployServiceServer;
 
-mod service_impl;
 mod handler;
+mod service_impl;
 
 pub use handler::start_grpc_server;
 pub use service_impl::LmDeployServiceImpl;

@@ -20,13 +20,17 @@ async fn main() -> Result<(), AppError> {
         AppConfig::load().map_err(|e| AppError::Config(e.to_string()))?
     };
 
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        EnvFilter::new(&config.logging.level)
-    });
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.logging.level));
 
     let fmt_layer = match config.logging.json_format {
-        true => tracing_subscriber::fmt::layer().json().with_filter(env_filter).boxed(),
-        false => tracing_subscriber::fmt::layer().with_filter(env_filter).boxed(),
+        true => tracing_subscriber::fmt::layer()
+            .json()
+            .with_filter(env_filter)
+            .boxed(),
+        false => tracing_subscriber::fmt::layer()
+            .with_filter(env_filter)
+            .boxed(),
     };
 
     tracing_subscriber::registry().with(fmt_layer).init();

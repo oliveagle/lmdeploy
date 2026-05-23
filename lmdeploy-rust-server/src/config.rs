@@ -59,20 +59,48 @@ pub struct ServerConfig {
     pub default_timeout_secs: u64,
 }
 
-fn default_http2_enabled() -> bool { true }
-fn default_http2_keepalive_interval() -> u64 { 60 }
-fn default_http2_keepalive_timeout() -> u64 { 10 }
-fn default_max_connections() -> usize { 10000 }
-fn default_connection_timeout() -> u64 { 30 }
-fn default_request_timeout() -> u64 { 300 }
-fn default_stream_timeout() -> u64 { 600 }
-fn default_stream_keepalive() -> u64 { 30000 }
-fn default_stream_chunk_size() -> usize { 8 }
-fn default_batch_enabled() -> bool { true }
-fn default_batch_size() -> usize { 8 }
-fn default_batch_timeout() -> u64 { 50 }
-fn default_shutdown_timeout() -> u64 { 30 }
-fn default_default_timeout_secs() -> u64 { 60 }
+fn default_http2_enabled() -> bool {
+    true
+}
+fn default_http2_keepalive_interval() -> u64 {
+    60
+}
+fn default_http2_keepalive_timeout() -> u64 {
+    10
+}
+fn default_max_connections() -> usize {
+    10000
+}
+fn default_connection_timeout() -> u64 {
+    30
+}
+fn default_request_timeout() -> u64 {
+    300
+}
+fn default_stream_timeout() -> u64 {
+    600
+}
+fn default_stream_keepalive() -> u64 {
+    30000
+}
+fn default_stream_chunk_size() -> usize {
+    8
+}
+fn default_batch_enabled() -> bool {
+    true
+}
+fn default_batch_size() -> usize {
+    8
+}
+fn default_batch_timeout() -> u64 {
+    50
+}
+fn default_shutdown_timeout() -> u64 {
+    30
+}
+fn default_default_timeout_secs() -> u64 {
+    60
+}
 
 /// Rate limiting configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -107,12 +135,24 @@ pub struct PerIpRateLimitConfig {
     pub max_tracked_ips: usize,
 }
 
-fn default_rate_limit_enabled() -> bool { false }
-fn default_requests_per_second() -> u32 { 100 }
-fn default_burst_size() -> u32 { 200 }
-fn default_per_ip_requests_per_second() -> u32 { 30 }
-fn default_per_ip_burst_size() -> u32 { 60 }
-fn default_max_tracked_ips() -> usize { 10000 }
+fn default_rate_limit_enabled() -> bool {
+    false
+}
+fn default_requests_per_second() -> u32 {
+    100
+}
+fn default_burst_size() -> u32 {
+    200
+}
+fn default_per_ip_requests_per_second() -> u32 {
+    30
+}
+fn default_per_ip_burst_size() -> u32 {
+    60
+}
+fn default_max_tracked_ips() -> usize {
+    10000
+}
 
 impl Default for RateLimitConfig {
     fn default() -> Self {
@@ -173,9 +213,15 @@ pub struct MetricsConfig {
     pub port: u16,
 }
 
-fn default_metrics_enabled() -> bool { true }
-fn default_metrics_addr() -> String { "0.0.0.0".into() }
-fn default_metrics_port() -> u16 { 9090 }
+fn default_metrics_enabled() -> bool {
+    true
+}
+fn default_metrics_addr() -> String {
+    "0.0.0.0".into()
+}
+fn default_metrics_port() -> u16 {
+    9090
+}
 
 /// Additional model to load (for multi-model support)
 #[derive(Debug, Clone, Deserialize, Serialize)]
