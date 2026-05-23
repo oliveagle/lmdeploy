@@ -41,7 +41,7 @@ def test_serializer_config():
     """Test WeightSerializer config loading."""
     print("[Test] WeightSerializer config loading...")
 
-    model_path = "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ"
+    model_path = "/mnt/data/models/modelscope_models/Qwen3.6-35B-A3B-AWQ"
 
     if not os.path.exists(model_path):
         print(f"[Test] SKIPPED: Model path {model_path} not found")

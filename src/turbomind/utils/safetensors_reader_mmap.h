@@ -36,6 +36,9 @@ public:
     explicit SafetensorsReaderMmap(const char* file_path)
         : fd_(-1), mapped_data_(nullptr), file_size_(0), header_size_(0)
     {
+        fprintf(stderr, "[Mmap] Opening safetensors file: %s\n", file_path);
+        fflush(stderr);
+
         // Open file
         fd_ = open(file_path, O_RDONLY);
         if (fd_ < 0) {
@@ -49,16 +52,26 @@ public:
             throw std::runtime_error(std::string("Cannot stat safetensors file: ") + file_path);
         }
         file_size_ = static_cast<size_t>(st.st_size);
+        fprintf(stderr, "[Mmap] File size: %zu bytes (%.2f GB)\n", file_size_, file_size_ / (1024.0 * 1024.0 * 1024.0));
+        fflush(stderr);
 
         // Map entire file into memory
+        fprintf(stderr, "[Mmap] Calling mmap for %zu bytes...\n", file_size_);
+        fflush(stderr);
         mapped_data_ = static_cast<const uint8_t*>(mmap(nullptr, file_size_, PROT_READ, MAP_PRIVATE, fd_, 0));
         if (mapped_data_ == MAP_FAILED) {
             close(fd_);
             throw std::runtime_error(std::string("Cannot mmap safetensors file: ") + file_path);
         }
+        fprintf(stderr, "[Mmap] mmap successful, address: %p\n", mapped_data_);
+        fflush(stderr);
 
         // Parse header
+        fprintf(stderr, "[Mmap] Parsing header...\n");
+        fflush(stderr);
         ParseHeader();
+        fprintf(stderr, "[Mmap] Header parsed: %zu tensors\n", metas_.size());
+        fflush(stderr);
     }
 
     explicit SafetensorsReaderMmap(const std::string& file_path) : SafetensorsReaderMmap(file_path.c_str()) {}
@@ -241,7 +254,11 @@ private:
     /// Format: {"tensor_name": {"dtype": "F32", "shape": [1, 768], "data_offsets": [0, 3072]}}
     void ParseJsonHeader(const std::string& json)
     {
+        fprintf(stderr, "[Mmap] JSON header size: %zu bytes (%.2f MB)\n", json.size(), json.size() / (1024.0 * 1024.0));
+        fflush(stderr);
+
         size_t pos = 0;
+        size_t tensor_count = 0;
 
         // Skip leading whitespace and opening brace
         while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t' ||
@@ -446,7 +463,16 @@ private:
                         metas_.push_back(meta);
             // Also add to hash map for O(1) lookup by name
             meta_map_.insert({metas_.back().name, metas_.back()});
+
+            tensor_count++;
+            if (tensor_count % 100 == 0) {
+                fprintf(stderr, "[Mmap] Parsed %zu tensors...\n", tensor_count);
+                fflush(stderr);
+            }
         }
+
+        fprintf(stderr, "[Mmap] JSON parsing complete: %zu tensors total\n", metas_.size());
+        fflush(stderr);
     }
 
     int fd_;                                         // File descriptor

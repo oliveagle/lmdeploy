@@ -12,7 +12,7 @@ os.environ['LMDEPLOY_LOG_LEVEL'] = 'ERROR'
 from lmdeploy import pipeline, GenerationConfig, TurbomindEngineConfig
 
 def main():
-    model_path = '/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-27B-AWQ'
+    model_path = '/mnt/data/models/modelscope_models/Qwen3___6-27B-AWQ'
     model_name = 'Qwen3.6-27B-AWQ'
 
     import subprocess

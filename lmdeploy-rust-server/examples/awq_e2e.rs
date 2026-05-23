@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model_path = if args.len() > 1 {
         args[1].clone()
     } else {
-        "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ".to_string()
+        "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ".to_string()
     };
 
     println!("=== AWQ End-to-End Inference Test ===");

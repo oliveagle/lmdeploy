@@ -5,7 +5,7 @@ use lmdeploy_server::turbomind_c::{EngineConfig, TurboMind};
 fn main() {
     println!("=== LMDeploy C API Simple Diagnostic ===\n");
 
-    let model_path = "/mnt/eaget-4tb/modelscope_models/Qwen/Qwen3-4B";
+    let model_path = "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ";
 
     // Test 1: Create EngineConfig
     println!("Test 1: Creating EngineConfig...");

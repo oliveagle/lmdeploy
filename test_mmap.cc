@@ -7,7 +7,7 @@
 int main() {
     std::cerr << "[TEST] Starting SafetensorsReaderMmap test..." << std::endl;
 
-    const char* path = "/mnt/eaget-4tb/modelscope_models/Qwen/Qwen3-4B/model-00001-of-00003.safetensors";
+    const char* path = "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ/model-00001-of-00008.safetensors";
 
     std::cerr << "[TEST] About to create SafetensorsReaderMmap..." << std::endl;
 

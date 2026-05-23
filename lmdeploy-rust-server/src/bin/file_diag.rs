@@ -13,7 +13,7 @@ fn main() {
         .open("/tmp/diag.log")
         .unwrap();
 
-    let model_path = "/mnt/eaget-4tb/modelscope_models/Qwen/Qwen3-4B";
+    let model_path = "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ";
 
     // Step 1
     writeln!(log, "STEP 1: Creating EngineConfig...").unwrap();

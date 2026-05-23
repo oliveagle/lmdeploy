@@ -50,6 +50,8 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 num_cpus = "1.16"
 lru = "0.12"
 chrono = "0.4"
+clap = { version = "4.5", features = ["derive"] }
+tabled = "0.16"
 
 [dev-dependencies]
 tokio-test = "0.4"

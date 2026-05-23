@@ -14,7 +14,7 @@ Usage:
     python3 examples/python_benchmark.py [model_path]
 
 Example:
-    python3 examples/python_benchmark.py /mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ
+    python3 examples/python_benchmark.py /mnt/data/models/modelscope_models/Qwen3.6-35B-A3B-AWQ
 """
 
 import json
@@ -38,7 +38,7 @@ CONTEXT_LENGTHS = [1024, 4096, 8192]
 OUTPUT_LENGTH = 512
 ITERATIONS = 3
 WARMUP_ITERATIONS = 1
-MODEL_PATH = "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ"
+MODEL_PATH = "/mnt/data/models/modelscope_models/Qwen3.6-35B-A3B-AWQ"
 
 
 class PythonBenchmark:

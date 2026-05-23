@@ -14,7 +14,7 @@ import os
 import os.path as osp
 
 # Add lmdeploy to path
-sys.path.insert(0, '/mnt/eaget-4tb/data/llm_server/lmdeploy')
+sys.path.insert(0, '/mnt/data/lmdeploy')
 
 import torch
 
@@ -65,5 +65,5 @@ def load_and_test(model_path: str, session_len: int = 8192):
     print("\nModel closed successfully.")
 
 if __name__ == '__main__':
-    model_path = '/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ'
+    model_path = '/mnt/data/models/modelscope_models/Qwen3.6-35B-A3B-AWQ'
     load_and_test(model_path)

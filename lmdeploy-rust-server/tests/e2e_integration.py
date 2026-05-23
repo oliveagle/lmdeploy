@@ -12,7 +12,7 @@ import sys
 import os
 
 # Add lmdeploy to path
-sys.path.insert(0, '/mnt/eaget-4tb/data/llm_server/lmdeploy')
+sys.path.insert(0, '/mnt/data/lmdeploy')
 
 from lmdeploy.tokenizer import Tokenizer
 
@@ -21,7 +21,7 @@ def test_tokenizer():
     """Test tokenizer loading"""
     print("[Phase 1] Testing tokenizer loading...")
 
-    model_path = "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B"
+    model_path = "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ"
 
     try:
         tokenizer = Tokenizer(model_path)
@@ -47,7 +47,7 @@ def test_model_config():
     """Test model config parsing"""
     print("[Phase 2] Testing model config parsing...")
 
-    model_path = "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B"
+    model_path = "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ"
     config_path = os.path.join(model_path, "config.json")
 
     try:
@@ -77,7 +77,7 @@ def test_awq_detection():
     print("[Phase 3] Testing AWQ quantization detection...")
 
     # Non-AWQ model
-    model_path = "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B"
+    model_path = "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ"
     config_path = os.path.join(model_path, "config.json")
 
     try:
@@ -88,12 +88,12 @@ def test_awq_detection():
         print(f"  OK: Qwen3.5-9B AWQ={has_awq} (expected: False)")
 
         # AWQ model (check both locations)
-        awq_model_path = "/mnt/eaget-4tb/data/llm_server/models/Qwen3.6-35B-A3B-AWQ"
+        awq_model_path = "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ"
         awq_config_path = os.path.join(awq_model_path, "config.json")
 
         # Try alternative path if symlink is broken
         if not os.path.exists(awq_config_path):
-            alt_path = "/mnt/eaget-4tb/data/llm_server/models/Qwen3.6-35B-A3B-AWQ/Qwen3___6-35B-A3B-AWQ"
+            alt_path = "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ"
             awq_config_path = os.path.join(alt_path, "config.json")
 
         if os.path.exists(awq_config_path):

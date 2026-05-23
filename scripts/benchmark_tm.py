@@ -25,7 +25,7 @@ class BenchmarkResult:
 class TurboMindBenchmark:
     def __init__(self, base_url: str = "http://localhost:8001"):
         self.base_url = base_url
-        self.model = "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ"
+        self.model = "/mnt/data/models/modelscope_models/Qwen3.6-35B-A3B-AWQ"
 
     def create_chat_payload(self, prompt: str, max_tokens: int = 128) -> dict:
         return {

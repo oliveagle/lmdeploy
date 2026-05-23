@@ -163,7 +163,7 @@ mod awq_inference_tests {
 
     fn get_awq_model_path() -> String {
         std::env::var("AWQ_MODEL_PATH")
-            .unwrap_or_else(|_| "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ".to_string())
+            .unwrap_or_else(|_| "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ".to_string())
     }
 
     #[tokio::test]

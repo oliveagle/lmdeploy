@@ -37,7 +37,7 @@ static FILE* log_file = nullptr;
     } while(0)
 
 int main(int argc, char* argv[]) {
-    const char* model_dir = "/mnt/eaget-4tb/modelscope_models/Qwen/Qwen3-4B";
+    const char* model_dir = "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ";
     if (argc > 1) {
         model_dir = argv[1];
     }

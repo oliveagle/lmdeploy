@@ -4,7 +4,7 @@
 import os
 import json
 
-MODEL_PATH = "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ"
+MODEL_PATH = "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ"
 
 def test_inference():
     from lmdeploy.turbomind.turbomind import TurboMind

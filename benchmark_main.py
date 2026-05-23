@@ -15,12 +15,12 @@ from lmdeploy import pipeline, GenerationConfig, TurbomindEngineConfig
 MODELS = [
     {
         'name': 'Qwen3.6-35B-A3B-AWQ',
-        'path': '/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ',
+        'path': '/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ',
         'gpu_memory_utilization': 0.85,
     },
     {
         'name': 'Qwen3.6-27B-AWQ',
-        'path': '/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-27B-AWQ',
+        'path': '/mnt/data/models/modelscope_models/Qwen3___6-27B-AWQ',
         'gpu_memory_utilization': 0.85,
     },
 ]

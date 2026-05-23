@@ -1018,8 +1018,16 @@ static void LoadWeightsFromSafetensors(
                 bool is_v = (tensor_name.find(".v_proj.") != std::string::npos);
 
                 if (is_q || is_k || is_v) {
-                    // Read tensor data from safetensors
+                    // Read tensor data from safetensors (zero-copy from mmap)
+                    auto read_start = std::chrono::high_resolution_clock::now();
                     std::vector<uint8_t> tensor_data = reader.read_tensor(tensor_name);
+                    auto read_elapsed = std::chrono::high_resolution_clock::now() - read_start;
+                    size_t data_size_mb = tensor_data.size() / (1024 * 1024);
+                    if (tensor_data.size() > 10 * 1024 * 1024 || read_elapsed > std::chrono::milliseconds(100)) {
+                        SAFETENSORS_LOG("[C-API] Read %s tensor: %zu MB, %.1fms\n",
+                                       is_q ? "Q" : (is_k ? "K" : "V"), data_size_mb,
+                                       std::chrono::duration_cast<std::chrono::milliseconds>(read_elapsed).count());
+                    }
 
                     if (is_q && acc.q_data.empty()) {
                         acc.q_data = std::move(tensor_data);
@@ -1071,7 +1079,9 @@ static void LoadWeightsFromSafetensors(
             }
 
             // Allocate GPU memory and transfer directly from mmap'd region
+            auto alloc_start = std::chrono::high_resolution_clock::now();
             auto tensor = target_param.alloc(shape_vec, meta.dtype);
+            auto alloc_elapsed = std::chrono::high_resolution_clock::now() - alloc_start;
 
             if (!tensor) {
                 ++skip_count;
@@ -1088,7 +1098,9 @@ static void LoadWeightsFromSafetensors(
             if (progress_count % 200 == 0 || i == reader.num_tensors() - 1) {
                 auto now = std::chrono::high_resolution_clock::now();
                 auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - load_start);
-                SAFETENSORS_LOG("[C-API] Allocated %zu/%zu tensors (%.0fs elapsed) from %s\n", progress_count, reader.num_tensors(), elapsed.count() / 1000.0, safetensors_path);
+                SAFETENSORS_LOG("[C-API] Allocated %zu/%zu tensors (%.0fs elapsed, alloc took %.0fms) from %s\n",
+                               progress_count, reader.num_tensors(), elapsed.count() / 1000.0,
+                               alloc_elapsed.count() / 1000.0, safetensors_path);
             }
         }
 
@@ -1102,6 +1114,8 @@ static void LoadWeightsFromSafetensors(
                             key.c_str(), acc.q_loaded, acc.k_loaded, acc.v_loaded);
                     continue;
                 }
+
+                auto qkv_start = std::chrono::high_resolution_clock::now();
 
                 // Navigate to the attention module
                 turbomind::core::Module* attn_module = model_weight;
@@ -1179,22 +1193,41 @@ static void LoadWeightsFromSafetensors(
 
                 // Copy fused data to GPU
                 std::memcpy(fused_tensor.raw_data(), fused_data.data(), fused_data.size());
-                SAFETENSORS_LOG("[C-API] Fused QKV for %s: [%zu,%zu]\n", key.c_str(), fused_out, hidden);
+                auto qkv_elapsed = std::chrono::high_resolution_clock::now() - qkv_start;
+                SAFETENSORS_LOG("[C-API] Fused QKV for %s: [%zu,%zu], %.0fms\n", key.c_str(), fused_out, hidden,
+                               std::chrono::duration_cast<std::chrono::milliseconds>(qkv_elapsed).count());
             }
+
+            auto qkv_total = std::chrono::high_resolution_clock::now() - load_start;
+            SAFETENSORS_LOG("[C-API] QKV fusion phase complete: %.1fs total elapsed\n",
+                           std::chrono::duration_cast<std::chrono::seconds>(qkv_total).count());
         }
 
         // Phase 2: Run all transfers in batched mode for better performance
-        SAFETENSORS_LOG("[C-API] Running batched transfers for %d tensors...\n", loaded_count);
+        auto transfer_start = std::chrono::high_resolution_clock::now();
+        size_t transfer_total_bytes = 0;
+        for (const auto& t : transfers) transfer_total_bytes += t.size;
+        SAFETENSORS_LOG("[C-API] Running batched transfers for %d tensors (%zu MB)...\n",
+                       loaded_count, transfer_total_bytes / (1024 * 1024));
 
         auto batch_start = std::chrono::high_resolution_clock::now();
         {
             auto group = batch_copy.group();
+            size_t transfer_progress = 0;
+            const size_t progress_interval = std::max((size_t)100, transfers.size() / 20);
             for (const auto& transfer : transfers) {
                 batch_copy(reinterpret_cast<const char*>(transfer.src), transfer.size,
                           reinterpret_cast<char*>(transfer.dst));
+                transfer_progress++;
+                if (transfer_progress % progress_interval == 0) {
+                    auto elapsed = std::chrono::high_resolution_clock::now() - transfer_start;
+                    SAFETENSORS_LOG("[C-API] Transfer progress: %zu/%zu (%.1fs elapsed)\n",
+                                   transfer_progress, transfers.size(), elapsed.count() / 1e9);
+                }
             }
         }
         // Group goes out of scope, then run the batch
+        SAFETENSORS_LOG("[C-API] Transfer group setup done, executing Run()...\n");
         batch_copy.Run();
 
         auto batch_end = std::chrono::high_resolution_clock::now();
