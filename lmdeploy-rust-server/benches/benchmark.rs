@@ -4,13 +4,14 @@
 //! - TTFT (Time To First Token)
 //! - Prefill speed (tokens/second)
 //! - Decode speed (tokens/second)
-//! - Multiple context lengths (1K, 4K, 8K tokens)
+//! - Multiple context lengths (1K, 4K, 8K, 16K, 32K tokens)
+//! - AWQ quantized model support
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
 
-/// Benchmark configuration for different context lengths
+/// Benchmark configuration for different context lengths (extended range)
 fn benchmark_config() -> Vec<usize> {
-    vec![1024, 4096, 8192]
+    vec![1024, 4096, 8192, 16384, 32768]
 }
 
 /// Benchmark prefill performance across different context lengths

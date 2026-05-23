@@ -1,16 +1,20 @@
 //! LMDeploy Performance Benchmark Tool
 //!
 //! Runs comprehensive performance benchmarks on LMDeploy TurboMind engine:
-//! - Multiple context lengths (1K, 4K, 8K tokens)
+//! - Multiple context lengths (1K, 4K, 8K, 16K, 32K tokens)
 //! - TTFT (Time To First Token) measurement
 //! - Prefill and decode speed tracking
 //! - GPU memory usage monitoring
+//! - Support for AWQ quantized models
 //!
 //! Usage:
 //!   cargo run --example benchmark -- <model_path>
 //!
-//! Example:
+//! Example (AWQ model):
 //!   cargo run --example benchmark -- /mnt/eaget-4tb/modelscope_models/tclf00/Qwen3___6-35B-A3B-AWQ
+//!
+//! Example (non-AWQ model):
+//!   cargo run --example benchmark -- /path/to/qwen3.5-9b
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -32,11 +36,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse model path from CLI arguments
     let model_path = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ".to_string());
+        .unwrap_or_else(|| "/mnt/eaget-4tb/modelscope_models/tclf00/Qwen3___6-35B-A3B-AWQ".to_string());
 
     println!("=== LMDeploy Performance Benchmark ===");
     println!("Model: {}", model_path);
-    println!("Context lengths: 1K, 4K, 8K tokens");
+    println!("Context lengths: 1K, 4K, 8K, 16K, 32K tokens");
     println!("Output length: {} tokens", OUTPUT_LENGTH);
     println!("Iterations: {}", ITERATIONS);
     println!("======================================\n");
@@ -53,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create benchmark config
     let config = BenchmarkConfig {
-        context_lengths: vec![1024, 4096, 8192],
+        context_lengths: vec![1024, 4096, 8192, 16384, 32768],
         output_length: OUTPUT_LENGTH,
         iterations: ITERATIONS,
         warmup_iterations: 1,

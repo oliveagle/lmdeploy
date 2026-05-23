@@ -28,7 +28,7 @@ pub struct BenchmarkConfig {
 impl Default for BenchmarkConfig {
     fn default() -> Self {
         Self {
-            context_lengths: vec![1024, 4096, 8192],
+            context_lengths: vec![1024, 4096, 8192, 16384, 32768],
             output_length: 512,
             iterations: 3,
             warmup_iterations: 1,
@@ -270,7 +270,11 @@ impl BenchmarkRunner {
         let mut summaries = Vec::new();
 
         for &target_context in &self.config.context_lengths {
-            let tolerance = if target_context >= 4096 { 1000 } else { 200 };
+            let tolerance = match target_context {
+                0..=4096 => 200,
+                4097..=16384 => 1000,
+                _ => 2000,
+            };
             let context_results: Vec<_> = results
                 .iter()
                 .filter(|r| (r.context_length as isize - target_context as isize).abs() < tolerance)
@@ -334,7 +338,7 @@ mod tests {
     #[test]
     fn test_benchmark_config_default() {
         let config = BenchmarkConfig::default();
-        assert_eq!(config.context_lengths, vec![1024, 4096, 8192]);
+        assert_eq!(config.context_lengths, vec![1024, 4096, 8192, 16384, 32768]);
         assert_eq!(config.output_length, 512);
         assert_eq!(config.iterations, 3);
         assert_eq!(config.warmup_iterations, 1);
@@ -352,6 +356,8 @@ mod tests {
             decode_time_ms: 1000.0,
             decode_speed_tps: 512.0,
             total_time_ms: 1500.0,
+            actual_output_tokens: 512,
+            itl_ms: vec![1.5, 1.2, 1.3],
         };
 
         let json = serde_json::to_string(&result).unwrap();
