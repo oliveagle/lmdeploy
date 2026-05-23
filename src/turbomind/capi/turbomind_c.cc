@@ -435,7 +435,10 @@ struct HfModelConfig {
     int num_experts_per_tok = 0;
 
     // MTP (Multi-Token Prediction) configuration
+    // Qwen3.5: mtp_num_hidden_layers (mtp.layers.* weights)
+    // DeepSeek/GLM4: num_nextn_predict_layers (layers.{num_hidden_layers+N}.* weights)
     int mtp_num_hidden_layers = 0;
+    int num_nextn_predict_layers = 0;
 
     // DeltaNet / Linear Attention
     bool use_linear_attn = false;
@@ -527,7 +530,10 @@ static HfModelConfig ParseHfConfig(const std::string& model_dir)
     config.num_experts_per_tok = get_int("num_experts_per_tok", 0);
 
     // MTP (Multi-Token Prediction) configuration
+    // Qwen3.5: mtp_num_hidden_layers (mtp.layers.* weights)
+    // DeepSeek/GLM4: num_nextn_predict_layers (layers.{num_hidden_layers+N}.* weights)
     config.mtp_num_hidden_layers = get_int("mtp_num_hidden_layers", 0);
+    config.num_nextn_predict_layers = get_int("num_nextn_predict_layers", 0);
 
     // DeltaNet / Linear Attention
     // Qwen3.5 uses layer_types array (["linear_attention", "full_attention", ...])
@@ -729,7 +735,7 @@ const char* TM_Safetensors_GetTensorName(void* handle, int index)
 // ============================================================
 
 // Forward declarations
-static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name);
+static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name, const HfModelConfig& hf_config);
 static void LoadWeightsFromSafetensors(
     turbomind::ModelWeight* model_weight,
     const char* safetensors_path,
@@ -940,7 +946,7 @@ static void LoadWeightsFromSafetensors(
             const std::string& tensor_name = meta.name;
 
             // Map HF weight names to TurboMind module paths
-            std::string tm_path = MapHuggingFaceWeightToTurboMind(tensor_name);
+            std::string tm_path = MapHuggingFaceWeightToTurboMind(tensor_name, hf_config);
             if (tm_path.empty()) {
                 ++skip_count;
                 continue;
@@ -1215,7 +1221,10 @@ core::Param LinearWeight_debug_param(class LinearWeight* lw, const std::string& 
 }
 
 // Map HuggingFace weight names to TurboMind module paths
-static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
+// Handles MTP (Multi-Token Prediction) weight mapping for different architectures:
+// - Qwen3.5 MTP: mtp.layers.X.* -> layers.X.* (shares weights with main model)
+// - DeepSeek MTP: layers.{num_hidden_layers + N}.* -> MTP-specific or shared
+static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name, const HfModelConfig& hf_config)
 {
     // HF format: model.language_model.layers.0.mlp.gate_proj.weight
     // TM format: layers.0.feed_forward.w1.weight
@@ -1277,6 +1286,81 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
         }
 
         return "";  // Skip unknown MTP params
+    }
+
+    // ========================================================
+    // DeepSeek/GLM4 MTP paths: layers.{num_hidden_layers+N}.*
+    // These are MTP predictor layers that share structure with main model layers
+    // Example: DeepSeek-V2 with num_hidden_layers=61, num_nextn_predict_layers=1
+    //          has weights at layers.61.self_attn.*, layers.61.mlp.* etc.
+    // ========================================================
+    // Check if this is a DeepSeek/GLM4 MTP layer (layers.N where N >= num_hidden_layers)
+    if (hf_config.num_nextn_predict_layers > 0 && hf_config.num_hidden_layers > 0) {
+        size_t layers_pos = result.find(".layers.");
+        if (layers_pos != std::string::npos) {
+            size_t layer_num_start = layers_pos + 8;  // ".layers." = 8 chars
+            size_t layer_num_end = result.find('.', layer_num_start);
+
+            if (layer_num_end != std::string::npos) {
+                std::string layer_num_str = result.substr(layer_num_start, layer_num_end - layer_num_start);
+
+                // Check if the layer number is >= num_hidden_layers (MTP predictor layers)
+                bool is_digit = !layer_num_str.empty() &&
+                                std::all_of(layer_num_str.begin(), layer_num_str.end(), ::isdigit);
+                if (is_digit) {
+                    int layer_num = std::stoi(layer_num_str);
+                    if (layer_num >= hf_config.num_hidden_layers) {
+                        // This is an MTP predictor layer
+                        // MTP-specific params: embed_tokens, enorm, hnorm, shared_head, eh_proj, rotary_emb
+                        // These are NOT supported in C++ engine - skip them
+                        if (result == "embed_tokens.weight") {
+                            return "";  // Skip MTP-specific embeddings
+                        }
+                        if (result == "enorm.weight") {
+                            return "";  // Skip MTP embedding norm
+                        }
+                        if (result == "hnorm.weight") {
+                            return "";  // Skip MTP hidden norm
+                        }
+                        if (result == "eh_proj.weight") {
+                            return "";  // Skip MTP embedding-hidden projection
+                        }
+                        if (result.find("shared_head.") == 0) {
+                            return "";  // Skip MTP shared head components
+                        }
+                        if (result.find("rotary_emb.") == 0) {
+                            return "";  // Skip MTP rotary embeddings
+                        }
+
+                        // For transformer layer components (attention, FFN, layer norms)
+                        // DeepSeek MTP shares structure with main model layers
+                        // Map MTP layer to main model layer 0 (or cycle through main model layers)
+                        // layers.{num_hidden_layers+N}.self_attn.* -> layers.{N % num_hidden_layers}.attention.*
+                        int target_layer = layer_num % hf_config.num_hidden_layers;
+                        std::string target_layer_str = std::to_string(target_layer);
+
+                        // Replace the layer number in the path
+                        // layers.N.xxx -> layers.{target_layer}.xxx
+                        result = result.substr(0, layer_num_start) + target_layer_str + result.substr(layer_num_end);
+
+                        // Apply standard MTP mappings and continue with normal processing
+                        replace_all(result, ".self_attn.", ".attention.");
+                        replace_all(result, ".mlp.experts.", ".moe_ffn.experts.");
+                        replace_all(result, ".mlp.", ".feed_forward.");
+                        replace_all(result, ".input_layernorm", ".attention_norm");
+                        replace_all(result, ".post_attention_layernorm", ".ffn_norm");
+                        replace_all(result, ".o_proj.", ".wo.");
+                        replace_all(result, ".gate_proj.", ".w1.");
+                        replace_all(result, ".up_proj.", ".w3.");
+                        replace_all(result, ".down_proj.", ".w2.");
+                        replace_all(result, ".qweight", ".weight");
+                        replace_all(result, ".qzeros", ".zeros");
+
+                        return result;  // Return mapped path
+                    }
+                }
+            }
+        }
     }
 
     // ========================================================
