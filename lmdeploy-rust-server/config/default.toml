@@ -34,6 +34,8 @@ shutdown_timeout_secs = 30
 model_path = "/mnt/eaget-4tb/data/llm_server/models/Qwen3.5-9B"
 model_name = "Qwen3.5-9B"
 max_context_length = 8192
+# max_batch_size is now GPU-adaptive (A100/A800=384, H100/H800/H200/L20Y=1024, default=128)
+# This value is automatically detected via nvidia-smi at runtime
 max_batch_size = 8
 engine_type = "pure_cpp"
 

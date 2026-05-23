@@ -22,6 +22,59 @@ use crate::turbomind_c::{
 };
 use serde::Serialize;
 
+/// Get the max inference batch size for LLM models according to the GPU type.
+///
+/// This matches the Python implementation in `lmdeploy.utils.get_max_batch_size`:
+/// - A100/A800: 384
+/// - H100/H800/H200/L20Y: 1024
+/// - Other CUDA devices: 128 (default)
+///
+/// Returns the GPU-adaptive batch size or 128 if GPU detection fails.
+fn get_max_batch_size() -> i32 {
+    use std::process::Command;
+
+    // Map of GPU name patterns to batch sizes
+    // Matches Python: max_batch_size_map = {'a100': 384, 'a800': 384, 'h100': 1024, 'h800': 1024, 'l20y': 1024, 'h200': 1024}
+    let max_batch_size_map = [
+        ("a100", 384),
+        ("a800", 384),
+        ("h100", 1024),
+        ("h800", 1024),
+        ("h200", 1024),
+        ("l20y", 1024),
+    ];
+
+    // Query GPU name using nvidia-smi
+    let output = match Command::new("nvidia-smi")
+        .args(&["--query-gpu=name", "--format=csv,noheader"])
+        .output()
+    {
+        Ok(output) if output.status.success() => output,
+        _ => {
+            tracing::warn!("Failed to detect GPU type using nvidia-smi, using default max_batch_size=128");
+            return 128;
+        }
+    };
+
+    let device_name = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+
+    // Check if any known GPU name pattern matches
+    for (pattern, size) in max_batch_size_map {
+        if device_name.contains(pattern) {
+            tracing::info!(gpu = %device_name, max_batch_size = size, "GPU-adaptive max_batch_size detected");
+            return size;
+        }
+    }
+
+    // Default for unknown CUDA devices
+    tracing::info!(
+        gpu = %device_name,
+        max_batch_size = 128,
+        "Unknown GPU type, using default max_batch_size=128"
+    );
+    128
+}
+
 /// A single token logprobs entry as returned by the OpenAI API.
 #[derive(Debug, Clone, Serialize)]
 pub struct TokenLogprob {
@@ -642,9 +695,10 @@ impl TurboMindCEngine {
         engine_config.set_max_prefill_token_num(8192);
 
         // max_batch_size: higher values improve throughput but use more memory
-        // Python uses get_max_batch_size('cuda'): A100=384, H100=1024, default=128
-        // We use a moderate default to balance memory and throughput
-        engine_config.set_max_batch_size(32);
+        // GPU-adaptive: A100/A800=384, H100/H800/H200/L20Y=1024, default=128
+        // This matches Python's get_max_batch_size('cuda') behavior
+        let max_batch_size = get_max_batch_size();
+        engine_config.set_max_batch_size(max_batch_size);
         engine_config.set_cache_block_seq_len(64);
         engine_config.set_cache_max_block_count(0.8);
         engine_config.set_enable_prefix_caching(prefix_cache_enabled);
@@ -715,7 +769,7 @@ impl TurboMindCEngine {
             request_pool: Some(request_pool),
             tokenizer,
             session_len: 65536,
-            max_batch_size: 32,
+            max_batch_size,
             quant_policy,
             hidden_size,
         })
