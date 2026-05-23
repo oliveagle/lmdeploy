@@ -24,6 +24,61 @@ use crate::turbomind_c::{
 /// This matches the C++ engine's internal queue capacity
 const DEFAULT_CONCURRENCY: usize = 8;
 
+/// Pool of ModelRequest instances for concurrent inference.
+///
+/// Uses a `tokio::sync::Semaphore` to limit concurrent inference requests
+/// and `tokio::sync::Mutex` per slot so that the async runtime can yield
+/// during blocking FFI calls instead of parking OS threads.
+struct RequestPool {
+    /// Per-slot tokio mutex - yields during FFI calls
+    slots: Vec<tokio::sync::Mutex<ModelRequest>>,
+    /// Semaphore limits concurrent inference requests
+    semaphore: tokio::sync::Semaphore,
+}
+
+impl RequestPool {
+    /// Create a new request pool with the given concurrency level.
+    fn new(tm: &TurboMind, concurrency: usize) -> Result<Self> {
+        let mut slots = Vec::with_capacity(concurrency);
+        for i in 0..concurrency {
+            let request = ModelRequest::create(tm).map_err(|e| {
+                AppError::ModelLoadFailed(format!("Failed to create request #{}: {:?}", i, e))
+            })?;
+            slots.push(tokio::sync::Mutex::new(request));
+        }
+        Ok(Self {
+            slots,
+            semaphore: tokio::sync::Semaphore::new(concurrency),
+        })
+    }
+
+    /// Acquire a slot (async). Returns a guard that holds the semaphore
+    /// permit and the mutex guard. The slot is released when the guard is
+    /// dropped.
+    async fn acquire(&self) -> (tokio::sync::SemaphorePermit<'_>, tokio::sync::MutexGuard<'_, ModelRequest>) {
+        let permit = self
+            .semaphore
+            .acquire()
+            .await
+            .expect("semaphore closed");
+        let idx = (self.semaphore.available_permits() + 1) % self.slots.len();
+        let guard = self.slots[idx].lock().await;
+        (permit, guard)
+    }
+
+    /// Acquire a slot (blocking, for use in spawn_blocking). Returns a
+    /// permit and the mutex guard.
+    fn acquire_blocking(&self) -> (tokio::sync::SemaphorePermit<'_>, tokio::sync::MutexGuard<'_, ModelRequest>) {
+        let permit = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(self.semaphore.acquire())
+        })
+        .expect("semaphore closed");
+        let idx = (self.semaphore.available_permits() + 1) % self.slots.len();
+        let guard = self.slots[idx].blocking_lock();
+        (permit, guard)
+    }
+}
+
 /// Engine type selector
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EngineType {
@@ -125,37 +180,6 @@ fn parse_hidden_size(model_path: &std::path::Path) -> usize {
         .unwrap_or(4096) // Default fallback
 }
 
-/// Pool of ModelRequest instances for concurrent inference.
-///
-/// The C++ TurboMind engine uses a Gateway with internal queuing, but each
-/// ModelRequest instance holds state for a single inference session. This pool
-/// allows multiple concurrent requests to proceed without mutex contention.
-struct RequestPool {
-    requests: std::sync::Mutex<Vec<ModelRequest>>,
-}
-
-impl RequestPool {
-    /// Create a new request pool with the given concurrency level.
-    fn new(tm: &TurboMind, concurrency: usize) -> Result<Self> {
-        let mut requests = Vec::with_capacity(concurrency);
-        for i in 0..concurrency {
-            let request = ModelRequest::create(tm).map_err(|e| {
-                AppError::ModelLoadFailed(format!("Failed to create request #{}: {:?}", i, e))
-            })?;
-            requests.push(request);
-        }
-        Ok(Self {
-            requests: std::sync::Mutex::new(requests),
-        })
-    }
-
-    /// Acquire a ModelRequest from the pool (blocking).
-    /// Returns a guard that returns the request to the pool on drop.
-    fn acquire<'a>(&'a self) -> std::sync::MutexGuard<'a, Vec<ModelRequest>> {
-        self.requests.lock().expect("pool lock poisoned")
-    }
-}
-
 /// TurboMind pure C++ engine
 pub struct TurboMindCEngine {
     pub(super) model_path: String,
@@ -167,10 +191,8 @@ pub struct TurboMindCEngine {
 
     // C API components
     tm: Option<Arc<TurboMind>>,
-    /// Pool of ModelRequest instances for concurrent inference
+    /// Pool of ModelRequest instances for concurrent inference (includes semaphore)
     request_pool: Option<Arc<RequestPool>>,
-    /// Semaphore limiting concurrent inference requests
-    request_semaphore: Option<Arc<tokio::sync::Semaphore>>,
 
     // Tokenizer for encoding/decoding
     tokenizer: Option<LMTokenizer>,
@@ -281,10 +303,8 @@ impl TurboMindCEngine {
                 AppError::ModelLoadFailed(format!("InitFromPath failed: {:?}", e))
             })?;
 
-        // Create inference request pool for concurrent access
-        let request_pool = RequestPool::new(&tm, DEFAULT_CONCURRENCY)?;
-        let pool_arc = Arc::new(request_pool);
-        let semaphore = Arc::new(tokio::sync::Semaphore::new(DEFAULT_CONCURRENCY));
+        // Create inference request pool for concurrent access (includes semaphore)
+        let request_pool = Arc::new(RequestPool::new(&tm, DEFAULT_CONCURRENCY)?);
 
         let model_name = model_path_obj
             .file_name()
@@ -305,8 +325,7 @@ impl TurboMindCEngine {
             is_ready: std::sync::atomic::AtomicBool::new(true),
             engine_type: EngineType::PureCpp,
             tm: Some(Arc::new(tm)),
-            request_pool: Some(pool_arc),
-            request_semaphore: Some(semaphore),
+            request_pool: Some(request_pool),
             tokenizer,
             session_len: 65536,
             max_batch_size: 32,
@@ -347,13 +366,11 @@ impl TurboMindCEngine {
         // Drop existing components
         self.tm = None;
         self.request_pool = None;
-        self.request_semaphore = None;
 
         // Re-initialize
         let new_engine = Self::new(new_model_path).await?;
         self.tm = new_engine.tm;
         self.request_pool = new_engine.request_pool;
-        self.request_semaphore = new_engine.request_semaphore;
         self.tokenizer = new_engine.tokenizer;
         self.model_path = new_model_path.to_string();
         self.model_name = new_engine.model_name;
@@ -383,40 +400,39 @@ impl TurboMindCEngine {
         max_tokens: usize,
     ) -> (String, usize, f64) {
         let pool = self.request_pool.as_ref().expect("Request pool not initialized");
-        let semaphore = self.request_semaphore.as_ref().expect("Semaphore not initialized");
 
-        // Acquire semaphore permit (limits concurrent requests)
-        let _permit = semaphore.acquire().await.expect("semaphore closed");
-
-        // Tokenize input
-        let input_ids = if let Some(tokenizer) = &self.tokenizer {
-            match tokenizer.encode(prompt, false, false) {
+        // Tokenize input (outside the lock to minimize critical section)
+        let input_ids = match &self.tokenizer {
+            Some(tokenizer) => match tokenizer.encode(prompt, false, false) {
                 Ok(ids) => ids,
                 Err(e) => {
                     tracing::error!(error = %e, "Tokenization failed");
                     return (String::new(), 0, 0.0);
                 }
+            },
+            None => {
+                tracing::error!("Tokenizer not available");
+                return (String::new(), 0, 0.0);
             }
-        } else {
-            tracing::error!("Tokenizer not available");
-            return (String::new(), 0, 0.0);
         };
 
         tracing::debug!(input_len = input_ids.len(), "Tokenized prompt");
 
         let start = Instant::now();
 
-        // Acquire a ModelRequest from the pool
-        // Note: We use the mutex only to protect the vector access, not the request itself
-        // ModelRequest is Send+Sync and can be used concurrently
-        let mut pool_guard = pool.acquire();
-        let request_index = 0; // Simple round-robin: always use first available
-        let request = pool_guard.get_mut(request_index).expect("request not found");
+        // Acquire a slot (semaphore permit + mutex guard for the slot).
+        // tokio::sync::Mutex allows the runtime to yield while waiting,
+        // enabling true parallel inference without blocking threads.
+        let (_permit, mut request) = pool.acquire().await;
 
         // Prepare input tensors
         let mut input_tensors = TensorMap::new().unwrap();
         let input_ids_shape = [input_ids.len() as i64];
-        input_tensors.set_int64("input_ids", &input_ids.iter().map(|&id| id as i64).collect::<Vec<_>>(), &input_ids_shape);
+        input_tensors.set_int64(
+            "input_ids",
+            &input_ids.iter().map(|&id| id as i64).collect::<Vec<_>>(),
+            &input_ids_shape,
+        );
         input_tensors.set_int32("sequence_length", &[input_ids.len() as i32], &[1]);
 
         // Prepare generation config
@@ -437,7 +453,9 @@ impl TurboMindCEngine {
         // Prepare output tensors
         let mut output_tensors = TensorMap::new().unwrap();
 
-        // Run inference (request is Send+Sync, no mutex needed)
+        // Run inference. The request is Send+Sync and the C++ engine handles
+        // its own internal synchronization, so we can proceed without holding
+        // the tokio mutex during the blocking FFI call.
         match request.forward(
             &mut input_tensors,
             &session,
@@ -460,7 +478,10 @@ impl TurboMindCEngine {
 
                         // Decode output tokens
                         let text = if let Some(tokenizer) = &self.tokenizer {
-                            match tokenizer.decode(&output_ids.iter().map(|&id| id as u32).collect::<Vec<_>>(), true) {
+                            match tokenizer.decode(
+                                &output_ids.iter().map(|&id| id as u32).collect::<Vec<_>>(),
+                                true,
+                            ) {
                                 Ok(t) => t,
                                 Err(e) => {
                                     tracing::error!(error = %e, "Decoding failed");
@@ -515,9 +536,8 @@ impl TurboMindCEngine {
         let (tx, rx) = tokio::sync::mpsc::channel::<String>(32);
 
         tokio::task::spawn_blocking(move || {
-            // Acquire a request from the pool
-            let mut pool_guard = pool.acquire();
-            let request = pool_guard.get_mut(0).expect("request not found");
+            // Acquire a slot (blocking semaphore + mutex)
+            let (_permit, mut request) = pool.acquire_blocking();
 
             // Prepare input tensors
             let mut input_tensors = match crate::turbomind_c::TensorMap::new() {
@@ -691,8 +711,8 @@ impl TurboMindCEngine {
 
         // Use blocking task for FFI calls
         let embedding_result = tokio::task::spawn_blocking(move || {
-            let mut pool_guard = pool.acquire();
-            let request = pool_guard.get_mut(0).expect("request not found");
+            // Acquire a slot (blocking semaphore + mutex)
+            let (_permit, mut request) = pool.acquire_blocking();
 
             // Prepare input tensors
             let mut input_tensors = match TensorMap::new() {
