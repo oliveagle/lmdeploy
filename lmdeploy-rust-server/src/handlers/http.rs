@@ -66,6 +66,34 @@ pub struct Choice {
     pub index: i32,
     pub message: Message,
     pub finish_reason: String,
+    /// Log probability information for each token (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logprobs: Option<ChoiceLogprobs>,
+}
+
+/// Log probability information for a single token.
+#[derive(Debug, Serialize, Clone)]
+pub struct LogprobToken {
+    pub token: String,
+    pub logprob: f64,
+    pub bytes: Vec<u8>,
+}
+
+/// Top log probability entry.
+#[derive(Debug, Serialize, Clone)]
+pub struct TopLogprobEntry {
+    pub token: String,
+    pub logprob: f64,
+    pub bytes: Vec<u8>,
+}
+
+/// Aggregated logprobs for a completion choice.
+#[derive(Debug, Serialize, Clone)]
+pub struct ChoiceLogprobs {
+    pub tokens: Vec<String>,
+    pub token_logprobs: Vec<f64>,
+    pub top_logprobs: Vec<Option<TopLogprobEntry>>,
+    pub top_tokens: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -143,6 +171,7 @@ pub async fn chat_completions(
                             content: "Batch processor error".into(),
                         },
                         finish_reason: "error".into(),
+                        logprobs: None,
                     }],
                     usage: Usage {
                         prompt_tokens: 0,
@@ -204,6 +233,8 @@ async fn chat_completions_stream_impl(
         req.presence_penalty,
         req.frequency_penalty,
         req.stop.clone(),
+        req.logprobs,
+        req.top_logprobs,
     );
 
     // Spawn a task that generates tokens and sends them through the channel
@@ -302,6 +333,7 @@ async fn fallback_chat_completion(
     model: &str,
 ) -> ChatCompletionsResponse {
     let prompt = messages_to_prompt(&req.messages);
+    let need_logprobs = req.logprobs.unwrap_or(false) || req.top_logprobs.unwrap_or(0) > 0;
 
     // Get the appropriate engine for the requested model
     let mm = state.model_manager.read().await;
@@ -322,10 +354,18 @@ async fn fallback_chat_completion(
         req.presence_penalty,
         req.frequency_penalty,
         req.stop.clone(),
+        req.logprobs,
+        req.top_logprobs,
     );
 
     let eng = engine.read().await;
-    let text = eng.generate(&prompt, params).await;
+    let (text, logprobs) = if need_logprobs {
+        let (t, _nt, _el, lp) = eng.generate_with_logprobs(&prompt, params).await;
+        (t, lp)
+    } else {
+        let t = eng.generate(&prompt, params).await;
+        (t, None)
+    };
 
     ChatCompletionsResponse {
         id: format!("chatcmpl-{}", uuid_simple()),
@@ -336,9 +376,28 @@ async fn fallback_chat_completion(
             index: 0,
             message: Message {
                 role: "assistant".into(),
-                content: text,
+                content: text.clone(),
             },
             finish_reason: "stop".into(),
+            logprobs: logprobs.map(|lp| {
+                ChoiceLogprobs {
+                    tokens: lp.iter().map(|t| t.token.clone()).collect(),
+                    token_logprobs: lp.iter().map(|t| t.logprob).collect(),
+                    top_logprobs: lp.iter().map(|t| {
+                        if !t.top_logprobs.is_empty() {
+                            let first = t.top_logprobs.first().unwrap();
+                            Some(TopLogprobEntry {
+                                token: first.token.clone(),
+                                logprob: first.logprob,
+                                bytes: first.bytes.clone(),
+                            })
+                        } else {
+                            None
+                        }
+                    }).collect(),
+                    top_tokens: Vec::new(),
+                }
+            }),
         }],
         usage: Usage {
             prompt_tokens: 0,

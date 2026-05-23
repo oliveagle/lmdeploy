@@ -35,7 +35,7 @@ use crate::handlers::http::{
     batch_chat_completions, batch_completions, batch_stats, cache_metrics, chat_completions,
     chat_completions_stream, clear_cache, completions, embeddings, health_check, list_models,
     model_load, model_load_progress, model_reload, model_unload, rate_limit_status, stream_metrics, tokenize,
-    ChatCompletionsRequest, ChatCompletionsResponse, Choice, Message, Usage,
+    ChatCompletionsRequest, ChatCompletionsResponse, Choice, ChoiceLogprobs, Message, TopLogprobEntry, Usage,
 };
 
 use crate::metrics::increment_tokens_generated_total;
@@ -547,6 +547,8 @@ async fn flush_batch(
                 async move {
                     let prompt = messages_to_prompt(&item.req.messages);
 
+                    let need_logprobs = item.req.logprobs.unwrap_or(false) || item.req.top_logprobs.unwrap_or(0) > 0;
+
                     let params = GenerationParams::from_chat_request(
                         item.req.temperature,
                         item.req.top_p,
@@ -555,11 +557,19 @@ async fn flush_batch(
                         item.req.presence_penalty,
                         item.req.frequency_penalty,
                         item.req.stop.clone(),
+                        item.req.logprobs,
+                        item.req.top_logprobs,
                     );
 
                     // Call the actual engine
                     let eng = engine_clone.read().await;
-                    let text = eng.generate(&prompt, params).await;
+                    let (text, logprobs) = if need_logprobs {
+                        let (t, _nt, _el, lp) = eng.generate_with_logprobs(&prompt, params).await;
+                        (t, lp)
+                    } else {
+                        let t = eng.generate(&prompt, params).await;
+                        (t, None)
+                    };
 
                     let response = ChatCompletionsResponse {
                         id: format!("chatcmpl-{}", uuid_simple()),
@@ -570,9 +580,28 @@ async fn flush_batch(
                             index: 0,
                             message: Message {
                                 role: "assistant".into(),
-                                content: text,
+                                content: text.clone(),
                             },
                             finish_reason: "stop".into(),
+                            logprobs: logprobs.map(|lp| {
+                                ChoiceLogprobs {
+                                    tokens: lp.iter().map(|t| t.token.clone()).collect(),
+                                    token_logprobs: lp.iter().map(|t| t.logprob).collect(),
+                                    top_logprobs: lp.iter().map(|t| {
+                                        if !t.top_logprobs.is_empty() {
+                                            let first = t.top_logprobs.first().unwrap();
+                                            Some(TopLogprobEntry {
+                                                token: first.token.clone(),
+                                                logprob: first.logprob,
+                                                bytes: first.bytes.clone(),
+                                            })
+                                        } else {
+                                            None
+                                        }
+                                    }).collect(),
+                                    top_tokens: Vec::new(),
+                                }
+                            }),
                         }],
                         usage: Usage {
                             prompt_tokens: 0,

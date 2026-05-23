@@ -7,5 +7,10 @@ pub mod cpp_engine;
 pub mod benchmark;
 
 // Re-export common types
-pub use cpp_engine::{EngineType, TurboMindCEngine, ModelState, ModelInfo, GenerationParams};
-pub use manager::{ModelEngine, ModelManager, ModelLoadProgress, ModelLoadTracker};
+pub use cpp_engine::{
+    EngineType, TurboMindCEngine, ModelState, ModelInfo, GenerationParams,
+    TokenLogprob, TopLogprob,
+};
+pub use manager::{
+    ModelEngine, ModelManager, ModelLoadProgress, ModelLoadTracker,
+};

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::error::{AppError, Result};
-use crate::model::cpp_engine::{EngineType, ModelState, ModelInfo, TurboMindCEngine, GenerationParams};
+use crate::model::cpp_engine::{EngineType, ModelState, ModelInfo, TurboMindCEngine, GenerationParams, TokenLogprob};
 
 /// Unified engine enum - Pure C++ only
 pub enum ModelEngine {
@@ -36,6 +36,16 @@ impl ModelEngine {
     pub async fn generate_with_metrics(&self, prompt: &str, params: GenerationParams) -> (String, usize, f64) {
         match self {
             ModelEngine::PureCpp(e) => e.generate_with_metrics(prompt, params).await,
+        }
+    }
+
+    pub async fn generate_with_logprobs(
+        &self,
+        prompt: &str,
+        params: GenerationParams,
+    ) -> (String, usize, f64, Option<Vec<TokenLogprob>>) {
+        match self {
+            ModelEngine::PureCpp(e) => e.generate_with_logprobs(prompt, params).await,
         }
     }
 

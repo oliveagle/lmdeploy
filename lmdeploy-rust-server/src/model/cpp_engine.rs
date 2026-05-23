@@ -20,6 +20,24 @@ use crate::turbomind_c::{
     c_int, c_void, EngineConfig, GenConfig, ModelRequest, ScheduleMetrics, TensorMap,
     TM_SessionParam, TurboMind,
 };
+use serde::Serialize;
+
+/// A single token logprobs entry as returned by the OpenAI API.
+#[derive(Debug, Clone, Serialize)]
+pub struct TokenLogprob {
+    pub token: String,
+    pub logprob: f64,
+    pub bytes: Vec<u8>,
+    pub top_logprobs: Vec<TopLogprob>,
+}
+
+/// One of the top logprobs for a token position.
+#[derive(Debug, Clone, Serialize)]
+pub struct TopLogprob {
+    pub token: String,
+    pub logprob: f64,
+    pub bytes: Vec<u8>,
+}
 
 /// Generation parameters from HTTP/gRPC requests.
 ///
@@ -43,6 +61,10 @@ pub struct GenerationParams {
     pub seed: Option<u64>,
     /// Stop sequences (not directly used by C++, handled by caller).
     pub stop: Option<Vec<String>>,
+    /// Return log probabilities for each token. Default: false
+    pub logprobs: Option<bool>,
+    /// Number of top log probabilities to return per token. Default: 0 (none)
+    pub top_logprobs: Option<u32>,
 }
 
 impl GenerationParams {
@@ -55,6 +77,8 @@ impl GenerationParams {
         presence_penalty: Option<f32>,
         frequency_penalty: Option<f32>,
         stop: Option<crate::handlers::http::Stop>,
+        logprobs: Option<bool>,
+        top_logprobs: Option<u32>,
     ) -> Self {
         let repetition_penalty = Self::compute_repetition_penalty(presence_penalty, frequency_penalty);
         Self {
@@ -69,6 +93,8 @@ impl GenerationParams {
                 crate::handlers::http::Stop::Single(s) => vec![s],
                 crate::handlers::http::Stop::Multiple(v) => v,
             }),
+            logprobs,
+            top_logprobs,
         }
     }
 
@@ -110,6 +136,14 @@ impl GenerationParams {
         }
         if let Some(seed) = self.seed {
             gen_cfg.set_random_seed(seed);
+        }
+        if let Some(logprobs) = self.logprobs {
+            let num_logprobs = if logprobs {
+                self.top_logprobs.unwrap_or(1) as c_int
+            } else {
+                0
+            };
+            gen_cfg.set_output_logprobs(num_logprobs);
         }
     }
 }
@@ -332,6 +366,131 @@ pub struct TurboMindCEngine {
 
     /// Model hidden dimension (from config.json), used for embeddings
     hidden_size: usize,
+}
+
+/// Extract logprobs from the C++ output tensors.
+///
+/// The C++ engine produces three output tensors when `output_logprobs > 0`:
+/// - `logprob_indexes`: [batch, seq_len, k] int32 — top-k token indexes per position
+/// - `logprob_vals`: [batch, seq_len, k] float32 — log probabilities per index
+/// - `logprob_nums`: [batch, seq_len] int32 — how many entries are valid per position
+///
+/// This function reads these tensors, selects the first (selected token) logprob
+/// and the top-k logprobs, and returns them paired with the decoded token text.
+///
+/// `output_ids` — the generated token IDs (int32 slice)
+/// `request` — the completed ModelRequest to read output tensors from
+/// `tokenizer` — for decoding token IDs to text
+/// `top_k_requested` — number of top logprobs requested (from GenerationParams)
+fn extract_logprobs(
+    output_ids: &[i32],
+    request: &ModelRequest,
+    tokenizer: &LMTokenizer,
+    top_k_requested: u32,
+) -> Option<Vec<TokenLogprob>> {
+    // Read logprob_nums to know how many valid entries per position
+    let logprob_nums = match request.get_output("logprob_nums") {
+        Ok((ptr, size)) => unsafe {
+            Some(std::slice::from_raw_parts(ptr as *const i32, size / 4))
+        },
+        Err(_) => None,
+    };
+    let logprob_nums = logprob_nums?;
+
+    // Read logprob_vals: [batch=1, seq_len, k]
+    let logprob_vals = match request.get_output("logprob_vals") {
+        Ok((ptr, size)) => unsafe {
+            Some(std::slice::from_raw_parts(ptr as *const f32, size / 4))
+        },
+        Err(_) => None,
+    };
+    let logprob_vals = logprob_vals?;
+
+    // Read logprob_indexes: [batch=1, seq_len, k]
+    let logprob_indexes = match request.get_output("logprob_indexes") {
+        Ok((ptr, size)) => unsafe {
+            Some(std::slice::from_raw_parts(ptr as *const i32, size / 4))
+        },
+        Err(_) => None,
+    };
+    let logprob_indexes = logprob_indexes?;
+
+    let k = top_k_requested as usize;
+    let seq_len = output_ids.len();
+    if seq_len == 0 || logprob_nums.len() < seq_len {
+        return None;
+    }
+
+    // The tensors are flat: [batch * seq_len * k], batch=1
+    // index into vals/indexes: row = seq_idx * k, col = logprob_idx
+    let mut result = Vec::with_capacity(seq_len);
+
+    for (i, &token_id) in output_ids.iter().enumerate() {
+        let num_valid = if i < logprob_nums.len() { logprob_nums[i] as usize } else { 0 };
+        if num_valid == 0 {
+            // No logprobs available for this position — emit a placeholder
+            result.push(TokenLogprob {
+                token: tokenizer
+                    .decode(&[token_id as u32], true)
+                    .ok()
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_default(),
+                logprob: 0.0,
+                bytes: Vec::new(),
+                top_logprobs: Vec::new(),
+            });
+            continue;
+        }
+
+        let base_idx = i * k;
+        let actual_k = num_valid.min(k);
+
+        // Find the selected token's logprob (where index matches token_id)
+        let mut selected_logprob = 0.0f64;
+        let mut top_logprobs = Vec::with_capacity(actual_k);
+        for j in 0..actual_k {
+            let idx = base_idx + j;
+            let tok_id = logprob_indexes[idx];
+            let lp = logprob_vals[idx] as f64;
+            let token_text = tokenizer
+                .decode(&[tok_id as u32], true)
+                .ok()
+                .filter(|s| !s.is_empty())
+                .unwrap_or_default();
+            let bytes_vec = token_text.as_bytes().to_vec();
+
+            top_logprobs.push(TopLogprob {
+                token: token_text.clone(),
+                logprob: lp,
+                bytes: bytes_vec.clone(),
+            });
+
+            if tok_id == token_id {
+                selected_logprob = lp;
+            }
+        }
+
+        // If we didn't find the exact token in top-k, use the first logprob
+        // as a fallback (shouldn't happen in normal cases)
+        if actual_k == 0 && base_idx < logprob_vals.len() {
+            selected_logprob = logprob_vals[base_idx] as f64;
+        }
+
+        let token_text = tokenizer
+            .decode(&[token_id as u32], true)
+            .ok()
+            .filter(|s| !s.is_empty())
+            .unwrap_or_default();
+
+        result.push(TokenLogprob {
+            token: token_text.clone(),
+            logprob: selected_logprob,
+            bytes: token_text.as_bytes().to_vec(),
+            top_logprobs,
+        });
+    }
+
+    Some(result)
 }
 
 impl TurboMindCEngine {
@@ -633,6 +792,125 @@ impl TurboMindCEngine {
             Err(e) => {
                 tracing::error!(error = ?e, "C++ inference failed");
                 (String::new(), 0, 0.0)
+            }
+        }
+    }
+
+    /// Generate text with logprobs, returning (text, num_tokens, elapsed_ms, logprobs)
+    ///
+    /// When `params.logprobs` is true or `params.top_logprobs` is set, this method
+    /// extracts log probability information from the C++ engine output tensors.
+    pub async fn generate_with_logprobs(
+        &self,
+        prompt: &str,
+        params: GenerationParams,
+    ) -> (String, usize, f64, Option<Vec<TokenLogprob>>) {
+        let pool = self.request_pool.as_ref().expect("Request pool not initialized");
+        let need_logprobs = params.logprobs.unwrap_or(false) || params.top_logprobs.unwrap_or(0) > 0;
+        let top_logprobs_req = params.top_logprobs.unwrap_or(1).max(1);
+
+        // Tokenize input
+        let input_ids = match &self.tokenizer {
+            Some(tokenizer) => match tokenizer.encode(prompt, false, false) {
+                Ok(ids) => ids,
+                Err(e) => {
+                    tracing::error!(error = %e, "Tokenization failed");
+                    return (String::new(), 0, 0.0, None);
+                }
+            },
+            None => {
+                tracing::error!("Tokenizer not available");
+                return (String::new(), 0, 0.0, None);
+            }
+        };
+
+        tracing::debug!(input_len = input_ids.len(), "Tokenized prompt");
+
+        let start = Instant::now();
+
+        let (_permit, mut request) = pool.acquire().await;
+
+        // Prepare input tensors
+        let mut input_tensors = TensorMap::new().unwrap();
+        let input_ids_shape = [input_ids.len() as i64];
+        input_tensors.set_int64(
+            "input_ids",
+            &input_ids.iter().map(|&id| id as i64).collect::<Vec<_>>(),
+            &input_ids_shape,
+        );
+        input_tensors.set_int32("sequence_length", &[input_ids.len() as i32], &[1]);
+
+        // Prepare generation config
+        let mut gen_cfg = GenConfig::new().unwrap();
+        gen_cfg.set_max_new_tokens(params.max_tokens.unwrap_or(512) as i32);
+        gen_cfg.set_temperature(params.temperature.unwrap_or(0.7));
+        gen_cfg.set_top_p(params.top_p.unwrap_or(0.95));
+        gen_cfg.set_top_k(params.top_k.unwrap_or(50) as i32);
+        params.apply_to_gen_config(&mut gen_cfg);
+
+        let session = TM_SessionParam {
+            id: unix_timestamp() as u64,
+            step: 0,
+            start_flag: true,
+            end_flag: true,
+        };
+
+        let mut output_tensors = TensorMap::new().unwrap();
+
+        match request.forward(
+            &mut input_tensors,
+            &session,
+            &gen_cfg,
+            false,
+            true,
+            &mut output_tensors,
+        ) {
+            Ok(_) => {
+                let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+                match request.get_output("output_ids") {
+                    Ok((data_ptr, size)) => {
+                        let num_tokens = size / 4;
+                        let output_ids: Vec<i32> = unsafe {
+                            std::slice::from_raw_parts(data_ptr as *const i32, num_tokens).to_vec()
+                        };
+
+                        let text = if let Some(tokenizer) = &self.tokenizer {
+                            match tokenizer.decode(
+                                &output_ids.iter().map(|&id| id as u32).collect::<Vec<_>>(),
+                                true,
+                            ) {
+                                Ok(t) => t,
+                                Err(e) => {
+                                    tracing::error!(error = %e, "Decoding failed");
+                                    format!("[decode error: {}]", e)
+                                }
+                            }
+                        } else {
+                            format!("{:?}", output_ids)
+                        };
+
+                        let logprobs = if need_logprobs {
+                            self.tokenizer
+                                .as_ref()
+                                .and_then(|tok| {
+                                    extract_logprobs(&output_ids, &request, tok, top_logprobs_req)
+                                })
+                        } else {
+                            None
+                        };
+
+                        (text, num_tokens, elapsed_ms, logprobs)
+                    }
+                    Err(e) => {
+                        tracing::error!(error = ?e, "Failed to get output_ids");
+                        (String::new(), 0, elapsed_ms, None)
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::error!(error = ?e, "C++ inference failed");
+                (String::new(), 0, 0.0, None)
             }
         }
     }

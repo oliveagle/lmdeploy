@@ -721,6 +721,16 @@ impl GenConfig {
     pub fn set_output_last_hidden_state(&mut self, value: c_int) {
         unsafe { TM_GenerationConfig_SetOutputLastHiddenState(self.0, value) }
     }
+
+    #[inline]
+    pub fn set_output_logprobs(&mut self, num_logprobs: c_int) {
+        unsafe { TM_GenerationConfig_SetOutputLogprobs(self.0, num_logprobs) }
+    }
+
+    #[inline]
+    pub fn set_output_logits(&mut self, value: c_int) {
+        unsafe { TM_GenerationConfig_SetOutputLogits(self.0, value) }
+    }
 }
 
 impl Drop for GenConfig {
