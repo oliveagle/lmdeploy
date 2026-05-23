@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use lmdeploy_server::model::benchmark::{BenchmarkConfig, BenchmarkRunner};
-use lmdeploy_server::model::TurboMindEngine;
+use lmdeploy_server::model::TurboMindCEngine;
 
 /// Benchmark scenarios with different context lengths
 const OUTPUT_LENGTH: usize = 512;
@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize engine
     println!("Initializing TurboMind engine...");
     let engine_start = Instant::now();
-    let engine = Arc::new(TurboMindEngine::new(&model_path).await?);
+    let engine = Arc::new(TurboMindCEngine::new(&model_path).await?);
     let engine_init_time = engine_start.elapsed();
     println!("Engine initialized in {:.2}s\n", engine_init_time.as_secs_f64());
 

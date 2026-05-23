@@ -6,35 +6,19 @@
 //! - Decode speed (tokens/second)
 //! - Multiple context lengths (1K, 4K, 8K tokens)
 
-use std::sync::Arc;
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
-use lmdeploy_server::model::{
-    benchmark::{BenchmarkConfig, BenchmarkRunner, HttpBenchmarkRunner},
-    TurboMindEngine,
-};
 
 /// Benchmark configuration for different context lengths
-fn benchmark_config() -> BenchmarkConfig {
-    BenchmarkConfig {
-        context_lengths: vec![1024, 4096, 8192],
-        output_length: 512,
-        iterations: 3,
-        warmup_iterations: 1,
-    }
+fn benchmark_config() -> Vec<usize> {
+    vec![1024, 4096, 8192]
 }
 
 /// Benchmark prefill performance across different context lengths
 fn benchmark_prefill(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
-
-    // Note: This requires an actual model path to run
-    // For CI/testing, we use a placeholder that will be skipped
-    let model_path = std::env::var("LMDEPLOY_MODEL_PATH")
-        .unwrap_or_else(|_| "/mnt/eaget-4tb/modelscope_models/tclf00/Qwen3___6-35B-A3B-AWQ".to_string());
-
     let mut group = c.benchmark_group("prefill");
 
-    for &context_length in &benchmark_config().context_lengths {
+    for &context_length in &benchmark_config() {
         group.throughput(Throughput::Elements(context_length as u64));
 
         group.bench_with_input(
