@@ -5,6 +5,8 @@
 pub mod benchmark;
 pub mod cpp_engine;
 mod manager;
+#[cfg(test)]
+mod stress_test;
 
 // Re-export common types
 pub use cpp_engine::{
