@@ -291,9 +291,6 @@ extern "C" fn token_callback(token_id: c_int, _seq_len: c_int, user_data: *mut c
     }
 }
 
-/// Default number of concurrent inference requests
-/// This matches the C++ engine's internal queue capacity
-const DEFAULT_CONCURRENCY: usize = 8;
 
 /// Shared context passed to the C token callback via raw pointer.
 struct StreamContext {
@@ -744,7 +741,8 @@ impl TurboMindCEngine {
             .map_err(|e| AppError::ModelLoadFailed(format!("InitFromPath failed: {:?}", e)))?;
 
         // Create inference request pool for concurrent access (includes semaphore)
-        let request_pool = Arc::new(RequestPool::new(&tm, DEFAULT_CONCURRENCY)?);
+        // Uses GPU-adaptive max_batch_size: A100=384, H100=1024, default=128
+        let request_pool = Arc::new(RequestPool::new(&tm, max_batch_size as usize)?);
 
         let model_name = model_path_obj
             .file_name()
@@ -753,7 +751,7 @@ impl TurboMindCEngine {
             .to_string();
 
         tracing::info!(
-            concurrency = DEFAULT_CONCURRENCY,
+            concurrency = max_batch_size,
             "TurboMind C++ engine initialized successfully"
         );
 
