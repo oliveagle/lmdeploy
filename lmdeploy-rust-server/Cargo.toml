@@ -7,6 +7,7 @@ description = "High-performance Rust API server for LMDeploy"
 [dependencies]
 # Async runtime
 tokio = { version = "1.40", features = ["full"] }
+parking_lot = "0.12"
 
 # HTTP/gRPC
 axum = { version = "0.7", features = ["http2"] }

@@ -1414,6 +1414,7 @@ dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "num_cpus",
+ "parking_lot",
  "prost",
  "reqwest",
  "serde",

@@ -120,8 +120,9 @@ impl TokenizeCache {
     }
 
     /// Get prefix match from cache
+    /// Uses read lock - only reads are performed, no mutations.
     async fn get_prefix(&self, text: &str) -> Option<Vec<u32>> {
-        let prefix_cache = self.prefix_cache.write().await;
+        let prefix_cache = self.prefix_cache.read().await;
 
         // Find the longest matching prefix
         let mut best_match: Option<(String, Vec<u32>)> = None;

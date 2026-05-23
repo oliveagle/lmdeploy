@@ -55,13 +55,21 @@ impl RequestPool {
     /// Acquire a slot (async). Returns a guard that holds the semaphore
     /// permit and the mutex guard. The slot is released when the guard is
     /// dropped.
+    ///
+    /// The slot selection uses round-robin to distribute load across slots.
+    /// Each permit acquisition corresponds to one available inference slot.
     async fn acquire(&self) -> (tokio::sync::SemaphorePermit<'_>, tokio::sync::MutexGuard<'_, ModelRequest>) {
         let permit = self
             .semaphore
             .acquire()
             .await
             .expect("semaphore closed");
-        let idx = (self.semaphore.available_permits() + 1) % self.slots.len();
+        // After acquiring, the number of available permits tells us how many
+        // concurrent requests are still possible. Use this to compute the slot index
+        // in a round-robin fashion. This avoids always using slot 0 and distributes
+        // load across all available slots.
+        let active = self.slots.len() - self.semaphore.available_permits() - 1;
+        let idx = active % self.slots.len();
         let guard = self.slots[idx].lock().await;
         (permit, guard)
     }
@@ -73,7 +81,9 @@ impl RequestPool {
             tokio::runtime::Handle::current().block_on(self.semaphore.acquire())
         })
         .expect("semaphore closed");
-        let idx = (self.semaphore.available_permits() + 1) % self.slots.len();
+        // Same round-robin logic as acquire()
+        let active = self.slots.len() - self.semaphore.available_permits() - 1;
+        let idx = active % self.slots.len();
         let guard = self.slots[idx].blocking_lock();
         (permit, guard)
     }
