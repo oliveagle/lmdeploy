@@ -553,6 +553,8 @@ async fn flush_batch(
                     let params = GenerationParams::from_chat_request(
                         item.req.temperature,
                         item.req.top_p,
+                        item.req.top_k,
+                        item.req.min_p,
                         item.req.max_tokens,
                         item.req.seed,
                         item.req.presence_penalty,

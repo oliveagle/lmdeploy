@@ -72,6 +72,8 @@ impl GenerationParams {
     pub fn from_chat_request(
         temperature: Option<f32>,
         top_p: Option<f32>,
+        top_k: Option<i32>,
+        min_p: Option<f32>,
         max_tokens: Option<i32>,
         seed: Option<i32>,
         presence_penalty: Option<f32>,
@@ -85,8 +87,8 @@ impl GenerationParams {
             max_tokens: max_tokens.map(|t| t as usize),
             temperature,
             top_p,
-            top_k: None,
-            min_p: None,
+            top_k,
+            min_p,
             repetition_penalty,
             seed: seed.map(|s| s as u64),
             stop: stop.map(|s| match s {
