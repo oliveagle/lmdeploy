@@ -5,12 +5,33 @@
 #include <cuda_runtime.h>
 #include <cstdio>
 
+// Compile-time debug flag for safetensors loading
+// Define to 1 to enable verbose debug output during weight loading
+#define SAFETENSORS_DEBUG 0
+
+#if SAFETENSORS_DEBUG
+#define SAFETENSORS_LOG(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__); fflush(stderr)
+#else
+#define SAFETENSORS_LOG(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
+#endif
+
 // Debug function to write to a file
 static void debug_log(const char* msg) {
     FILE* f = fopen("/tmp/turbomind_debug.log", "a");
     if (f) {
         fputs(msg, f);
         fclose(f);
+    }
+}
+
+// Helper function to replace all occurrences of a substring
+// More efficient than repeated find+replace in while loops
+static void replace_all(std::string& str, const std::string& from, const std::string& to) {
+    if (from.empty()) return;
+    size_t start_pos = 0;
+    while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length();  // Move past the replacement to avoid infinite loops
     }
 }
 
@@ -854,8 +875,7 @@ static void LoadWeightsFromSafetensors(
     turbomind::core::Allocator managed_allocator{turbomind::core::CreateCudaManagedAllocator()};
     auto managed_guard = turbomind::core::ContextGuard{managed_allocator};
 
-    fprintf(stderr, "[C-API] LoadWeightsFromSafetensors: %s\n", safetensors_path);
-    fflush(stderr);
+    SAFETENSORS_LOG("[C-API] LoadWeightsFromSafetensors: %s\n", safetensors_path);
 
     try {
         auto load_start = std::chrono::high_resolution_clock::now();
@@ -865,8 +885,7 @@ static void LoadWeightsFromSafetensors(
 
         auto mmap_done = std::chrono::high_resolution_clock::now();
         auto mmap_ms = std::chrono::duration_cast<std::chrono::milliseconds>(mmap_done - load_start);
-        fprintf(stderr, "[C-API] mmap took: %ldms, Loading safetensors: %s (%zu tensors)\n", mmap_ms.count(), safetensors_path, reader.num_tensors());
-        fflush(stderr);
+        SAFETENSORS_LOG("[C-API] mmap took: %ldms, Loading safetensors: %s (%zu tensors)\n", mmap_ms.count(), safetensors_path, reader.num_tensors());
 
         // Pre-allocated vectors (reused for all tensors to avoid heap allocations)
         std::vector<std::string> parts;
@@ -889,8 +908,7 @@ static void LoadWeightsFromSafetensors(
         size_t progress_count = 0;
         const auto& tensors = reader.tensors();  // Direct reference to avoid re-lookup
 
-        fprintf(stderr, "[C-API] Starting tensor processing loop (%zu tensors)...\n", reader.num_tensors());
-        fflush(stderr);
+        SAFETENSORS_LOG("[C-API] Starting tensor processing loop (%zu tensors)...\n", reader.num_tensors());
 
         // Structure to hold transfer info
         struct Transfer {
@@ -1029,15 +1047,13 @@ static void LoadWeightsFromSafetensors(
             try {
                 src_data = reader.get_tensor_data(tensor_name);
             } catch (const std::exception& e) {
-                fprintf(stderr, "[C-API] get_tensor_data failed for %s: %s\n", tensor_name.c_str(), e.what());
-                fflush(stderr);
+                SAFETENSORS_LOG("[C-API] get_tensor_data failed for %s: %s\n", tensor_name.c_str(), e.what());
                 ++skip_count;
                 continue;
             }
 
             if (!src_data) {
-                fprintf(stderr, "[C-API] NULL data pointer for %s\n", tensor_name.c_str());
-                fflush(stderr);
+                SAFETENSORS_LOG("[C-API] NULL data pointer for %s\n", tensor_name.c_str());
                 ++skip_count;
                 continue;
             }
@@ -1066,15 +1082,13 @@ static void LoadWeightsFromSafetensors(
             if (progress_count % 200 == 0 || i == reader.num_tensors() - 1) {
                 auto now = std::chrono::high_resolution_clock::now();
                 auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - load_start);
-                fprintf(stderr, "[C-API] Allocated %zu/%zu tensors (%.0fs elapsed) from %s\n", progress_count, reader.num_tensors(), elapsed.count() / 1000.0, safetensors_path);
-                fflush(stderr);
+                SAFETENSORS_LOG("[C-API] Allocated %zu/%zu tensors (%.0fs elapsed) from %s\n", progress_count, reader.num_tensors(), elapsed.count() / 1000.0, safetensors_path);
             }
         }
 
         // Phase 1.5: Fuse accumulated QKV tensors and add to transfers
         if (!qkv_accumulators.empty()) {
-            fprintf(stderr, "[C-API] Fusing %zu QKV tensors...\n", qkv_accumulators.size());
-            fflush(stderr);
+            SAFETENSORS_LOG("[C-API] Fusing %zu QKV tensors...\n", qkv_accumulators.size());
 
             for (const auto& [key, acc] : qkv_accumulators) {
                 if (!acc.q_loaded || !acc.k_loaded || !acc.v_loaded) {
@@ -1159,13 +1173,12 @@ static void LoadWeightsFromSafetensors(
 
                 // Copy fused data to GPU
                 std::memcpy(fused_tensor.raw_data(), fused_data.data(), fused_data.size());
-                fprintf(stderr, "[C-API] Fused QKV for %s: [%zu,%zu]\n", key.c_str(), fused_out, hidden);
+                SAFETENSORS_LOG("[C-API] Fused QKV for %s: [%zu,%zu]\n", key.c_str(), fused_out, hidden);
             }
         }
 
         // Phase 2: Run all transfers in batched mode for better performance
-        fprintf(stderr, "[C-API] Running batched transfers for %d tensors...\n", loaded_count);
-        fflush(stderr);
+        SAFETENSORS_LOG("[C-API] Running batched transfers for %d tensors...\n", loaded_count);
 
         auto batch_start = std::chrono::high_resolution_clock::now();
         {
@@ -1180,25 +1193,20 @@ static void LoadWeightsFromSafetensors(
 
         auto batch_end = std::chrono::high_resolution_clock::now();
         auto batch_ms = std::chrono::duration_cast<std::chrono::milliseconds>(batch_end - batch_start);
-        fprintf(stderr, "[C-API] Batched transfers completed in %ldms\n", batch_ms.count());
-        fflush(stderr);
+        SAFETENSORS_LOG("[C-API] Batched transfers completed in %ldms\n", batch_ms.count());
 
-        fprintf(stderr, "[C-API] Loaded %d tensors, skipped %d from %s\n", loaded_count, skip_count, safetensors_path);
-        fflush(stderr);
+        SAFETENSORS_LOG("[C-API] Loaded %d tensors, skipped %d from %s\n", loaded_count, skip_count, safetensors_path);
 
         // Trim CUDA memory pool to release unused memory back to OS
         turbomind::core::Context::device_alloc()->trim(0);
-        fprintf(stderr, "[C-API] Trimmed CUDA memory pool after loading %s\n", safetensors_path);
-        fflush(stderr);
+        SAFETENSORS_LOG("[C-API] Trimmed CUDA memory pool after loading %s\n", safetensors_path);
     }
     catch (const std::exception& e) {
         // Log error but continue with other files
         fprintf(stderr, "[C-API] Error loading safetensors file %s: %s\n", safetensors_path, e.what());
-        fflush(stderr);
     }
 
     fprintf(stderr, "[C-API] LoadWeightsFromSafetensors EXIT: %s\n", safetensors_path);
-    fflush(stderr);
 }
 
 // Forward declarations for debugging
@@ -1217,12 +1225,12 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     std::string result = hf_name;
 
     // Remove "model." prefix if present
-    if (result.find("model.") == 0) {
+    if (result.compare(0, 6, "model.") == 0) {
         result = result.substr(6);
     }
 
     // Remove "language_model." prefix if present (for vision-language models)
-    if (result.find("language_model.") == 0) {
+    if (result.compare(0, 15, "language_model.") == 0) {
         result = result.substr(15);
     }
 
@@ -1232,7 +1240,7 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     // MTP shares weights with main model layers (mtp.layers.X.* -> layers.X.*)
     // MTP-specific params (norm, fc, pre_fc_norm_*) are NOT supported in C++ engine
     // since there's no mtp module - skip them by returning empty string
-    bool is_mtp = result.find("mtp.") == 0;
+    bool is_mtp = result.compare(0, 4, "mtp.") == 0;
     if (is_mtp) {
         // Remove mtp prefix for mapping
         result = result.substr(4);  // Remove "mtp." prefix
@@ -1242,50 +1250,28 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
         if (result == "norm.weight" || result == "norm") {
             return "";  // Skip MTP-specific norm
         }
-        if (result.find("fc.") == 0) {
+        if (result.compare(0, 3, "fc.") == 0) {
             return "";  // Skip MTP-specific fc
         }
-        if (result.find("pre_fc_norm_") == 0) {
+        if (result.compare(0, 13, "pre_fc_norm_") == 0) {
             return "";  // Skip MTP-specific pre_fc_norm_*
         }
 
         // MTP layers share weights with main model: layers.X.*
-        if (result.find("layers.") == 0) {
+        if (result.compare(0, 7, "layers.") == 0) {
             // Keep "layers." in the path and apply standard mappings
-            size_t mtp_pos;
-            while ((mtp_pos = result.find(".self_attn.")) != std::string::npos) {
-                result.replace(mtp_pos, 11, ".attention.");
-            }
-            while ((mtp_pos = result.find(".mlp.experts.")) != std::string::npos) {
-                result.replace(mtp_pos, 13, ".moe_ffn.experts.");
-            }
-            while ((mtp_pos = result.find(".mlp.")) != std::string::npos) {
-                result.replace(mtp_pos, 5, ".feed_forward.");
-            }
-            while ((mtp_pos = result.find(".input_layernorm")) != std::string::npos) {
-                result.replace(mtp_pos, 16, ".attention_norm");
-            }
-            while ((mtp_pos = result.find(".post_attention_layernorm")) != std::string::npos) {
-                result.replace(mtp_pos, 24, ".ffn_norm");
-            }
-            while ((mtp_pos = result.find(".o_proj.")) != std::string::npos) {
-                result.replace(mtp_pos, 8, ".wo.");
-            }
-            while ((mtp_pos = result.find(".gate_proj.")) != std::string::npos) {
-                result.replace(mtp_pos, 11, ".w1.");
-            }
-            while ((mtp_pos = result.find(".up_proj.")) != std::string::npos) {
-                result.replace(mtp_pos, 9, ".w3.");
-            }
-            while ((mtp_pos = result.find(".down_proj.")) != std::string::npos) {
-                result.replace(mtp_pos, 11, ".w2.");
-            }
-            while ((mtp_pos = result.find(".qweight")) != std::string::npos) {
-                result.replace(mtp_pos, 8, ".weight");
-            }
-            while ((mtp_pos = result.find(".qzeros")) != std::string::npos) {
-                result.replace(mtp_pos, 7, ".zeros");
-            }
+            // Each pattern only appears once, so no while loops needed
+            replace_all(result, ".self_attn.", ".attention.");
+            replace_all(result, ".mlp.experts.", ".moe_ffn.experts.");
+            replace_all(result, ".mlp.", ".feed_forward.");
+            replace_all(result, ".input_layernorm", ".attention_norm");
+            replace_all(result, ".post_attention_layernorm", ".ffn_norm");
+            replace_all(result, ".o_proj.", ".wo.");
+            replace_all(result, ".gate_proj.", ".w1.");
+            replace_all(result, ".up_proj.", ".w3.");
+            replace_all(result, ".down_proj.", ".w2.");
+            replace_all(result, ".qweight", ".weight");
+            replace_all(result, ".qzeros", ".zeros");
 
             return result;  // Map to main model layers
         }
@@ -1297,11 +1283,11 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     // Top-level params (no dots before them)
     // ========================================================
     // lm_head.weight -> output.weight
-    if (result.find("lm_head.") == 0) {
+    if (result.compare(0, 8, "lm_head.") == 0) {
         result = "output." + result.substr(8);  // "lm_head." = 8 chars
     }
     // embed_tokens.weight -> tok_embeddings (direct param on model_weight)
-    if (result.find("embed_tokens.") == 0) {
+    if (result.compare(0, 12, "embed_tokens.") == 0) {
         result = "tok_embeddings";  // Return just the param name, not "tok_embeddings.weight"
     }
 
@@ -1310,24 +1296,23 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     // ========================================================
     // Handle MoE expert paths: .mlp.experts.N.<proj> -> .moe_ffn.experts.N.<proj>
     // This pattern matches: layers.X.mlp.experts.Y.gate_proj.weight
-    size_t pos;
-    while ((pos = result.find(".mlp.experts.")) != std::string::npos) {
-        result.replace(pos, 13, ".moe_ffn.experts.");
-    }
+    replace_all(result, ".mlp.experts.", ".moe_ffn.experts.");
 
     // Handle MoE gate: .mlp.gate.weight -> .moe_ffn.gate.weight
     // (This is the router gate, not to be confused with gate_proj)
     // Pattern: layers.X.mlp.gate.weight -> layers.X.moe_ffn.gate.weight
     // We need to be careful not to match .gate_proj.
-    // Check for .mlp.gate. followed by weight (not _proj)
-    size_t mlp_gate_pos = 0;
-    while ((mlp_gate_pos = result.find(".mlp.gate.")) != std::string::npos) {
+    size_t mlp_gate_pos = result.find(".mlp.gate.");
+    if (mlp_gate_pos != std::string::npos) {
         // Check if this is actually .mlp.gate_proj. (skip if so)
-        if (result.substr(mlp_gate_pos).find(".gate_proj.") == std::string::npos &&
-            result.find("weight", mlp_gate_pos) < result.find(".", mlp_gate_pos + 10)) {
+        size_t gate_proj_pos = result.find(".gate_proj.", mlp_gate_pos);
+        size_t next_dot = result.find('.', mlp_gate_pos + 10);
+        size_t weight_pos = result.find("weight", mlp_gate_pos);
+        // Only replace if we find "weight" before the next dot and no gate_proj
+        if (gate_proj_pos == std::string::npos &&
+            weight_pos != std::string::npos &&
+            (next_dot == std::string::npos || weight_pos < next_dot)) {
             result.replace(mlp_gate_pos, 10, ".moe_ffn.gate.");
-        } else {
-            break;
         }
     }
 
@@ -1338,118 +1323,57 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name)
     // HF format: layers.X.self_attn.in_proj.qkv.weight
     // TM format: layers.X.linear_attn.in_proj_qkv.weight
     // Apply these BEFORE the general self_attn -> attention replacement
-    while ((pos = result.find(".self_attn.in_proj.qkv.")) != std::string::npos) {
-        result.replace(pos, 21, ".linear_attn.in_proj_qkv.");
-    }
-    while ((pos = result.find(".self_attn.in_proj.z.")) != std::string::npos) {
-        result.replace(pos, 20, ".linear_attn.in_proj_z.");
-    }
-    while ((pos = result.find(".self_attn.in_proj.a.")) != std::string::npos) {
-        result.replace(pos, 20, ".linear_attn.in_proj_a.");
-    }
-    while ((pos = result.find(".self_attn.in_proj.b.")) != std::string::npos) {
-        result.replace(pos, 20, ".linear_attn.in_proj_b.");
-    }
-
-    // Also handle fused in_proj.weight -> in_proj_all for linear_attn
-    while ((pos = result.find(".self_attn.in_proj.weight")) != std::string::npos) {
-        result.replace(pos, 22, ".linear_attn.in_proj_all.weight");
-    }
-
-    // Linear attention output projection mapping
-    while ((pos = result.find(".linear_attn.linear_out_proj.")) != std::string::npos) {
-        result.replace(pos, 29, ".linear_attn.out_proj.");
-    }
-    while ((pos = result.find(".self_attn.linear_out_proj.")) != std::string::npos) {
-        result.replace(pos, 25, ".linear_attn.out_proj.");
-    }
-
-    // DeltaNet direct parameters (conv1d, A_log, dt_bias)
-    // These are PARAMS on DeltaNetWeight, not child modules
-    // HF format: .linear_attn.conv1d.weight
-    // TM format: .linear_attn.conv1d (direct param, no weight suffix)
-    size_t conv_pos = result.find(".linear_attn.conv1d.weight");
-    while (conv_pos != std::string::npos) {
-        result.replace(conv_pos, 20, ".linear_attn.conv1d");
-        conv_pos = result.find(".linear_attn.conv1d.weight");
-    }
-
-    // Handle A_log and dt_bias (they don't have .weight suffix, just keep as is)
-    // A_log is handled directly as a param: layers.X.linear_attn.A_log
-    // dt_bias is handled directly as a param: layers.X.linear_attn.dt_bias
+    replace_all(result, ".self_attn.in_proj.qkv.", ".linear_attn.in_proj_qkv.");
+    replace_all(result, ".self_attn.in_proj.z.", ".linear_attn.in_proj_z.");
+    replace_all(result, ".self_attn.in_proj.a.", ".linear_attn.in_proj_a.");
+    replace_all(result, ".self_attn.in_proj.b.", ".linear_attn.in_proj_b.");
+    replace_all(result, ".self_attn.in_proj.weight", ".linear_attn.in_proj_all.weight");
+    replace_all(result, ".linear_attn.linear_out_proj.", ".linear_attn.out_proj.");
+    replace_all(result, ".self_attn.linear_out_proj.", ".linear_attn.out_proj.");
+    replace_all(result, ".linear_attn.conv1d.weight", ".linear_attn.conv1d");
 
     // self_attn -> attention (for standard full attention layers)
-    while ((pos = result.find(".self_attn.")) != std::string::npos) {
-        result.replace(pos, 11, ".attention.");
-    }
+    replace_all(result, ".self_attn.", ".attention.");
 
     // mlp -> feed_forward (only for non-MoE models)
     // Skip if we already have moe_ffn
-    while ((pos = result.find(".mlp.")) != std::string::npos) {
+    size_t mlp_pos = result.find(".mlp.");
+    while (mlp_pos != std::string::npos) {
         // Don't replace if it's part of moe_ffn
-        if (result.find(".moe_ffn.", pos - 5) != pos - 5) {
-            result.replace(pos, 5, ".feed_forward.");
+        if (mlp_pos >= 5 && result.compare(mlp_pos - 5, 8, ".moe_ffn.") != 0) {
+            result.replace(mlp_pos, 5, ".feed_forward.");
+            mlp_pos = result.find(".mlp.", mlp_pos + 14);  // Skip the replacement
         } else {
             break;
         }
     }
 
-    // input_layernorm -> attention_norm
-    while ((pos = result.find(".input_layernorm")) != std::string::npos) {
-        result.replace(pos, 16, ".attention_norm");
-    }
-
-    // post_attention_layernorm -> ffn_norm
-    while ((pos = result.find(".post_attention_layernorm")) != std::string::npos) {
-        result.replace(pos, 24, ".ffn_norm");
-    }
+    // Layer norm replacements
+    replace_all(result, ".input_layernorm", ".attention_norm");
+    replace_all(result, ".post_attention_layernorm", ".ffn_norm");
 
     // Map HF q_proj/k_proj/v_proj to TM fused w_qkv
     // HF stores separate Q/K/V weights, but TM uses a fused w_qkv weight
     // Each of q_proj, k_proj, v_proj maps to w_qkv for weight loading
-    while ((pos = result.find(".q_proj.")) != std::string::npos) {
-        result.replace(pos, 8, ".w_qkv.");
-    }
-    while ((pos = result.find(".k_proj.")) != std::string::npos) {
-        result.replace(pos, 8, ".w_qkv.");
-    }
-    while ((pos = result.find(".v_proj.")) != std::string::npos) {
-        result.replace(pos, 8, ".w_qkv.");
-    }
-
-    // o_proj -> wo
-    while ((pos = result.find(".o_proj.")) != std::string::npos) {
-        result.replace(pos, 8, ".wo.");
-    }
+    replace_all(result, ".q_proj.", ".w_qkv.");
+    replace_all(result, ".k_proj.", ".w_qkv.");
+    replace_all(result, ".v_proj.", ".w_qkv.");
+    replace_all(result, ".o_proj.", ".wo.");
 
     // FFN projections (applies to both standard FFN and MoE experts)
-    while ((pos = result.find(".gate_proj.")) != std::string::npos) {
-        result.replace(pos, 11, ".w1.");
-    }
-    while ((pos = result.find(".up_proj.")) != std::string::npos) {
-        result.replace(pos, 9, ".w3.");
-    }
-    while ((pos = result.find(".down_proj.")) != std::string::npos) {
-        result.replace(pos, 11, ".w2.");
-    }
+    replace_all(result, ".gate_proj.", ".w1.");
+    replace_all(result, ".up_proj.", ".w3.");
+    replace_all(result, ".down_proj.", ".w2.");
 
     // Note: DeltaNet (linear_attn) specific mappings are handled earlier
     // in the function (before self_attn -> attention replacement)
 
     // AWQ quantization parameters (qweight -> weight, etc.)
     // These must be last so .weight suffix is already established
-    while ((pos = result.find(".qweight")) != std::string::npos) {
-        result.replace(pos, 8, ".weight");
-    }
-    while ((pos = result.find(".qzeros")) != std::string::npos) {
-        result.replace(pos, 7, ".zeros");
-    }
-    while ((pos = result.find(".weight_scale")) != std::string::npos) {
-        result.replace(pos, 13, ".scales");
-    }
-    while ((pos = result.find(".weight_zero")) != std::string::npos) {
-        result.replace(pos, 12, ".zeros");
-    }
+    replace_all(result, ".qweight", ".weight");
+    replace_all(result, ".qzeros", ".zeros");
+    replace_all(result, ".weight_scale", ".scales");
+    replace_all(result, ".weight_zero", ".zeros");
 
     return result;
 }
