@@ -124,6 +124,7 @@ auto ModelRequest::Forward(InputParam param, std::function<void()> cb) -> Output
     r->gen_cfg       = param.gen_cfg;
     r->stream_output = param.stream_output;
     r->forward_cb    = std::move(cb);
+    r->token_cb      = std::move(param.token_cb);
     r->state         = state;
     r->metrics       = metrics;
 

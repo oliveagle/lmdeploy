@@ -17,12 +17,37 @@ use std::time::Instant;
 use crate::error::{AppError, Result};
 use crate::tokenizer::LMTokenizer;
 use crate::turbomind_c::{
-    EngineConfig, GenConfig, ModelRequest, ScheduleMetrics, TensorMap, TM_SessionParam, TurboMind,
+    c_int, c_void, EngineConfig, GenConfig, ModelRequest, ScheduleMetrics, TensorMap,
+    TM_SessionParam, TurboMind,
 };
+
+/// Token callback for event-driven streaming.
+///
+/// Invoked by the C++ engine whenever a new token is generated.
+/// Decodes the token and sends it through the channel.
+extern "C" fn token_callback(token_id: c_int, _seq_len: c_int, user_data: *mut c_void) {
+    unsafe {
+        let ctx = &*(user_data as *const StreamContext);
+
+        let token_ids: Vec<u32> = vec![token_id as u32];
+        let token_str = match ctx.tokenizer.decode(&token_ids, true) {
+            Ok(s) if !s.is_empty() => s,
+            _ => return,
+        };
+
+        let _ = ctx.tx.try_send(token_str);
+    }
+}
 
 /// Default number of concurrent inference requests
 /// This matches the C++ engine's internal queue capacity
 const DEFAULT_CONCURRENCY: usize = 8;
+
+/// Shared context passed to the C token callback via raw pointer.
+struct StreamContext {
+    tokenizer: LMTokenizer,
+    tx: tokio::sync::mpsc::Sender<String>,
+}
 
 /// Pool of ModelRequest instances for concurrent inference.
 ///
@@ -518,6 +543,9 @@ impl TurboMindCEngine {
     }
 
     /// Generate text with streaming output (token-by-token)
+    ///
+    /// Uses event-driven callbacks from the C++ engine instead of polling.
+    /// Each generated token fires a callback that decodes and sends it through the channel.
     pub async fn generate_stream(&self, prompt: &str) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
         // Tokenize input
         let (input_ids, tokenizer) = match &self.tokenizer {
@@ -540,20 +568,30 @@ impl TurboMindCEngine {
         let input_ids_vec: Vec<i64> = input_ids.iter().map(|&id| id as i64).collect();
         let prompt_len = input_ids.len() as i32;
 
-        // Clone pool for thread spawn
         let pool = self.request_pool.as_ref().expect("Request pool not initialized").clone();
 
         let (tx, rx) = tokio::sync::mpsc::channel::<String>(32);
 
         tokio::task::spawn_blocking(move || {
-            // Acquire a slot (blocking semaphore + mutex)
             let (_permit, mut request) = pool.acquire_blocking();
+
+            // Create callback context
+            let ctx = Arc::new(StreamContext { tokenizer, tx });
+            let ctx_ptr = Arc::into_raw(ctx) as *mut c_void;
+
+            // Set the token callback before submitting the request
+            if let Err(e) = unsafe { request.set_token_callback(token_callback, ctx_ptr) } {
+                tracing::error!(error = ?e, "Failed to set token callback");
+                let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
+                return;
+            }
 
             // Prepare input tensors
             let mut input_tensors = match crate::turbomind_c::TensorMap::new() {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!(error = ?e, "Failed to create tensor map");
+                    let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
                     return;
                 }
             };
@@ -566,6 +604,7 @@ impl TurboMindCEngine {
                 Ok(g) => g,
                 Err(e) => {
                     tracing::error!(error = ?e, "Failed to create gen config");
+                    let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
                     return;
                 }
             };
@@ -591,52 +630,19 @@ impl TurboMindCEngine {
                 false, // enable_metrics
             ) {
                 tracing::error!(error = ?e, "ForwardAsync failed");
+                let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
                 return;
             }
 
-            // Polling loop for streaming tokens
-            let mut prev_seq_len = input_ids_vec.len() as i32;
-
+            // Wait for completion (no polling needed for tokens, only for status)
             loop {
-                // Small sleep to avoid busy-waiting
                 std::thread::sleep(std::time::Duration::from_millis(5));
 
-                let (status, seq_len) = match request.get_streaming_state() {
+                let (status, _seq_len) = match request.get_streaming_state() {
                     Ok(s) => s,
-                    Err(_) => continue, // State not yet available, keep polling
+                    Err(_) => continue,
                 };
 
-                // Read new tokens if seq_len increased
-                if seq_len > prev_seq_len {
-                    match request.get_stream_token() {
-                        Ok((data_ptr, token_count)) if token_count > 0 => {
-                            let all_tokens = unsafe {
-                                std::slice::from_raw_parts(data_ptr, token_count)
-                            };
-
-                            // Decode only new tokens
-                            let new_len = seq_len as usize;
-                            if new_len <= token_count && new_len > prev_seq_len as usize {
-                                let new_tokens = &all_tokens[prev_seq_len as usize..new_len];
-                                // Decode new tokens to text
-                                let token_ids: Vec<u32> = new_tokens.iter().map(|&id| id as u32).collect();
-                                let token_str = if let Ok(s) = tokenizer.decode(&token_ids, true) {
-                                    s
-                                } else {
-                                    String::new()
-                                };
-                                if !token_str.is_empty() {
-                                    // Blocking send to avoid dropping tokens
-                                    let _ = tx.blocking_send(token_str);
-                                }
-                            }
-                            prev_seq_len = seq_len;
-                        }
-                        _ => {} // Ignore errors or empty token count
-                    }
-                }
-
-                // Check if generation is complete
                 match status {
                     crate::turbomind_c::TM_RequestStatus::TM_STATUS_FINISH => break,
                     crate::turbomind_c::TM_RequestStatus::TM_STATUS_CANCEL => break,
@@ -646,6 +652,9 @@ impl TurboMindCEngine {
                     _ => continue,
                 }
             }
+
+            // Reclaim the Arc to prevent memory leak
+            let _ctx = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
         });
 
         Box::pin(tokio_stream::wrappers::ReceiverStream::new(rx))

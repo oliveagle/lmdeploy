@@ -755,8 +755,17 @@ void Engine::Impl::Update(BatchData& b, std::vector<Signal>& signals)
                 c.token_ids[c.seq_len] = output_ids[i];
                 c.seq_len              = sequence_length[i];
                 s.cache_len            = sequence_length[i] - 1;
-                if (const int new_tokens = c.seq_len - s.tokens.size()) {
+                const int old_tokens_count = static_cast<int>(s.tokens.size());
+                if (const int new_tokens = c.seq_len - old_tokens_count) {
                     s.tokens.insert(s.tokens.end(), c.token_ids + c.seq_len - new_tokens, c.token_ids + c.seq_len);
+                    if (c.req->token_cb) {
+                        signals.push_back([r = c.req, seq_len = c.seq_len, new_tokens]() {
+                            int offset = seq_len - new_tokens;
+                            for (int j = 0; j < new_tokens; ++j) {
+                                r->token_cb(r->output_ids.data()[offset + j], offset + j + 1);
+                            }
+                        });
+                    }
                 }
                 if (TM_UNLIKELY(finished[i])) {
                     signals.push_back([r = c.req, l = c.seq_len] {  //

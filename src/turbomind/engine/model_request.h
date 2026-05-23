@@ -28,11 +28,13 @@ public:
     struct InputParam {
         std::shared_ptr<TensorMap> tensors;
 
-        SessionParam     session;
+        SessionParam session;
         GenerationConfig gen_cfg;
 
         bool stream_output;
         bool enable_metrics;
+
+        std::function<void(int token_id, int seq_len)> token_cb;
     };
 
     struct OutputParam {

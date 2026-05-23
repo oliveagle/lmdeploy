@@ -4,6 +4,12 @@
 
 use std::fmt;
 
+/// Token callback type for event-driven streaming.
+///
+/// Invoked from the C++ engine when a new token is generated.
+/// Must be thread-safe (called from C++ engine thread).
+pub type TM_TokenCallback = extern "C" fn(token_id: c_int, seq_len: c_int, user_data: *mut c_void);
+
 // Re-export types
 pub use std::os::raw::{c_char, c_float, c_int, c_long, c_uint, c_void};
 
@@ -299,6 +305,11 @@ extern "C" {
         req: *mut TM_ModelRequest,
         out_status: *mut TM_RequestStatus,
         out_seq_len: *mut c_int,
+    ) -> c_int;
+    pub fn TM_ModelRequest_SetTokenCallback(
+        req: *mut TM_ModelRequest,
+        cb: TM_TokenCallback,
+        user_data: *mut c_void,
     ) -> c_int;
 }
 
@@ -950,6 +961,29 @@ impl ModelRequest {
         }
 
         Ok((out_status, out_seq_len))
+    }
+
+    /// Register a token callback for event-driven streaming.
+    ///
+    /// The callback will be invoked from the C++ engine thread whenever a new token is generated.
+    /// The callback must be thread-safe.
+    ///
+    /// # Safety
+    /// - `cb` must be valid for the lifetime of the request
+    /// - `user_data` must be a valid pointer or null
+    pub unsafe fn set_token_callback(
+        &mut self,
+        cb: TM_TokenCallback,
+        user_data: *mut c_void,
+    ) -> FFResult<()> {
+        let ret = TM_ModelRequest_SetTokenCallback(self.0, cb, user_data);
+        if ret != 0 {
+            return Err(FFError::from_last_error().unwrap_or(FFError {
+                code: TM_ErrorCode::TM_ERR_RUNTIME,
+                message: "SetTokenCallback failed".into(),
+            }));
+        }
+        Ok(())
     }
 }
 

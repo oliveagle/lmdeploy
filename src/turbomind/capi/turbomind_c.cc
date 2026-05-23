@@ -2333,6 +2333,16 @@ void TM_GenerationConfig_SetOutputLogits(TM_GenerationConfig* config, int value)
 // Inference (ModelRequest)
 // ============================================================
 
+struct TM_TokenCallbackWrapper {
+    TM_TokenCallback func;
+    void* user_data;
+    int token_id;
+    int seq_len;
+
+    TM_TokenCallbackWrapper(TM_TokenCallback f, void* ud)
+        : func(f), user_data(ud), token_id(0), seq_len(0) {}
+};
+
 struct TM_ModelRequest {
     turbomind::ModelRequest* req;
     std::shared_ptr<turbomind::TensorMap> output_tensors;
@@ -2340,6 +2350,7 @@ struct TM_ModelRequest {
     std::shared_ptr<turbomind::RequestMetrics> output_metrics;
     std::shared_ptr<turbomind::TensorMap> streaming_tensors;
     std::shared_ptr<turbomind::AtomicRequestState> streaming_state;
+    std::shared_ptr<TM_TokenCallbackWrapper> token_cb_wrapper;
 };
 
 TM_ModelRequest* TM_ModelRequest_Create(TM_TurboMind* tm)
@@ -2441,6 +2452,12 @@ int TM_ModelRequest_ForwardAsync(
         param.stream_output = stream_output;
         param.enable_metrics = enable_metrics;
 
+        if (req->token_cb_wrapper) {
+            param.token_cb = [wrapper = req->token_cb_wrapper](int token_id, int seq_len) {
+                wrapper->func(token_id, seq_len, wrapper->user_data);
+            };
+        }
+
         // Submit request asynchronously - don't block, let caller poll state
         auto out = req->req->Forward(std::move(param), []() {
             // Completion callback - does nothing in async mode
@@ -2457,6 +2474,17 @@ int TM_ModelRequest_ForwardAsync(
         SetError(TM_ERR_RUNTIME, e.what());
         return TM_ERR_RUNTIME;
     }
+}
+
+int TM_ModelRequest_SetTokenCallback(TM_ModelRequest* req, TM_TokenCallback cb, void* user_data)
+{
+    if (!req) {
+        SetError(TM_ERR_INVALID_ARG, "NULL argument to TM_ModelRequest_SetTokenCallback");
+        return TM_ERR_INVALID_ARG;
+    }
+
+    req->token_cb_wrapper = std::make_shared<TokenCallbackWrapper>(cb, user_data);
+    return TM_OK;
 }
 
 int TM_ModelRequest_GetStreamToken(

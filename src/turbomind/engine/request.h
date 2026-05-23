@@ -106,6 +106,8 @@ struct Request {
 
     std::function<void()> forward_cb;
 
+    std::function<void(int token_id, int seq_len)> token_cb;
+
     std::shared_ptr<AtomicRequestState> state;
 
     std::shared_ptr<RequestMetrics> metrics;
