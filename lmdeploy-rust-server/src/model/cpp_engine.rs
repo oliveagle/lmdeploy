@@ -1230,6 +1230,101 @@ impl TurboMindCEngine {
     }
 }
 
+/// A batch inference request item.
+///
+/// Contains the input data and generation parameters for a single request
+/// within a batch.
+#[derive(Debug, Clone)]
+pub struct BatchItem {
+    /// Unique request ID (for tracking)
+    pub request_id: u64,
+    /// Input prompt text
+    pub prompt: String,
+    /// Generation parameters
+    pub params: GenerationParams,
+    /// Whether to return logprobs
+    pub need_logprobs: bool,
+}
+
+/// Result of a batch inference request.
+///
+/// Contains the generated text and optional logprobs.
+#[derive(Debug, Clone)]
+pub struct BatchResult {
+    /// Request ID matching the input BatchItem
+    pub request_id: u64,
+    /// Generated text
+    pub text: String,
+    /// Number of generated tokens
+    pub num_tokens: usize,
+    /// Elapsed time in milliseconds
+    pub elapsed_ms: f64,
+    /// Logprobs if requested
+    pub logprobs: Option<Vec<TokenLogprob>>,
+    /// Error message if request failed
+    pub error: Option<String>,
+}
+
+impl TurboMindCEngine {
+    /// Generate text for a batch of prompts with parallel processing.
+    ///
+    /// Each request is processed independently with its own generation parameters.
+    /// Requests are processed concurrently up to the engine's concurrency limit.
+    ///
+    /// Returns a vector of results in the same order as the input items.
+    pub async fn generate_batch(self: &Arc<Self>, items: Vec<BatchItem>) -> Vec<BatchResult> {
+        if items.is_empty() {
+            return Vec::new();
+        }
+
+        let engine_clone = Arc::clone(self);
+        let mut handles = Vec::with_capacity(items.len());
+
+        for item in items {
+            let engine = Arc::clone(&engine_clone);
+            let handle = tokio::spawn(async move {
+                engine.process_single_request(item).await
+            });
+            handles.push(handle);
+        }
+
+        let mut results = Vec::with_capacity(handles.len());
+        for handle in handles {
+            results.push(handle.await.unwrap());
+        }
+
+        results
+    }
+
+    /// Process a single batch request.
+    async fn process_single_request(&self, item: BatchItem) -> BatchResult {
+        let request_id = item.request_id;
+
+        if item.need_logprobs {
+            let (text, num_tokens, elapsed_ms, logprobs) =
+                self.generate_with_logprobs(&item.prompt, item.params).await;
+            BatchResult {
+                request_id,
+                text,
+                num_tokens,
+                elapsed_ms,
+                logprobs,
+                error: None,
+            }
+        } else {
+            let text = self.generate(&item.prompt, item.params).await;
+            BatchResult {
+                request_id,
+                text,
+                num_tokens: 0,
+                elapsed_ms: 0.0,
+                logprobs: None,
+                error: None,
+            }
+        }
+    }
+}
+
 impl std::fmt::Debug for TurboMindCEngine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TurboMindCEngine")
