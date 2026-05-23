@@ -39,6 +39,7 @@ use crate::handlers::http::{
 };
 
 use crate::metrics::increment_tokens_generated_total;
+use crate::model::GenerationParams;
 
 /// Type alias for the batch sender channel
 pub type BatchSender = mpsc::UnboundedSender<BatchItem>;
@@ -545,11 +546,20 @@ async fn flush_batch(
                 let engine_clone = engine.clone();
                 async move {
                     let prompt = messages_to_prompt(&item.req.messages);
-                    let max_tokens = item.req.max_tokens.unwrap_or(512) as usize;
+
+                    let params = GenerationParams::from_chat_request(
+                        item.req.temperature,
+                        item.req.top_p,
+                        item.req.max_tokens,
+                        item.req.seed,
+                        item.req.presence_penalty,
+                        item.req.frequency_penalty,
+                        item.req.stop.clone(),
+                    );
 
                     // Call the actual engine
                     let eng = engine_clone.read().await;
-                    let text = eng.generate(&prompt, max_tokens).await;
+                    let text = eng.generate(&prompt, params).await;
 
                     let response = ChatCompletionsResponse {
                         id: format!("chatcmpl-{}", uuid_simple()),

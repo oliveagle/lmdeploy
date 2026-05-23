@@ -15,6 +15,7 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::cache::compute_hash;
 use crate::metrics::StreamMetricsSnapshot;
+use crate::model::GenerationParams;
 use crate::server::{AppState, BatchItem, BatchStatsResponse};
 
 #[derive(Debug, Deserialize, Clone)]
@@ -195,13 +196,23 @@ async fn chat_completions_stream_impl(
     let final_model = model.to_string();
     let prompt_len = prompt.len();
 
+    let params = GenerationParams::from_chat_request(
+        req.temperature,
+        req.top_p,
+        req.max_tokens,
+        req.seed,
+        req.presence_penalty,
+        req.frequency_penalty,
+        req.stop.clone(),
+    );
+
     // Spawn a task that generates tokens and sends them through the channel
     let metrics_inner = metrics.clone();
     let first_token_start = Instant::now();
     let prompt_for_task = prompt.clone();
     tokio::spawn(async move {
         let eng = engine.read().await;
-        let chunks = eng.generate_stream(&prompt_for_task).await;
+        let chunks = eng.generate_stream(&prompt_for_task, params).await;
         futures::pin_mut!(chunks);
 
         let mut first_token_recorded = false;
@@ -303,8 +314,18 @@ async fn fallback_chat_completion(
     };
     drop(mm);
 
+    let params = GenerationParams::from_chat_request(
+        req.temperature,
+        req.top_p,
+        req.max_tokens,
+        req.seed,
+        req.presence_penalty,
+        req.frequency_penalty,
+        req.stop.clone(),
+    );
+
     let eng = engine.read().await;
-    let text = eng.generate(&prompt, req.max_tokens.unwrap_or(512) as usize).await;
+    let text = eng.generate(&prompt, params).await;
 
     ChatCompletionsResponse {
         id: format!("chatcmpl-{}", uuid_simple()),
@@ -486,8 +507,16 @@ async fn fallback_completions(
     };
     drop(mm);
 
+    let params = GenerationParams {
+        max_tokens: req.max_tokens.map(|t| t as usize),
+        temperature: req.temperature,
+        top_p: None,
+        top_k: None,
+        ..Default::default()
+    };
+
     let eng = engine.read().await;
-    let text = eng.generate(prompt_text, req.max_tokens.unwrap_or(512) as usize).await;
+    let text = eng.generate(prompt_text, params).await;
 
     CompletionsResponse {
         id: format!("cmpl-{}", uuid_simple()),
@@ -637,10 +666,16 @@ pub async fn batch_chat_completions(
     let mut total_prompt_tokens = 0;
     let mut total_completion_tokens = 0;
 
+    let params = GenerationParams {
+        max_tokens: req.max_tokens.map(|t| t as usize),
+        temperature: req.temperature,
+        top_p: req.top_p,
+        ..Default::default()
+    };
+
     for (idx, messages) in req.messages.iter().enumerate() {
         let prompt = messages_to_prompt(messages);
-        let max_tokens = req.max_tokens.unwrap_or(512) as usize;
-        let text = eng.generate(&prompt, max_tokens).await;
+        let text = eng.generate(&prompt, params.clone()).await;
 
         total_prompt_tokens += prompt.len() as i32;
         total_completion_tokens += text.len() as i32;
@@ -699,9 +734,14 @@ pub async fn batch_completions(
     let mut total_prompt_tokens = 0;
     let mut total_completion_tokens = 0;
 
+    let params = GenerationParams {
+        max_tokens: req.max_tokens.map(|t| t as usize),
+        temperature: req.temperature,
+        ..Default::default()
+    };
+
     for (idx, prompt) in req.prompts.iter().enumerate() {
-        let max_tokens = req.max_tokens.unwrap_or(512) as usize;
-        let text = eng.generate(prompt, max_tokens).await;
+        let text = eng.generate(prompt, params.clone()).await;
 
         total_prompt_tokens += prompt.len() as i32;
         total_completion_tokens += text.len() as i32;

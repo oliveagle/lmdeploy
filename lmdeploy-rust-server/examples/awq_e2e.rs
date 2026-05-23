@@ -7,6 +7,8 @@
 
 use std::time::Instant;
 
+use lmdeploy_server::model::GenerationParams;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
@@ -75,7 +77,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   Prompt: '{}'", prompt);
 
         let start = Instant::now();
-        let (text, num_tokens, elapsed_ms) = engine.generate_with_metrics(prompt, 50).await;
+        let params = GenerationParams {
+            max_tokens: Some(50),
+            ..Default::default()
+        };
+        let (text, num_tokens, elapsed_ms) = engine.generate_with_metrics(prompt, params).await;
         let total_time = start.elapsed();
 
         println!("   Output: '{}'", text.trim());

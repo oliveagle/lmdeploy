@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::error::{AppError, Result};
-use crate::model::cpp_engine::{EngineType, ModelState, ModelInfo, TurboMindCEngine};
+use crate::model::cpp_engine::{EngineType, ModelState, ModelInfo, TurboMindCEngine, GenerationParams};
 
 /// Unified engine enum - Pure C++ only
 pub enum ModelEngine {
@@ -27,21 +27,21 @@ impl ModelEngine {
         }
     }
 
-    pub async fn generate(&self, prompt: &str, max_tokens: usize) -> String {
+    pub async fn generate(&self, prompt: &str, params: GenerationParams) -> String {
         match self {
-            ModelEngine::PureCpp(e) => e.generate(prompt, max_tokens).await,
+            ModelEngine::PureCpp(e) => e.generate(prompt, params).await,
         }
     }
 
-    pub async fn generate_with_metrics(&self, prompt: &str, max_tokens: usize) -> (String, usize, f64) {
+    pub async fn generate_with_metrics(&self, prompt: &str, params: GenerationParams) -> (String, usize, f64) {
         match self {
-            ModelEngine::PureCpp(e) => e.generate_with_metrics(prompt, max_tokens).await,
+            ModelEngine::PureCpp(e) => e.generate_with_metrics(prompt, params).await,
         }
     }
 
-    pub async fn generate_stream(&self, prompt: &str) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+    pub async fn generate_stream(&self, prompt: &str, params: GenerationParams) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
         match self {
-            ModelEngine::PureCpp(e) => e.generate_stream(prompt).await,
+            ModelEngine::PureCpp(e) => e.generate_stream(prompt, params).await,
         }
     }
 

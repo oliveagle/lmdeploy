@@ -21,6 +21,99 @@ use crate::turbomind_c::{
     TM_SessionParam, TurboMind,
 };
 
+/// Generation parameters from HTTP/gRPC requests.
+///
+/// These parameters are applied to the GenConfig when calling the C++ engine.
+#[derive(Debug, Clone, Default)]
+pub struct GenerationParams {
+    /// Maximum number of new tokens to generate.
+    pub max_tokens: Option<usize>,
+    /// Sampling temperature (0.0 = deterministic, > 0.0 = random sampling).
+    /// Default: 0.7
+    pub temperature: Option<f32>,
+    /// Nucleus sampling threshold (0.0-1.0). Default: 0.95
+    pub top_p: Option<f32>,
+    /// Top-k sampling (0 = disabled). Default: 50
+    pub top_k: Option<i32>,
+    /// Minimum probability threshold for MinP sampling. Default: 0.0
+    pub min_p: Option<f32>,
+    /// Repetition penalty. Default: 1.0
+    pub repetition_penalty: Option<f32>,
+    /// Random seed for deterministic sampling. None = random.
+    pub seed: Option<u64>,
+    /// Stop sequences (not directly used by C++, handled by caller).
+    pub stop: Option<Vec<String>>,
+}
+
+impl GenerationParams {
+    /// Create GenerationParams from ChatCompletionsRequest fields.
+    pub fn from_chat_request(
+        temperature: Option<f32>,
+        top_p: Option<f32>,
+        max_tokens: Option<i32>,
+        seed: Option<i32>,
+        presence_penalty: Option<f32>,
+        frequency_penalty: Option<f32>,
+        stop: Option<crate::handlers::http::Stop>,
+    ) -> Self {
+        let repetition_penalty = Self::compute_repetition_penalty(presence_penalty, frequency_penalty);
+        Self {
+            max_tokens: max_tokens.map(|t| t as usize),
+            temperature,
+            top_p,
+            top_k: None,
+            min_p: None,
+            repetition_penalty,
+            seed: seed.map(|s| s as u64),
+            stop: stop.map(|s| match s {
+                crate::handlers::http::Stop::Single(s) => vec![s],
+                crate::handlers::http::Stop::Multiple(v) => v,
+            }),
+        }
+    }
+
+    /// Compute repetition penalty from presence/frequency penalties.
+    fn compute_repetition_penalty(
+        presence_penalty: Option<f32>,
+        frequency_penalty: Option<f32>,
+    ) -> Option<f32> {
+        let presence = presence_penalty.unwrap_or(0.0);
+        let frequency = frequency_penalty.unwrap_or(0.0);
+        let combined = presence + frequency;
+        if combined == 0.0 {
+            None
+        } else {
+            Some((1.0 + combined).max(0.5).min(3.0))
+        }
+    }
+
+    /// Apply parameters to a GenConfig instance.
+    /// Only sets values that are Some(), leaving defaults for None.
+    pub fn apply_to_gen_config(&self, gen_cfg: &mut GenConfig) {
+        if let Some(max_tokens) = self.max_tokens {
+            gen_cfg.set_max_new_tokens(max_tokens as c_int);
+        }
+        if let Some(temperature) = self.temperature {
+            gen_cfg.set_temperature(temperature);
+        }
+        if let Some(top_p) = self.top_p {
+            gen_cfg.set_top_p(top_p);
+        }
+        if let Some(top_k) = self.top_k {
+            gen_cfg.set_top_k(top_k as c_int);
+        }
+        if let Some(min_p) = self.min_p {
+            gen_cfg.set_min_p(min_p);
+        }
+        if let Some(repetition_penalty) = self.repetition_penalty {
+            gen_cfg.set_repetition_penalty(repetition_penalty);
+        }
+        if let Some(seed) = self.seed {
+            gen_cfg.set_random_seed(seed);
+        }
+    }
+}
+
 /// Token callback for event-driven streaming.
 ///
 /// Invoked by the C++ engine whenever a new token is generated.
@@ -423,8 +516,8 @@ impl TurboMindCEngine {
     }
 
     /// Generate text with TurboMind C++ engine
-    pub async fn generate(&self, prompt: &str, max_tokens: usize) -> String {
-        let (text, _, _) = self.generate_with_metrics(prompt, max_tokens).await;
+    pub async fn generate(&self, prompt: &str, params: GenerationParams) -> String {
+        let (text, _, _) = self.generate_with_metrics(prompt, params).await;
         text
     }
 
@@ -432,7 +525,7 @@ impl TurboMindCEngine {
     pub async fn generate_with_metrics(
         &self,
         prompt: &str,
-        max_tokens: usize,
+        params: GenerationParams,
     ) -> (String, usize, f64) {
         let pool = self.request_pool.as_ref().expect("Request pool not initialized");
 
@@ -470,12 +563,14 @@ impl TurboMindCEngine {
         );
         input_tensors.set_int32("sequence_length", &[input_ids.len() as i32], &[1]);
 
-        // Prepare generation config
+        // Prepare generation config with HTTP parameters
         let mut gen_cfg = GenConfig::new().unwrap();
-        gen_cfg.set_max_new_tokens(max_tokens as i32);
-        gen_cfg.set_temperature(0.7);
-        gen_cfg.set_top_p(0.95);
-        gen_cfg.set_top_k(50);
+        gen_cfg.set_max_new_tokens(params.max_tokens.unwrap_or(512) as i32);
+        gen_cfg.set_temperature(params.temperature.unwrap_or(0.7));
+        gen_cfg.set_top_p(params.top_p.unwrap_or(0.95));
+        gen_cfg.set_top_k(params.top_k.unwrap_or(50) as i32);
+        // Apply any additional parameters (min_p, repetition_penalty, seed)
+        params.apply_to_gen_config(&mut gen_cfg);
 
         // Prepare session parameters (use unique ID for each request)
         let session = TM_SessionParam {
@@ -546,7 +641,7 @@ impl TurboMindCEngine {
     ///
     /// Uses event-driven callbacks from the C++ engine instead of polling.
     /// Each generated token fires a callback that decodes and sends it through the channel.
-    pub async fn generate_stream(&self, prompt: &str) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+    pub async fn generate_stream(&self, prompt: &str, params: GenerationParams) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
         // Tokenize input
         let (input_ids, tokenizer) = match &self.tokenizer {
             Some(t) => {
@@ -569,6 +664,7 @@ impl TurboMindCEngine {
         let prompt_len = input_ids.len() as i32;
 
         let pool = self.request_pool.as_ref().expect("Request pool not initialized").clone();
+        let params_for_blocking = params.clone();
 
         let (tx, rx) = tokio::sync::mpsc::channel::<String>(32);
 
@@ -599,7 +695,7 @@ impl TurboMindCEngine {
             input_tensors.set_int64("input_ids", &input_ids_vec, &input_ids_shape);
             input_tensors.set_int32("sequence_length", &[prompt_len], &[1]);
 
-            // Prepare generation config
+            // Prepare generation config with HTTP parameters
             let mut gen_cfg = match crate::turbomind_c::GenConfig::new() {
                 Ok(g) => g,
                 Err(e) => {
@@ -608,10 +704,12 @@ impl TurboMindCEngine {
                     return;
                 }
             };
-            gen_cfg.set_max_new_tokens(1024);
-            gen_cfg.set_temperature(0.7);
-            gen_cfg.set_top_p(0.95);
-            gen_cfg.set_top_k(50);
+            gen_cfg.set_max_new_tokens(params_for_blocking.max_tokens.unwrap_or(1024) as i32);
+            gen_cfg.set_temperature(params_for_blocking.temperature.unwrap_or(0.7));
+            gen_cfg.set_top_p(params_for_blocking.top_p.unwrap_or(0.95));
+            gen_cfg.set_top_k(params_for_blocking.top_k.unwrap_or(50) as i32);
+            // Apply any additional parameters (min_p, repetition_penalty, seed)
+            params_for_blocking.apply_to_gen_config(&mut gen_cfg);
 
             // Session parameters (unique session ID)
             let session = crate::turbomind_c::TM_SessionParam {
@@ -674,7 +772,7 @@ impl TurboMindCEngine {
     /// still needs to be fully initialized. If `dimensions` is specified and smaller
     /// than the model's hidden size, returns the first `dimensions` dimensions.
     pub async fn embed(&self, text: &str, dimensions: Option<usize>) -> Vec<f32> {
-        let tm = match &self.tm {
+        let _tm = match &self.tm {
             Some(t) => t,
             None => {
                 tracing::error!("TurboMind not initialized");

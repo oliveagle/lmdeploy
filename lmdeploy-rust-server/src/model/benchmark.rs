@@ -9,6 +9,8 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 
 use crate::model::cpp_engine::TurboMindCEngine;
+use crate::model::GenerationParams;
+use futures::StreamExt;
 
 /// Benchmark configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,7 +36,7 @@ impl Default for BenchmarkConfig {
     }
 }
 
-/// Single benchmark result
+/// Single benchmark result (with actual streaming measurements)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BenchmarkResult {
     /// Context length (in tokens)
@@ -43,9 +45,9 @@ pub struct BenchmarkResult {
     pub output_length: usize,
     /// Iteration number (1-indexed)
     pub iteration: usize,
-    /// Time to first token (milliseconds)
+    /// Time to first token (milliseconds) - actual measured via streaming
     pub ttft_ms: f64,
-    /// Prefill time (milliseconds)
+    /// Prefill time (milliseconds) - actual measured (time to first token - prefill computation)
     pub prefill_time_ms: f64,
     /// Prefill speed (tokens/second)
     pub prefill_speed_tps: f64,
@@ -55,6 +57,45 @@ pub struct BenchmarkResult {
     pub decode_speed_tps: f64,
     /// Total time (milliseconds)
     pub total_time_ms: f64,
+    /// Actual output tokens generated
+    pub actual_output_tokens: usize,
+    /// Individual inter-token latencies (milliseconds)
+    pub itl_ms: Vec<f64>,
+}
+
+/// Streaming benchmark result (with per-token timing)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamingBenchmarkResult {
+    /// Context length (in tokens)
+    pub context_length: usize,
+    /// Output length requested (in tokens)
+    pub output_length: usize,
+    /// Actual output tokens generated
+    pub actual_output_tokens: usize,
+    /// Iteration number
+    pub iteration: usize,
+    /// Time to first token (milliseconds) - actual measured
+    pub ttft_ms: f64,
+    /// Total time (milliseconds)
+    pub total_time_ms: f64,
+    /// Decode time (total - TTFT, in milliseconds)
+    pub decode_time_ms: f64,
+    /// Decode speed (tokens/second)
+    pub decode_speed_tps: f64,
+    /// Average inter-token latency (milliseconds)
+    pub avg_itl_ms: f64,
+    /// Min inter-token latency (milliseconds)
+    pub min_itl_ms: f64,
+    /// Max inter-token latency (milliseconds)
+    pub max_itl_ms: f64,
+    /// P50 inter-token latency (milliseconds)
+    pub p50_itl_ms: f64,
+    /// P95 inter-token latency (milliseconds)
+    pub p95_itl_ms: f64,
+    /// P99 inter-token latency (milliseconds)
+    pub p99_itl_ms: f64,
+    /// Individual token timestamps (milliseconds from start)
+    pub token_timestamps_ms: Vec<f64>,
 }
 
 /// Aggregated benchmark results
@@ -96,7 +137,7 @@ pub struct BenchmarkReport {
     pub timestamp: i64,
 }
 
-/// Benchmark runner
+/// Benchmark runner with streaming support
 pub struct BenchmarkRunner {
     engine: Arc<TurboMindCEngine>,
     config: BenchmarkConfig,
@@ -108,19 +149,19 @@ impl BenchmarkRunner {
         Self { engine, config }
     }
 
-    /// Run all benchmarks
+    /// Run all benchmarks using streaming for accurate TTFT measurement
     pub async fn run(&self) -> Result<BenchmarkReport, String> {
         let mut all_results = Vec::new();
 
         for &context_length in &self.config.context_lengths {
             // Warmup runs
             for _ in 0..self.config.warmup_iterations {
-                let _ = self.run_single_benchmark(context_length, self.config.output_length).await;
+                let _ = self.run_streaming_benchmark(context_length, self.config.output_length, 0).await;
             }
 
             // Measured runs
-            for _iter in 1..=self.config.iterations {
-                let result = self.run_single_benchmark(context_length, self.config.output_length).await?;
+            for iter in 1..=self.config.iterations {
+                let result = self.run_streaming_benchmark(context_length, self.config.output_length, iter).await?;
                 all_results.push(result);
             }
         }
@@ -129,8 +170,8 @@ impl BenchmarkRunner {
         let summaries = self.generate_summaries(&all_results);
 
         Ok(BenchmarkReport {
-            engine_name: "LMDeploy TurboMind".to_string(),
-            model_path: self.engine.info().path,
+            engine_name: "LMDeploy TurboMind C++ (streaming)".to_string(),
+            model_path: self.engine.model_path.clone(),
             config: self.config.clone(),
             results: all_results,
             summaries,
@@ -138,67 +179,73 @@ impl BenchmarkRunner {
         })
     }
 
-    /// Run a single benchmark iteration
-    async fn run_single_benchmark(&self, context_length: usize, output_length: usize) -> Result<BenchmarkResult, String> {
+    /// Run a single benchmark iteration using streaming for accurate timing
+    async fn run_streaming_benchmark(&self, context_length: usize, output_length: usize, iteration: usize) -> Result<BenchmarkResult, String> {
         // Generate a prompt of approximately context_length tokens
-        // Assuming roughly 4 characters per token
         let prompt = generate_prompt(context_length * 4);
 
-        let start = Instant::now();
-
-        // Tokenize the prompt to get actual input token count
-        let input_ids = if let Some(tokenizer) = self.engine.tokenizer() {
-            match tokenizer.encode(&prompt, false, false) {
+        // Tokenize to get actual input token count
+        let input_ids = match self.engine.tokenizer() {
+            Some(t) => match t.encode(&prompt, false, false) {
                 Ok(ids) => ids,
-                Err(e) => {
-                    return Err(format!("Tokenization failed: {}", e));
-                }
-            }
-        } else {
-            return Err("Tokenizer not available".to_string());
+                Err(e) => return Err(format!("Tokenization failed: {}", e)),
+            },
+            None => return Err("Tokenizer not available".to_string()),
         };
-
         let actual_input_tokens = input_ids.len();
 
-        // Call the engine with metrics
-        let (_output_text, _output_token_count, elapsed_ms) = self.engine.generate_with_metrics(&prompt, output_length).await;
-
-        // The elapsed_ms from Python bridge is the total time (prefill + decode)
-        // We need to estimate TTFT and separate prefill/decode times
-        // For a rough estimate:
-        // - TTFT is roughly the time for the first token, which is a fraction of prefill time
-        // - Decode time is (total_time - prefill_time)
-        // - Prefill time is proportional to input_tokens
-
-        // Total time in milliseconds
-        let total_time_ms = elapsed_ms;
-
-        // Estimate prefill time (input processing)
-        // Typical ratio: prefill is about 10-20% of total time for short outputs
-        // For longer outputs, prefill becomes smaller percentage
-        let prefill_ratio = if actual_input_tokens > 0 {
-            // Rough estimate based on typical LLM inference patterns
-            ((actual_input_tokens as f64) / ((actual_input_tokens + output_length) as f64) * 0.5).min(0.3)
-        } else {
-            0.2
+        // Use streaming to get actual TTFT and per-token timing
+        let params = GenerationParams {
+            max_tokens: Some(output_length),
+            ..Default::default()
         };
-        let prefill_time_ms = total_time_ms * prefill_ratio;
 
-        // TTFT is typically 30-50% of prefill time (time to first generated token)
-        let ttft_ms = prefill_time_ms * 0.4;
+        let start = Instant::now();
+        let mut stream = self.engine.generate_stream(&prompt, params).await;
 
-        // Decode time is remaining time
-        let decode_time_ms = total_time_ms - prefill_time_ms;
+        let mut ttft_ms = 0.0;
+        let mut first_token_received = false;
+        let mut total_tokens = 0;
+        let mut last_token_time = 0.0;
+        let mut token_times: Vec<f64> = Vec::new();
 
-        // Calculate speeds
+        // Collect tokens from stream
+        while let Some(_token) = stream.next().await {
+            let elapsed = start.elapsed().as_secs_f64() * 1000.0; // ms
+
+            if !first_token_received {
+                ttft_ms = elapsed;
+                first_token_received = true;
+            }
+            last_token_time = elapsed;
+            token_times.push(elapsed);
+            total_tokens += 1;
+        }
+
+        let total_time_ms = last_token_time;
+
+        // Calculate inter-token latencies
+        let mut itl_ms: Vec<f64> = Vec::new();
+        for i in 1..token_times.len() {
+            itl_ms.push(token_times[i] - token_times[i-1]);
+        }
+
+        // Calculate prefill time (TTFT for the first output token)
+        let prefill_time_ms = ttft_ms;
+
+        // Decode time is remaining time after first token
+        let decode_time_ms = total_time_ms - ttft_ms;
+
+        // Calculate prefill speed (input processing rate)
         let prefill_speed_tps = if prefill_time_ms > 0.0 {
             (actual_input_tokens as f64 * 1000.0) / prefill_time_ms
         } else {
             0.0
         };
 
-        let decode_speed_tps = if decode_time_ms > 0.0 && output_length > 0 {
-            (output_length as f64 * 1000.0) / decode_time_ms
+        // Calculate decode speed (output processing rate)
+        let decode_speed_tps = if decode_time_ms > 0.0 && total_tokens > 0 {
+            (total_tokens as f64 * 1000.0) / decode_time_ms
         } else {
             0.0
         };
@@ -206,13 +253,15 @@ impl BenchmarkRunner {
         Ok(BenchmarkResult {
             context_length: actual_input_tokens,
             output_length: output_length,
-            iteration: 1, // Will be updated by caller
-            ttft_ms: ttft_ms,
-            prefill_time_ms: prefill_time_ms,
+            iteration,
+            ttft_ms,
+            prefill_time_ms,
             prefill_speed_tps,
-            decode_time_ms: decode_time_ms,
+            decode_time_ms,
             decode_speed_tps,
-            total_time_ms: total_time_ms,
+            total_time_ms,
+            actual_output_tokens: total_tokens,
+            itl_ms,
         })
     }
 
@@ -220,8 +269,6 @@ impl BenchmarkRunner {
     fn generate_summaries(&self, results: &[BenchmarkResult]) -> Vec<BenchmarkSummary> {
         let mut summaries = Vec::new();
 
-        // Group results by context length (with tolerance for actual token counts)
-        // 1K target -> ~900 tokens, 4K target -> ~3600 tokens, 8K target -> ~7200 tokens
         for &target_context in &self.config.context_lengths {
             let tolerance = if target_context >= 4096 { 1000 } else { 200 };
             let context_results: Vec<_> = results

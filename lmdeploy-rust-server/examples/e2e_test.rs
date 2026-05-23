@@ -15,6 +15,8 @@
 
 use std::time::Instant;
 
+use lmdeploy_server::model::GenerationParams;
+
 use lmdeploy_server::model::cpp_engine::{EngineType, TurboMindCEngine};
 
 #[tokio::main]
@@ -60,7 +62,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Prompt: \"{}\"", prompt);
 
     let inference_start = Instant::now();
-    let (output, num_tokens, _elapsed_ms) = engine.generate_with_metrics(prompt, 32).await;
+    let params = GenerationParams {
+        max_tokens: Some(32),
+        ..Default::default()
+    };
+    let (output, num_tokens, _elapsed_ms) = engine.generate_with_metrics(prompt, params).await;
     let total_ms = inference_start.elapsed().as_secs_f64() * 1000.0;
 
     if output.is_empty() {
@@ -82,7 +88,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Prompt: \"{}\"", long_prompt);
 
     let start = Instant::now();
-    let (output2, tokens2, _elapsed2) = engine.generate_with_metrics(long_prompt, 128).await;
+    let params2 = GenerationParams {
+        max_tokens: Some(128),
+        ..Default::default()
+    };
+    let (output2, tokens2, _elapsed2) = engine.generate_with_metrics(long_prompt, params2).await;
     let total2 = start.elapsed().as_secs_f64() * 1000.0;
 
     if output2.is_empty() {

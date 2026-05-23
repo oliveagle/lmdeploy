@@ -1,5 +1,6 @@
 //! Quick test for C++ engine with smaller 4B model
 use lmdeploy_server::model::cpp_engine::TurboMindCEngine;
+use lmdeploy_server::model::GenerationParams;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,8 +29,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let prompt = "What is 2+2?";
     println!("Prompt: {}", prompt);
 
+    let params = GenerationParams {
+        max_tokens: Some(32),
+        ..Default::default()
+    };
     let gen_start = std::time::Instant::now();
-    let result = engine.generate(prompt, 32).await;
+    let result = engine.generate(prompt, params).await;
     let gen_time = gen_start.elapsed();
 
     println!("Output: {}", result);
