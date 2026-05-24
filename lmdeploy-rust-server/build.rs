@@ -15,6 +15,7 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", cuda_stubs);
     println!("cargo:rustc-link-search=native={}", system_cuda);
     println!("cargo:rustc-link-lib=dylib=turbomind_c");
+    println!("cargo:rustc-link-lib=dylib=tm_shim");
     println!("cargo:rustc-link-lib=dylib=cudart");
     println!("cargo:rustc-link-lib=dylib=cublasLt");
     println!("cargo:rustc-link-lib=dylib=cuda");
