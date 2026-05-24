@@ -76,6 +76,8 @@ fn event_type_to_proto(t: EngineEventType) -> i32 {
 fn build_stream_metrics(metrics: &StreamRequestMetrics) -> Option<StreamMetrics> {
     Some(StreamMetrics {
         token_timestamp_secs: metrics.token_timestamp_secs,
+        first_token_latency_secs: metrics.first_token_latency_secs,
+        completion_tokens: metrics.completion_tokens as i32,
         engine_events: metrics
             .engine_events
             .iter()
@@ -195,26 +197,18 @@ impl LmDeployService for LmDeployServiceImpl {
         params.grammar = grammar;
 
         // Run inference with or without logprobs
+        // Always use generate_with_metrics to get real timing data
         let (text, num_tokens, elapsed_ms, logprobs) = if need_logprobs {
             let (t, nt, el, lp) = eng.generate_with_logprobs(&req.prompt, params).await;
             (t, nt, el, lp)
         } else {
-            let t = eng.generate(&req.prompt, params).await;
-            (t, 0, 0.0, None)
-        };
-
-        // Recalculate elapsed_ms for non-logprobs path
-        let elapsed = if need_logprobs {
-            elapsed_ms
-        } else {
-            // Use a simple estimate if we didn't get metrics
-            let _ = num_tokens; // suppress unused warning
-            0.0
+            let (t, nt, el) = eng.generate_with_metrics(&req.prompt, params).await;
+            (t, nt, el, None)
         };
 
         // Calculate tokens per second
-        let tokens_per_second = if elapsed > 0.0 && num_tokens > 0 {
-            (num_tokens as f64 / elapsed) * 1000.0
+        let tokens_per_second = if elapsed_ms > 0.0 && num_tokens > 0 {
+            (num_tokens as f64 / elapsed_ms) * 1000.0
         } else {
             0.0
         };
@@ -260,7 +254,7 @@ impl LmDeployService for LmDeployServiceImpl {
             completion_tokens: num_tokens as i32,
             finish_reason: if !is_empty { 0.0 } else { 2.0 },
             error: String::new(),
-            latency_ms: elapsed as f32,
+            latency_ms: elapsed_ms as f32,
             tokens_per_second: tokens_per_second as f32,
             logprobs: logprobs_entries,
         };
@@ -364,17 +358,19 @@ impl LmDeployService for LmDeployServiceImpl {
             {
                 // stream.next() returns String directly (not Result<String, Error>)
                 let token = token_result;
-                let latency_ms = first_token_start.elapsed().as_millis() as u64;
+                let ttft_secs = first_token_start.elapsed().as_secs_f64();
                 if !first_token_recorded {
+                    // Record TTFT on first token
+                    metrics.record_ttft(ttft_secs);
                     tracing::info!(
-                        first_token_latency_ms = latency_ms,
+                        first_token_latency_secs = ttft_secs,
                         "First token latency recorded (gRPC stream)"
                     );
                     first_token_recorded = true;
                 }
 
-                // Update token timestamp in metrics
-                metrics.mark_token_generated();
+                // Update token counter and timestamp in metrics
+                metrics.record_token();
 
                 let chunk = GenerateStreamResponse {
                     payload: Some(generate_stream_response::Payload::Chunk(StreamChunk {
@@ -485,12 +481,19 @@ impl LmDeployService for LmDeployServiceImpl {
                                     .generate_stream(&req.prompt, params)
                                     .await;
 
+                                let request_start = Instant::now();
+                                let mut first_token = true;
+
                                 while let Ok(Some(token)) = tokio::time::timeout(
                                     std::time::Duration::from_secs(300),
                                     token_stream.next(),
                                 ).await
                                 {
-                                    request_metrics.mark_token_generated();
+                                    if first_token {
+                                        request_metrics.record_ttft(request_start.elapsed().as_secs_f64());
+                                        first_token = false;
+                                    }
+                                    request_metrics.record_token();
 
                                     let chunk = GenerateStreamResponse {
                                         payload: Some(

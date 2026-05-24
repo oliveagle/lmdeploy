@@ -301,15 +301,16 @@ async fn chat_completions_stream_impl(
         let mut first_token_recorded = false;
         while let Some(chunk_text) = chunks.next().await {
             if !first_token_recorded {
-                let latency_ms = first_token_start.elapsed().as_millis() as u64;
-                metrics_inner.streams.record_stream_start(latency_ms);
+                let ttft_secs = first_token_start.elapsed().as_secs_f64();
+                request_metrics.record_ttft(ttft_secs);
+                metrics_inner.streams.record_stream_start((ttft_secs * 1000.0) as u64);
                 first_token_recorded = true;
             }
 
             metrics_inner.streams.record_chunk();
 
-            // Update token timestamp in per-request metrics
-            request_metrics.mark_token_generated();
+            // Update token counter and timestamp in per-request metrics
+            request_metrics.record_token();
 
             if tx.send(chunk_text).await.is_err() {
                 tracing::info!("Client disconnected, stopping stream");

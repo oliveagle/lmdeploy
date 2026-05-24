@@ -109,6 +109,8 @@ message EngineEvent {
 message StreamMetrics {
   double token_timestamp_secs = 1;  // Wall-clock time of most recent token
   repeated EngineEvent engine_events = 2;
+  double first_token_latency_secs = 3;  // TTFT: time from request start to first token (seconds)
+  int32 completion_tokens = 4;  // Number of tokens generated so far
 }
 
 // Batch generation request

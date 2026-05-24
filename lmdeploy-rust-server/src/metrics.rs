@@ -72,6 +72,10 @@ pub struct StreamRequestMetrics {
     pub token_timestamp_secs: f64,
     /// Engine lifecycle events collected during this request
     pub engine_events: Vec<EngineEvent>,
+    /// TTFT in seconds: elapsed from request start to first token
+    pub first_token_latency_secs: f64,
+    /// Number of completion tokens generated so far
+    pub completion_tokens: u32,
 }
 
 impl StreamRequestMetrics {
@@ -79,6 +83,8 @@ impl StreamRequestMetrics {
         Self {
             token_timestamp_secs: Self::wall_time_secs(),
             engine_events: Vec::new(),
+            first_token_latency_secs: 0.0,
+            completion_tokens: 0,
         }
     }
 
@@ -87,9 +93,25 @@ impl StreamRequestMetrics {
         self.engine_events.push(EngineEvent::now(event_type));
     }
 
-    /// Update the token timestamp when a new token is generated
-    pub fn mark_token_generated(&mut self) {
+    /// Record TTFT (Time To First Token) in seconds.
+    /// Call this when the first token is generated.
+    pub fn record_ttft(&mut self, ttft_secs: f64) {
+        if self.first_token_latency_secs == 0.0 && ttft_secs > 0.0 {
+            self.first_token_latency_secs = ttft_secs;
+        }
+    }
+
+    /// Increment completion token counter and update timestamp.
+    /// This replaces mark_token_generated() for better tracking.
+    pub fn record_token(&mut self) {
+        self.completion_tokens += 1;
         self.token_timestamp_secs = Self::wall_time_secs();
+    }
+
+    /// Update the token timestamp when a new token is generated.
+    /// Deprecated: Use record_token() instead which also increments counter.
+    pub fn mark_token_generated(&mut self) {
+        self.record_token();
     }
 
     /// Get the current wall-clock time as seconds since epoch
@@ -386,6 +408,8 @@ mod tests {
         let metrics = StreamRequestMetrics::new();
         assert!(metrics.token_timestamp_secs > 0.0);
         assert_eq!(metrics.engine_events.len(), 0);
+        assert_eq!(metrics.first_token_latency_secs, 0.0);
+        assert_eq!(metrics.completion_tokens, 0);
     }
 
     #[test]
@@ -403,6 +427,35 @@ mod tests {
     }
 
     #[test]
+    fn test_stream_request_metrics_record_ttft() {
+        let mut metrics = StreamRequestMetrics::new();
+        metrics.record_ttft(0.123);
+
+        assert_eq!(metrics.first_token_latency_secs, 0.123);
+
+        // Second call should be ignored (only first TTFT is recorded)
+        metrics.record_ttft(0.456);
+        assert_eq!(metrics.first_token_latency_secs, 0.123);
+    }
+
+    #[test]
+    fn test_stream_request_metrics_record_token() {
+        let mut metrics = StreamRequestMetrics::new();
+        let first_ts = metrics.token_timestamp_secs;
+
+        // Simulate small delay
+        std::thread::sleep(Duration::from_millis(10));
+        metrics.record_token();
+
+        assert!(metrics.token_timestamp_secs > first_ts);
+        assert_eq!(metrics.completion_tokens, 1);
+
+        // Record another token
+        metrics.record_token();
+        assert_eq!(metrics.completion_tokens, 2);
+    }
+
+    #[test]
     fn test_stream_request_metrics_mark_token() {
         let mut metrics = StreamRequestMetrics::new();
         let first_ts = metrics.token_timestamp_secs;
@@ -412,6 +465,8 @@ mod tests {
         metrics.mark_token_generated();
 
         assert!(metrics.token_timestamp_secs > first_ts);
+        // mark_token_generated calls record_token internally
+        assert_eq!(metrics.completion_tokens, 1);
     }
 
     #[test]
