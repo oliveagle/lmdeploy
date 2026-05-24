@@ -19,6 +19,7 @@ use crate::tokenizer::LMTokenizer;
 use crate::turbomind_c::{
     c_int, c_void, CompiledGrammar, EngineConfig, GenConfig, ModelRequest, ScheduleMetrics,
     TM_SessionParam, TensorMap, TurboMind,
+    DL_DEVICE_TYPE_CUDA, DL_DTYPE_CODE_INT,
 };
 use serde::Serialize;
 
@@ -1842,6 +1843,35 @@ fn unix_timestamp() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs() as i64
+}
+
+/// Set a tensor to TensorMap using DLPack zero-copy transfer.
+///
+/// When the data is stored on GPU, this function uses DLPack to pass
+/// the GPU pointer directly to the C++ engine without CPU copy.
+/// For CPU data, it falls back to the standard setter.
+fn set_tensor_dlpack(
+    tensors: &mut TensorMap,
+    name: &str,
+    data_ptr: *const c_void,
+    data_i64: &[i64],
+    shape: &[i64],
+    is_gpu: bool,
+) {
+    if is_gpu && !data_ptr.is_null() {
+        // Zero-copy DLPack path: GPU pointer directly to C++ engine
+        tensors.set_from_dlpack(
+            name,
+            data_ptr,
+            shape,
+            DL_DTYPE_CODE_INT as c_int,  // int64
+            64,                           // 64 bits
+            DL_DEVICE_TYPE_CUDA as c_int, // CUDA GPU
+        );
+    } else {
+        // Fallback: CPU copy
+        tensors.set_int64(name, data_i64, shape);
+    }
 }
 
 #[cfg(test)]

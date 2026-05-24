@@ -14,7 +14,7 @@ use tokio::sync::oneshot;
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::cache::compute_hash;
-use crate::metrics::StreamMetricsSnapshot;
+use crate::metrics::{StreamMetricsSnapshot, StreamRequestMetrics, EngineEventType};
 use crate::model::GenerationParams;
 use crate::server::{AppState, BatchItem, BatchStatsResponse};
 use crate::turbomind_c::CompiledGrammar;
@@ -288,8 +288,17 @@ async fn chat_completions_stream_impl(
     let metrics_inner = metrics.clone();
     let first_token_start = Instant::now();
     let prompt_for_task = prompt.clone();
+
     tokio::spawn(async move {
+        // Initialize streaming metrics with QUEUED event
+        let mut request_metrics = StreamRequestMetrics::new();
+        request_metrics.record_event(EngineEventType::Queued);
+
         let eng = engine.read().await;
+
+        // Record SCHEDULED event before starting inference
+        request_metrics.record_event(EngineEventType::Scheduled);
+
         let chunks = eng.generate_stream(&prompt_for_task, params).await;
         futures::pin_mut!(chunks);
 
@@ -303,11 +312,21 @@ async fn chat_completions_stream_impl(
 
             metrics_inner.streams.record_chunk();
 
+            // Update token timestamp in per-request metrics
+            request_metrics.mark_token_generated();
+
             if tx.send(chunk_text).await.is_err() {
                 tracing::info!("Client disconnected, stopping stream");
                 break;
             }
         }
+
+        // Log final request metrics
+        tracing::debug!(
+            token_timestamp_secs = request_metrics.token_timestamp_secs,
+            num_events = request_metrics.engine_events.len(),
+            "Request completed with metrics"
+        );
     });
 
     // Convert channel into SSE stream with usage tracking

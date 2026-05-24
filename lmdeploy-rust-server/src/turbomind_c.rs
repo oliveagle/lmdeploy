@@ -116,6 +116,20 @@ pub enum TM_RequestStatus {
     TM_STATUS_NO_QUEUE = 10,
 }
 
+// DLPack type codes (from dlpack/dlpack.h)
+pub const DL_DEVICE_TYPE_CPU: u32 = 1;
+pub const DL_DEVICE_TYPE_CUDA: u32 = 2;
+pub const DL_DEVICE_TYPE_VULKAN: u32 = 7;
+pub const DL_DEVICE_TYPE_ROCM: u32 = 10;
+pub const DL_DEVICE_TYPE_ONEAPI: u32 = 11;
+
+// DLPack type codes for dtype
+pub const DL_DTYPE_CODE_BOOL: u32 = 0;
+pub const DL_DTYPE_CODE_INT: u32 = 2;
+pub const DL_DTYPE_CODE_FLOAT: u32 = 3;
+pub const DL_DTYPE_CODE_UINT: u32 = 4;
+pub const DL_DTYPE_CODE_BFLOAT: u32 = 5;
+
 // FFI function signatures
 extern "C" {
     // Error handling
@@ -250,6 +264,21 @@ extern "C" {
         data: *const c_float,
         ndim: c_int,
         shape: *const i64,
+    );
+    /// Set tensor from DLPack memory pointer (zero-copy).
+    /// `data` is a raw pointer from DLPack capsule (GPU or CPU).
+    /// `dl_type_code`: DLPack type code (0=kBool, 2=kInt, 3=kFloat, 4=kUInt, 5=kBFloat)
+    /// `dl_type_bits`: number of bits per element
+    /// `device_type`: 1=CPU, 2=CUDA GPU
+    pub fn TM_TensorMap_SetDLPack(
+        map: *mut TM_TensorMap,
+        name: *const c_char,
+        data: *const c_void,
+        ndim: c_int,
+        shape: *const i64,
+        dl_type_code: c_int,
+        dl_type_bits: c_int,
+        device_type: c_int,
     );
 
     // Safetensors
@@ -1019,6 +1048,43 @@ impl TensorMap {
                 data,
                 shape.len() as c_int,
                 shape.as_ptr(),
+            );
+        }
+    }
+
+    /// Set tensor from a DLPack memory pointer (zero-copy transfer).
+    ///
+    /// # Arguments
+    /// * `name` - Tensor name (e.g., "input_ids", "output_ids")
+    /// * `data` - Raw pointer from DLPack capsule (GPU or CPU memory)
+    /// * `shape` - Tensor shape
+    /// * `dl_type_code` - DLPack type code (0=kBool, 2=kInt, 3=kFloat, 4=kUInt, 5=kBFloat)
+    /// * `dl_type_bits` - Number of bits per element (8, 16, 32, 64)
+    /// * `device_type` - DLPack device type (1=CPU, 2=CUDA GPU)
+    ///
+    /// # Safety
+    /// The pointer `data` must remain valid for the lifetime of the inference request.
+    /// This method does not copy the data - it references the original memory directly.
+    pub fn set_from_dlpack(
+        &mut self,
+        name: &str,
+        data: *const c_void,
+        shape: &[i64],
+        dl_type_code: c_int,
+        dl_type_bits: c_int,
+        device_type: c_int,
+    ) {
+        unsafe {
+            let name_c = std::ffi::CString::new(name).unwrap();
+            TM_TensorMap_SetDLPack(
+                self.0,
+                name_c.as_ptr(),
+                data,
+                shape.len() as c_int,
+                shape.as_ptr(),
+                dl_type_code,
+                dl_type_bits,
+                device_type,
             );
         }
     }

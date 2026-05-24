@@ -122,6 +122,19 @@ impl LMTokenizer {
             }
         }
 
+        // Check for duplicate BOS tokens at the start (matching Python: tokenizer.py:478-483)
+        if token_ids.len() >= 2 {
+            if let Some(bos_id) = self.bos_token_id {
+                if token_ids[0] == bos_id && token_ids[1] == bos_id {
+                    tracing::warn!(
+                        "Detected duplicate bos token {} in prompt, this will likely reduce response quality, one of them will be removed",
+                        bos_id
+                    );
+                    token_ids.remove(0);
+                }
+            }
+        }
+
         Ok(token_ids)
     }
 
@@ -197,6 +210,20 @@ impl LMTokenizer {
                     token_ids.insert(0, bos_id);
                 }
             }
+
+            // Check for duplicate BOS tokens at the start
+            if token_ids.len() >= 2 {
+                if let Some(bos_id) = self.bos_token_id {
+                    if token_ids[0] == bos_id && token_ids[1] == bos_id {
+                        tracing::warn!(
+                            "Detected duplicate bos token {} in prompt, this will likely reduce response quality, one of them will be removed",
+                            bos_id
+                        );
+                        token_ids.remove(0);
+                    }
+                }
+            }
+
             results.push(token_ids);
         }
         Ok(results)

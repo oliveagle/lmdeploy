@@ -93,6 +93,35 @@ constexpr TM_MemoryType ToCMemoryType(turbomind::DeviceType mt)
     }
 }
 
+/// Convert DLPack type components (code, bits) to turbomind DataType.
+/// DLPack type codes: kBool=0, kInt=2, kFloat=3, kUInt=4, kBFloat=5
+/// Matches dlpack.h definition.
+constexpr turbomind::DataType DLPackTypeToTM(int dl_type_code, int dl_type_bits)
+{
+    using DT = turbomind::DataType;
+    // dl_type_code: 0=kBool, 2=kInt, 3=kFloat, 4=kUInt, 5=kBFloat
+    if (dl_type_code == 0) return DT::kBool;
+    if (dl_type_code == 2) {
+        if (dl_type_bits == 8) return DT::kInt8;
+        if (dl_type_bits == 16) return DT::kInt16;
+        if (dl_type_bits == 32) return DT::kInt32;
+        if (dl_type_bits == 64) return DT::kInt64;
+    }
+    if (dl_type_code == 3) {
+        if (dl_type_bits == 16) return DT::kFloat16;
+        if (dl_type_bits == 32) return DT::kFloat32;
+        if (dl_type_bits == 64) return DT::kFloat64;
+    }
+    if (dl_type_code == 4) {
+        if (dl_type_bits == 8) return DT::kUint8;
+        if (dl_type_bits == 16) return DT::kUint16;
+        if (dl_type_bits == 32) return DT::kUint32;
+        if (dl_type_bits == 64) return DT::kUint64;
+    }
+    if (dl_type_code == 5) return DT::kBfloat16;
+    return DT::kNull;
+}
+
 turbomind::DeviceType FromCMemoryType(TM_MemoryType mt)
 {
     switch (mt) {
@@ -1659,6 +1688,29 @@ void TM_TensorMap_SetInt64GPU(TM_TensorMap* map, const char* name, const int64_t
 void TM_TensorMap_SetFloat32GPU(TM_TensorMap* map, const char* name, const float* data, int ndim, const int64_t* shape)
 {
     SetTensorCommon(&map->map, name, data, ndim, shape, turbomind::DeviceType::kDEVICE);
+}
+
+// DLPack-based tensor setting: accept a raw GPU pointer and dtype from DLPack capsule
+// This enables zero-copy tensor transfer from Python/Rust to C++ engine
+void TM_TensorMap_SetDLPack(
+    TM_TensorMap* map,
+    const char* name,
+    const void* data,
+    int ndim,
+    const int64_t* shape,
+    int dl_type_code,
+    int dl_type_bits,
+    int device_type)
+{
+    std::vector<turbomind::core::ssize_t> shape_vec(shape, shape + ndim);
+    auto dtype = DLPackTypeToTM(dl_type_code, dl_type_bits);
+    auto device_type_tm = (device_type == 2) ? turbomind::DeviceType::kDEVICE : turbomind::DeviceType::kCPU;
+    auto tensor = turbomind::core::Tensor(
+        const_cast<void*>(data),
+        turbomind::Layout{shape_vec},
+        dtype,
+        device_type_tm);
+    map->map[name] = std::move(tensor);
 }
 
 bool TM_TensorMap_Get(

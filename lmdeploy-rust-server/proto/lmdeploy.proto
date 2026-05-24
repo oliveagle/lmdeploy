@@ -87,6 +87,28 @@ message StreamChunk {
   string text = 1;
   int32 token_id = 2;
   bool is_final = 3;
+  // Streaming metrics (matching Python RequestMetrics/EngineEvent)
+  StreamMetrics metrics = 4;
+}
+
+// Engine event types matching Python lmdeploy.messages.EventType
+enum EngineEventType {
+  ENGINE_EVENT_UNSPECIFIED = 0;
+  ENGINE_EVENT_QUEUED = 1;      // Request enqueued
+  ENGINE_EVENT_SCHEDULED = 2;   // Request scheduled for inference
+  ENGINE_EVENT_PREEMPTED = 3;   // Request preempted
+}
+
+// Single engine lifecycle event (matching Python lmdeploy.messages.EngineEvent)
+message EngineEvent {
+  EngineEventType event_type = 1;
+  double timestamp_secs = 2;  // Wall-clock time in seconds since epoch
+}
+
+// Per-request streaming metrics (matching Python lmdeploy.messages.RequestMetrics)
+message StreamMetrics {
+  double token_timestamp_secs = 1;  // Wall-clock time of most recent token
+  repeated EngineEvent engine_events = 2;
 }
 
 // Batch generation request

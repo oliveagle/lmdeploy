@@ -2,12 +2,110 @@
 //!
 //! Provides Prometheus-compatible metrics for monitoring request latency,
 //! throughput, cache hit rates, and streaming performance.
+//!
+//! Streaming metrics collection mirrors Python's RequestMetrics / EngineEvent:
+//! - `EventType` enum: QUEUED, SCHEDULED, PREEMPTED (matches Python messages.py)
+//! - `EngineEvent`: timestamped engine lifecycle event
+//! - `StreamRequestMetrics`: per-request metrics with token_timestamp + engine_events
 
 use serde::Serialize;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use std::net::SocketAddr;
+
+/// Engine event types matching Python `lmdeploy.messages.EventType`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EngineEventType {
+    /// Request has been enqueued and is waiting in the queue
+    Queued,
+    /// Request has been scheduled for inference
+    Scheduled,
+    /// Request has been preempted from the engine
+    Preempted,
+}
+
+impl EngineEventType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Queued => "QUEUED",
+            Self::Scheduled => "SCHEDULED",
+            Self::Preempted => "PREEMPTED",
+        }
+    }
+}
+
+/// A single engine lifecycle event, matching Python `lmdeploy.messages.EngineEvent`
+#[derive(Debug, Clone, Copy)]
+pub struct EngineEvent {
+    pub event_type: EngineEventType,
+    /// Wall-clock timestamp in seconds (same semantics as Python's `time.time()`)
+    pub timestamp_secs: f64,
+}
+
+impl EngineEvent {
+    pub fn new(event_type: EngineEventType, timestamp_secs: f64) -> Self {
+        Self {
+            event_type,
+            timestamp_secs,
+        }
+    }
+
+    pub fn now(event_type: EngineEventType) -> Self {
+        Self {
+            event_type,
+            timestamp_secs: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system clock before epoch")
+                .as_secs_f64(),
+        }
+    }
+}
+
+/// Per-request streaming metrics matching Python `lmdeploy.messages.RequestMetrics`
+///
+/// Tracks wall-clock token timestamps and engine lifecycle events for each
+/// streaming request, enabling downstream calculation of TTFT, ITL, and TPOT.
+#[derive(Debug, Clone)]
+pub struct StreamRequestMetrics {
+    /// Wall-clock time (seconds) of the most recent token generation
+    pub token_timestamp_secs: f64,
+    /// Engine lifecycle events collected during this request
+    pub engine_events: Vec<EngineEvent>,
+}
+
+impl StreamRequestMetrics {
+    pub fn new() -> Self {
+        Self {
+            token_timestamp_secs: Self::wall_time_secs(),
+            engine_events: Vec::new(),
+        }
+    }
+
+    /// Record an engine event on this request's timeline
+    pub fn record_event(&mut self, event_type: EngineEventType) {
+        self.engine_events.push(EngineEvent::now(event_type));
+    }
+
+    /// Update the token timestamp when a new token is generated
+    pub fn mark_token_generated(&mut self) {
+        self.token_timestamp_secs = Self::wall_time_secs();
+    }
+
+    /// Get the current wall-clock time as seconds since epoch
+    fn wall_time_secs() -> f64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock before epoch")
+            .as_secs_f64()
+    }
+}
+
+impl Default for StreamRequestMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Initialize the Prometheus metrics exporter
 pub fn init_metrics(config: &crate::config::MetricsConfig) {
@@ -260,5 +358,63 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(10)).await;
         let elapsed = timer.finish();
         assert!(elapsed > 0.009);
+    }
+
+    #[test]
+    fn test_engine_event_type() {
+        assert_eq!(EngineEventType::Queued.as_str(), "QUEUED");
+        assert_eq!(EngineEventType::Scheduled.as_str(), "SCHEDULED");
+        assert_eq!(EngineEventType::Preempted.as_str(), "PREEMPTED");
+    }
+
+    #[test]
+    fn test_engine_event_new() {
+        let event = EngineEvent::new(EngineEventType::Scheduled, 12345.0);
+        assert_eq!(event.event_type, EngineEventType::Scheduled);
+        assert_eq!(event.timestamp_secs, 12345.0);
+    }
+
+    #[test]
+    fn test_engine_event_now() {
+        let event = EngineEvent::now(EngineEventType::Queued);
+        assert_eq!(event.event_type, EngineEventType::Queued);
+        assert!(event.timestamp_secs > 0.0);
+    }
+
+    #[test]
+    fn test_stream_request_metrics_new() {
+        let metrics = StreamRequestMetrics::new();
+        assert!(metrics.token_timestamp_secs > 0.0);
+        assert_eq!(metrics.engine_events.len(), 0);
+    }
+
+    #[test]
+    fn test_stream_request_metrics_record_event() {
+        let mut metrics = StreamRequestMetrics::new();
+        metrics.record_event(EngineEventType::Queued);
+        metrics.record_event(EngineEventType::Scheduled);
+
+        assert_eq!(metrics.engine_events.len(), 2);
+        assert_eq!(metrics.engine_events[0].event_type, EngineEventType::Queued);
+        assert_eq!(metrics.engine_events[1].event_type, EngineEventType::Scheduled);
+    }
+
+    #[test]
+    fn test_stream_request_metrics_mark_token() {
+        let mut metrics = StreamRequestMetrics::new();
+        let first_ts = metrics.token_timestamp_secs;
+
+        // Simulate small delay
+        std::thread::sleep(Duration::from_millis(10));
+        metrics.mark_token_generated();
+
+        assert!(metrics.token_timestamp_secs > first_ts);
+    }
+
+    #[test]
+    fn test_stream_request_metrics_default() {
+        let metrics = StreamRequestMetrics::default();
+        assert!(metrics.token_timestamp_secs > 0.0);
+        assert_eq!(metrics.engine_events.len(), 0);
     }
 }

@@ -8,6 +8,7 @@ use tonic::{Request, Response, Status, Streaming};
 
 use crate::cache::TokenizeCache;
 use crate::error::AppError;
+use crate::metrics::{EngineEventType, StreamRequestMetrics};
 use crate::model::ModelManager;
 use crate::model::{BatchItem, BatchResult, GenerationParams, ModelEngine};
 use crate::turbomind_c::CompiledGrammar;
@@ -16,7 +17,8 @@ use super::lmdeploy::v1::{
     generate_stream_response, lm_deploy_service_server::LmDeployService, BatchGenerateRequest,
     BatchGenerateResponse, GenerateRequest, GenerateResponse, GenerateStreamResponse,
     HealthRequest, HealthResponse, LogprobEntry, ModelInfoRequest, ModelInfoResponse, StreamChunk,
-    TokenizeRequest, TokenizeResponse, TopLogprobEntry,
+    TokenizeRequest, TokenizeResponse, TopLogprobEntry, EngineEventType as ProtoEngineEventType,
+    StreamMetrics, EngineEvent,
 };
 
 /// Convert guided decoding fields from gRPC request to a CompiledGrammar.
@@ -61,6 +63,30 @@ fn get_default_engine(
     model_manager.blocking_read().get_model(None)
 }
 
+/// Convert internal EngineEventType to proto-generated EngineEventType i32 value
+fn event_type_to_proto(t: EngineEventType) -> i32 {
+    match t {
+        EngineEventType::Queued => ProtoEngineEventType::EngineEventQueued as i32,
+        EngineEventType::Scheduled => ProtoEngineEventType::EngineEventScheduled as i32,
+        EngineEventType::Preempted => ProtoEngineEventType::EngineEventPreempted as i32,
+    }
+}
+
+/// Build optional proto StreamMetrics from a StreamRequestMetrics
+fn build_stream_metrics(metrics: &StreamRequestMetrics) -> Option<StreamMetrics> {
+    Some(StreamMetrics {
+        token_timestamp_secs: metrics.token_timestamp_secs,
+        engine_events: metrics
+            .engine_events
+            .iter()
+            .map(|e| EngineEvent {
+                event_type: event_type_to_proto(e.event_type),
+                timestamp_secs: e.timestamp_secs,
+            })
+            .collect(),
+    })
+}
+
 #[derive(Clone)]
 pub struct LmDeployServiceImpl {
     pub version: String,
@@ -96,8 +122,8 @@ impl LmDeployService for LmDeployServiceImpl {
         tracing::info!(prompt_len = req.prompt.len(), "gRPC Generate request");
 
         // Check if logprobs are requested
-        let need_logprobs = req.logprobs || req.top_logprobs > 0;
-        let top_logprobs = if req.top_logprobs > 0 {
+        let _need_logprobs = req.logprobs || req.top_logprobs > 0;
+        let _top_logprobs = if req.top_logprobs > 0 {
             Some(req.top_logprobs as u32)
         } else {
             None
@@ -251,6 +277,10 @@ impl LmDeployService for LmDeployServiceImpl {
             let first_token_start = Instant::now();
             let mut first_token_recorded = false;
 
+            // Initialize streaming metrics with QUEUED event
+            let mut metrics = StreamRequestMetrics::new();
+            metrics.record_event(EngineEventType::Queued);
+
             // Get the engine
             let Some(engine_ref) = get_default_engine(&manager) else {
                 let _ = tx.send(Ok(GenerateStreamResponse {
@@ -258,6 +288,7 @@ impl LmDeployService for LmDeployServiceImpl {
                         text: "[ERROR: No model loaded]".to_string(),
                         token_id: 0,
                         is_final: true,
+                        metrics: build_stream_metrics(&metrics),
                     })),
                 })).await;
                 return;
@@ -266,6 +297,9 @@ impl LmDeployService for LmDeployServiceImpl {
             // Lock the engine for the duration of streaming
             let engine_guard = engine_ref.read().await;
             let engine = &*engine_guard;
+
+            // Record SCHEDULED event before starting inference
+            metrics.record_event(EngineEventType::Scheduled);
 
             // Use the engine's streaming method with pre-tokenized input if available
             let mut stream = if let Some(ids) = pre_tokenized_ids {
@@ -291,11 +325,15 @@ impl LmDeployService for LmDeployServiceImpl {
                     first_token_recorded = true;
                 }
 
+                // Update token timestamp in metrics
+                metrics.mark_token_generated();
+
                 let chunk = GenerateStreamResponse {
                     payload: Some(generate_stream_response::Payload::Chunk(StreamChunk {
                         text: token,
                         token_id: 0,
                         is_final: false,
+                        metrics: build_stream_metrics(&metrics),
                     })),
                 };
 
@@ -311,6 +349,7 @@ impl LmDeployService for LmDeployServiceImpl {
                     text: "[DONE]".to_string(),
                     token_id: 0,
                     is_final: true,
+                    metrics: build_stream_metrics(&metrics),
                 })),
             };
 
@@ -361,6 +400,10 @@ impl LmDeployService for LmDeployServiceImpl {
                                     "Bidirectional stream request"
                                 );
 
+                                // Initialize metrics for this request
+                                let mut request_metrics = StreamRequestMetrics::new();
+                                request_metrics.record_event(EngineEventType::Queued);
+
                                 // Get the engine for this request
                                 let Some(engine_ref) = get_default_engine(&manager) else {
                                     let _ = tx.send(Ok(GenerateStreamResponse {
@@ -368,12 +411,16 @@ impl LmDeployService for LmDeployServiceImpl {
                                             text: "[ERROR: No model loaded]".to_string(),
                                             token_id: 0,
                                             is_final: true,
+                                            metrics: build_stream_metrics(&request_metrics),
                                         })),
                                     })).await;
                                     continue;
                                 };
                                 let engine_guard = engine_ref.read().await;
                                 let engine = &*engine_guard;
+
+                                // Record SCHEDULED event
+                                request_metrics.record_event(EngineEventType::Scheduled);
 
                                 // Build generation params
                                 let params = GenerationParams::from_grpc_request(
@@ -395,12 +442,15 @@ impl LmDeployService for LmDeployServiceImpl {
                                     token_stream.next(),
                                 ).await
                                 {
+                                    request_metrics.mark_token_generated();
+
                                     let chunk = GenerateStreamResponse {
                                         payload: Some(
                                             generate_stream_response::Payload::Chunk(StreamChunk {
                                                 text: token,
                                                 token_id: 0,
                                                 is_final: false,
+                                                metrics: build_stream_metrics(&request_metrics),
                                             })),
                                     };
 
@@ -417,6 +467,7 @@ impl LmDeployService for LmDeployServiceImpl {
                                             text: "[DONE]".to_string(),
                                             token_id: 0,
                                             is_final: true,
+                                            metrics: build_stream_metrics(&request_metrics),
                                         })),
                                 };
 
