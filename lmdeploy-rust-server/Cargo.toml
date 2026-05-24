@@ -37,8 +37,9 @@ anyhow = "1.0"
 metrics = "0.23"
 metrics-exporter-prometheus = "0.15"
 
-# Tokenizers (HuggingFace)
+# Tokenizers
 tokenizers = "0.21"
+splintr = { path = "../third_party/splintr", default-features = false, features = ["regexr-jit"] }
 
 # Utilities
 uuid = { version = "1.10", features = ["v4"] }

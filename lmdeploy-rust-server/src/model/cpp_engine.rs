@@ -524,7 +524,7 @@ extern "C" fn batch_completion_callback(_status: c_int, _seq_len: c_int, user_da
 /// Uses a `tokio::sync::Semaphore` to limit concurrent inference requests
 /// and `tokio::sync::Mutex` per slot so that the async runtime can yield
 /// during blocking FFI calls instead of parking OS threads.
-struct RequestPool {
+pub(crate) struct RequestPool {
     /// Per-slot tokio mutex - yields during FFI calls
     slots: Vec<tokio::sync::Mutex<ModelRequest>>,
     /// Semaphore limits concurrent inference requests
@@ -575,7 +575,7 @@ impl RequestPool {
     ///
     /// The slot selection uses round-robin to distribute load across slots.
     /// Each permit acquisition corresponds to one available inference slot.
-    async fn acquire(
+    pub(crate) async fn acquire(
         &self,
     ) -> (
         tokio::sync::SemaphorePermit<'_>,
@@ -1678,6 +1678,11 @@ impl TurboMindCEngine {
     /// Get the tokenizer
     pub fn tokenizer(&self) -> Option<&LMTokenizer> {
         self.tokenizer.as_ref()
+    }
+
+    /// Get the request pool for benchmark timing
+    pub fn pool(&self) -> Option<&RequestPool> {
+        self.request_pool.as_ref().map(|arc| arc.as_ref())
     }
 
     /// Generate embeddings for text by running token embedding lookup + forward pass.

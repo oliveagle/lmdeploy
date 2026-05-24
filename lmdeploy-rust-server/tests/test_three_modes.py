@@ -67,9 +67,13 @@ async def test_python_turbomind_direct(
 
     # Generate prompt
     prompt = generate_prompt(context_length * 4)
-    input_ids = tokenizer.encode(prompt)
 
-    # Measure streaming generation
+    # Phase 1: Tokenization
+    tok_start = time.perf_counter()
+    input_ids = tokenizer.encode(prompt)
+    tokenization_ms = (time.perf_counter() - tok_start) * 1000
+
+    # Phase 2: Engine (timing from inference start to first token)
     gen_config = GenerationConfig(max_new_tokens=output_tokens, temperature=0.7)
 
     start_time = time.perf_counter()
@@ -101,7 +105,9 @@ async def test_python_turbomind_direct(
         "mode": "Python Direct",
         "context_length": len(input_ids),
         "output_tokens": token_count,
+        "tokenization_ms": tokenization_ms,
         "ttft_ms": first_token_time or 0,
+        "engine_time_ms": first_token_time or 0,  # Python: engine_time = ttft (no pool overhead)
         "total_time_ms": total_time_ms,
         "prefill_speed_tps": (len(input_ids) / (first_token_time or 1)) * 1000 if first_token_time else 0,
         "decode_speed_tps": (token_count / max(1, total_time_ms - (first_token_time or 0))) * 1000,
@@ -137,7 +143,11 @@ async def test_python_bridge(
     sys.path.insert(0, str(Path(__file__).parent.parent / "lmdeploy" / "lib"))
     from lmdeploy.tokenizer import Tokenizer
     tokenizer = Tokenizer(model_path)
+
+    # Phase 1: Tokenization
+    tok_start = time.perf_counter()
     input_ids = tokenizer.encode(prompt)
+    tokenization_ms = (time.perf_counter() - tok_start) * 1000
 
     # Send generate_stream command
     cmd = {
@@ -152,7 +162,7 @@ async def test_python_bridge(
     proc.stdin.write(json.dumps(cmd) + "\n")
     proc.stdin.flush()
 
-    # Collect streaming response
+    # Phase 2: Engine (timing from inference start to first token)
     start_time = time.perf_counter()
     first_token_time = None
     token_count = 0
@@ -184,7 +194,9 @@ async def test_python_bridge(
         "mode": "PyBridge",
         "context_length": len(input_ids),
         "output_tokens": token_count,
+        "tokenization_ms": tokenization_ms,
         "ttft_ms": first_token_time or 0,
+        "engine_time_ms": first_token_time or 0,  # PyBridge: engine_time = ttft
         "total_time_ms": total_time_ms,
         "prefill_speed_tps": (len(input_ids) / (first_token_time or 1)) * 1000 if first_token_time else 0,
         "decode_speed_tps": (token_count / max(1, total_time_ms - (first_token_time or 0))) * 1000,

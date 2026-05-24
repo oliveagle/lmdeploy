@@ -62,6 +62,12 @@ pub struct BenchmarkResult {
     pub actual_output_tokens: usize,
     /// Individual inter-token latencies (milliseconds)
     pub itl_ms: Vec<f64>,
+    /// Tokenization time (milliseconds) - time to encode prompt to tokens
+    pub tokenization_time_ms: f64,
+    /// Pool acquisition time (milliseconds) - time to acquire request slot
+    pub pool_acquire_time_ms: f64,
+    /// Pure C++ engine time (milliseconds) - TTFT minus tokenization and pool time
+    pub engine_time_ms: f64,
 }
 
 /// Streaming benchmark result (with per-token timing)
@@ -194,7 +200,8 @@ impl BenchmarkRunner {
         // Generate a prompt of approximately context_length tokens
         let prompt = generate_prompt(context_length * 4);
 
-        // Tokenize to get actual input token count
+        // Phase 1: Tokenize and measure time
+        let tok_start = Instant::now();
         let input_ids = match self.engine.tokenizer() {
             Some(t) => match t.encode(&prompt, false, false) {
                 Ok(ids) => ids,
@@ -202,7 +209,18 @@ impl BenchmarkRunner {
             },
             None => return Err("Tokenizer not available".to_string()),
         };
+        let tokenization_time_ms = tok_start.elapsed().as_secs_f64() * 1000.0;
         let actual_input_tokens = input_ids.len();
+
+        // Phase 2: Pool acquisition - measure time to acquire a request slot
+        let pool = match self.engine.pool() {
+            Some(p) => p,
+            None => return Err("Pool not available".to_string()),
+        };
+        let pool_start = Instant::now();
+        let (_permit, mut _request, mut _input_tensors, mut _output_tensors) =
+            pool.acquire().await;
+        let pool_acquire_time_ms = pool_start.elapsed().as_secs_f64() * 1000.0;
 
         // Use streaming to get actual TTFT and per-token timing
         let params = GenerationParams {
@@ -260,6 +278,10 @@ impl BenchmarkRunner {
             0.0
         };
 
+        // Pure C++ engine time = TTFT - pool_acquire_time_ms
+        // (tokenization is done before the main flow, so subtract from TTFT)
+        let engine_time_ms = ttft_ms - pool_acquire_time_ms;
+
         Ok(BenchmarkResult {
             context_length: actual_input_tokens,
             output_length: output_length,
@@ -272,6 +294,9 @@ impl BenchmarkRunner {
             total_time_ms,
             actual_output_tokens: total_tokens,
             itl_ms,
+            tokenization_time_ms,
+            pool_acquire_time_ms,
+            engine_time_ms,
         })
     }
 

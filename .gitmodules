@@ -1,0 +1,3 @@
+[submodule "third_party/splintr"]
+	path = third_party/splintr
+	url = https://github.com/ml-rust/splintr.git

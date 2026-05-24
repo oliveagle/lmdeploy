@@ -56,9 +56,15 @@ async def benchmark_direct(ctx_tokens: int, run: int) -> dict:
     inst = tm.create_instance()
 
     prompt = gen_prompt(ctx_tokens * 4)
+
+    # Phase 1: Tokenization
+    tok_start = time.perf_counter()
     input_ids = tok.encode(prompt)
+    tokenization_ms = (time.perf_counter() - tok_start) * 1000
+
     cfg = GenerationConfig(max_new_tokens=OUTPUT_TOKENS, temperature=0.7)
 
+    # Phase 2: Engine (timing from inference start to first token)
     start = time.perf_counter()
     first_t, count = None, 0
     async for out in inst.async_stream_infer(
@@ -72,17 +78,20 @@ async def benchmark_direct(ctx_tokens: int, run: int) -> dict:
             count += len(out.token_ids)
 
     total_ms = (time.perf_counter() - start) * 1000
+    ttft_ms = first_t or 0
+    decode_ms = total_ms - ttft_ms
     tm.close()
 
-    decode_ms = total_ms - (first_t or 0)
-    print(f"TTFT={first_t:.0f}ms, total={total_ms:.0f}ms, tokens={count}")
+    print(f"TTFT={ttft_ms:.0f}ms, total={total_ms:.0f}ms, tokens={count}")
 
     return {
         "context_length": len(input_ids),
         "output_tokens": count,
-        "ttft_ms": first_t or 0,
+        "tokenization_ms": tokenization_ms,
+        "ttft_ms": ttft_ms,
+        "engine_time_ms": ttft_ms,  # Python direct: engine_time = ttft (no pool overhead)
         "total_time_ms": total_ms,
-        "prefill_tps": (len(input_ids) / (first_t or 1)) * 1000 if first_t else 0,
+        "prefill_tps": (len(input_ids) / ttft_ms) * 1000 if ttft_ms else 0,
         "decode_tps": (count / max(1, decode_ms)) * 1000,
     }
 

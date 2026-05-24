@@ -36,31 +36,35 @@ This document defines the measurement methodology for comparing Python vs Rust T
 
 ## Measurement Dimensions
 
+All benchmark results now report these timing phases:
+
+| Field | Description | Python | Rust |
+|-------|-------------|--------|------|
+| `tokenization_ms` | encode prompt → token IDs | Measured | Measured |
+| `pool_acquire_time_ms` | acquire inference slot | 0 (N/A) | Measured |
+| `engine_time_ms` | pure C++ engine time (TTFT - overhead) | = ttft_ms | = ttft - pool_time |
+| `ttft_ms` | total time to first token | Measured | Measured |
+| `prefill_tps` | input_tokens / (engine_time_ms / 1000) | Calculated | Calculated |
+| `decode_tps` | output_tokens / (decode_time_ms / 1000) | Calculated | Calculated |
+
 ### 1. Pure C++ Engine Call Time (不含 tokenization/pool)
 
 **Python Direct:**
 ```python
-# In test_three_modes.py
-start = time.perf_counter()
-for output in instance.stream_infer(...):
-    # Measure from first token callback
-    if first_token_time is None:
-        first_token_time = (time.perf_counter() - start) * 1000
+# Engine time = ttft (Python has no pool overhead)
+engine_time_ms = ttft_ms
+prefill_speed = input_tokens / (engine_time_ms / 1000)
 ```
 
 **Rust PureCpp:**
 ```rust
-// In benchmark.rs
-let start = Instant::now();
-let mut stream = engine.generate_stream(&prompt, params).await;
-// Measure from first token
-while let Some(_token) = stream.next().await {
-    if !first_token_received {
-        ttft_ms = start.elapsed().as_secs_f64() * 1000.0;
-        first_token_received = true;
-    }
-}
+// Engine time excludes pool acquisition overhead
+engine_time_ms = ttft_ms - pool_acquire_time_ms
+prefill_speed = input_tokens / (engine_time_ms / 1000)
 ```
+
+This allows apple-to-apple comparison: both backends report the same
+engine_time_ms definition for prefill throughput calculation.
 
 ### 2. Tokenization Time
 
@@ -82,16 +86,17 @@ let tok_time = tok_start.elapsed().as_secs_f64() * 1000.0;
 
 **Rust:**
 ```rust
+// benchmark.rs: Phase 2 measurement
+let pool = engine.pool().expect("Pool not available");
 let pool_start = Instant::now();
-let request = engine.pool.acquire().await;
-let pool_time = pool_start.elapsed().as_secs_f64() * 1000.0;
+let (_permit, mut request, ..) = pool.acquire().await;
+let pool_acquire_time_ms = pool_start.elapsed().as_secs_f64() * 1000.0;
 ```
 
 **Python:**
 ```python
 # Python TurboMind doesn't have explicit pool acquisition
-# Engine instance is created once and reused
-pool_time = 0  # N/A for Python Direct
+pool_acquire_time_ms = 0  # N/A for Python Direct
 ```
 
 ### 4. End-to-End TTFT (Time To First Token)
