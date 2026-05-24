@@ -229,7 +229,10 @@ impl BenchmarkRunner {
         };
 
         let start = Instant::now();
-        let mut stream = self.engine.generate_stream(&prompt, params).await;
+        let mut stream = self
+            .engine
+            .generate_stream_with_ids(&prompt, input_ids.clone(), params)
+            .await;
 
         let mut ttft_ms = 0.0;
         let mut first_token_received = false;

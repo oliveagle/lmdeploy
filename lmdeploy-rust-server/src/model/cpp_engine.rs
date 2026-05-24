@@ -1748,9 +1748,6 @@ impl TurboMindCEngine {
         tokenizer: LMTokenizer,
         params: GenerationParams,
     ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
-        // Input IDs are already tokenized - convert to i64 for tensor
-        let input_ids_vec: Vec<i64> = input_ids.iter().map(|&id| id as i64).collect();
-
         let pool = self
             .request_pool
             .as_ref()
@@ -1799,8 +1796,8 @@ impl TurboMindCEngine {
                 return;
             }
 
-            // Set input tensors
-            set_input_ids_i64(&mut input_tensors, &input_ids_vec);
+            // Set input tensors using GPU path (avoids CPU→GPU copy inside engine)
+            set_input_ids_gpu(&mut input_tensors, &input_ids);
 
             // Prepare generation config with HTTP parameters
             let mut gen_cfg = match crate::turbomind_c::GenConfig::new() {
