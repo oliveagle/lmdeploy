@@ -22,6 +22,41 @@ pub type TM_CompletionCallback = extern "C" fn(status: c_int, seq_len: c_int, us
 // Re-export types
 pub use std::os::raw::{c_char, c_float, c_int, c_long, c_uint, c_void};
 
+// CUDA runtime FFI bindings for GPU memory management
+// These functions are from libcudart.so which is already linked by turbomind_c.so
+extern "C" {
+    /// Allocate memory on GPU
+    pub fn cudaMalloc(ptr: *mut *mut c_void, size: usize) -> c_int;
+
+    /// Free GPU memory
+    pub fn cudaFree(ptr: *mut c_void) -> c_int;
+
+    /// Copy memory (H2D, D2H, D2D)
+    pub fn cudaMemcpy(
+        dst: *mut c_void,
+        src: *const c_void,
+        size: usize,
+        kind: cudaMemcpyKind,
+    ) -> c_int;
+
+    /// Allocate page-locked host memory (faster H2D transfers)
+    pub fn cudaMallocHost(ptr: *mut *mut c_void, size: usize) -> c_int;
+
+    /// Free page-locked host memory
+    pub fn cudaFreeHost(ptr: *mut c_void) -> c_int;
+}
+
+/// CUDA memory copy direction
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum cudaMemcpyKind {
+    HostToHost = 0,
+    HostToDevice = 1,
+    DeviceToHost = 2,
+    DeviceToDevice = 3,
+    Default = 4,
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct TM_Error {

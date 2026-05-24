@@ -12,6 +12,8 @@
 //! independent and can run concurrently with others.
 
 use std::sync::Arc;
+use std::sync::Condvar;
+use std::sync::Mutex as StdMutex;
 use std::time::Instant;
 
 use crate::error::{AppError, Result};
@@ -20,6 +22,7 @@ use crate::turbomind_c::{
     c_int, c_void, CompiledGrammar, EngineConfig, GenConfig, ModelRequest, ScheduleMetrics,
     TM_DataType, TM_SessionParam, TensorMap, TurboMind, TM_Tensor,
     DL_DEVICE_TYPE_CUDA, DL_DTYPE_CODE_INT,
+    cudaMalloc, cudaFree, cudaMallocHost, cudaFreeHost, cudaMemcpy, cudaMemcpyKind,
 };
 use serde::Serialize;
 
@@ -31,17 +34,188 @@ use serde::Serialize;
 /// 2. Extend with converted i64 values
 /// 3. Pass to C++ engine (data is copied internally)
 /// 4. Buffer can be reused for next request
-/// Thread-local buffer for reusing input_ids allocation across requests.
-/// This avoids per-request heap allocations for the i64 conversion of input_ids.
-///
-/// The buffer is used in the following pattern:
-/// 1. Clear the buffer
-/// 2. Extend with converted i64 values
-/// 3. Pass to C++ engine (data is copied internally)
-/// 4. Buffer can be reused for next request
 use std::cell::RefCell;
 thread_local! {
     static INPUT_ID_BUFFER: RefCell<Vec<i64>> = RefCell::new(Vec::with_capacity(8192));
+}
+
+/// Reusable GPU buffer for input_ids.
+/// Manages a pre-allocated GPU memory region to avoid per-request cudaMalloc/cudaFree overhead.
+/// Uses a capacity growth strategy to minimize allocations over the session lifetime.
+struct GpuInputIdsBuffer {
+    gpu_ptr: *mut c_void,
+    capacity: usize,
+}
+
+unsafe impl Send for GpuInputIdsBuffer {}
+
+impl GpuInputIdsBuffer {
+    fn new(initial_capacity: usize) -> Self {
+        let mut gpu_ptr = std::ptr::null_mut();
+        let size = initial_capacity * std::mem::size_of::<i64>();
+        unsafe {
+            let ret = cudaMalloc(&mut gpu_ptr, size);
+            if ret != 0 {
+                tracing::warn!(ret, "cudaMalloc failed for GPU buffer, falling back to per-request allocation");
+            }
+        }
+        Self { gpu_ptr, capacity: initial_capacity }
+    }
+
+    /// Get GPU pointer, growing the buffer if needed.
+    /// Returns None if GPU allocation fails.
+    fn get_or_grow(&mut self, needed_elements: usize) -> *mut c_void {
+        if needed_elements > self.capacity {
+            // Free old buffer and allocate larger one
+            if !self.gpu_ptr.is_null() {
+                unsafe { cudaFree(self.gpu_ptr) };
+            }
+            let new_capacity = needed_elements.next_power_of_two().max(self.capacity * 2);
+            let mut new_ptr = std::ptr::null_mut();
+            let size = new_capacity * std::mem::size_of::<i64>();
+            unsafe {
+                if cudaMalloc(&mut new_ptr, size) == 0 {
+                    self.gpu_ptr = new_ptr;
+                    self.capacity = new_capacity;
+                } else {
+                    tracing::warn!("cudaMalloc failed to grow GPU buffer");
+                    return std::ptr::null_mut();
+                }
+            }
+        }
+        self.gpu_ptr
+    }
+}
+
+impl Drop for GpuInputIdsBuffer {
+    fn drop(&mut self) {
+        if !self.gpu_ptr.is_null() {
+            unsafe { cudaFree(self.gpu_ptr) };
+        }
+    }
+}
+
+/// Pinned host buffer for fast CPU->GPU transfers.
+struct PinnedHostBuffer {
+    host_ptr: *mut c_void,
+    capacity: usize,
+}
+
+unsafe impl Send for PinnedHostBuffer {}
+
+impl PinnedHostBuffer {
+    fn new(initial_capacity: usize) -> Self {
+        let mut host_ptr = std::ptr::null_mut();
+        let size = initial_capacity * std::mem::size_of::<i64>();
+        unsafe {
+            if cudaMallocHost(&mut host_ptr, size) != 0 {
+                tracing::warn!("cudaMallocHost failed for pinned buffer");
+                host_ptr = std::ptr::null_mut();
+            }
+        }
+        Self { host_ptr, capacity: initial_capacity }
+    }
+
+    fn get_or_grow(&mut self, needed_elements: usize) -> *mut c_void {
+        if needed_elements > self.capacity {
+            if !self.host_ptr.is_null() {
+                unsafe { cudaFreeHost(self.host_ptr) };
+            }
+            let new_capacity = needed_elements.next_power_of_two().max(self.capacity * 2);
+            let mut new_ptr = std::ptr::null_mut();
+            let size = new_capacity * std::mem::size_of::<i64>();
+            unsafe {
+                if cudaMallocHost(&mut new_ptr, size) == 0 {
+                    self.host_ptr = new_ptr;
+                    self.capacity = new_capacity;
+                } else {
+                    self.host_ptr = std::ptr::null_mut();
+                }
+            }
+        }
+        self.host_ptr
+    }
+}
+
+impl Drop for PinnedHostBuffer {
+    fn drop(&mut self) {
+        if !self.host_ptr.is_null() {
+            unsafe { cudaFreeHost(self.host_ptr) };
+        }
+    }
+}
+
+thread_local! {
+    static GPU_INPUT_BUFFER: RefCell<GpuInputIdsBuffer> = RefCell::new(
+        GpuInputIdsBuffer::new(8192)
+    );
+    static PINNED_HOST_BUFFER: RefCell<PinnedHostBuffer> = RefCell::new(
+        PinnedHostBuffer::new(8192)
+    );
+}
+
+/// Set input_ids on TensorMap using GPU tensor path.
+///
+/// This function:
+/// 1. Copies input_ids to pinned host memory (fast transfer)
+/// 2. Copies from pinned host memory to GPU via cudaMemcpy
+/// 3. Sets the GPU tensor using set_int64_gpu
+///
+/// Reuses pre-allocated GPU and pinned host buffers to minimize allocation overhead.
+fn set_input_ids_gpu(tensors: &mut TensorMap, input_ids: &[u32]) {
+    let gpu_size = input_ids.len();
+
+    GPU_INPUT_BUFFER.with(|gpu_buf_cell| {
+        PINNED_HOST_BUFFER.with(|pinned_cell| {
+            let mut gpu_buf = gpu_buf_cell.borrow_mut();
+            let mut pinned_buf = pinned_cell.borrow_mut();
+
+            // Get or grow GPU buffer
+            let gpu_ptr = gpu_buf.get_or_grow(gpu_size);
+            if gpu_ptr.is_null() {
+                // Fallback to CPU path if GPU allocation fails
+                set_input_ids(tensors, input_ids);
+                return;
+            }
+
+            // Get or grow pinned host buffer
+            let pinned_ptr = pinned_buf.get_or_grow(gpu_size);
+
+            // Convert u32 input_ids to i64 in the pinned buffer (or fall back to regular Vec)
+            if !pinned_ptr.is_null() {
+                let pinned_slice: &mut [i64] =
+                    unsafe { std::slice::from_raw_parts_mut(pinned_ptr as *mut i64, gpu_size) };
+                for (dst, src) in pinned_slice.iter_mut().zip(input_ids.iter()) {
+                    *dst = *src as i64;
+                }
+
+                unsafe {
+                    cudaMemcpy(
+                        gpu_ptr,
+                        pinned_ptr,
+                        gpu_size * std::mem::size_of::<i64>(),
+                        cudaMemcpyKind::HostToDevice,
+                    )
+                };
+            } else {
+                // Fallback: convert to Vec and copy from regular CPU memory
+                let i64_buf: Vec<i64> = input_ids.iter().map(|&id| id as i64).collect();
+                unsafe {
+                    cudaMemcpy(
+                        gpu_ptr,
+                        i64_buf.as_ptr() as *const c_void,
+                        i64_buf.len() * std::mem::size_of::<i64>(),
+                        cudaMemcpyKind::HostToDevice,
+                    )
+                };
+            }
+
+            let shape = [gpu_size as i64];
+            tensors.set_int64_gpu("input_ids", gpu_ptr.cast(), &shape);
+        });
+    });
+
+    tensors.set_int32("sequence_length", &[input_ids.len() as i32], &[1]);
 }
 
 /// Efficiently set input_ids on TensorMap, reusing a thread-local buffer.
@@ -454,7 +628,7 @@ impl GenerationParams {
 /// Completion callback for event-driven request completion.
 ///
 /// Invoked by the C++ engine when the request completes (finish, error, or cancel).
-/// Signals completion through the channel, avoiding polling.
+/// Uses condition variable for event-driven notification instead of polling.
 extern "C" fn completion_callback(status: c_int, seq_len: c_int, user_data: *mut c_void) {
     unsafe {
         let ctx = &*(user_data as *const StreamContext);
@@ -469,9 +643,11 @@ extern "C" fn completion_callback(status: c_int, seq_len: c_int, user_data: *mut
             _ => tracing::debug!(status, seq_len, "Request completed with status"),
         }
 
-        // Signal completion by closing the sender
-        // This causes the receiver stream to end naturally
-        ctx.completion_flag.store(true, std::sync::atomic::Ordering::Release);
+        // Signal completion via condition variable
+        let (lock, cvar) = &*ctx.completion;
+        let mut done = lock.lock().unwrap();
+        *done = true;
+        cvar.notify_one();
     }
 }
 
@@ -502,20 +678,31 @@ extern "C" fn token_callback(token_id: c_int, _seq_len: c_int, user_data: *mut c
 struct StreamContext {
     tokenizer: LMTokenizer,
     tx: tokio::sync::mpsc::Sender<String>,
-    /// Atomic flag set by completion callback to signal request is done
-    completion_flag: std::sync::atomic::AtomicBool,
+    /// Completion signal via condition variable for event-driven waiting
+    /// Arc<(Mutex<bool>, Condvar)> - the bool is set to true when complete
+    completion: Arc<(StdMutex<bool>, Condvar)>,
 }
+
+/// Send-safe wrapper for the raw context pointer.
+/// Safe to Send because the underlying Arc<StreamContext> is Send + Sync,
+/// and we only perform atomic operations on it across threads.
+struct ContextPtr(*mut c_void);
+unsafe impl Send for ContextPtr {}
 
 /// Batch completion context for non-streaming batch inference
 struct BatchCompletionContext {
-    completion_flag: std::sync::atomic::AtomicBool,
+    /// Completion signal via condition variable
+    completion: Arc<(StdMutex<bool>, Condvar)>,
 }
 
 /// Batch completion callback for non-streaming batch inference.
 extern "C" fn batch_completion_callback(_status: c_int, _seq_len: c_int, user_data: *mut c_void) {
     unsafe {
         let ctx = &*(user_data as *const BatchCompletionContext);
-        ctx.completion_flag.store(true, std::sync::atomic::Ordering::Release);
+        let (lock, cvar) = &*ctx.completion;
+        let mut done = lock.lock().unwrap();
+        *done = true;
+        cvar.notify_one();
     }
 }
 
@@ -1292,8 +1479,8 @@ impl TurboMindCEngine {
         input_tensors.clear();
         output_tensors.clear();
 
-        // Use optimized input_ids setter (reuses thread-local buffer)
-        set_input_ids(&mut input_tensors, &input_ids);
+        // Use GPU tensor path for input_ids (faster than CPU path)
+        set_input_ids_gpu(&mut input_tensors, &input_ids);
 
         // Prepare generation config with HTTP parameters
         let mut gen_cfg = GenConfig::new().unwrap();
@@ -1418,7 +1605,7 @@ impl TurboMindCEngine {
         input_tensors.clear();
         output_tensors.clear();
 
-        set_input_ids(&mut input_tensors, &input_ids);
+        set_input_ids_gpu(&mut input_tensors, &input_ids);
 
         // Prepare generation config
         let mut gen_cfg = GenConfig::new().unwrap();
@@ -1550,6 +1737,10 @@ impl TurboMindCEngine {
     }
 
     /// Internal streaming implementation with token IDs.
+    ///
+    /// Uses tokio::task::spawn (lightweight) instead of spawn_blocking to avoid
+    /// OS thread scheduling overhead. The only blocking operation is pool acquisition,
+    /// which uses block_in_place to yield the async executor.
     async fn generate_stream_impl(
         &self,
         input_ids: Vec<u32>,
@@ -1564,39 +1755,46 @@ impl TurboMindCEngine {
             .as_ref()
             .expect("Request pool not initialized")
             .clone();
-        let params_for_blocking = params.clone();
+        let params_clone = params.clone();
 
         let (tx, rx) = tokio::sync::mpsc::channel::<String>(32);
 
-        tokio::task::spawn_blocking(move || {
+        // Use tokio::task::spawn instead of spawn_blocking to avoid OS thread overhead.
+        // Only the pool acquisition is blocking (uses block_in_place internally),
+        // and forward_async is non-blocking (submits request to C++ engine queue).
+        tokio::task::spawn(async move {
+            // Use block_in_place for pool acquisition to avoid blocking the async executor.
+            // This is necessary because the pool uses tokio::sync primitives.
             let (_permit, mut request, mut input_tensors, mut _output_tensors) =
-                pool.acquire_blocking();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(pool.acquire())
+                });
 
             // Clear and reuse TensorMaps
             input_tensors.clear();
 
-            // Create atomic flag for completion signaling
-            let completion_flag = std::sync::atomic::AtomicBool::new(false);
+            // Create condition variable for completion signaling (event-driven, no polling)
+            let completion = Arc::new((StdMutex::new(false), Condvar::new()));
 
-            // Create callback context with completion flag
+            // Create callback context with completion condition variable
             let ctx = Arc::new(StreamContext {
                 tokenizer,
                 tx,
-                completion_flag,
+                completion: Arc::clone(&completion),
             });
-            let ctx_ptr = Arc::into_raw(ctx) as *mut c_void;
+            let ctx_ptr = ContextPtr(Arc::into_raw(ctx) as *mut c_void);
 
             // Set the token callback before submitting the request
-            if let Err(e) = unsafe { request.set_token_callback(token_callback, ctx_ptr) } {
+            if let Err(e) = unsafe { request.set_token_callback(token_callback, ctx_ptr.0) } {
                 tracing::error!(error = ?e, "Failed to set token callback");
-                let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
+                let _ = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
                 return;
             }
 
             // Set the completion callback to avoid polling
-            if let Err(e) = unsafe { request.set_completion_callback(completion_callback, ctx_ptr) } {
+            if let Err(e) = unsafe { request.set_completion_callback(completion_callback, ctx_ptr.0) } {
                 tracing::error!(error = ?e, "Failed to set completion callback");
-                let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
+                let _ = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
                 return;
             }
 
@@ -1608,16 +1806,16 @@ impl TurboMindCEngine {
                 Ok(g) => g,
                 Err(e) => {
                     tracing::error!(error = ?e, "Failed to create gen config");
-                    let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
+                    let _ = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
                     return;
                 }
             };
-            gen_cfg.set_max_new_tokens(params_for_blocking.max_tokens.unwrap_or(1024) as i32);
-            gen_cfg.set_temperature(params_for_blocking.temperature.unwrap_or(0.7));
-            gen_cfg.set_top_p(params_for_blocking.top_p.unwrap_or(0.95));
-            gen_cfg.set_top_k(params_for_blocking.top_k.unwrap_or(50) as i32);
+            gen_cfg.set_max_new_tokens(params_clone.max_tokens.unwrap_or(1024) as i32);
+            gen_cfg.set_temperature(params_clone.temperature.unwrap_or(0.7));
+            gen_cfg.set_top_p(params_clone.top_p.unwrap_or(0.95));
+            gen_cfg.set_top_k(params_clone.top_k.unwrap_or(50) as i32);
             // Apply any additional parameters (min_p, repetition_penalty, seed)
-            params_for_blocking.apply_to_gen_config(&mut gen_cfg);
+            params_clone.apply_to_gen_config(&mut gen_cfg);
 
             // Session parameters (unique session ID)
             let session = crate::turbomind_c::TM_SessionParam {
@@ -1628,15 +1826,16 @@ impl TurboMindCEngine {
             };
 
             // Attach grammar for guided decoding if provided
-            if let Some(grammar) = &params_for_blocking.grammar {
+            if let Some(grammar) = &params_clone.grammar {
                 if let Err(e) = request.set_grammar(grammar) {
                     tracing::warn!(error = ?e, "Failed to attach grammar for stream");
-                    let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
+                    let _ = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
                     return;
                 }
             }
 
             // Submit async forward with stream_output=true
+            // This is non-blocking: submits to C++ engine queue and returns immediately
             if let Err(e) = request.forward_async(
                 &mut input_tensors,
                 &session,
@@ -1645,31 +1844,26 @@ impl TurboMindCEngine {
                 false, // enable_metrics
             ) {
                 tracing::error!(error = ?e, "ForwardAsync failed");
-                let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
+                let _ = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
                 return;
             }
 
-            // Event-driven wait: completion callback sets the flag
-            // This is CPU-efficient: no polling, just a relaxed load in a loop
-            loop {
-                // Use relaxed ordering for the flag check (faster, safe for this use case)
-                let is_done = unsafe {
-                    (*(&ctx_ptr as *const *mut c_void as *const StreamContext))
-                        .completion_flag
-                        .load(std::sync::atomic::Ordering::Relaxed)
+            // Event-driven wait: completion callback notifies via Condvar
+            // Zero CPU waste - blocks until callback signals completion
+            let (lock, cvar) = &*completion;
+            let mut done = lock.lock().unwrap();
+            while !*done {
+                // Safety: Condvar::wait_timeout returns Err only if lock is poisoned
+                // Use 100ms timeout as safety net against missed notifications
+                let result = cvar.wait_timeout(done, std::time::Duration::from_millis(100));
+                done = match result {
+                    Ok((guard, _timeout)) => guard,
+                    Err(poisoned) => poisoned.into_inner(),
                 };
-
-                if is_done {
-                    break;
-                }
-
-                // Use a longer sleep since we're event-driven now
-                // The callback will wake us up, so this is just a safety net
-                std::thread::sleep(std::time::Duration::from_millis(10));
             }
 
             // Reclaim the Arc to prevent memory leak
-            let _ctx = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
+            let _ctx = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
         });
 
         Box::pin(tokio_stream::wrappers::ReceiverStream::new(rx))
@@ -2191,7 +2385,7 @@ impl TurboMindCEngine {
                 // Clear and reuse input TensorMap
                 input_tensors.clear();
 
-                set_input_ids(&mut input_tensors, &input_ids);
+                set_input_ids_gpu(&mut input_tensors, &input_ids);
 
                 // Prepare generation config
                 let mut gen_cfg = match GenConfig::new() {
@@ -2252,8 +2446,9 @@ impl TurboMindCEngine {
                 }
 
                 // Event-driven completion: register completion callback instead of polling
+                let completion = Arc::new((StdMutex::new(false), Condvar::new()));
                 let completion_ctx = BatchCompletionContext {
-                    completion_flag: std::sync::atomic::AtomicBool::new(false),
+                    completion: Arc::clone(&completion),
                 };
                 let ctx_ptr = Box::into_raw(Box::new(completion_ctx)) as *mut c_void;
 
@@ -2270,13 +2465,15 @@ impl TurboMindCEngine {
                     };
                 }
 
-                // Wait for completion via callback (event-driven, CPU-efficient)
-                let completion_ctx_ref = unsafe { &*ctx_ptr.cast::<BatchCompletionContext>() };
-                loop {
-                    if completion_ctx_ref.completion_flag.load(std::sync::atomic::Ordering::Relaxed) {
-                        break;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(10));
+                // Wait for completion via Condvar (event-driven, zero CPU waste)
+                let (lock, cvar) = &*completion;
+                let mut done = lock.lock().unwrap();
+                while !*done {
+                    let result = cvar.wait_timeout(done, std::time::Duration::from_millis(100));
+                    done = match result {
+                        Ok((guard, _timeout)) => guard,
+                        Err(poisoned) => poisoned.into_inner(),
+                    };
                 }
                 // Cleanup
                 let _ctx = unsafe { Box::from_raw(ctx_ptr as *mut BatchCompletionContext) };

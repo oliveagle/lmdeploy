@@ -67,7 +67,7 @@ impl PyBridgeEngine {
         };
 
         // Load tokenizer
-        let tokenizer = Some(LMTokenizer::from_pretrained(model_path).map_err(|e| {
+        let tokenizer = Some(LMTokenizer::from_path(model_path).map_err(|e| {
             AppError::ModelLoadFailed(format!("Failed to load tokenizer: {}", e))
         })?);
 

@@ -38,8 +38,8 @@ metrics = "0.23"
 metrics-exporter-prometheus = "0.15"
 
 # Tokenizers
-tokenizers = "0.21"
 splintr = { path = "../third_party/splintr", default-features = false, features = ["regexr-jit"] }
+rustc-hash = "2.0"
 
 # Utilities
 uuid = { version = "1.10", features = ["v4"] }
