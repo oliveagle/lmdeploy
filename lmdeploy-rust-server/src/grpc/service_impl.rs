@@ -418,8 +418,8 @@ impl LmDeployService for LmDeployServiceImpl {
             while let Ok(Some(token_result)) =
                 tokio::time::timeout(std::time::Duration::from_secs(600), stream.next()).await
             {
-                // stream.next() returns String directly (not Result<String, Error>)
-                let token = token_result;
+                // stream.next() now returns (token_id, token_text) tuple
+                let (token_id, token_text) = token_result;
                 let ttft_secs = first_token_start.elapsed().as_secs_f64();
                 if !first_token_recorded {
                     // Record TTFT on first token
@@ -437,8 +437,8 @@ impl LmDeployService for LmDeployServiceImpl {
                 // Use cached engine events to avoid re-serialization overhead
                 let chunk = GenerateStreamResponse {
                     payload: Some(generate_stream_response::Payload::Chunk(StreamChunk {
-                        text: token,
-                        token_id: 0,
+                        text: token_text,
+                        token_id: token_id as i32,
                         is_final: false,
                         metrics: Some(cached_metrics.to_proto(&metrics)),
                     })),
@@ -550,7 +550,7 @@ impl LmDeployService for LmDeployServiceImpl {
                                 let request_start = Instant::now();
                                 let mut first_token = true;
 
-                                while let Ok(Some(token)) = tokio::time::timeout(
+                                while let Ok(Some((token_id, token_text))) = tokio::time::timeout(
                                     std::time::Duration::from_secs(300),
                                     token_stream.next(),
                                 ).await
@@ -564,8 +564,8 @@ impl LmDeployService for LmDeployServiceImpl {
                                     let chunk = GenerateStreamResponse {
                                         payload: Some(
                                             generate_stream_response::Payload::Chunk(StreamChunk {
-                                                text: token,
-                                                token_id: 0,
+                                                text: token_text,
+                                                token_id: token_id as i32,
                                                 is_final: false,
                                                 metrics: Some(cached_metrics.to_proto(&request_metrics)),
                                             })),

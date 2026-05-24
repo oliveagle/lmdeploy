@@ -745,7 +745,7 @@ extern "C" fn completion_callback(status: c_int, seq_len: c_int, user_data: *mut
 /// Token callback for event-driven streaming.
 ///
 /// Invoked by the C++ engine whenever a new token is generated.
-/// Decodes the token and sends it through the channel.
+/// Decodes the token and sends (token_id, text) tuple through the channel.
 /// Optimized for minimal latency: uses try_send and stack-allocated buffer (no heap allocation).
 extern "C" fn token_callback(token_id: c_int, _seq_len: c_int, user_data: *mut c_void) {
     unsafe {
@@ -760,14 +760,14 @@ extern "C" fn token_callback(token_id: c_int, _seq_len: c_int, user_data: *mut c
 
         // Use try_send for non-blocking send - if channel is full, drop this token
         // This prevents blocking the C++ callback thread and improves TTFT
-        let _ = ctx.tx.try_send(token_str);
+        let _ = ctx.tx.try_send((token_id as u32, token_str));
     }
 }
 
 /// Shared context passed to the C callbacks via raw pointer.
 struct StreamContext {
     tokenizer: LMTokenizer,
-    tx: tokio::sync::mpsc::Sender<String>,
+    tx: tokio::sync::mpsc::Sender<(u32, String)>,
     /// Completion signal via condition variable for event-driven waiting
     /// Arc<(Mutex<bool>, Condvar)> - the bool is set to true when complete
     completion: Arc<(StdMutex<bool>, Condvar)>,
@@ -1805,11 +1805,13 @@ impl TurboMindCEngine {
     ///
     /// Uses event-driven callbacks from the C++ engine instead of polling.
     /// Each generated token fires a callback that decodes and sends it through the channel.
+    ///
+    /// Returns a stream of (token_id, token_text) tuples.
     pub async fn generate_stream(
         &self,
         prompt: &str,
         params: GenerationParams,
-    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = (u32, String)> + Send>> {
         // Tokenize input
         let (input_ids, tokenizer) = match &self.tokenizer {
             Some(t) => {
@@ -1835,12 +1837,14 @@ impl TurboMindCEngine {
     /// Generate text with streaming output using pre-tokenized input.
     ///
     /// This variant skips tokenization for lower TTFT when token IDs are already known.
+    ///
+    /// Returns a stream of (token_id, token_text) tuples.
     pub async fn generate_stream_with_ids(
         &self,
         _prompt: &str,
         input_ids: Vec<u32>,
         params: GenerationParams,
-    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = (u32, String)> + Send>> {
         let tokenizer = match &self.tokenizer {
             Some(t) => t.clone(),
             None => {
@@ -1858,12 +1862,15 @@ impl TurboMindCEngine {
     /// Uses tokio::task::spawn (lightweight) instead of spawn_blocking to avoid
     /// OS thread scheduling overhead. The only blocking operation is pool acquisition,
     /// which uses block_in_place to yield the async executor.
+    ///
+    /// Returns a stream of (token_id, token_text) tuples so callers can access
+    /// raw token IDs without having to re-tokenize the text on their side.
     async fn generate_stream_impl(
         &self,
         input_ids: Vec<u32>,
         tokenizer: LMTokenizer,
         params: GenerationParams,
-    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = (u32, String)> + Send>> {
         let pool = self
             .request_pool
             .as_ref()
@@ -1871,7 +1878,7 @@ impl TurboMindCEngine {
             .clone();
         let params_clone = params.clone();
 
-        let (tx, rx) = tokio::sync::mpsc::channel::<String>(32);
+        let (tx, rx) = tokio::sync::mpsc::channel::<(u32, String)>(32);
 
         // Use tokio::task::spawn instead of spawn_blocking to avoid OS thread overhead.
         // Only the pool acquisition is blocking (uses block_in_place internally),
@@ -2422,7 +2429,7 @@ impl TurboMindCEngine {
     /// forward_async), we enable the engine to batch them efficiently on GPU.
     ///
     /// Returns a vector of results in the same order as the input items.
-    pub async fn generate_batch(self: &Arc<Self>, items: Vec<BatchItem>) -> Vec<BatchResult> {
+    pub async fn generate_batch(&self, items: Vec<BatchItem>) -> Vec<BatchResult> {
         if items.is_empty() {
             return Vec::new();
         }

@@ -42,6 +42,7 @@ use crate::rate_limiter::{GlobalRateLimiter, PerIpRateLimiter};
 
 use crate::metrics::increment_tokens_generated_total;
 use crate::model::GenerationParams;
+use crate::model::cpp_engine::BatchItem as EngineBatchItem;
 
 /// Type alias for the batch sender channel
 pub type BatchSender = mpsc::UnboundedSender<BatchItem>;
@@ -578,7 +579,7 @@ async fn flush_batch(
         tracing::info!(
             model = %model,
             batch_size,
-            "Executing batch"
+            "Executing vectorized batch prefill"
         );
 
         // Get the engine for this model
@@ -592,91 +593,121 @@ async fn flush_batch(
         };
         drop(mm);
 
-        // Process all requests in parallel
-        let tasks: Vec<_> = entry
-            .requests
-            .into_iter()
-            .map(|item| {
-                let engine_clone = engine.clone();
-                async move {
-                    let prompt = messages_to_prompt(&item.req.messages);
+        // Convert HTTP BatchItems to Engine BatchItems for vectorized prefill
+        let mut engine_items = Vec::with_capacity(entry.requests.len());
+        let mut http_items = Vec::with_capacity(entry.requests.len());
 
-                    let need_logprobs = item.req.logprobs.unwrap_or(false)
-                        || item.req.top_logprobs.unwrap_or(0) > 0;
+        for item in entry.requests {
+            let request_id = unix_timestamp() as u64 + http_items.len() as u64;
+            let prompt = messages_to_prompt(&item.req.messages);
 
-                    let grammar = response_format_to_grammar(&item.req.response_format);
-                    let params = GenerationParams::from_chat_request(
-                        item.req.temperature,
-                        item.req.top_p,
-                        item.req.top_k,
-                        item.req.min_p,
-                        item.req.max_tokens,
-                        item.req.seed,
-                        item.req.presence_penalty,
-                        item.req.frequency_penalty,
-                        item.req.stop.clone(),
-                        item.req.logprobs,
-                        item.req.top_logprobs,
-                        grammar,
-                    );
+            let grammar = response_format_to_grammar(&item.req.response_format);
+            let params = GenerationParams::from_chat_request(
+                item.req.temperature,
+                item.req.top_p,
+                item.req.top_k,
+                item.req.min_p,
+                item.req.max_tokens,
+                item.req.seed,
+                item.req.presence_penalty,
+                item.req.frequency_penalty,
+                item.req.stop.clone(),
+                item.req.logprobs,
+                item.req.top_logprobs,
+                grammar,
+            );
 
-                    // Call the actual engine
-                    let eng = engine_clone.read().await;
-                    let (text, logprobs) = if need_logprobs {
-                        let (t, _nt, _el, lp) = eng.generate_with_logprobs(&prompt, params).await;
-                        (t, lp)
-                    } else {
-                        let t = eng.generate(&prompt, params).await;
-                        (t, None)
-                    };
+            let need_logprobs = item.req.logprobs.unwrap_or(false)
+                || item.req.top_logprobs.unwrap_or(0) > 0;
 
-                    let response = ChatCompletionsResponse {
-                        id: format!("chatcmpl-{}", uuid_simple()),
-                        object: "chat.completion".into(),
-                        created: unix_timestamp(),
-                        model: item.req.model.clone(),
-                        choices: vec![Choice {
-                            index: 0,
-                            message: Message {
-                                role: "assistant".into(),
-                                content: text.clone(),
-                            },
-                            finish_reason: "stop".into(),
-                            logprobs: logprobs.map(|lp| ChoiceLogprobs {
-                                tokens: lp.iter().map(|t| t.token.clone()).collect(),
-                                token_logprobs: lp.iter().map(|t| t.logprob).collect(),
-                                top_logprobs: lp
-                                    .iter()
-                                    .map(|t| {
-                                        if !t.top_logprobs.is_empty() {
-                                            let first = t.top_logprobs.first().unwrap();
-                                            Some(TopLogprobEntry {
-                                                token: first.token.clone(),
-                                                logprob: first.logprob,
-                                                bytes: first.bytes.clone(),
-                                            })
-                                        } else {
-                                            None
-                                        }
-                                    })
-                                    .collect(),
-                                top_tokens: Vec::new(),
-                            }),
-                        }],
-                        usage: Usage {
-                            prompt_tokens: 0,
-                            completion_tokens: 0,
-                            total_tokens: 0,
+            engine_items.push(EngineBatchItem {
+                request_id,
+                prompt,
+                params,
+                need_logprobs,
+            });
+
+            http_items.push((item, request_id));
+        }
+
+        // Vectorized batch: submit all requests simultaneously to C++ gateway
+        // The gateway's ModelExecutor performs dynamic batching on GPU
+        let eng = engine.read().await;
+        let batch_results = eng.generate_batch(engine_items).await;
+        drop(eng);
+
+        // Send responses back to clients
+        for (http_item, request_id) in http_items {
+            let result = batch_results
+                .iter()
+                .find(|r| r.request_id == request_id)
+                .unwrap_or(&batch_results[0]);
+
+            let response = if let Some(ref error) = result.error {
+                ChatCompletionsResponse {
+                    id: format!("chatcmpl-{}", uuid_simple()),
+                    object: "chat.completion".into(),
+                    created: unix_timestamp(),
+                    model: http_item.req.model.clone(),
+                    choices: vec![Choice {
+                        index: 0,
+                        message: Message {
+                            role: "assistant".into(),
+                            content: error.clone(),
                         },
-                    };
-
-                    let _ = item.tx.send(response);
+                        finish_reason: "error".into(),
+                        logprobs: None,
+                    }],
+                    usage: Usage {
+                        prompt_tokens: 0,
+                        completion_tokens: 0,
+                        total_tokens: 0,
+                    },
                 }
-            })
-            .collect();
+            } else {
+                ChatCompletionsResponse {
+                    id: format!("chatcmpl-{}", uuid_simple()),
+                    object: "chat.completion".into(),
+                    created: unix_timestamp(),
+                    model: http_item.req.model.clone(),
+                    choices: vec![Choice {
+                        index: 0,
+                        message: Message {
+                            role: "assistant".into(),
+                            content: result.text.clone(),
+                        },
+                        finish_reason: "stop".into(),
+                        logprobs: result.logprobs.as_ref().map(|lp| ChoiceLogprobs {
+                            tokens: lp.iter().map(|t| t.token.clone()).collect(),
+                            token_logprobs: lp.iter().map(|t| t.logprob).collect(),
+                            top_logprobs: lp
+                                .iter()
+                                .map(|t| {
+                                    if !t.top_logprobs.is_empty() {
+                                        let first = t.top_logprobs.first().unwrap();
+                                        Some(TopLogprobEntry {
+                                            token: first.token.clone(),
+                                            logprob: first.logprob,
+                                            bytes: first.bytes.clone(),
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect(),
+                            top_tokens: Vec::new(),
+                        }),
+                    }],
+                    usage: Usage {
+                        prompt_tokens: 0,
+                        completion_tokens: result.num_tokens as i32,
+                        total_tokens: result.num_tokens as i32,
+                    },
+                }
+            };
 
-        // Execute all tasks concurrently
-        futures::future::join_all(tasks).await;
+            let _ = http_item.tx.send(response);
+        }
     }
 }
 

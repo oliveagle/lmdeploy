@@ -14,7 +14,8 @@ use tokio::sync::RwLock;
 
 use crate::error::{AppError, Result};
 use crate::model::cpp_engine::{
-    EngineType, GenerationParams, ModelInfo, ModelState, TokenLogprob, TurboMindCEngine,
+    BatchItem, BatchResult, EngineType, GenerationParams, ModelInfo, ModelState, TokenLogprob,
+    TurboMindCEngine,
 };
 use crate::model::python_bridge::PythonBridge;
 use crate::tokenizer::LMTokenizer;
@@ -134,7 +135,7 @@ impl ModelEngine {
         &self,
         prompt: &str,
         params: GenerationParams,
-    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = (u32, String)> + Send>> {
         match self {
             ModelEngine::PureCpp(e) => e.generate_stream(prompt, params).await,
             ModelEngine::PyBridge(e) => {
@@ -148,7 +149,7 @@ impl ModelEngine {
                 match result {
                     Ok(stream) => {
                         use futures::StreamExt;
-                        let stream = stream.map(|chunk| chunk.text);
+                        let stream = stream.map(|chunk| (chunk.token_id, chunk.text));
                         Box::pin(stream)
                     }
                     Err(_) => Box::pin(futures::stream::empty()),
@@ -162,9 +163,14 @@ impl ModelEngine {
         prompt: &str,
         input_ids: Vec<u32>,
         params: GenerationParams,
-    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
-        let _ = (prompt, input_ids, params);
-        Box::pin(futures::stream::empty())
+    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = (u32, String)> + Send>> {
+        match self {
+            ModelEngine::PureCpp(e) => e.generate_stream_with_ids(prompt, input_ids, params).await,
+            ModelEngine::PyBridge(_) => {
+                let _ = (prompt, input_ids, params);
+                Box::pin(futures::stream::empty())
+            }
+        }
     }
 
     pub async fn embed(&self, text: &str, dimensions: Option<usize>) -> Vec<f32> {
@@ -178,6 +184,23 @@ impl ModelEngine {
             ModelEngine::PyBridge(_) => Err(AppError::ModelLoadFailed(
                 "Reload not supported for PythonBridge".into(),
             )),
+        }
+    }
+
+    pub async fn generate_batch(&self, items: Vec<BatchItem>) -> Vec<BatchResult> {
+        match self {
+            ModelEngine::PureCpp(e) => e.generate_batch(items).await,
+            ModelEngine::PyBridge(_) => items
+                .into_iter()
+                .map(|item| BatchResult {
+                    request_id: item.request_id,
+                    text: String::new(),
+                    num_tokens: 0,
+                    elapsed_ms: 0.0,
+                    logprobs: None,
+                    error: Some("Batch inference not supported for PythonBridge".to_string()),
+                })
+                .collect(),
         }
     }
 

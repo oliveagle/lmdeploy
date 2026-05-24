@@ -299,7 +299,7 @@ async fn chat_completions_stream_impl(
         futures::pin_mut!(chunks);
 
         let mut first_token_recorded = false;
-        while let Some(chunk_text) = chunks.next().await {
+        while let Some((_token_id, chunk_text)) = chunks.next().await {
             if !first_token_recorded {
                 let ttft_secs = first_token_start.elapsed().as_secs_f64();
                 request_metrics.record_ttft(ttft_secs);

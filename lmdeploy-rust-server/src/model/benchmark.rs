@@ -240,7 +240,7 @@ impl BenchmarkRunner {
         let mut token_times: Vec<f64> = Vec::new();
 
         // Collect tokens from stream
-        while let Some(_token) = stream.next().await {
+        while let Some((_token_id, _token_text)) = stream.next().await {
             let elapsed = start.elapsed().as_secs_f64() * 1000.0; // ms
 
             if !first_token_received {
