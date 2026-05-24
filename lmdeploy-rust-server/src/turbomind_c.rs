@@ -302,6 +302,7 @@ extern "C" {
     // TensorMap
     pub fn TM_TensorMap_Create() -> *mut TM_TensorMap;
     pub fn TM_TensorMap_Destroy(map: *mut TM_TensorMap);
+    pub fn TM_TensorMap_Clear(map: *mut TM_TensorMap);
     pub fn TM_TensorMap_SetInt32(
         map: *mut TM_TensorMap,
         name: *const c_char,
@@ -1192,6 +1193,14 @@ impl TensorMap {
     /// Get the raw C pointer for passing to C functions
     pub fn as_mut_ptr(&self) -> *mut TM_TensorMap {
         self.0
+    }
+
+    /// Clear the tensor map for reuse, removing all tensors without freeing allocations.
+    ///
+    /// This allows the same TensorMap to be reused across multiple forward calls,
+    /// avoiding per-request heap allocations and destruction.
+    pub fn clear(&mut self) {
+        unsafe { TM_TensorMap_Clear(self.0) }
     }
 }
 

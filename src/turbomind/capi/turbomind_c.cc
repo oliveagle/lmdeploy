@@ -2286,6 +2286,13 @@ void TM_TensorMap_Destroy(TM_TensorMap* map)
     delete map;
 }
 
+void TM_TensorMap_Clear(TM_TensorMap* map)
+{
+    if (map) {
+        map->map.clear();
+    }
+}
+
 void TM_TensorMap_SetInt32(TM_TensorMap* map, const char* name, const int32_t* data, int ndim, const int64_t* shape)
 {
     SetTensorCommon(&map->map, name, data, ndim, shape, turbomind::DeviceType::kCPU);

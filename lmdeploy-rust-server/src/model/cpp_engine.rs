@@ -489,26 +489,48 @@ struct RequestPool {
     slots: Vec<tokio::sync::Mutex<ModelRequest>>,
     /// Semaphore limits concurrent inference requests
     semaphore: tokio::sync::Semaphore,
+    /// Reusable TensorMap per slot for input tensors (avoids per-forward allocation).
+    /// Each slot has its own TensorMap cleared before each forward call.
+    input_tensor_maps: Vec<tokio::sync::Mutex<TensorMap>>,
+    /// Reusable TensorMap per slot for output tensors.
+    output_tensor_maps: Vec<tokio::sync::Mutex<TensorMap>>,
 }
 
 impl RequestPool {
     /// Create a new request pool with the given concurrency level.
     fn new(tm: &TurboMind, concurrency: usize) -> Result<Self> {
         let mut slots = Vec::with_capacity(concurrency);
+        let mut input_tensor_maps = Vec::with_capacity(concurrency);
+        let mut output_tensor_maps = Vec::with_capacity(concurrency);
+
         for i in 0..concurrency {
             let request = ModelRequest::create(tm).map_err(|e| {
                 AppError::ModelLoadFailed(format!("Failed to create request #{}: {:?}", i, e))
             })?;
             slots.push(tokio::sync::Mutex::new(request));
+
+            // Create reusable TensorMaps for this slot
+            let input_map = TensorMap::new().map_err(|e| {
+                AppError::ModelLoadFailed(format!("Failed to create input tensor map #{}: {:?}", i, e))
+            })?;
+            input_tensor_maps.push(tokio::sync::Mutex::new(input_map));
+
+            let output_map = TensorMap::new().map_err(|e| {
+                AppError::ModelLoadFailed(format!("Failed to create output tensor map #{}: {:?}", i, e))
+            })?;
+            output_tensor_maps.push(tokio::sync::Mutex::new(output_map));
         }
+
         Ok(Self {
             slots,
             semaphore: tokio::sync::Semaphore::new(concurrency),
+            input_tensor_maps,
+            output_tensor_maps,
         })
     }
 
     /// Acquire a slot (async). Returns a guard that holds the semaphore
-    /// permit and the mutex guard. The slot is released when the guard is
+    /// permit and the mutex guards. The slot is released when the guard is
     /// dropped.
     ///
     /// The slot selection uses round-robin to distribute load across slots.
@@ -518,35 +540,42 @@ impl RequestPool {
     ) -> (
         tokio::sync::SemaphorePermit<'_>,
         tokio::sync::MutexGuard<'_, ModelRequest>,
+        tokio::sync::MutexGuard<'_, TensorMap>,
+        tokio::sync::MutexGuard<'_, TensorMap>,
     ) {
         let permit = self.semaphore.acquire().await.expect("semaphore closed");
-        // After acquiring, the number of available permits tells us how many
-        // concurrent requests are still possible. Use this to compute the slot index
-        // in a round-robin fashion. This avoids always using slot 0 and distributes
-        // load across all available slots.
         let active = self.slots.len() - self.semaphore.available_permits() - 1;
         let idx = active % self.slots.len();
         let guard = self.slots[idx].lock().await;
-        (permit, guard)
+        let input_map = self.input_tensor_maps[idx].lock().await;
+        let output_map = self.output_tensor_maps[idx].lock().await;
+        (permit, guard, input_map, output_map)
     }
 
     /// Acquire a slot (blocking, for use in spawn_blocking). Returns a
-    /// permit and the mutex guard.
+    /// permit and the mutex guards.
     fn acquire_blocking(
         &self,
     ) -> (
         tokio::sync::SemaphorePermit<'_>,
         tokio::sync::MutexGuard<'_, ModelRequest>,
+        tokio::sync::MutexGuard<'_, TensorMap>,
+        tokio::sync::MutexGuard<'_, TensorMap>,
     ) {
         let permit = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(self.semaphore.acquire())
         })
         .expect("semaphore closed");
-        // Same round-robin logic as acquire()
         let active = self.slots.len() - self.semaphore.available_permits() - 1;
         let idx = active % self.slots.len();
         let guard = self.slots[idx].blocking_lock();
-        (permit, guard)
+        let input_map = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(self.input_tensor_maps[idx].lock())
+        });
+        let output_map = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(self.output_tensor_maps[idx].lock())
+        });
+        (permit, guard, input_map, output_map)
     }
 }
 
@@ -1079,10 +1108,13 @@ impl TurboMindCEngine {
 
         let start = Instant::now();
 
-        let (_permit, mut request) = pool.acquire().await;
+        let (_permit, mut request, mut input_tensors, mut output_tensors) = pool.acquire().await;
+
+        // Clear and reuse TensorMaps instead of allocating new ones
+        input_tensors.clear();
+        output_tensors.clear();
 
         // Prepare input tensors: use DLPack zero-copy for GPU, fallback to CPU copy
-        let mut input_tensors = TensorMap::new().unwrap();
         if dlpack_input.device.is_gpu() && !dlpack_input.data.is_null() {
             // Zero-copy: GPU pointer directly to C++ engine
             input_tensors.set_from_dlpack(
@@ -1114,8 +1146,6 @@ impl TurboMindCEngine {
             start_flag: true,
             end_flag: true,
         };
-
-        let mut output_tensors = TensorMap::new().unwrap();
 
         let result = request.forward(
             &mut input_tensors,
@@ -1216,10 +1246,12 @@ impl TurboMindCEngine {
         // Acquire a slot (semaphore permit + mutex guard for the slot).
         // tokio::sync::Mutex allows the runtime to yield while waiting,
         // enabling true parallel inference without blocking threads.
-        let (_permit, mut request) = pool.acquire().await;
+        let (_permit, mut request, mut input_tensors, mut output_tensors) = pool.acquire().await;
 
-        // Prepare input tensors
-        let mut input_tensors = TensorMap::new().unwrap();
+        // Clear and reuse TensorMaps instead of allocating new ones
+        input_tensors.clear();
+        output_tensors.clear();
+
         // Use optimized input_ids setter (reuses thread-local buffer)
         set_input_ids(&mut input_tensors, &input_ids);
 
@@ -1240,8 +1272,7 @@ impl TurboMindCEngine {
             end_flag: true,
         };
 
-        // Prepare output tensors
-        let mut output_tensors = TensorMap::new().unwrap();
+        // Prepare output tensors (reused from pool)
 
         // Attach grammar for guided decoding if provided
         if let Some(grammar) = &params.grammar {
@@ -1341,10 +1372,12 @@ impl TurboMindCEngine {
 
         let start = Instant::now();
 
-        let (_permit, mut request) = pool.acquire().await;
+        let (_permit, mut request, mut input_tensors, mut output_tensors) = pool.acquire().await;
 
-        // Prepare input tensors
-        let mut input_tensors = TensorMap::new().unwrap();
+        // Clear and reuse TensorMaps
+        input_tensors.clear();
+        output_tensors.clear();
+
         set_input_ids(&mut input_tensors, &input_ids);
 
         // Prepare generation config
@@ -1361,8 +1394,6 @@ impl TurboMindCEngine {
             start_flag: true,
             end_flag: true,
         };
-
-        let mut output_tensors = TensorMap::new().unwrap();
 
         // Attach grammar for guided decoding if provided
         if let Some(grammar) = &params.grammar {
@@ -1498,7 +1529,11 @@ impl TurboMindCEngine {
         let (tx, rx) = tokio::sync::mpsc::channel::<String>(32);
 
         tokio::task::spawn_blocking(move || {
-            let (_permit, mut request) = pool.acquire_blocking();
+            let (_permit, mut request, mut input_tensors, mut _output_tensors) =
+                pool.acquire_blocking();
+
+            // Clear and reuse TensorMaps
+            input_tensors.clear();
 
             // Create callback context
             let ctx = Arc::new(StreamContext { tokenizer, tx });
@@ -1511,15 +1546,7 @@ impl TurboMindCEngine {
                 return;
             }
 
-            // Prepare input tensors
-            let mut input_tensors = match crate::turbomind_c::TensorMap::new() {
-                Ok(t) => t,
-                Err(e) => {
-                    tracing::error!(error = ?e, "Failed to create tensor map");
-                    let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
-                    return;
-                }
-            };
+            // Set input tensors
             set_input_ids_i64(&mut input_tensors, &input_ids_vec);
 
             // Prepare generation config with HTTP parameters
@@ -1666,16 +1693,13 @@ impl TurboMindCEngine {
         // Use blocking task for FFI calls
         let embedding_result = tokio::task::spawn_blocking(move || {
             // Acquire a slot (blocking semaphore + mutex)
-            let (_permit, mut request) = pool.acquire_blocking();
+            let (_permit, mut request, mut input_tensors, mut output_tensors) =
+                pool.acquire_blocking();
 
-            // Prepare input tensors
-            let mut input_tensors = match TensorMap::new() {
-                Ok(t) => t,
-                Err(e) => {
-                    tracing::error!(error = ?e, "Failed to create tensor map");
-                    return Vec::new();
-                }
-            };
+            // Clear and reuse TensorMaps
+            input_tensors.clear();
+            output_tensors.clear();
+
             set_input_ids_i64(&mut input_tensors, &input_ids_i64);
 
             // Prepare generation config with output_last_hidden_state=2 (kGeneration = last token)
@@ -1696,15 +1720,6 @@ impl TurboMindCEngine {
                 step: 0,
                 start_flag: true,
                 end_flag: true,
-            };
-
-            // Prepare output tensors
-            let mut output_tensors = match TensorMap::new() {
-                Ok(t) => t,
-                Err(e) => {
-                    tracing::error!(error = ?e, "Failed to create output tensor map");
-                    return Vec::new();
-                }
             };
 
             // Run inference to get last_hidden_state
@@ -1826,15 +1841,13 @@ impl TurboMindCEngine {
         }
 
         let embedding_result = tokio::task::spawn_blocking(move || {
-            let (_permit, mut request) = pool.acquire_blocking();
+            let (_permit, mut request, mut input_tensors, mut output_tensors) =
+                pool.acquire_blocking();
 
-            let mut input_tensors = match TensorMap::new() {
-                Ok(t) => t,
-                Err(e) => {
-                    tracing::error!(error = ?e, "Failed to create tensor map");
-                    return None;
-                }
-            };
+            // Clear and reuse TensorMaps
+            input_tensors.clear();
+            output_tensors.clear();
+
             set_input_ids_i64(&mut input_tensors, &input_ids_i64);
 
             let mut gen_cfg = match GenConfig::new() {
@@ -1853,14 +1866,6 @@ impl TurboMindCEngine {
                 step: 0,
                 start_flag: true,
                 end_flag: true,
-            };
-
-            let mut output_tensors = match TensorMap::new() {
-                Ok(t) => t,
-                Err(e) => {
-                    tracing::error!(error = ?e, "Failed to create output tensor map");
-                    return None;
-                }
             };
 
             if let Err(e) = request.forward(
@@ -2123,25 +2128,10 @@ impl TurboMindCEngine {
                 };
 
                 // Acquire a slot from the pool
-                let (_permit, mut request) = match pool_clone.acquire_blocking() {
-                    (p, r) => (p, r),
-                };
+                let (_permit, mut request, mut input_tensors, _output_tensors) = pool_clone.acquire_blocking();
 
-                // Prepare input tensors
-                let mut input_tensors = match TensorMap::new() {
-                    Ok(t) => t,
-                    Err(e) => {
-                        tracing::error!(error = ?e, request_id, "Failed to create input tensor map");
-                        return BatchResult {
-                            request_id,
-                            text: String::new(),
-                            num_tokens: 0,
-                            elapsed_ms: start.elapsed().as_secs_f64() * 1000.0,
-                            logprobs: None,
-                            error: Some(format!("Failed to create tensor map: {:?}", e)),
-                        };
-                    }
-                };
+                // Clear and reuse input TensorMap
+                input_tensors.clear();
 
                 set_input_ids(&mut input_tensors, &input_ids);
 

@@ -194,6 +194,9 @@ int TM_TurboMind_GetScheduleMetrics(
 TM_TensorMap* TM_TensorMap_Create(void);
 void TM_TensorMap_Destroy(TM_TensorMap* map);
 
+// Clear a TensorMap for reuse (removes all tensors, keeps allocated memory)
+void TM_TensorMap_Clear(TM_TensorMap* map);
+
 // Tensor creation and insertion into map
 // For CPU tensors with data pointer (no copy)
 void TM_TensorMap_SetInt32(TM_TensorMap* map, const char* name, const int32_t* data, int ndim, const int64_t* shape);
