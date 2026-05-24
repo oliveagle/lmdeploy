@@ -412,9 +412,12 @@ Tensor UnifiedAttentionLayer::core_attention(Tensor& qkv, const ForwardParam& p,
 
     const bool is_mla = weights.is_mla();
 
-    Tensor tmp_kv{{local_kv_head_num, is_mla ? 1 : 2, d.prefill.k_sum + MAX_CTA_S, size_per_head}, dtype, device};
-
     const int cache_layer_id = cache_layer_ids_[p.layer_id];
+
+    // Direct pointer to K portion of QKV tensor, eliminating tmp_kv copy
+    // QKV layout: [token_num, local_head_num + 2 * local_kv_head_num, size_per_head]
+    // K offset = local_head_num * size_per_head elements from start
+    const char* k_data = (const char*)qkv.raw_data() + local_head_num * size_per_head * byte_size(dtype, 1);
 
     auto CreateParams = [&](int offset, AttentionData::Stat stat, int max_kv_splits, cudaStream_t stream) {
         AttentionParams<T> params{};
@@ -458,17 +461,17 @@ Tensor UnifiedAttentionLayer::core_attention(Tensor& qkv, const ForwardParam& p,
                                                        cache_layer_id,
                                                        engine_param_.cache_block_seq_len};
 
-        // prefill only
+        // prefill only: direct mapping from QKV tensor, eliminating tmp_kv allocation and copy
         if (is_mla) {
             params.linear_iter_params = LinearIteratorParams{
-                tmp_kv.raw_data(),           // flattened KV
+                k_data,                      // direct from QKV K portion
                 stat.k_sum * size_per_head,  // stride to next head
-                0                            // stride from K to V
+                0                            // stride from K to V (K and V share same data in MLA)
             };
         }
         else {
             params.linear_iter_params = LinearIteratorParams{
-                tmp_kv.raw_data(),               // flattened KV
+                k_data,                       // direct from QKV K portion
                 stat.k_sum * size_per_head * 2,  // stride to next head
                 stat.k_sum * size_per_head       // stride from K to V
             };
@@ -569,12 +572,12 @@ Tensor UnifiedAttentionLayer::core_attention(Tensor& qkv, const ForwardParam& p,
         // disable split kv for prefill for now
         auto params = CreateParams(offset, d.prefill, 1, pf_stream);
         if constexpr (sizeof(T) == 2) {
+            // Write K/V to cache blocks for future decode operations
             invokeProcessKV_v2_(params);
             TM_CUDA_CHECK(cudaGetLastError());
 
-            /// TODO: skip flattening for `sm_80`
-            invokeFlattenKV_v2_(params, d.prefill.k_sum);
-            TM_CUDA_CHECK(cudaGetLastError());
+            // Skip flattenKV_v2 - use direct QKV mapping instead via linear_iter_params
+            // This eliminates the tmp_kv allocation and copy overhead
 
             dispatchAttention(params);
             TM_CUDA_CHECK(cudaGetLastError());
