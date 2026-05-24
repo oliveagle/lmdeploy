@@ -696,6 +696,7 @@ impl LmDeployService for LmDeployServiceImpl {
                 let engine = engine_ref.read().await;
                 match &*engine {
                     ModelEngine::PureCpp(e) => e.model_name.clone(),
+                    ModelEngine::PyBridge(_) => "py_bridge".to_string(),
                 }
             }
             None => "no-model".to_string(),
@@ -736,6 +737,20 @@ impl LmDeployService for LmDeployServiceImpl {
                                 "generate".into(),
                                 "stream".into(),
                                 "batch".into(),
+                                "tokenize".into(),
+                            ],
+                        }
+                    }
+                    ModelEngine::PyBridge(e) => {
+                        ModelInfoResponse {
+                            model_name: format!("PyBridge: {}", e.model_path().split('/').last().unwrap_or("model")),
+                            model_path: e.model_path().to_string(),
+                            max_context_length: 65536,
+                            vocab_size: 248070,  // Qwen3.5 default
+                            supports_streaming: true,
+                            capabilities: vec![
+                                "generate".into(),
+                                "stream".into(),
                                 "tokenize".into(),
                             ],
                         }

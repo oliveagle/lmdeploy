@@ -1,9 +1,12 @@
-//! Engine abstraction layer - Pure C++ TurboMind engine
+//! Engine abstraction layer - Multi-engine support for LMDeploy
 //!
-//! This module provides a unified interface for C++ TurboMind inference.
+//! This module provides unified interfaces for multiple inference engines:
+//! - Pure C++ TurboMind engine (via C API)
+//! - Python bridge engine (via Python subprocess + C++ TurboMind)
 
 pub mod benchmark;
 pub mod cpp_engine;
+pub mod python_bridge;
 mod manager;
 #[cfg(test)]
 mod stress_test;
@@ -14,3 +17,4 @@ pub use cpp_engine::{
     TokenLogprob, TopLogprob, TurboMindCEngine,
 };
 pub use manager::{ModelEngine, ModelLoadProgress, ModelLoadTracker, ModelManager};
+pub use python_bridge::{PythonBridge, ScheduleMetrics};

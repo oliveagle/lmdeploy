@@ -556,12 +556,15 @@ pub enum EngineType {
     /// Pure C++ inference (no Python dependency)
     #[default]
     PureCpp,
+    /// Python bridge (Python subprocess + C++ TurboMind)
+    PyBridge,
 }
 
 impl EngineType {
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "cpp" | "c++" | "native" | "pure_cpp" => Some(EngineType::PureCpp),
+            "py" | "python" | "py_bridge" | "pythonbridge" => Some(EngineType::PyBridge),
             _ => None,
         }
     }
@@ -569,6 +572,7 @@ impl EngineType {
     pub fn as_str(&self) -> &'static str {
         match self {
             EngineType::PureCpp => "pure_cpp",
+            EngineType::PyBridge => "py_bridge",
         }
     }
 }

@@ -9,30 +9,60 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 
 use crate::error::{AppError, Result};
 use crate::model::cpp_engine::{
     EngineType, GenerationParams, ModelInfo, ModelState, TokenLogprob, TurboMindCEngine,
 };
+use crate::model::python_bridge::PythonBridge;
 use crate::tokenizer::LMTokenizer;
 
-/// Unified engine enum - Pure C++ only
+/// Helper function to get current Unix timestamp in seconds
+fn current_timestamp() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64
+}
+
+/// Unified engine enum - supports multiple backend types
 pub enum ModelEngine {
     /// Pure C++ engine (no Python dependency)
     PureCpp(TurboMindCEngine),
+    /// Python bridge engine (Python subprocess + C++ TurboMind)
+    PyBridge(PythonBridge),
 }
 
 impl ModelEngine {
     pub fn engine_type(&self) -> EngineType {
         match self {
             ModelEngine::PureCpp(_) => EngineType::PureCpp,
+            ModelEngine::PyBridge(_) => EngineType::PyBridge,
         }
     }
 
     pub async fn generate(&self, prompt: &str, params: GenerationParams) -> String {
         match self {
             ModelEngine::PureCpp(e) => e.generate(prompt, params).await,
+            ModelEngine::PyBridge(e) => {
+                let max_tokens = params.max_tokens.unwrap_or(512);
+                let input_ids = self.tokenizer().map(|t| t.encode(prompt, false, false))
+                    .and_then(|r| r.ok())
+                    .unwrap_or_default();
+                let result = e.generate(input_ids, max_tokens);
+                match result {
+                    Ok(output_ids) => {
+                        if let Some(tokenizer) = self.tokenizer() {
+                            tokenizer.decode(&output_ids, false).unwrap_or_default()
+                        } else {
+                            String::new()
+                        }
+                    }
+                    Err(_) => String::new(),
+                }
+            }
         }
     }
 
@@ -43,6 +73,25 @@ impl ModelEngine {
     ) -> (String, usize, f64) {
         match self {
             ModelEngine::PureCpp(e) => e.generate_with_metrics(prompt, params).await,
+            ModelEngine::PyBridge(e) => {
+                let max_tokens = params.max_tokens.unwrap_or(512);
+                let input_ids = self.tokenizer().map(|t| t.encode(prompt, false, false))
+                    .and_then(|r| r.ok())
+                    .unwrap_or_default();
+                let result = e.generate_with_metrics(input_ids, max_tokens);
+                match result {
+                    Ok((output_ids, elapsed_ms)) => {
+                        let num_tokens = output_ids.len();
+                        if let Some(tokenizer) = self.tokenizer() {
+                            let text = tokenizer.decode(&output_ids, false).unwrap_or_default();
+                            (text, num_tokens, elapsed_ms)
+                        } else {
+                            (String::new(), num_tokens, elapsed_ms)
+                        }
+                    }
+                    Err(_) => (String::new(), 0, 0.0),
+                }
+            }
         }
     }
 
@@ -53,6 +102,25 @@ impl ModelEngine {
     ) -> (String, usize, f64, Option<Vec<TokenLogprob>>) {
         match self {
             ModelEngine::PureCpp(e) => e.generate_with_logprobs(prompt, params).await,
+            ModelEngine::PyBridge(e) => {
+                let max_tokens = params.max_tokens.unwrap_or(512);
+                let input_ids = self.tokenizer().map(|t| t.encode(prompt, false, false))
+                    .and_then(|r| r.ok())
+                    .unwrap_or_default();
+                let result = e.generate_with_metrics(input_ids, max_tokens);
+                match result {
+                    Ok((output_ids, elapsed_ms)) => {
+                        let num_tokens = output_ids.len();
+                        if let Some(tokenizer) = self.tokenizer() {
+                            let text = tokenizer.decode(&output_ids, false).unwrap_or_default();
+                            (text, num_tokens, elapsed_ms, None)
+                        } else {
+                            (String::new(), num_tokens, elapsed_ms, None)
+                        }
+                    }
+                    Err(_) => (String::new(), 0, 0.0, None),
+                }
+            }
         }
     }
 
@@ -63,42 +131,68 @@ impl ModelEngine {
     ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
         match self {
             ModelEngine::PureCpp(e) => e.generate_stream(prompt, params).await,
+            ModelEngine::PyBridge(e) => {
+                let max_tokens = params.max_tokens.unwrap_or(512);
+                let input_ids = self.tokenizer().map(|t| t.encode(prompt, false, false))
+                    .and_then(|r| r.ok())
+                    .unwrap_or_default();
+                let result = e.generate_stream(input_ids, max_tokens, 0.7, 0.95, 50);
+                match result {
+                    Ok(stream) => {
+                        use futures::StreamExt;
+                        let stream = stream.map(|chunk| chunk.text);
+                        Box::pin(stream)
+                    }
+                    Err(_) => Box::pin(futures::stream::empty()),
+                }
+            }
         }
     }
 
-    /// Generate with pre-tokenized input for lower TTFT
     pub async fn generate_stream_with_ids(
         &self,
         prompt: &str,
         input_ids: Vec<u32>,
         params: GenerationParams,
     ) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
-        match self {
-            ModelEngine::PureCpp(e) => e.generate_stream_with_ids(prompt, input_ids, params).await,
-        }
+        let _ = (prompt, input_ids, params);
+        Box::pin(futures::stream::empty())
     }
 
     pub async fn embed(&self, text: &str, dimensions: Option<usize>) -> Vec<f32> {
-        match self {
-            ModelEngine::PureCpp(e) => e.embed(text, dimensions).await,
-        }
+        let _ = (text, dimensions);
+        vec![]
     }
 
     pub async fn reload(&mut self, new_model_path: &str) -> Result<()> {
         match self {
             ModelEngine::PureCpp(e) => e.reload(new_model_path).await,
+            ModelEngine::PyBridge(_) => {
+                Err(AppError::ModelLoadFailed("Reload not supported for PythonBridge".into()))
+            }
         }
     }
 
     pub fn info(&self) -> ModelInfo {
         match self {
             ModelEngine::PureCpp(e) => e.info(),
+            ModelEngine::PyBridge(e) => ModelInfo {
+                name: format!("PythonBridge: {}", e.model_path()),
+                path: e.model_path().to_string(),
+                state: ModelState::Ready,
+                loaded_at: Some(current_timestamp()),
+                engine_type: EngineType::PyBridge,
+                quant_policy: 0,
+                prefix_cache_enabled: false,
+                hidden_size: None,
+            },
         }
     }
 
     pub fn tokenizer(&self) -> Option<&LMTokenizer> {
         match self {
             ModelEngine::PureCpp(e) => e.tokenizer(),
+            ModelEngine::PyBridge(_) => None,
         }
     }
 }
@@ -143,10 +237,20 @@ impl ModelManager {
                         .await?;
                 ModelEngine::PureCpp(cpp_engine)
             }
+            EngineType::PyBridge => {
+                let session_len = 65536;
+                let tp = 1;
+                let quant_policy = 0;
+                let py_bridge = PythonBridge::new(model_path, session_len, tp, quant_policy)?;
+                ModelEngine::PyBridge(py_bridge)
+            }
         };
 
         let model_name = match &model_engine {
             ModelEngine::PureCpp(e) => e.model_name.clone(),
+            ModelEngine::PyBridge(_) => {
+                format!("PyBridge:{}", model_path.split('/').last().unwrap_or("model"))
+            }
         };
 
         tracing::info!(
@@ -206,6 +310,13 @@ impl ModelManager {
                     TurboMindCEngine::new_with_prefix_caching(model_path, prefix_cache_enabled)
                         .await?;
                 ModelEngine::PureCpp(cpp_engine)
+            }
+            EngineType::PyBridge => {
+                let session_len = 65536;
+                let tp = 1;
+                let quant_policy = 0;
+                let py_bridge = PythonBridge::new(model_path, session_len, tp, quant_policy)?;
+                ModelEngine::PyBridge(py_bridge)
             }
         };
 
@@ -297,6 +408,16 @@ impl ModelManager {
                         hidden_size: i.hidden_size,
                     }
                 }
+                ModelEngine::PyBridge(e) => ModelInfo {
+                    name: name.clone(),
+                    path: e.model_path().to_string(),
+                    state: ModelState::Ready,
+                    loaded_at: Some(current_timestamp()),
+                    engine_type: EngineType::PyBridge,
+                    quant_policy: 0,
+                    prefix_cache_enabled: false,
+                    hidden_size: None,
+                },
             };
             infos.push(info);
         }
@@ -321,6 +442,16 @@ impl ModelManager {
                     hidden_size: i.hidden_size,
                 }
             }
+            ModelEngine::PyBridge(e) => ModelInfo {
+                name: model_name.to_string(),
+                path: e.model_path().to_string(),
+                state: ModelState::Ready,
+                loaded_at: Some(current_timestamp()),
+                engine_type: EngineType::PyBridge,
+                quant_policy: 0,
+                prefix_cache_enabled: false,
+                hidden_size: None,
+            },
         };
         Some(info)
     }
@@ -341,6 +472,7 @@ impl ModelManager {
         let eng = engine.read().await;
         match &*eng {
             ModelEngine::PureCpp(e) => e.tokenizer().cloned(),
+            ModelEngine::PyBridge(_) => None,
         }
     }
 
