@@ -48,7 +48,9 @@ impl ModelEngine {
             ModelEngine::PureCpp(e) => e.generate(prompt, params).await,
             ModelEngine::PyBridge(e) => {
                 let max_tokens = params.max_tokens.unwrap_or(512);
-                let input_ids = self.tokenizer().map(|t| t.encode(prompt, false, false))
+                let input_ids = self
+                    .tokenizer()
+                    .map(|t| t.encode(prompt, false, false))
                     .and_then(|r| r.ok())
                     .unwrap_or_default();
                 let result = e.generate(input_ids, max_tokens);
@@ -75,7 +77,9 @@ impl ModelEngine {
             ModelEngine::PureCpp(e) => e.generate_with_metrics(prompt, params).await,
             ModelEngine::PyBridge(e) => {
                 let max_tokens = params.max_tokens.unwrap_or(512);
-                let input_ids = self.tokenizer().map(|t| t.encode(prompt, false, false))
+                let input_ids = self
+                    .tokenizer()
+                    .map(|t| t.encode(prompt, false, false))
                     .and_then(|r| r.ok())
                     .unwrap_or_default();
                 let result = e.generate_with_metrics(input_ids, max_tokens);
@@ -104,7 +108,9 @@ impl ModelEngine {
             ModelEngine::PureCpp(e) => e.generate_with_logprobs(prompt, params).await,
             ModelEngine::PyBridge(e) => {
                 let max_tokens = params.max_tokens.unwrap_or(512);
-                let input_ids = self.tokenizer().map(|t| t.encode(prompt, false, false))
+                let input_ids = self
+                    .tokenizer()
+                    .map(|t| t.encode(prompt, false, false))
                     .and_then(|r| r.ok())
                     .unwrap_or_default();
                 let result = e.generate_with_metrics(input_ids, max_tokens);
@@ -133,7 +139,9 @@ impl ModelEngine {
             ModelEngine::PureCpp(e) => e.generate_stream(prompt, params).await,
             ModelEngine::PyBridge(e) => {
                 let max_tokens = params.max_tokens.unwrap_or(512);
-                let input_ids = self.tokenizer().map(|t| t.encode(prompt, false, false))
+                let input_ids = self
+                    .tokenizer()
+                    .map(|t| t.encode(prompt, false, false))
                     .and_then(|r| r.ok())
                     .unwrap_or_default();
                 let result = e.generate_stream(input_ids, max_tokens, 0.7, 0.95, 50);
@@ -167,9 +175,9 @@ impl ModelEngine {
     pub async fn reload(&mut self, new_model_path: &str) -> Result<()> {
         match self {
             ModelEngine::PureCpp(e) => e.reload(new_model_path).await,
-            ModelEngine::PyBridge(_) => {
-                Err(AppError::ModelLoadFailed("Reload not supported for PythonBridge".into()))
-            }
+            ModelEngine::PyBridge(_) => Err(AppError::ModelLoadFailed(
+                "Reload not supported for PythonBridge".into(),
+            )),
         }
     }
 
@@ -249,7 +257,10 @@ impl ModelManager {
         let model_name = match &model_engine {
             ModelEngine::PureCpp(e) => e.model_name.clone(),
             ModelEngine::PyBridge(_) => {
-                format!("PyBridge:{}", model_path.split('/').last().unwrap_or("model"))
+                format!(
+                    "PyBridge:{}",
+                    model_path.split('/').last().unwrap_or("model")
+                )
             }
         };
 
@@ -275,13 +286,8 @@ impl ModelManager {
         model_path: &str,
         engine_type: EngineType,
     ) -> Result<()> {
-        self.load_model_with_type_and_prefix_cache(
-            model_name,
-            model_path,
-            engine_type,
-            false,
-        )
-        .await
+        self.load_model_with_type_and_prefix_cache(model_name, model_path, engine_type, false)
+            .await
     }
 
     /// Load a new model with specified engine type and prefix caching control

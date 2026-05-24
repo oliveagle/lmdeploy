@@ -23,16 +23,13 @@
 //! cargo test --test performance_regression
 //! ```
 
-use lmdeploy_server::model::cpp_engine::{
-    GenerationParams, TurboMindCEngine,
-};
+use lmdeploy_server::model::cpp_engine::{GenerationParams, TurboMindCEngine};
 use std::time::Instant;
 
 /// Get the AWQ model path from environment or use default
 fn get_model_path() -> String {
-    std::env::var("AWQ_MODEL_PATH").unwrap_or_else(|_| {
-        "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ".to_string()
-    })
+    std::env::var("AWQ_MODEL_PATH")
+        .unwrap_or_else(|_| "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ".to_string())
 }
 
 /// Check if the model path exists
@@ -419,9 +416,15 @@ mod performance_tests {
         let output_tokens = num_tokens.saturating_sub(input_tokens);
         let metrics = calculate_metrics(input_tokens, output_tokens, total_elapsed);
 
-        println!("Comprehensive - Prefill @ 8K: {:.2} tok/s", metrics.prefill_tps);
+        println!(
+            "Comprehensive - Prefill @ 8K: {:.2} tok/s",
+            metrics.prefill_tps
+        );
         if metrics.prefill_tps < 3000.0 {
-            failures.push(format!("Prefill @ 8K: {:.2} tok/s (expected >3000)", metrics.prefill_tps));
+            failures.push(format!(
+                "Prefill @ 8K: {:.2} tok/s (expected >3000)",
+                metrics.prefill_tps
+            ));
         }
 
         // Test 2: Decode @ 8K
@@ -440,23 +443,29 @@ mod performance_tests {
         let output_tokens = num_tokens.saturating_sub(input_tokens);
         let metrics = calculate_metrics(input_tokens, output_tokens, total_elapsed);
 
-        println!("Comprehensive - Decode @ 8K: {:.2} tok/s", metrics.decode_tps);
+        println!(
+            "Comprehensive - Decode @ 8K: {:.2} tok/s",
+            metrics.decode_tps
+        );
         if metrics.decode_tps < 40.0 {
-            failures.push(format!("Decode @ 8K: {:.2} tok/s (expected >40)", metrics.decode_tps));
+            failures.push(format!(
+                "Decode @ 8K: {:.2} tok/s (expected >40)",
+                metrics.decode_tps
+            ));
         }
 
         // Test 3: TTFT @ 8K
         println!("Comprehensive - TTFT @ 8K: {:.2}ms", metrics.ttft_ms);
         if metrics.ttft_ms > 2000.0 {
-            failures.push(format!("TTFT @ 8K: {:.2}ms (expected <2000)", metrics.ttft_ms));
+            failures.push(format!(
+                "TTFT @ 8K: {:.2}ms (expected <2000)",
+                metrics.ttft_ms
+            ));
         }
 
         // Report all failures at once
         if !failures.is_empty() {
-            panic!(
-                "Performance regression detected:\n{}",
-                failures.join("\n")
-            );
+            panic!("Performance regression detected:\n{}", failures.join("\n"));
         }
     }
 
@@ -504,7 +513,9 @@ mod performance_tests {
         // Calculate statistics
         let avg_speed: f64 = prefill_speeds.iter().sum::<f64>() / iterations as f64;
         let min_speed = prefill_speeds.iter().fold(f64::INFINITY, |a, &b| a.min(b));
-        let max_speed = prefill_speeds.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+        let max_speed = prefill_speeds
+            .iter()
+            .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
         let variance = prefill_speeds
             .iter()
             .map(|&x| (x - avg_speed).powi(2))

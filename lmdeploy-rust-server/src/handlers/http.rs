@@ -14,7 +14,7 @@ use tokio::sync::oneshot;
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::cache::compute_hash;
-use crate::metrics::{StreamMetricsSnapshot, StreamRequestMetrics, EngineEventType};
+use crate::metrics::{EngineEventType, StreamMetricsSnapshot, StreamRequestMetrics};
 use crate::model::GenerationParams;
 use crate::server::{AppState, BatchItem, BatchStatsResponse};
 use crate::turbomind_c::CompiledGrammar;
@@ -52,13 +52,9 @@ pub enum ResponseFormat {
     /// JSON object output (constrained to valid JSON)
     JsonObject,
     /// JSON schema constrained output
-    JsonSchema {
-        json_schema: JsonSchemaSpec,
-    },
+    JsonSchema { json_schema: JsonSchemaSpec },
     /// Regex constrained output
-    RegexSchema {
-        regex_schema: String,
-    },
+    RegexSchema { regex_schema: String },
 }
 
 /// JSON schema specification for structured output.
@@ -1571,7 +1567,9 @@ pub async fn model_load_progress(
 /// # Returns
 /// * `Some(Arc<CompiledGrammar>)` - If a valid grammar constraint is specified
 /// * `None` - If no constraint should be applied (text mode or error)
-pub fn response_format_to_grammar(response_format: &Option<ResponseFormat>) -> Option<Arc<CompiledGrammar>> {
+pub fn response_format_to_grammar(
+    response_format: &Option<ResponseFormat>,
+) -> Option<Arc<CompiledGrammar>> {
     match response_format {
         Some(ResponseFormat::Text) => None,
         Some(ResponseFormat::JsonObject) => {

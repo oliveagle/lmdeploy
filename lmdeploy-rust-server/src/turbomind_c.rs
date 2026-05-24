@@ -17,10 +17,17 @@ pub type TM_TokenCallback = extern "C" fn(token_id: c_int, seq_len: c_int, user_
 /// status: the final request status (TM_RequestStatus)
 /// seq_len: the final sequence length
 /// user_data: opaque pointer passed to the callback
-pub type TM_CompletionCallback = extern "C" fn(status: c_int, seq_len: c_int, user_data: *mut c_void);
+pub type TM_CompletionCallback =
+    extern "C" fn(status: c_int, seq_len: c_int, user_data: *mut c_void);
 
 // Re-export types
 pub use std::os::raw::{c_char, c_float, c_int, c_long, c_uint, c_void};
+
+/// CUDA event handle (opaque pointer)
+pub type cudaEvent_t = *mut std::os::raw::c_void;
+
+/// CUDA stream handle (opaque pointer)
+pub type cudaStream_t = *mut std::os::raw::c_void;
 
 // CUDA runtime FFI bindings for GPU memory management
 // These functions are from libcudart.so which is already linked by turbomind_c.so
@@ -39,11 +46,86 @@ extern "C" {
         kind: cudaMemcpyKind,
     ) -> c_int;
 
+    /// Async copy memory (H2D, D2H, D2D) on given stream
+    pub fn cudaMemcpyAsync(
+        dst: *mut c_void,
+        src: *const c_void,
+        size: usize,
+        kind: cudaMemcpyKind,
+        stream: cudaStream_t,
+    ) -> c_int;
+
     /// Allocate page-locked host memory (faster H2D transfers)
     pub fn cudaMallocHost(ptr: *mut *mut c_void, size: usize) -> c_int;
 
     /// Free page-locked host memory
     pub fn cudaFreeHost(ptr: *mut c_void) -> c_int;
+
+    /// Create an event for stream synchronization
+    pub fn cudaEventCreate(event: *mut cudaEvent_t) -> c_int;
+
+    /// Destroy an event
+    pub fn cudaEventDestroy(event: cudaEvent_t) -> c_int;
+
+    /// Record an event on a stream
+    pub fn cudaEventRecord(event: cudaEvent_t, stream: cudaStream_t) -> c_int;
+
+    /// Wait for an event to complete (blocks CPU)
+    pub fn cudaEventSynchronize(event: cudaEvent_t) -> c_int;
+
+    /// Create a CUDA stream for async operations
+    pub fn cudaStreamCreate(stream: *mut cudaStream_t) -> c_int;
+
+    /// Destroy a CUDA stream
+    pub fn cudaStreamDestroy(stream: cudaStream_t) -> c_int;
+
+    /// Wait for a stream to complete all operations (blocks CPU)
+    pub fn cudaStreamSynchronize(stream: cudaStream_t) -> c_int;
+}
+
+/// CUDA event handle (opaque pointer wrapper)
+#[derive(Debug)]
+pub struct CudaEvent {
+    handle: cudaEvent_t,
+}
+
+unsafe impl Send for CudaEvent {}
+unsafe impl Sync for CudaEvent {}
+
+impl CudaEvent {
+    pub fn new() -> std::result::Result<Self, i32> {
+        let mut handle: cudaEvent_t = std::ptr::null_mut();
+        let ret = unsafe { cudaEventCreate(&mut handle) };
+        if ret == 0 {
+            Ok(Self { handle })
+        } else {
+            Err(ret)
+        }
+    }
+
+    pub fn record(&self, stream: cudaStream_t) -> std::result::Result<(), i32> {
+        let ret = unsafe { cudaEventRecord(self.handle, stream) };
+        if ret == 0 {
+            Ok(())
+        } else {
+            Err(ret)
+        }
+    }
+
+    pub fn sync(&self) -> std::result::Result<(), i32> {
+        let ret = unsafe { cudaEventSynchronize(self.handle) };
+        if ret == 0 {
+            Ok(())
+        } else {
+            Err(ret)
+        }
+    }
+}
+
+impl Drop for CudaEvent {
+    fn drop(&mut self) {
+        unsafe { cudaEventDestroy(self.handle) };
+    }
 }
 
 /// CUDA memory copy direction
@@ -181,11 +263,11 @@ pub const DL_DTYPE_CODE_BFLOAT: u32 = 5;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct TM_Tensor {
-    pub dtype: TM_DataType,         // data type
-    pub ndim: c_int,                // number of dimensions
-    pub shape: [i64; 8],            // max 8 dimensions
-    pub data: *mut c_void,          // data pointer
-    pub device_id: c_int,           // -1 for CPU, >= 0 for CUDA device
+    pub dtype: TM_DataType, // data type
+    pub ndim: c_int,        // number of dimensions
+    pub shape: [i64; 8],    // max 8 dimensions
+    pub data: *mut c_void,  // data pointer
+    pub device_id: c_int,   // -1 for CPU, >= 0 for CUDA device
 }
 
 // Safety: TM_Tensor is a POD struct that can be safely sent between threads.
@@ -207,8 +289,20 @@ impl Default for TM_Tensor {
 
 impl TM_Tensor {
     /// Create a new tensor with the given data type and shape.
-    pub fn new(dtype: TM_DataType, ndim: c_int, shape: [i64; 8], data: *mut c_void, device_id: c_int) -> Self {
-        Self { dtype, ndim, shape, data, device_id }
+    pub fn new(
+        dtype: TM_DataType,
+        ndim: c_int,
+        shape: [i64; 8],
+        data: *mut c_void,
+        device_id: c_int,
+    ) -> Self {
+        Self {
+            dtype,
+            ndim,
+            shape,
+            data,
+            device_id,
+        }
     }
 
     /// Check if the tensor is valid (has non-null data pointer).
@@ -534,7 +628,10 @@ extern "C" {
     pub fn TM_Grammar_CreateFromRegex(regex: *const c_char) -> *mut TM_CompiledGrammar;
     pub fn TM_Grammar_GetBuiltinJSON() -> *const TM_CompiledGrammar;
     pub fn TM_Grammar_Destroy(grammar: *mut TM_CompiledGrammar);
-    pub fn TM_ModelRequest_SetGrammar(req: *mut TM_ModelRequest, grammar: *const TM_CompiledGrammar) -> c_int;
+    pub fn TM_ModelRequest_SetGrammar(
+        req: *mut TM_ModelRequest,
+        grammar: *const TM_CompiledGrammar,
+    ) -> c_int;
 
     // DLPack / Zero-Copy Tensor Sharing
     pub fn TM_TensorFromDLPack(dlpack_capsule: *mut c_void, out_tensor: *mut TM_Tensor) -> c_int;
@@ -1027,7 +1124,10 @@ impl CompiledGrammar {
                     message: "Failed to create grammar from JSON schema".into(),
                 }));
             }
-            Ok(CompiledGrammar { ptr, builtin: false })
+            Ok(CompiledGrammar {
+                ptr,
+                builtin: false,
+            })
         }
     }
 
@@ -1045,7 +1145,10 @@ impl CompiledGrammar {
                     message: "Failed to create grammar from EBNF".into(),
                 }));
             }
-            Ok(CompiledGrammar { ptr, builtin: false })
+            Ok(CompiledGrammar {
+                ptr,
+                builtin: false,
+            })
         }
     }
 
@@ -1063,7 +1166,10 @@ impl CompiledGrammar {
                     message: "Failed to create grammar from regex".into(),
                 }));
             }
-            Ok(CompiledGrammar { ptr, builtin: false })
+            Ok(CompiledGrammar {
+                ptr,
+                builtin: false,
+            })
         }
     }
 
@@ -1371,11 +1477,11 @@ impl ModelRequest {
         // The caller should use the regular get_output() and compute shape themselves.
         // This method is primarily for creating DLPack capsules from known tensors.
         Ok(TM_Tensor {
-            dtype: TM_DataType::TM_DATATYPE_INVALID,  // Caller must set this
+            dtype: TM_DataType::TM_DATATYPE_INVALID, // Caller must set this
             ndim: 1,
             shape: [out_size as i64, 1, 1, 1, 1, 1, 1, 1],
             data: out_data,
-            device_id: 0,  // Assume GPU for output tensors
+            device_id: 0, // Assume GPU for output tensors
         })
     }
 

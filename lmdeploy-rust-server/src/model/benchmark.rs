@@ -218,8 +218,7 @@ impl BenchmarkRunner {
             None => return Err("Pool not available".to_string()),
         };
         let pool_start = Instant::now();
-        let (_permit, mut _request, mut _input_tensors, mut _output_tensors) =
-            pool.acquire().await;
+        let (_permit, mut _request, mut _input_tensors, mut _output_tensors) = pool.acquire().await;
         let pool_acquire_time_ms = pool_start.elapsed().as_secs_f64() * 1000.0;
 
         // Use streaming to get actual TTFT and per-token timing
@@ -476,14 +475,24 @@ impl BatchBenchmarkRunner {
                 // Warmup
                 for _ in 0..self.config.warmup_iterations {
                     let _ = self
-                        .run_batch_benchmark(context_length, batch_size, self.config.output_length, 0)
+                        .run_batch_benchmark(
+                            context_length,
+                            batch_size,
+                            self.config.output_length,
+                            0,
+                        )
                         .await;
                 }
 
                 // Measured runs
                 for iter in 1..=self.config.iterations {
                     let result = self
-                        .run_batch_benchmark(context_length, batch_size, self.config.output_length, iter)
+                        .run_batch_benchmark(
+                            context_length,
+                            batch_size,
+                            self.config.output_length,
+                            iter,
+                        )
                         .await?;
                     all_results.push(result);
                 }
@@ -558,7 +567,9 @@ impl BatchBenchmarkRunner {
         } else {
             0.0
         };
-        let min_latency = request_latencies.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+        let min_latency = request_latencies
+            .iter()
+            .fold(f64::INFINITY, |a, &b| a.min(b));
         let max_latency = request_latencies
             .iter()
             .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
@@ -603,7 +614,8 @@ impl BatchBenchmarkRunner {
                     .iter()
                     .filter(|r| {
                         r.batch_size == batch_size
-                            && (r.context_length as isize - target_context as isize).abs() < tolerance
+                            && (r.context_length as isize - target_context as isize).abs()
+                                < tolerance
                     })
                     .collect();
 
@@ -618,8 +630,11 @@ impl BatchBenchmarkRunner {
                     .iter()
                     .map(|r| r.throughput_tps)
                     .fold(f64::NEG_INFINITY, f64::max);
-                let avg_latency =
-                    filtered.iter().map(|r| r.avg_request_latency_ms).sum::<f64>() / count as f64;
+                let avg_latency = filtered
+                    .iter()
+                    .map(|r| r.avg_request_latency_ms)
+                    .sum::<f64>()
+                    / count as f64;
 
                 let mut sorted_latencies: Vec<f64> =
                     filtered.iter().map(|r| r.avg_request_latency_ms).collect();

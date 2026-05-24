@@ -306,7 +306,11 @@ fn format_context_lengths(lengths: &[usize]) -> String {
 
 /// Format batch sizes for display
 fn format_batch_sizes(sizes: &[usize]) -> String {
-    sizes.iter().map(|&s| format!("{}", s)).collect::<Vec<_>>().join(", ")
+    sizes
+        .iter()
+        .map(|&s| format!("{}", s))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Run sequential benchmarks
@@ -638,7 +642,9 @@ fn output_batch_table(
                     p95_latency_ms: format!("{:.2}", summary.p95_request_latency_ms),
                     total_time_ms: format!("{:.2}", {
                         // Average total time from individual results matching this config
-                        let matching: Vec<_> = report.results.iter()
+                        let matching: Vec<_> = report
+                            .results
+                            .iter()
                             .filter(|r| {
                                 (r.context_length as isize - *context_length as isize).abs() < 500
                                     && r.batch_size == summary.batch_size
@@ -647,7 +653,8 @@ fn output_batch_table(
                         if matching.is_empty() {
                             0.0
                         } else {
-                            matching.iter().map(|r| r.total_time_ms).sum::<f64>() / matching.len() as f64
+                            matching.iter().map(|r| r.total_time_ms).sum::<f64>()
+                                / matching.len() as f64
                         }
                     }),
                     speedup,

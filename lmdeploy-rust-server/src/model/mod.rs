@@ -6,8 +6,8 @@
 
 pub mod benchmark;
 pub mod cpp_engine;
-pub mod python_bridge;
 mod manager;
+pub mod python_bridge;
 #[cfg(test)]
 mod stress_test;
 

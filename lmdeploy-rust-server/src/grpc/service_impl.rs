@@ -15,10 +15,10 @@ use crate::turbomind_c::CompiledGrammar;
 
 use super::lmdeploy::v1::{
     generate_stream_response, lm_deploy_service_server::LmDeployService, BatchGenerateRequest,
-    BatchGenerateResponse, GenerateRequest, GenerateResponse, GenerateStreamResponse,
-    HealthRequest, HealthResponse, LogprobEntry, ModelInfoRequest, ModelInfoResponse, StreamChunk,
-    TokenizeRequest, TokenizeResponse, TopLogprobEntry, EngineEventType as ProtoEngineEventType,
-    StreamMetrics, EngineEvent,
+    BatchGenerateResponse, EngineEvent, EngineEventType as ProtoEngineEventType, GenerateRequest,
+    GenerateResponse, GenerateStreamResponse, HealthRequest, HealthResponse, LogprobEntry,
+    ModelInfoRequest, ModelInfoResponse, StreamChunk, StreamMetrics, TokenizeRequest,
+    TokenizeResponse, TopLogprobEntry,
 };
 
 /// Convert guided decoding fields from gRPC request to a CompiledGrammar.
@@ -157,14 +157,38 @@ impl LmDeployService for LmDeployServiceImpl {
         // Build GenerationParams with logprobs and grammar support
         let need_logprobs = req.logprobs || req.top_logprobs > 0;
         let mut params = GenerationParams::from_grpc_request_with_logprobs(
-            if req.max_tokens > 0 { Some(req.max_tokens as usize) } else { None },
-            if req.temperature > 0.0 { Some(req.temperature) } else { None },
-            if req.top_p > 0.0 { Some(req.top_p) } else { None },
+            if req.max_tokens > 0 {
+                Some(req.max_tokens as usize)
+            } else {
+                None
+            },
+            if req.temperature > 0.0 {
+                Some(req.temperature)
+            } else {
+                None
+            },
+            if req.top_p > 0.0 {
+                Some(req.top_p)
+            } else {
+                None
+            },
             if req.top_k > 0 { Some(req.top_k) } else { None },
-            if req.repetition_penalty > 0 { Some(req.repetition_penalty as f32) } else { None },
-            if req.seed > 0 { Some(req.seed as u64) } else { None },
+            if req.repetition_penalty > 0 {
+                Some(req.repetition_penalty as f32)
+            } else {
+                None
+            },
+            if req.seed > 0 {
+                Some(req.seed as u64)
+            } else {
+                None
+            },
             if req.logprobs { Some(true) } else { None },
-            if req.top_logprobs > 0 { Some(req.top_logprobs as u32) } else { None },
+            if req.top_logprobs > 0 {
+                Some(req.top_logprobs as u32)
+            } else {
+                None
+            },
         );
 
         // Apply grammar constraint if provided
@@ -180,7 +204,9 @@ impl LmDeployService for LmDeployServiceImpl {
         };
 
         // Recalculate elapsed_ms for non-logprobs path
-        let elapsed = if need_logprobs { elapsed_ms } else {
+        let elapsed = if need_logprobs {
+            elapsed_ms
+        } else {
             // Use a simple estimate if we didn't get metrics
             let _ = num_tokens; // suppress unused warning
             0.0
@@ -205,24 +231,26 @@ impl LmDeployService for LmDeployServiceImpl {
             .unwrap_or(0);
 
         // Convert TokenLogprob to gRPC LogprobEntry
-        let logprobs_entries = logprobs.map(|lp| {
-            lp.iter()
-                .map(|t| LogprobEntry {
-                    token_id: 0, // Will be filled from token_ids if needed
-                    token: t.token.clone(),
-                    logprob: t.logprob as f32,
-                    top_logprobs: t
-                        .top_logprobs
-                        .iter()
-                        .map(|tp| TopLogprobEntry {
-                            token_id: 0,
-                            token: tp.token.clone(),
-                            logprob: tp.logprob as f32,
-                        })
-                        .collect(),
-                })
-                .collect()
-        }).unwrap_or_default();
+        let logprobs_entries = logprobs
+            .map(|lp| {
+                lp.iter()
+                    .map(|t| LogprobEntry {
+                        token_id: 0, // Will be filled from token_ids if needed
+                        token: t.token.clone(),
+                        logprob: t.logprob as f32,
+                        top_logprobs: t
+                            .top_logprobs
+                            .iter()
+                            .map(|tp| TopLogprobEntry {
+                                token_id: 0,
+                                token: tp.token.clone(),
+                                logprob: tp.logprob as f32,
+                            })
+                            .collect(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
 
         let is_empty = text.is_empty();
         let resp = GenerateResponse {
@@ -255,12 +283,32 @@ impl LmDeployService for LmDeployServiceImpl {
         // Clone necessary data for the spawned task
         let manager = Arc::clone(&self.model_manager);
         let params = GenerationParams::from_grpc_request(
-            if req.max_tokens > 0 { Some(req.max_tokens as usize) } else { None },
-            if req.temperature > 0.0 { Some(req.temperature) } else { None },
-            if req.top_p > 0.0 { Some(req.top_p) } else { None },
+            if req.max_tokens > 0 {
+                Some(req.max_tokens as usize)
+            } else {
+                None
+            },
+            if req.temperature > 0.0 {
+                Some(req.temperature)
+            } else {
+                None
+            },
+            if req.top_p > 0.0 {
+                Some(req.top_p)
+            } else {
+                None
+            },
             if req.top_k > 0 { Some(req.top_k) } else { None },
-            if req.repetition_penalty > 0 { Some(req.repetition_penalty as f32) } else { None },
-            if req.seed > 0 { Some(req.seed as u64) } else { None },
+            if req.repetition_penalty > 0 {
+                Some(req.repetition_penalty as f32)
+            } else {
+                None
+            },
+            if req.seed > 0 {
+                Some(req.seed as u64)
+            } else {
+                None
+            },
         );
         let prompt = req.prompt;
 
@@ -283,14 +331,16 @@ impl LmDeployService for LmDeployServiceImpl {
 
             // Get the engine
             let Some(engine_ref) = get_default_engine(&manager) else {
-                let _ = tx.send(Ok(GenerateStreamResponse {
-                    payload: Some(generate_stream_response::Payload::Chunk(StreamChunk {
-                        text: "[ERROR: No model loaded]".to_string(),
-                        token_id: 0,
-                        is_final: true,
-                        metrics: build_stream_metrics(&metrics),
-                    })),
-                })).await;
+                let _ = tx
+                    .send(Ok(GenerateStreamResponse {
+                        payload: Some(generate_stream_response::Payload::Chunk(StreamChunk {
+                            text: "[ERROR: No model loaded]".to_string(),
+                            token_id: 0,
+                            is_final: true,
+                            metrics: build_stream_metrics(&metrics),
+                        })),
+                    }))
+                    .await;
                 return;
             };
 
@@ -309,10 +359,8 @@ impl LmDeployService for LmDeployServiceImpl {
             };
 
             // Process tokens from the stream
-            while let Ok(Some(token_result)) = tokio::time::timeout(
-                std::time::Duration::from_secs(600),
-                stream.next(),
-            ).await
+            while let Ok(Some(token_result)) =
+                tokio::time::timeout(std::time::Duration::from_secs(600), stream.next()).await
             {
                 // stream.next() returns String directly (not Result<String, Error>)
                 let token = token_result;
@@ -531,14 +579,42 @@ impl LmDeployService for LmDeployServiceImpl {
                 let grammar = build_grammar_from_grpc(&gen_req);
                 let need_logprobs = gen_req.logprobs || gen_req.top_logprobs > 0;
                 let mut params = GenerationParams::from_grpc_request_with_logprobs(
-                    if gen_req.max_tokens > 0 { Some(gen_req.max_tokens as usize) } else { None },
-                    if gen_req.temperature > 0.0 { Some(gen_req.temperature) } else { None },
-                    if gen_req.top_p > 0.0 { Some(gen_req.top_p) } else { None },
-                    if gen_req.top_k > 0 { Some(gen_req.top_k) } else { None },
-                    if gen_req.repetition_penalty > 0 { Some(gen_req.repetition_penalty as f32) } else { None },
-                    if gen_req.seed > 0 { Some(gen_req.seed as u64) } else { None },
+                    if gen_req.max_tokens > 0 {
+                        Some(gen_req.max_tokens as usize)
+                    } else {
+                        None
+                    },
+                    if gen_req.temperature > 0.0 {
+                        Some(gen_req.temperature)
+                    } else {
+                        None
+                    },
+                    if gen_req.top_p > 0.0 {
+                        Some(gen_req.top_p)
+                    } else {
+                        None
+                    },
+                    if gen_req.top_k > 0 {
+                        Some(gen_req.top_k)
+                    } else {
+                        None
+                    },
+                    if gen_req.repetition_penalty > 0 {
+                        Some(gen_req.repetition_penalty as f32)
+                    } else {
+                        None
+                    },
+                    if gen_req.seed > 0 {
+                        Some(gen_req.seed as u64)
+                    } else {
+                        None
+                    },
                     if gen_req.logprobs { Some(true) } else { None },
-                    if gen_req.top_logprobs > 0 { Some(gen_req.top_logprobs as u32) } else { None },
+                    if gen_req.top_logprobs > 0 {
+                        Some(gen_req.top_logprobs as u32)
+                    } else {
+                        None
+                    },
                 );
                 params.grammar = grammar;
                 BatchItem {
@@ -553,7 +629,9 @@ impl LmDeployService for LmDeployServiceImpl {
         // Process batch requests sequentially (the engine handles internal parallelism)
         let mut batch_results = Vec::with_capacity(batch_items.len());
         for item in batch_items {
-            let (text, num_tokens, elapsed_ms) = engine.generate_with_metrics(&item.prompt, item.params).await;
+            let (text, num_tokens, elapsed_ms) = engine
+                .generate_with_metrics(&item.prompt, item.params)
+                .await;
             batch_results.push(BatchResult {
                 request_id: item.request_id,
                 text,
@@ -564,15 +642,9 @@ impl LmDeployService for LmDeployServiceImpl {
             });
         }
 
-        let total_latency_ms = batch_results
-            .iter()
-            .map(|r| r.elapsed_ms)
-            .sum::<f64>();
+        let total_latency_ms = batch_results.iter().map(|r| r.elapsed_ms).sum::<f64>();
 
-        let total_tokens: usize = batch_results
-            .iter()
-            .map(|r| r.num_tokens)
-            .sum();
+        let total_tokens: usize = batch_results.iter().map(|r| r.num_tokens).sum();
 
         let throughput_tokens_per_second = if total_latency_ms > 0.0 {
             (total_tokens as f64 / total_latency_ms) * 1000.0
@@ -584,16 +656,25 @@ impl LmDeployService for LmDeployServiceImpl {
         let responses: Vec<GenerateResponse> = batch_results
             .into_iter()
             .map(|r| {
-                let logprobs = r.logprobs.unwrap_or_default().into_iter().map(|lp| LogprobEntry {
-                    token_id: lp.token_id,
-                    token: lp.token,
-                    logprob: lp.logprob as f32,
-                    top_logprobs: lp.top_logprobs.into_iter().map(|tlp| TopLogprobEntry {
-                        token_id: tlp.token_id,
-                        token: tlp.token,
-                        logprob: tlp.logprob as f32,
-                    }).collect(),
-                }).collect();
+                let logprobs = r
+                    .logprobs
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|lp| LogprobEntry {
+                        token_id: lp.token_id,
+                        token: lp.token,
+                        logprob: lp.logprob as f32,
+                        top_logprobs: lp
+                            .top_logprobs
+                            .into_iter()
+                            .map(|tlp| TopLogprobEntry {
+                                token_id: tlp.token_id,
+                                token: tlp.token,
+                                logprob: tlp.logprob as f32,
+                            })
+                            .collect(),
+                    })
+                    .collect();
                 GenerateResponse {
                     text: r.text,
                     token_ids: vec![],
@@ -705,7 +786,12 @@ impl LmDeployService for LmDeployServiceImpl {
         let uptime = self.start_time.elapsed().as_secs() as i64;
 
         let resp = HealthResponse {
-            status: if model_name != "no-model" { "ok" } else { "degraded" }.into(),
+            status: if model_name != "no-model" {
+                "ok"
+            } else {
+                "degraded"
+            }
+            .into(),
             version: self.version.clone(),
             model: model_name,
             uptime_seconds: uptime,
@@ -723,7 +809,12 @@ impl LmDeployService for LmDeployServiceImpl {
                 let engine = engine_ref.read().await;
                 match &*engine {
                     ModelEngine::PureCpp(e) => {
-                        let tokenizer = self.model_manager.read().await.get_default_tokenizer().await;
+                        let tokenizer = self
+                            .model_manager
+                            .read()
+                            .await
+                            .get_default_tokenizer()
+                            .await;
                         let vocab_size = tokenizer.as_ref().map(|t| t.vocab_size()).unwrap_or(0);
                         let info = e.info();
 
@@ -743,10 +834,13 @@ impl LmDeployService for LmDeployServiceImpl {
                     }
                     ModelEngine::PyBridge(e) => {
                         ModelInfoResponse {
-                            model_name: format!("PyBridge: {}", e.model_path().split('/').last().unwrap_or("model")),
+                            model_name: format!(
+                                "PyBridge: {}",
+                                e.model_path().split('/').last().unwrap_or("model")
+                            ),
                             model_path: e.model_path().to_string(),
                             max_context_length: 65536,
-                            vocab_size: 248070,  // Qwen3.5 default
+                            vocab_size: 248070, // Qwen3.5 default
                             supports_streaming: true,
                             capabilities: vec![
                                 "generate".into(),

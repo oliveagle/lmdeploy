@@ -1,0 +1,40 @@
+{
+  "model": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "config": {
+    "warmup_runs": 2,
+    "measure_runs": 3,
+    "max_prefill_token_num": 65536,
+    "num_tokens_per_iter": 65536,
+    "max_prefill_iters": 1
+  },
+  "results": {
+    "4K": {
+      "ctx_tokens": 4001,
+      "avg_ms": 969.4501949998084,
+      "min_ms": 656.2907670013374,
+      "max_ms": 1282.6096229982795,
+      "avg_tps": 4127.0815361492505,
+      "max_tps": 6096.383190458394,
+      "avg_iters": 1.0
+    },
+    "8K": {
+      "ctx_tokens": 8001,
+      "avg_ms": 3001.070662998245,
+      "min_ms": 3001.070662998245,
+      "max_ms": 3001.070662998245,
+      "avg_tps": 2666.048520165977,
+      "max_tps": 2666.048520165977,
+      "avg_iters": 1.0
+    },
+    "16K": {
+      "ctx_tokens": 16001,
+      "avg_ms": 6857.664025497797,
+      "min_ms": 5550.613833998796,
+      "max_ms": 8164.714216996799,
+      "avg_tps": 2333.301827051594,
+      "max_tps": 2882.7442294742555,
+      "avg_iters": 1.0
+    }
+  },
+  "timestamp": 1779635491.240604
+}

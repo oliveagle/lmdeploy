@@ -3,13 +3,13 @@
 //! This test verifies that the HTTP API correctly handles logprobs requests
 //! and returns properly formatted responses.
 
-use std::sync::Arc;
 use axum::{
     body::Body,
     http::{header, Method, Request, StatusCode},
 };
 use http_body_util::BodyExt;
 use serde_json::Value;
+use std::sync::Arc;
 use tower::ServiceExt;
 
 use lmdeploy_server::config::Config;
@@ -21,9 +21,8 @@ use lmdeploy_server::tokenizer::LMTokenizer;
 async fn create_test_app() -> Result<axum::Router, Box<dyn std::error::Error>> {
     let config = Arc::new(tokio::sync::RwLock::new(Config::default()));
 
-    let model_path = std::env::var("MODEL_PATH").unwrap_or_else(|_| {
-        "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ".to_string()
-    });
+    let model_path = std::env::var("MODEL_PATH")
+        .unwrap_or_else(|_| "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ".to_string());
 
     // Load tokenizer
     let tokenizer = LMTokenizer::from_path(&model_path)?;
@@ -60,7 +59,8 @@ async fn test_chat_completions_with_logprobs() -> Result<(), Box<dyn std::error:
         .method(Method::POST)
         .uri("/v1/chat/completions")
         .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(r#"
+        .body(Body::from(
+            r#"
         {
             "model": "test",
             "messages": [{"role": "user", "content": "Hello"}],
@@ -68,7 +68,8 @@ async fn test_chat_completions_with_logprobs() -> Result<(), Box<dyn std::error:
             "logprobs": true,
             "top_logprobs": 5
         }
-        "#))?;
+        "#,
+        ))?;
 
     let response = app
         .oneshot(request)
@@ -112,15 +113,20 @@ async fn test_chat_completions_without_logprobs() -> Result<(), Box<dyn std::err
         .method(Method::POST)
         .uri("/v1/chat/completions")
         .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(r#"
+        .body(Body::from(
+            r#"
         {
             "model": "test",
             "messages": [{"role": "user", "content": "Hello"}],
             "max_tokens": 10
         }
-        "#))?;
+        "#,
+        ))?;
 
-    let response = app.oneshot(request).await.map_err(|e| format!("Request failed: {}", e))?;
+    let response = app
+        .oneshot(request)
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
 
     assert_eq!(response.status(), StatusCode::OK);
 

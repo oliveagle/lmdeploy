@@ -94,6 +94,10 @@ Layer/norm/head mappings per model family are defined directly in `calibrate.py`
 - `lmdeploy/tokenizer.py` — HuggingFace/SentencePiece tokenizer wrapper.
 - `lmdeploy/serve/openai/` — OpenAI-compatible API server.
 
+- `lmdeploy-rust-server/tests/benchmark_python_official.py` — 官方 Python TurboMind benchmark 脚本
+- `lmdeploy-rust-server/tests/prefill_benchmark_awq.py` — AWQ 模型 prefill 专用 benchmark
+- `BENCHMARK_PYTHON_TM_20260518.json` — 历史基准数据 (42,875 tok/s prefill)
+
 ## Adding a New PyTorch Model
 
 Use the `/support-new-model` skill for a complete step-by-step guide.

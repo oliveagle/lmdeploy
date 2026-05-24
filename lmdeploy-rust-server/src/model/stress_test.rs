@@ -100,7 +100,11 @@ async fn test_slot_distribution_is_balanced() {
         h.await.unwrap();
     }
 
-    let usage: Vec<usize> = pool.slot_usage.iter().map(|s| s.load(Ordering::SeqCst)).collect();
+    let usage: Vec<usize> = pool
+        .slot_usage
+        .iter()
+        .map(|s| s.load(Ordering::SeqCst))
+        .collect();
     let min_usage = *usage.iter().min().unwrap();
     let max_usage = *usage.iter().max().unwrap();
 
@@ -136,7 +140,8 @@ async fn test_no_deadlock_under_contention() {
         }));
     }
 
-    let result = tokio::time::timeout(Duration::from_secs(10), futures::future::join_all(handles)).await;
+    let result =
+        tokio::time::timeout(Duration::from_secs(10), futures::future::join_all(handles)).await;
 
     assert!(result.is_ok(), "Deadlock detected: test timed out");
     for h in result.unwrap() {
@@ -168,7 +173,10 @@ async fn test_all_tasks_complete_with_unique_results() {
     let final_order = order.lock().unwrap().clone();
     assert_eq!(final_order.len(), 10, "Not all tasks completed");
     // All IDs should be unique (no duplicates from race conditions)
-    let unique_count = final_order.iter().collect::<std::collections::HashSet<_>>().len();
+    let unique_count = final_order
+        .iter()
+        .collect::<std::collections::HashSet<_>>()
+        .len();
     assert_eq!(unique_count, 10, "Duplicate task IDs observed");
 }
 
@@ -263,7 +271,11 @@ async fn test_slot_selection_with_varying_concurrency() {
             h.await.unwrap();
         }
 
-        let usage: Vec<usize> = pool.slot_usage.iter().map(|s| s.load(Ordering::SeqCst)).collect();
+        let usage: Vec<usize> = pool
+            .slot_usage
+            .iter()
+            .map(|s| s.load(Ordering::SeqCst))
+            .collect();
         let min_usage = *usage.iter().min().unwrap();
         let max_usage = *usage.iter().max().unwrap();
 

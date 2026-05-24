@@ -19,10 +19,10 @@ use std::time::Instant;
 use crate::error::{AppError, Result};
 use crate::tokenizer::LMTokenizer;
 use crate::turbomind_c::{
-    c_int, c_void, CompiledGrammar, EngineConfig, GenConfig, ModelRequest, ScheduleMetrics,
-    TM_DataType, TM_SessionParam, TensorMap, TurboMind, TM_Tensor,
-    DL_DEVICE_TYPE_CUDA, DL_DTYPE_CODE_INT,
-    cudaMalloc, cudaFree, cudaMallocHost, cudaFreeHost, cudaMemcpy, cudaMemcpyKind,
+    c_int, c_void, cudaFree, cudaFreeHost, cudaMalloc, cudaMallocHost, cudaMemcpy, cudaMemcpyAsync,
+    cudaMemcpyKind, cudaStreamCreate, cudaStreamDestroy, cudaStream_t, CompiledGrammar,
+    CudaEvent, EngineConfig, GenConfig, ModelRequest, ScheduleMetrics, TM_DataType,
+    TM_SessionParam, TM_Tensor, TensorMap, TurboMind, DL_DEVICE_TYPE_CUDA, DL_DTYPE_CODE_INT,
 };
 use serde::Serialize;
 
@@ -41,10 +41,12 @@ thread_local! {
 
 /// Reusable GPU buffer for input_ids.
 /// Manages a pre-allocated GPU memory region to avoid per-request cudaMalloc/cudaFree overhead.
-/// Uses a capacity growth strategy to minimize allocations over the session lifetime.
+/// Uses a dedicated CUDA stream for async operations, allowing the CPU to continue
+/// working while the GPU transfer happens in the background.
 struct GpuInputIdsBuffer {
     gpu_ptr: *mut c_void,
     capacity: usize,
+    stream: cudaStream_t,
 }
 
 unsafe impl Send for GpuInputIdsBuffer {}
@@ -56,10 +58,27 @@ impl GpuInputIdsBuffer {
         unsafe {
             let ret = cudaMalloc(&mut gpu_ptr, size);
             if ret != 0 {
-                tracing::warn!(ret, "cudaMalloc failed for GPU buffer, falling back to per-request allocation");
+                tracing::warn!(
+                    ret,
+                    "cudaMalloc failed for GPU buffer, falling back to per-request allocation"
+                );
             }
         }
-        Self { gpu_ptr, capacity: initial_capacity }
+        let mut stream: cudaStream_t = std::ptr::null_mut();
+        unsafe {
+            let ret = cudaStreamCreate(&mut stream);
+            if ret != 0 {
+                tracing::warn!(
+                    ret,
+                    "cudaStreamCreate failed, falling back to sync transfers"
+                );
+            }
+        }
+        Self {
+            gpu_ptr,
+            capacity: initial_capacity,
+            stream,
+        }
     }
 
     /// Get GPU pointer, growing the buffer if needed.
@@ -92,6 +111,9 @@ impl Drop for GpuInputIdsBuffer {
         if !self.gpu_ptr.is_null() {
             unsafe { cudaFree(self.gpu_ptr) };
         }
+        if !self.stream.is_null() {
+            unsafe { cudaStreamDestroy(self.stream) };
+        }
     }
 }
 
@@ -113,7 +135,10 @@ impl PinnedHostBuffer {
                 host_ptr = std::ptr::null_mut();
             }
         }
-        Self { host_ptr, capacity: initial_capacity }
+        Self {
+            host_ptr,
+            capacity: initial_capacity,
+        }
     }
 
     fn get_or_grow(&mut self, needed_elements: usize) -> *mut c_void {
@@ -152,6 +177,68 @@ thread_local! {
     static PINNED_HOST_BUFFER: RefCell<PinnedHostBuffer> = RefCell::new(
         PinnedHostBuffer::new(8192)
     );
+}
+
+/// Set input_ids on TensorMap using GPU tensor path with async transfer.
+///
+/// This function:
+/// 1. Copies input_ids to pinned host memory (fast transfer)
+/// 2. Copies from pinned host memory to GPU via cudaMemcpyAsync (non-blocking)
+///    using a dedicated CUDA stream for overlapping with other operations
+/// 3. Records a CUDA event after the async copy
+/// 4. Sets the GPU tensor using set_int64_gpu
+///
+/// The async copy allows overlapping the H2D transfer with other CPU work,
+/// reducing overall latency. The event ensures synchronization before the
+/// forward pass uses the data.
+///
+/// Reuses pre-allocated GPU and pinned host buffers to minimize allocation overhead.
+///
+/// Returns `Some(CudaEvent)` if async transfer was used (caller should sync on this
+/// event before relying on the GPU tensor being ready). Returns `None` on fallback paths.
+fn set_input_ids_gpu_async(tensors: &mut TensorMap, input_ids: &[u32]) -> Option<CudaEvent> {
+    let gpu_size = input_ids.len();
+    GPU_INPUT_BUFFER.with(|gpu_buf_cell| {
+        PINNED_HOST_BUFFER.with(|pinned_cell| {
+            let mut gpu_buf = gpu_buf_cell.borrow_mut();
+            let mut pinned_buf = pinned_cell.borrow_mut();
+            let gpu_ptr = gpu_buf.get_or_grow(gpu_size);
+            if gpu_ptr.is_null() {
+                set_input_ids(tensors, input_ids);
+                return None;
+            }
+            let pinned_ptr = pinned_buf.get_or_grow(gpu_size);
+            if !pinned_ptr.is_null() {
+                let pinned_slice: &mut [i64] =
+                    unsafe { std::slice::from_raw_parts_mut(pinned_ptr as *mut i64, gpu_size) };
+                for (dst, src) in pinned_slice.iter_mut().zip(input_ids.iter()) {
+                    *dst = *src as i64;
+                }
+                if let Ok(event) = CudaEvent::new() {
+                    // Use the dedicated stream for async copy to enable overlap
+                    let stream = gpu_buf.stream;
+                    unsafe {
+                        cudaMemcpyAsync(
+                            gpu_ptr,
+                            pinned_ptr,
+                            gpu_size * std::mem::size_of::<i64>(),
+                            cudaMemcpyKind::HostToDevice,
+                            stream,
+                        )
+                    };
+                    // Record event on the same stream for synchronization
+                    let _ = event.record(stream);
+                    let shape = [gpu_size as i64];
+                    tensors.set_int64_gpu("input_ids", gpu_ptr.cast(), &shape);
+                    tensors.set_int32("sequence_length", &[input_ids.len() as i32], &[1]);
+                    return Some(event);
+                }
+            }
+            // Fallback to sync copy
+            set_input_ids_gpu(tensors, input_ids);
+            None
+        })
+    })
 }
 
 /// Set input_ids on TensorMap using GPU tensor path.
@@ -406,12 +493,16 @@ fn get_max_batch_size() -> i32 {
     {
         Ok(output) if output.status.success() => output,
         _ => {
-            tracing::warn!("Failed to detect GPU type using nvidia-smi, using default max_batch_size=128");
+            tracing::warn!(
+                "Failed to detect GPU type using nvidia-smi, using default max_batch_size=128"
+            );
             return 128;
         }
     };
 
-    let device_name = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+    let device_name = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .to_lowercase();
 
     // Check if any known GPU name pattern matches
     for (pattern, size) in max_batch_size_map {
@@ -651,7 +742,6 @@ extern "C" fn completion_callback(status: c_int, seq_len: c_int, user_data: *mut
     }
 }
 
-
 /// Token callback for event-driven streaming.
 ///
 /// Invoked by the C++ engine whenever a new token is generated.
@@ -673,7 +763,6 @@ extern "C" fn token_callback(token_id: c_int, _seq_len: c_int, user_data: *mut c
         let _ = ctx.tx.try_send(token_str);
     }
 }
-
 
 /// Shared context passed to the C callbacks via raw pointer.
 struct StreamContext {
@@ -739,12 +828,18 @@ impl RequestPool {
 
             // Create reusable TensorMaps for this slot
             let input_map = TensorMap::new().map_err(|e| {
-                AppError::ModelLoadFailed(format!("Failed to create input tensor map #{}: {:?}", i, e))
+                AppError::ModelLoadFailed(format!(
+                    "Failed to create input tensor map #{}: {:?}",
+                    i, e
+                ))
             })?;
             input_tensor_maps.push(tokio::sync::Mutex::new(input_map));
 
             let output_map = TensorMap::new().map_err(|e| {
-                AppError::ModelLoadFailed(format!("Failed to create output tensor map #{}: {:?}", i, e))
+                AppError::ModelLoadFailed(format!(
+                    "Failed to create output tensor map #{}: {:?}",
+                    i, e
+                ))
             })?;
             output_tensor_maps.push(tokio::sync::Mutex::new(output_map));
         }
@@ -1078,7 +1173,10 @@ impl TurboMindCEngine {
     }
 
     /// Create a new C++ engine with prefix caching control
-    pub async fn new_with_prefix_caching(model_path: &str, prefix_cache_enabled: bool) -> Result<Self> {
+    pub async fn new_with_prefix_caching(
+        model_path: &str,
+        prefix_cache_enabled: bool,
+    ) -> Result<Self> {
         tracing::info!(model_path, "Initializing TurboMind C++ engine");
 
         let model_path_obj = std::path::PathBuf::from(model_path);
@@ -1304,7 +1402,9 @@ impl TurboMindCEngine {
         input_ids: DlpackInputTensor<'_>,
         params: GenerationParams,
     ) -> String {
-        let (text, _, _) = self.generate_with_dlpack_input_and_metrics(input_ids, params).await;
+        let (text, _, _) = self
+            .generate_with_dlpack_input_and_metrics(input_ids, params)
+            .await;
         text
     }
 
@@ -1320,7 +1420,10 @@ impl TurboMindCEngine {
         dlpack_input: DlpackInputTensor<'_>,
         params: GenerationParams,
     ) -> (String, usize, f64) {
-        let pool = self.request_pool.as_ref().expect("Request pool not initialized");
+        let pool = self
+            .request_pool
+            .as_ref()
+            .expect("Request pool not initialized");
 
         let seq_len = if dlpack_input.shape.is_empty() {
             0
@@ -1402,9 +1505,8 @@ impl TurboMindCEngine {
                 }
 
                 let token_count = size / 4; // int32 tokens
-                let output_ids = unsafe {
-                    std::slice::from_raw_parts(data as *const u32, token_count)
-                };
+                let output_ids =
+                    unsafe { std::slice::from_raw_parts(data as *const u32, token_count) };
 
                 let input_len = seq_len;
                 let output_tokens = if output_ids.len() > input_len {
@@ -1480,8 +1582,15 @@ impl TurboMindCEngine {
         input_tensors.clear();
         output_tensors.clear();
 
-        // Use GPU tensor path for input_ids (faster than CPU path)
-        set_input_ids_gpu(&mut input_tensors, &input_ids);
+        // Start async GPU transfer for input_ids - CPU continues with config prep
+        // while H2D happens in the background
+        if let Some(event) = set_input_ids_gpu_async(&mut input_tensors, &input_ids) {
+            // Sync on the event before forward to ensure data is ready on GPU
+            // This sync point is necessary to guarantee correctness
+            let _ = event.sync();
+        } else {
+            // Fallback path: already synced in set_input_ids_gpu
+        }
 
         // Prepare generation config with HTTP parameters
         let mut gen_cfg = GenConfig::new().unwrap();
@@ -1606,7 +1715,12 @@ impl TurboMindCEngine {
         input_tensors.clear();
         output_tensors.clear();
 
-        set_input_ids_gpu(&mut input_tensors, &input_ids);
+        // Start async GPU transfer for input_ids - CPU continues with config prep
+        // while H2D happens in the background
+        if let Some(event) = set_input_ids_gpu_async(&mut input_tensors, &input_ids) {
+            // Sync on the event before forward to ensure data is ready on GPU
+            let _ = event.sync();
+        }
 
         // Prepare generation config
         let mut gen_cfg = GenConfig::new().unwrap();
@@ -1714,7 +1828,8 @@ impl TurboMindCEngine {
             }
         };
 
-        self.generate_stream_impl(input_ids, tokenizer, params).await
+        self.generate_stream_impl(input_ids, tokenizer, params)
+            .await
     }
 
     /// Generate text with streaming output using pre-tokenized input.
@@ -1734,7 +1849,8 @@ impl TurboMindCEngine {
             }
         };
 
-        self.generate_stream_impl(input_ids, tokenizer, params).await
+        self.generate_stream_impl(input_ids, tokenizer, params)
+            .await
     }
 
     /// Internal streaming implementation with token IDs.
@@ -1790,14 +1906,20 @@ impl TurboMindCEngine {
             }
 
             // Set the completion callback to avoid polling
-            if let Err(e) = unsafe { request.set_completion_callback(completion_callback, ctx_ptr.0) } {
+            if let Err(e) =
+                unsafe { request.set_completion_callback(completion_callback, ctx_ptr.0) }
+            {
                 tracing::error!(error = ?e, "Failed to set completion callback");
                 let _ = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
                 return;
             }
 
-            // Set input tensors using GPU path (avoids CPU→GPU copy inside engine)
-            set_input_ids_gpu(&mut input_tensors, &input_ids);
+            // Start async GPU transfer for input_ids - CPU continues with config prep
+            // while H2D happens in the background
+            if let Some(event) = set_input_ids_gpu_async(&mut input_tensors, &input_ids) {
+                // Sync on the event before forward to ensure data is ready on GPU
+                let _ = event.sync();
+            }
 
             // Prepare generation config with HTTP parameters
             let mut gen_cfg = match crate::turbomind_c::GenConfig::new() {
@@ -2157,7 +2279,10 @@ impl TurboMindCEngine {
                 (1, [hidden_size as i64, 1, 1, 1, 1, 1, 1, 1])
             } else {
                 // [num_vectors, hidden_size]
-                (2, [num_vectors as i64, hidden_size as i64, 1, 1, 1, 1, 1, 1])
+                (
+                    2,
+                    [num_vectors as i64, hidden_size as i64, 1, 1, 1, 1, 1, 1],
+                )
             };
 
             // Calculate offset to last token's embedding
@@ -2240,9 +2365,8 @@ fn extract_batch_result(
     match request.get_output("output_ids") {
         Ok((data_ptr, size)) => {
             let num_tokens = size / 4;
-            let output_ids: Vec<i32> = unsafe {
-                std::slice::from_raw_parts(data_ptr as *const i32, num_tokens).to_vec()
-            };
+            let output_ids: Vec<i32> =
+                unsafe { std::slice::from_raw_parts(data_ptr as *const i32, num_tokens).to_vec() };
 
             let text = match tokenizer.decode(
                 &output_ids.iter().map(|&id| id as u32).collect::<Vec<_>>(),
@@ -2321,14 +2445,17 @@ impl TurboMindCEngine {
             Some(p) => Arc::clone(p),
             None => {
                 tracing::error!("Request pool not initialized");
-                return items.into_iter().map(|item| BatchResult {
-                    request_id: item.request_id,
-                    text: String::new(),
-                    num_tokens: 0,
-                    elapsed_ms: 0.0,
-                    logprobs: None,
-                    error: Some("Request pool not initialized".to_string()),
-                }).collect();
+                return items
+                    .into_iter()
+                    .map(|item| BatchResult {
+                        request_id: item.request_id,
+                        text: String::new(),
+                        num_tokens: 0,
+                        elapsed_ms: 0.0,
+                        logprobs: None,
+                        error: Some("Request pool not initialized".to_string()),
+                    })
+                    .collect();
             }
         };
 
@@ -2336,14 +2463,17 @@ impl TurboMindCEngine {
             Some(t) => t.clone(),
             None => {
                 tracing::error!("Tokenizer not available");
-                return items.into_iter().map(|item| BatchResult {
-                    request_id: item.request_id,
-                    text: String::new(),
-                    num_tokens: 0,
-                    elapsed_ms: 0.0,
-                    logprobs: None,
-                    error: Some("Tokenizer not available".to_string()),
-                }).collect();
+                return items
+                    .into_iter()
+                    .map(|item| BatchResult {
+                        request_id: item.request_id,
+                        text: String::new(),
+                        num_tokens: 0,
+                        elapsed_ms: 0.0,
+                        logprobs: None,
+                        error: Some("Tokenizer not available".to_string()),
+                    })
+                    .collect();
             }
         };
 
@@ -2383,12 +2513,18 @@ impl TurboMindCEngine {
                 };
 
                 // Acquire a slot from the pool
-                let (_permit, mut request, mut input_tensors, _output_tensors) = pool_clone.acquire_blocking();
+                let (_permit, mut request, mut input_tensors, _output_tensors) =
+                    pool_clone.acquire_blocking();
 
                 // Clear and reuse input TensorMap
                 input_tensors.clear();
 
-                set_input_ids_gpu(&mut input_tensors, &input_ids);
+                // Start async GPU transfer for input_ids - CPU continues with config prep
+                // while H2D happens in the background
+                if let Some(event) = set_input_ids_gpu_async(&mut input_tensors, &input_ids) {
+                    // Sync on the event before forward to ensure data is ready on GPU
+                    let _ = event.sync();
+                }
 
                 // Prepare generation config
                 let mut gen_cfg = match GenConfig::new() {
@@ -2455,7 +2591,9 @@ impl TurboMindCEngine {
                 };
                 let ctx_ptr = Box::into_raw(Box::new(completion_ctx)) as *mut c_void;
 
-                if let Err(e) = unsafe { request.set_completion_callback(batch_completion_callback, ctx_ptr) } {
+                if let Err(e) =
+                    unsafe { request.set_completion_callback(batch_completion_callback, ctx_ptr) }
+                {
                     tracing::error!(error = ?e, request_id, "Failed to set completion callback");
                     let _ = unsafe { Box::from_raw(ctx_ptr as *mut BatchCompletionContext) };
                     return BatchResult {
@@ -2489,7 +2627,14 @@ impl TurboMindCEngine {
                 // Extract results after completion
                 let need_logprobs = item.need_logprobs;
                 let top_logprobs_req = item.params.top_logprobs.unwrap_or(1).max(1);
-                return extract_batch_result(&request, &tokenizer_clone, request_id, start, need_logprobs, top_logprobs_req);
+                return extract_batch_result(
+                    &request,
+                    &tokenizer_clone,
+                    request_id,
+                    start,
+                    need_logprobs,
+                    top_logprobs_req,
+                );
             });
 
             handles.push(handle);
@@ -2582,7 +2727,7 @@ fn set_tensor_dlpack(
             name,
             data_ptr,
             shape,
-            DL_DTYPE_CODE_INT as c_int,  // int64
+            DL_DTYPE_CODE_INT as c_int,   // int64
             64,                           // 64 bits
             DL_DEVICE_TYPE_CUDA as c_int, // CUDA GPU
         );

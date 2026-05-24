@@ -4,12 +4,12 @@
 //! The Python subprocess loads the model using the working Python API and
 //! exposes inference via stdin/stdout JSON protocol.
 
+use futures::{Stream, StreamExt};
 use std::io::{BufRead, BufReader, Write};
+use std::pin::Pin;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{Arc, Mutex};
-use std::pin::Pin;
 use std::task::{Context, Poll};
-use futures::{Stream, StreamExt};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -107,7 +107,7 @@ struct StreamChunkResponse {
     #[serde(default)]
     token_index: Option<usize>,
     #[serde(default)]
-    r#type: Option<String>,  // "chunk" or "done"
+    r#type: Option<String>, // "chunk" or "done"
     #[serde(default)]
     error: Option<String>,
 }
@@ -261,7 +261,12 @@ impl PythonBridge {
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .spawn()
-            .map_err(|e| crate::error::AppError::ModelLoadFailed(format!("Failed to start Python bridge: {}", e)))?;
+            .map_err(|e| {
+                crate::error::AppError::ModelLoadFailed(format!(
+                    "Failed to start Python bridge: {}",
+                    e
+                ))
+            })?;
 
         let stdin = child.stdin.take().expect("Failed to get stdin");
         let stdout = child.stdout.take().expect("Failed to get stdout");
@@ -290,14 +295,18 @@ impl PythonBridge {
 
     /// Send a command and read the response
     fn send_command(&self, cmd: &BridgeCommand) -> Result<BridgeResponse> {
-        let json = serde_json::to_string(cmd)
-            .map_err(|e| crate::error::AppError::InferenceFailed(format!("JSON encode error: {}", e)))?;
+        let json = serde_json::to_string(cmd).map_err(|e| {
+            crate::error::AppError::InferenceFailed(format!("JSON encode error: {}", e))
+        })?;
 
-        let mut stdin = self.stdin.lock()
+        let mut stdin = self
+            .stdin
+            .lock()
             .map_err(|e| crate::error::AppError::InferenceFailed(format!("Lock error: {}", e)))?;
         writeln!(stdin, "{}", json)
             .map_err(|e| crate::error::AppError::InferenceFailed(format!("Write error: {}", e)))?;
-        stdin.flush()
+        stdin
+            .flush()
             .map_err(|e| crate::error::AppError::InferenceFailed(format!("Flush error: {}", e)))?;
         drop(stdin);
 
@@ -306,19 +315,25 @@ impl PythonBridge {
 
     /// Read a response from the bridge
     fn read_response(&self) -> Result<BridgeResponse> {
-        let mut stdout = self.stdout.lock()
+        let mut stdout = self
+            .stdout
+            .lock()
             .map_err(|e| crate::error::AppError::InferenceFailed(format!("Lock error: {}", e)))?;
         let mut line = String::new();
-        stdout.read_line(&mut line)
+        stdout
+            .read_line(&mut line)
             .map_err(|e| crate::error::AppError::InferenceFailed(format!("Read error: {}", e)))?;
         drop(stdout);
 
-        let response: BridgeResponse = serde_json::from_str(&line)
-            .map_err(|e| crate::error::AppError::InferenceFailed(format!("JSON decode error: {}", e)))?;
+        let response: BridgeResponse = serde_json::from_str(&line).map_err(|e| {
+            crate::error::AppError::InferenceFailed(format!("JSON decode error: {}", e))
+        })?;
 
         if response.status != "ok" {
             return Err(crate::error::AppError::InferenceFailed(
-                response.message.unwrap_or_else(|| "Unknown error".to_string())
+                response
+                    .message
+                    .unwrap_or_else(|| "Unknown error".to_string()),
             ));
         }
 
@@ -326,7 +341,11 @@ impl PythonBridge {
     }
 
     /// Generate tokens from input_ids, returning (output_ids, elapsed_ms)
-    pub fn generate_with_metrics(&self, input_ids: Vec<u32>, max_new_tokens: usize) -> Result<(Vec<u32>, f64)> {
+    pub fn generate_with_metrics(
+        &self,
+        input_ids: Vec<u32>,
+        max_new_tokens: usize,
+    ) -> Result<(Vec<u32>, f64)> {
         let cmd = BridgeCommand::Generate {
             input_ids,
             max_new_tokens,
@@ -370,14 +389,18 @@ impl PythonBridge {
             top_k,
         };
 
-        let json = serde_json::to_string(&cmd)
-            .map_err(|e| crate::error::AppError::InferenceFailed(format!("JSON encode error: {}", e)))?;
+        let json = serde_json::to_string(&cmd).map_err(|e| {
+            crate::error::AppError::InferenceFailed(format!("JSON encode error: {}", e))
+        })?;
 
-        let mut stdin = self.stdin.lock()
+        let mut stdin = self
+            .stdin
+            .lock()
             .map_err(|e| crate::error::AppError::InferenceFailed(format!("Lock error: {}", e)))?;
         writeln!(stdin, "{}", json)
             .map_err(|e| crate::error::AppError::InferenceFailed(format!("Write error: {}", e)))?;
-        stdin.flush()
+        stdin
+            .flush()
             .map_err(|e| crate::error::AppError::InferenceFailed(format!("Flush error: {}", e)))?;
         drop(stdin);
 
@@ -398,7 +421,8 @@ impl PythonBridge {
                         }
                         match serde_json::from_str::<StreamChunkResponse>(line_trimmed) {
                             Ok(chunk) => {
-                                let is_done = chunk.r#type.as_deref() == Some("done") || chunk.is_last;
+                                let is_done =
+                                    chunk.r#type.as_deref() == Some("done") || chunk.is_last;
                                 let stream_chunk = BridgeStreamChunk {
                                     token_id: chunk.token_id,
                                     text: chunk.text.clone(),
@@ -443,7 +467,9 @@ impl PythonBridge {
     pub fn shutdown(&self) -> Result<()> {
         let _ = self.send_command(&BridgeCommand::Shutdown);
 
-        let mut child = self.child.lock()
+        let mut child = self
+            .child
+            .lock()
             .map_err(|e| crate::error::AppError::InferenceFailed(format!("Lock error: {}", e)))?;
         let _ = child.kill();
         let _ = child.wait();

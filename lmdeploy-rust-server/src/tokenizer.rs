@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
-use splintr::Tokenizer;
 use splintr::core::byte_level::byte_level_decode;
+use splintr::Tokenizer;
 
 /// LMDeploy tokenizer wrapper backed by splintr
 #[derive(Clone)]
@@ -37,7 +37,11 @@ impl LMTokenizer {
         ))
     }
 
-    fn new(tokenizer: Tokenizer, bos_token_id: Option<u32>, eos_token_ids: Vec<u32>) -> Result<Self> {
+    fn new(
+        tokenizer: Tokenizer,
+        bos_token_id: Option<u32>,
+        eos_token_ids: Vec<u32>,
+    ) -> Result<Self> {
         let vocab_size = tokenizer.vocab_size();
         Ok(Self {
             tokenizer: Arc::new(tokenizer),
@@ -76,12 +80,14 @@ impl LMTokenizer {
     }
 
     pub fn decode(&self, token_ids: &[u32], _skip_special_tokens: bool) -> Result<String> {
-        self.tokenizer.decode(token_ids)
+        self.tokenizer
+            .decode(token_ids)
             .map_err(|e| anyhow!("Decoding failed: {}", e))
     }
 
     pub fn decode_token(&self, token_id: u32) -> Result<String> {
-        self.tokenizer.decode(&[token_id])
+        self.tokenizer
+            .decode(&[token_id])
             .map_err(|e| anyhow!("Decoding failed: {}", e))
     }
 
@@ -120,7 +126,10 @@ impl LMTokenizer {
             if token_ids.len() >= 2 {
                 if let Some(bos_id) = self.bos_token_id {
                     if token_ids[0] == bos_id && token_ids[1] == bos_id {
-                        tracing::warn!("Detected duplicate bos token {} in prompt, removing one", bos_id);
+                        tracing::warn!(
+                            "Detected duplicate bos token {} in prompt, removing one",
+                            bos_id
+                        );
                         token_ids.remove(0);
                     }
                 }
@@ -153,17 +162,22 @@ fn load_bpe_from_json(path: &Path) -> Result<(Tokenizer, Option<u32>, Vec<u32>)>
     let parsed: serde_json::Value = serde_json::from_str(&content)
         .map_err(|e| anyhow!("Failed to parse tokenizer.json: {}", e))?;
 
-    let model = parsed.get("model")
+    let model = parsed
+        .get("model")
         .ok_or_else(|| anyhow!("Missing 'model' field"))?;
 
-    let model_type = model.get("type").and_then(|v| v.as_str())
+    let model_type = model
+        .get("type")
+        .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("Missing model type"))?;
 
     if model_type != "BPE" {
         return Err(anyhow!("Unsupported model type: {}", model_type));
     }
 
-    let vocab = model.get("vocab").and_then(|v| v.as_object())
+    let vocab = model
+        .get("vocab")
+        .and_then(|v| v.as_object())
         .ok_or_else(|| anyhow!("Missing vocab"))?;
 
     // Detect byte-level decoder
@@ -201,7 +215,10 @@ fn load_bpe_from_json(path: &Path) -> Result<(Tokenizer, Option<u32>, Vec<u32>)>
                 Some(s) => s,
                 None => continue,
             };
-            let is_special = entry.get("special").and_then(|v| v.as_bool()).unwrap_or(false);
+            let is_special = entry
+                .get("special")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
 
             if is_special {
                 special_tokens.insert(content.to_string(), id);
@@ -240,7 +257,11 @@ fn load_bpe_from_json(path: &Path) -> Result<(Tokenizer, Option<u32>, Vec<u32>)>
     Ok((tokenizer, bos_token_id, eos_token_ids))
 }
 
-fn find_bpe_token(encoder: &FxHashMap<Vec<u8>, u32>, is_byte_level: bool, token: &str) -> Option<u32> {
+fn find_bpe_token(
+    encoder: &FxHashMap<Vec<u8>, u32>,
+    is_byte_level: bool,
+    token: &str,
+) -> Option<u32> {
     if is_byte_level {
         let bytes = byte_level_decode(token)?;
         encoder.get(&bytes).copied()

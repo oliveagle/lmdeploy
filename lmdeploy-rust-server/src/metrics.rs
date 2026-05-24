@@ -396,7 +396,10 @@ mod tests {
 
         assert_eq!(metrics.engine_events.len(), 2);
         assert_eq!(metrics.engine_events[0].event_type, EngineEventType::Queued);
-        assert_eq!(metrics.engine_events[1].event_type, EngineEventType::Scheduled);
+        assert_eq!(
+            metrics.engine_events[1].event_type,
+            EngineEventType::Scheduled
+        );
     }
 
     #[test]

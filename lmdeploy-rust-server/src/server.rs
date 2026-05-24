@@ -32,9 +32,9 @@ use crate::handlers::http::{
     batch_chat_completions, batch_completions, batch_stats, cache_metrics, chat_completions,
     chat_completions_stream, clear_cache, completions, embeddings, get_prefix_cache_status,
     health_check, list_models, model_load, model_load_progress, model_reload, model_unload,
-    rate_limit_status, set_prefix_cache, stream_metrics, tokenize,
+    rate_limit_status, response_format_to_grammar, set_prefix_cache, stream_metrics, tokenize,
     ChatCompletionsRequest, ChatCompletionsResponse, Choice, ChoiceLogprobs, Message,
-    response_format_to_grammar, TopLogprobEntry, Usage,
+    TopLogprobEntry, Usage,
 };
 use crate::metrics::{init_metrics, AppMetrics};
 use crate::model::{ModelLoadTracker, ModelManager};
@@ -175,8 +175,9 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
                 let entry_engine_type =
                     crate::model::cpp_engine::EngineType::from_str(&entry.engine_type)
                         .unwrap_or(crate::model::cpp_engine::EngineType::PureCpp);
-                let entry_prefix_cache_enabled =
-                    entry.prefix_cache_enabled.unwrap_or(config.model.prefix_cache_enabled);
+                let entry_prefix_cache_enabled = entry
+                    .prefix_cache_enabled
+                    .unwrap_or(config.model.prefix_cache_enabled);
                 let mut mm = model_manager.write().await;
                 if let Err(e) = mm
                     .load_model_with_type_and_prefix_cache(

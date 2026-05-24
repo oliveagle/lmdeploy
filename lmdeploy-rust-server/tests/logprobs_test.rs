@@ -98,7 +98,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if max_top <= 10 {
             println!("Test 3: PASSED");
         } else {
-            println!("Test 3: FAILED - Expected max 10 top_logprobs, got {}", max_top);
+            println!(
+                "Test 3: FAILED - Expected max 10 top_logprobs, got {}",
+                max_top
+            );
         }
     } else {
         println!("Test 3: FAILED - No logprobs returned");
