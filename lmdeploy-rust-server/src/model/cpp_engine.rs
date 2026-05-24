@@ -229,8 +229,8 @@ fn set_input_ids_gpu_async(tensors: &mut TensorMap, input_ids: &[u32]) -> Option
                     // Record event on the same stream for synchronization
                     let _ = event.record(stream);
                     let shape = [gpu_size as i64];
-                    tensors.set_int64_gpu("input_ids", gpu_ptr.cast(), &shape);
-                    tensors.set_int32("sequence_length", &[input_ids.len() as i32], &[1]);
+                    tensors.set_input_ids_gpu(gpu_ptr.cast(), &shape);
+                    tensors.set_sequence_length(input_ids.len() as i32);
                     return Some(event);
                 }
             }
@@ -298,11 +298,11 @@ fn set_input_ids_gpu(tensors: &mut TensorMap, input_ids: &[u32]) {
             }
 
             let shape = [gpu_size as i64];
-            tensors.set_int64_gpu("input_ids", gpu_ptr.cast(), &shape);
+            tensors.set_input_ids_gpu(gpu_ptr.cast(), &shape);
         });
     });
 
-    tensors.set_int32("sequence_length", &[input_ids.len() as i32], &[1]);
+    tensors.set_sequence_length(input_ids.len() as i32);
 }
 
 /// Efficiently set input_ids on TensorMap, reusing a thread-local buffer.
@@ -315,9 +315,9 @@ fn set_input_ids(tensors: &mut TensorMap, input_ids: &[u32]) {
         buf.reserve(input_ids.len());
         buf.extend(input_ids.iter().map(|&id| id as i64));
         let shape = [buf.len() as i64];
-        tensors.set_int64("input_ids", &buf, &shape);
+        tensors.set_input_ids(&buf, &shape);
     });
-    tensors.set_int32("sequence_length", &[input_ids.len() as i32], &[1]);
+    tensors.set_sequence_length(input_ids.len() as i32);
 }
 
 /// Set input_ids on TensorMap from pre-converted i64 slice, reusing thread-local buffer.
@@ -328,9 +328,9 @@ fn set_input_ids_i64(tensors: &mut TensorMap, input_ids: &[i64]) {
         buf.reserve(input_ids.len());
         buf.extend_from_slice(input_ids);
         let shape = [buf.len() as i64];
-        tensors.set_int64("input_ids", &buf, &shape);
+        tensors.set_input_ids(&buf, &shape);
     });
-    tensors.set_int32("sequence_length", &[input_ids.len() as i32], &[1]);
+    tensors.set_sequence_length(input_ids.len() as i32);
 }
 
 /// DLPack input tensor for zero-copy transfer to the C++ engine.
@@ -1460,9 +1460,9 @@ impl TurboMindCEngine {
             // Fallback: CPU copy via standard setter
             tracing::warn!("DLPack input not on GPU, falling back to CPU copy");
             // CPU fallback requires the caller to provide CPU data via separate API
-            input_tensors.set_int64("input_ids", &[0], &[0]);
+            input_tensors.set_input_ids(&[0], &[0]);
         }
-        input_tensors.set_int32("sequence_length", &[seq_len as i32], &[1]);
+        input_tensors.set_sequence_length(seq_len as i32);
 
         let mut gen_cfg = GenConfig::new().unwrap();
         gen_cfg.set_max_new_tokens(params.max_tokens.unwrap_or(512) as i32);

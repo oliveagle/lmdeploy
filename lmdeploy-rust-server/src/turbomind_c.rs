@@ -3,6 +3,8 @@
 //! Direct bindings to turbomind_c.so without Python overhead
 
 use std::fmt;
+use std::ffi::CString;
+use std::sync::OnceLock;
 
 /// Token callback type for event-driven streaming.
 ///
@@ -28,6 +30,30 @@ pub type cudaEvent_t = *mut std::os::raw::c_void;
 
 /// CUDA stream handle (opaque pointer)
 pub type cudaStream_t = *mut std::os::raw::c_void;
+
+// =============================================================================
+// Cached tensor key CString constants - avoid per-call CString allocation
+// These are initialized lazily on first use via OnceLock
+// =============================================================================
+
+static INPUT_IDS_KEY: OnceLock<CString> = OnceLock::new();
+static OUTPUT_IDS_KEY: OnceLock<CString> = OnceLock::new();
+static SEQUENCE_LENGTH_KEY: OnceLock<CString> = OnceLock::new();
+static INPUT_IDS_LOGITS_KEY: OnceLock<CString> = OnceLock::new();
+static LOGITS_KEY: OnceLock<CString> = OnceLock::new();
+static LOGIT_BIAS_KEY: OnceLock<CString> = OnceLock::new();
+static STOP_TOKEN_IDS_KEY: OnceLock<CString> = OnceLock::new();
+static ATTENTION_MASK_KEY: OnceLock<CString> = OnceLock::new();
+static POSITION_IDS_KEY: OnceLock<CString> = OnceLock::new();
+static HIDDEN_STATES_KEY: OnceLock<CString> = OnceLock::new();
+static PAST_KEY_VALUES_KEY: OnceLock<CString> = OnceLock::new();
+static LOSS_KEY: OnceLock<CString> = OnceLock::new();
+
+/// Get or create a CString pointer for a known tensor key.
+/// Returns `*const c_char` directly usable in FFI calls without allocation.
+fn tensor_key_ptr(lock: &OnceLock<CString>, name: &'static str) -> *const c_char {
+    lock.get_or_init(|| CString::new(name).unwrap()).as_ptr()
+}
 
 // CUDA runtime FFI bindings for GPU memory management
 // These functions are from libcudart.so which is already linked by turbomind_c.so
@@ -1344,6 +1370,116 @@ impl TensorMap {
                 dl_type_code,
                 dl_type_bits,
                 device_type,
+            );
+        }
+    }
+
+    // =============================================================================
+    // Optimized convenience methods for common tensor keys
+    // These use pre-allocated CString constants to avoid per-call allocation
+    // =============================================================================
+
+    /// Set input_ids tensor (int64) - uses cached "input_ids" key
+    pub fn set_input_ids(&mut self, data: &[i64], shape: &[i64]) {
+        unsafe {
+            TM_TensorMap_SetInt64(
+                self.0,
+                tensor_key_ptr(&INPUT_IDS_KEY, "input_ids"),
+                data.as_ptr(),
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
+        }
+    }
+
+    /// Set input_ids tensor with GPU pointer (zero-copy) - uses cached "input_ids" key
+    pub fn set_input_ids_gpu(&mut self, data: *const i64, shape: &[i64]) {
+        unsafe {
+            TM_TensorMap_SetInt64GPU(
+                self.0,
+                tensor_key_ptr(&INPUT_IDS_KEY, "input_ids"),
+                data,
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
+        }
+    }
+
+    /// Set output_ids tensor (int64) - uses cached "output_ids" key
+    pub fn set_output_ids(&mut self, data: &[i64], shape: &[i64]) {
+        unsafe {
+            TM_TensorMap_SetInt64(
+                self.0,
+                tensor_key_ptr(&OUTPUT_IDS_KEY, "output_ids"),
+                data.as_ptr(),
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
+        }
+    }
+
+    /// Set output_ids tensor with GPU pointer (zero-copy) - uses cached "output_ids" key
+    pub fn set_output_ids_gpu(&mut self, data: *const i64, shape: &[i64]) {
+        unsafe {
+            TM_TensorMap_SetInt64GPU(
+                self.0,
+                tensor_key_ptr(&OUTPUT_IDS_KEY, "output_ids"),
+                data,
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
+        }
+    }
+
+    /// Set sequence_length tensor (int32) - uses cached "sequence_length" key
+    pub fn set_sequence_length(&mut self, len: i32) {
+        static SHAPE: [i64; 1] = [1];
+        unsafe {
+            TM_TensorMap_SetInt32(
+                self.0,
+                tensor_key_ptr(&SEQUENCE_LENGTH_KEY, "sequence_length"),
+                &len,
+                1,
+                SHAPE.as_ptr(),
+            );
+        }
+    }
+
+    /// Set logits tensor (float32) - uses cached "logits" key
+    pub fn set_logits(&mut self, data: &[c_float], shape: &[i64]) {
+        unsafe {
+            TM_TensorMap_SetFloat32(
+                self.0,
+                tensor_key_ptr(&LOGITS_KEY, "logits"),
+                data.as_ptr(),
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
+        }
+    }
+
+    /// Set logits tensor with GPU pointer - uses cached "logits" key
+    pub fn set_logits_gpu(&mut self, data: *const c_float, shape: &[i64]) {
+        unsafe {
+            TM_TensorMap_SetFloat32GPU(
+                self.0,
+                tensor_key_ptr(&LOGITS_KEY, "logits"),
+                data,
+                shape.len() as c_int,
+                shape.as_ptr(),
+            );
+        }
+    }
+
+    /// Set hidden_states tensor (float32) - uses cached "hidden_states" key
+    pub fn set_hidden_states(&mut self, data: *const c_float, shape: &[i64]) {
+        unsafe {
+            TM_TensorMap_SetFloat32GPU(
+                self.0,
+                tensor_key_ptr(&HIDDEN_STATES_KEY, "hidden_states"),
+                data,
+                shape.len() as c_int,
+                shape.as_ptr(),
             );
         }
     }
