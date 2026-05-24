@@ -699,6 +699,10 @@ impl TurboMindCEngine {
         engine_config.set_max_batch_size(max_batch_size);
         engine_config.set_cache_block_seq_len(64);
         engine_config.set_cache_max_block_count(0.8);
+        // cache_chunk_size: Python default -1 means allocate cache_max_entry_count blocks
+        // When 0: allocates sqrt(cache_max_entry_count) blocks
+        // When -1: allocates cache_max_entry_count blocks (matches Python behavior)
+        engine_config.set_cache_chunk_size(-1);
         engine_config.set_enable_prefix_caching(prefix_cache_enabled);
         engine_config.set_enable_metrics(true);
         engine_config.set_quant_policy(quant_policy);
