@@ -53,6 +53,13 @@ private:
         std::vector<Tensor>        recurrent_states;
         Buffer_<void*>             conv_state_ptrs;
         Buffer_<void*>             recurrent_state_ptrs;
+
+        // Reusable temporary buffers for forward pass (allocated per phase, reused per request)
+        // These prevent repeated allocations during large prefill operations
+        Tensor attn_out;
+        Tensor conv_out;
+        Tensor beta;
+        Tensor g;
     };
     std::vector<Data> data_;
 

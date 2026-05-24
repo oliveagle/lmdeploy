@@ -99,11 +99,11 @@ def run_benchmark_with_pipeline():
                 do_preprocess=False,
                 stream_response=True,
             ):
-                if ttft_time is None and response.text:
+                if ttft_time is None and response.generate_token_len:
                     ttft_time = time.perf_counter() - start_time
 
-                if response.token_ids:
-                    output_tokens = len(response.token_ids)
+                if response.generate_token_len:
+                    output_tokens = response.generate_token_len
 
             total_time = time.perf_counter() - start_time
 

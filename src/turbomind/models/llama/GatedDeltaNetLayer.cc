@@ -81,9 +81,12 @@ void GatedDeltaNetLayer::Setup(int phase, TensorMap& env)
     d.conv_states.resize(d.batch_size);
     d.recurrent_states.resize(d.batch_size);
 
+    // Calculate total tokens across all requests for buffer allocation
+    int total_tokens = 0;
     for (int i = 0; i < d.batch_size; ++i) {
         d.rc[i]         = b.rc[i].get();
         d.input_lens[i] = b.rc[i]->input_len;
+        total_tokens   += d.input_lens[i];
 
         auto& s = *b.rc[i]->seq;
         TM_CHECK(s.conv_states && s.recurrent_states)
@@ -107,6 +110,28 @@ void GatedDeltaNetLayer::Setup(int phase, TensorMap& env)
 
     Copy(conv_state_ptrs_buf_, d.batch_size, d.conv_state_ptrs);
     Copy(recurrent_state_ptrs_buf_, d.batch_size, d.recurrent_state_ptrs);
+
+    // Allocate temporary buffers for the phase based on total token count.
+    // These buffers persist for the phase and are reused across multiple Forward calls
+    // within the same scheduling round, preventing OOM during large prefill operations
+    // by avoiding repeated per-request allocations.
+    if (total_tokens > 0) {
+        const auto dtype  = d.conv_states[0].dtype();
+        const auto device = d.conv_states[0].device();
+
+        const int conv_dim    = d.conv_states[0].shape(2);
+        const int value_dim   = d.recurrent_states[0].shape(1) * d.recurrent_states[0].shape(3);
+        const int num_v_heads = d.recurrent_states[0].shape(1);
+
+        // conv_out: (total_tokens, conv_dim)
+        d.conv_out = {{total_tokens, conv_dim}, dtype, device};
+        // attn_out: (total_tokens, value_dim)
+        d.attn_out = {{total_tokens, value_dim}, dtype, device};
+        // beta: (total_tokens, num_v_heads)
+        d.beta = {{total_tokens, num_v_heads}, dtype, device};
+        // g: (total_tokens, num_v_heads)
+        d.g = {{total_tokens, num_v_heads}, dtype, device};
+    }
 }
 
 static int linear_layer_index(int layer_id, const std::vector<int>& layer_types)
@@ -174,8 +199,10 @@ void GatedDeltaNetLayer::Forward(ForwardParam p)
         const int b_offset = conv_dim + value_dim;   // column offset to b logits
         const int a_offset = b_offset + v_heads_tp;  // column offset to a logits
 
-        Tensor beta{{token_num, num_v_heads}, dtype, device};
-        Tensor g{{token_num, num_v_heads}, dtype, device};
+        // Use pre-allocated phase buffers to avoid repeated allocations
+        // This is critical for large prefill operations to prevent OOM
+        auto beta = pd.beta.view({token_num, num_v_heads});
+        auto g    = pd.g.view({token_num, num_v_heads});
 
         auto b = all_proj.slice({0, b_offset}, {-1, v_heads_tp});
         auto a = all_proj.slice({0, a_offset}, {-1, v_heads_tp});
@@ -187,8 +214,9 @@ void GatedDeltaNetLayer::Forward(ForwardParam p)
         // =================================================================
         // 3. Process all requests at once via batched kernel launches
         // =================================================================
-        Tensor attn_out{{token_num, value_dim}, dtype, device};
-        Tensor conv_out{{token_num, conv_dim}, dtype, device};
+        // Use pre-allocated phase buffers for intermediate outputs
+        auto attn_out = pd.attn_out.view({token_num, value_dim});
+        auto conv_out = pd.conv_out.view({token_num, conv_dim});
 
         const int state_layer_idx              = linear_layer_index(p.layer_id, layer_types_);
         const int conv_state_layer_offset      = state_layer_idx * (conv_dim * d_conv);
