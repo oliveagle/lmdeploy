@@ -1867,6 +1867,14 @@ struct TM_TokenCallbackWrapper {
         : func(f), user_data(ud), token_id(0), seq_len(0) {}
 };
 
+struct TM_CompletionCallbackWrapper {
+    TM_CompletionCallback func;
+    void* user_data;
+
+    TM_CompletionCallbackWrapper(TM_CompletionCallback f, void* ud)
+        : func(f), user_data(ud) {}
+};
+
 struct TM_ModelRequest {
     turbomind::ModelRequest* req;
     std::shared_ptr<turbomind::TensorMap> output_tensors;
@@ -1875,6 +1883,7 @@ struct TM_ModelRequest {
     std::shared_ptr<turbomind::TensorMap> streaming_tensors;
     std::shared_ptr<turbomind::AtomicRequestState> streaming_state;
     std::shared_ptr<TM_TokenCallbackWrapper> token_cb_wrapper;
+    std::shared_ptr<TM_CompletionCallbackWrapper> completion_cb_wrapper;
 };
 
 TM_ModelRequest* TM_ModelRequest_Create(TM_TurboMind* tm)
@@ -2073,4 +2082,130 @@ int TM_ModelRequest_SetTokenCallback(TM_ModelRequest* req, TM_TokenCallback cb, 
 
     req->token_cb_wrapper = std::make_shared<TM_TokenCallbackWrapper>(cb, user_data);
     return TM_OK;
+}
+
+int TM_ModelRequest_SetCompletionCallback(TM_ModelRequest* req, TM_CompletionCallback cb, void* user_data)
+{
+    if (!req) {
+        SetError(TM_ERR_INVALID_ARG, "NULL argument to TM_ModelRequest_SetCompletionCallback");
+        return TM_ERR_INVALID_ARG;
+    }
+
+    req->completion_cb_wrapper = std::make_shared<TM_CompletionCallbackWrapper>(cb, user_data);
+    return TM_OK;
+}
+
+void TM_TensorMap_Clear(TM_TensorMap* map)
+{
+    if (map) {
+        map->map.clear();
+    }
+}
+
+int TM_ModelRequest_ForwardAsync(
+    TM_ModelRequest* req,
+    TM_TensorMap* input_tensors,
+    const TM_SessionParam* session,
+    const TM_GenerationConfig* gen_cfg,
+    bool stream_output,
+    bool enable_metrics)
+{
+    if (!req || !input_tensors || !session || !gen_cfg) {
+        SetError(TM_ERR_INVALID_ARG, "NULL argument to TM_ModelRequest_ForwardAsync");
+        return TM_ERR_INVALID_ARG;
+    }
+
+    try {
+        turbomind::ModelRequest::InputParam param{};
+        param.tensors = std::make_shared<turbomind::core::TensorMap>(std::move(input_tensors->map));
+        param.session.id = session->id;
+        param.session.step = session->step;
+        param.session.start_flag = session->start_flag;
+        param.session.end_flag = session->end_flag;
+        param.gen_cfg = gen_cfg->config;
+        param.stream_output = stream_output;
+        param.enable_metrics = enable_metrics;
+
+        // Set token callback if registered
+        if (req->token_cb_wrapper) {
+            auto wrapper = req->token_cb_wrapper;
+            param.token_cb = [wrapper](int token_id, int seq_len) {
+                if (wrapper && wrapper->func) {
+                    wrapper->func(token_id, seq_len, wrapper->user_data);
+                }
+            };
+        }
+
+        // Set completion callback if registered
+        if (req->completion_cb_wrapper) {
+            auto wrapper = req->completion_cb_wrapper;
+            param.completion_cb = [wrapper](int status, int seq_len) {
+                if (wrapper && wrapper->func) {
+                    wrapper->func(status, seq_len, wrapper->user_data);
+                }
+            };
+        }
+
+        auto out = req->req->ForwardAsync(std::move(param));
+
+        // Store outputs for later retrieval
+        req->streaming_tensors = std::move(out.tensors);
+        req->streaming_state = std::move(out.state);
+
+        return TM_OK;
+    }
+    catch (const std::exception& e) {
+        SetError(TM_ERR_RUNTIME, e.what());
+        return TM_ERR_RUNTIME;
+    }
+}
+
+int TM_ModelRequest_GetStreamingState(TM_ModelRequest* req, TM_RequestStatus* out_status, int* out_seq_len)
+{
+    if (!req || !out_status) {
+        return TM_ERR_INVALID_ARG;
+    }
+
+    auto state = req->streaming_state ? req->streaming_state->exchange(nullptr) : nullptr;
+    if (!state) {
+        // No state available - request may not have been submitted yet
+        *out_status = TM_STATUS_OK;
+        if (out_seq_len) *out_seq_len = 0;
+        return 0;
+    }
+
+    *out_status = static_cast<TM_RequestStatus>(state->status);
+    if (out_seq_len) *out_seq_len = state->seq_len;
+    return 0;
+}
+
+int TM_ModelRequest_GetStreamToken(
+    TM_ModelRequest* req,
+    void** out_data,
+    size_t* out_count)
+{
+    if (!req || !out_data || !out_count) {
+        return TM_ERR_INVALID_ARG;
+    }
+
+    if (!req->streaming_tensors) {
+        SetError(TM_ERR_RUNTIME, "Request has not been submitted with ForwardAsync");
+        return TM_ERR_RUNTIME;
+    }
+
+    auto it = req->streaming_tensors->find("output_ids");
+    if (it == req->streaming_tensors->end()) {
+        SetError(TM_ERR_NOT_FOUND, "output_ids tensor not found");
+        return TM_ERR_NOT_FOUND;
+    }
+
+    const auto& tensor = it->second;
+    *out_data = const_cast<void*>(tensor.raw_data());
+    *out_count = static_cast<size_t>(tensor.size() / sizeof(int32_t));
+    return 0;
+}
+
+TM_CompiledGrammar* TM_Grammar_GetBuiltinJSON(void)
+{
+    return new TM_CompiledGrammar{};
 }

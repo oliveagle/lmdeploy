@@ -10,6 +10,15 @@ use std::fmt;
 /// Must be thread-safe (called from C++ engine thread).
 pub type TM_TokenCallback = extern "C" fn(token_id: c_int, seq_len: c_int, user_data: *mut c_void);
 
+/// Completion callback type for event-driven request completion.
+///
+/// Invoked from the C++ engine when the request completes (finish, error, or cancel).
+/// Must be thread-safe (called from C++ engine thread).
+/// status: the final request status (TM_RequestStatus)
+/// seq_len: the final sequence length
+/// user_data: opaque pointer passed to the callback
+pub type TM_CompletionCallback = extern "C" fn(status: c_int, seq_len: c_int, user_data: *mut c_void);
+
 // Re-export types
 pub use std::os::raw::{c_char, c_float, c_int, c_long, c_uint, c_void};
 
@@ -473,6 +482,14 @@ extern "C" {
     pub fn TM_ModelRequest_SetTokenCallback(
         req: *mut TM_ModelRequest,
         cb: TM_TokenCallback,
+        user_data: *mut c_void,
+    ) -> c_int;
+
+    // Register a completion callback for event-driven request completion.
+    // The callback will be invoked from the C++ engine thread when the request completes.
+    pub fn TM_ModelRequest_SetCompletionCallback(
+        req: *mut TM_ModelRequest,
+        cb: TM_CompletionCallback,
         user_data: *mut c_void,
     ) -> c_int;
 
@@ -1411,6 +1428,30 @@ impl ModelRequest {
             return Err(FFError::from_last_error().unwrap_or(FFError {
                 code: TM_ErrorCode::TM_ERR_RUNTIME,
                 message: "SetTokenCallback failed".into(),
+            }));
+        }
+        Ok(())
+    }
+
+    /// Register a completion callback for event-driven request completion.
+    ///
+    /// The callback will be invoked from the C++ engine thread when the request
+    /// completes (finish, error, cancel).
+    /// The callback must be thread-safe.
+    ///
+    /// # Safety
+    /// - `cb` must be valid for the lifetime of the request
+    /// - `user_data` must be a valid pointer or null
+    pub unsafe fn set_completion_callback(
+        &mut self,
+        cb: TM_CompletionCallback,
+        user_data: *mut c_void,
+    ) -> FFResult<()> {
+        let ret = TM_ModelRequest_SetCompletionCallback(self.0, cb, user_data);
+        if ret != 0 {
+            return Err(FFError::from_last_error().unwrap_or(FFError {
+                code: TM_ErrorCode::TM_ERR_RUNTIME,
+                message: "SetCompletionCallback failed".into(),
             }));
         }
         Ok(())

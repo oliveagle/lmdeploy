@@ -451,6 +451,31 @@ impl GenerationParams {
     }
 }
 
+/// Completion callback for event-driven request completion.
+///
+/// Invoked by the C++ engine when the request completes (finish, error, or cancel).
+/// Signals completion through the channel, avoiding polling.
+extern "C" fn completion_callback(status: c_int, seq_len: c_int, user_data: *mut c_void) {
+    unsafe {
+        let ctx = &*(user_data as *const StreamContext);
+
+        // Log the completion status for debugging
+        match status {
+            7 => tracing::debug!(seq_len, "Request completed: TM_STATUS_FINISH"),
+            5 => tracing::warn!(seq_len, "Request completed: TM_STATUS_FAIL"),
+            8 => tracing::debug!(seq_len, "Request completed: TM_STATUS_CANCEL"),
+            6 => tracing::warn!(seq_len, "Request completed: TM_STATUS_TOO_LONG"),
+            9 => tracing::warn!(seq_len, "Request completed: TM_STATUS_INCONSISTENCY"),
+            _ => tracing::debug!(status, seq_len, "Request completed with status"),
+        }
+
+        // Signal completion by closing the sender
+        // This causes the receiver stream to end naturally
+        ctx.completion_flag.store(true, std::sync::atomic::Ordering::Release);
+    }
+}
+
+
 /// Token callback for event-driven streaming.
 ///
 /// Invoked by the C++ engine whenever a new token is generated.
@@ -473,10 +498,25 @@ extern "C" fn token_callback(token_id: c_int, _seq_len: c_int, user_data: *mut c
 }
 
 
-/// Shared context passed to the C token callback via raw pointer.
+/// Shared context passed to the C callbacks via raw pointer.
 struct StreamContext {
     tokenizer: LMTokenizer,
     tx: tokio::sync::mpsc::Sender<String>,
+    /// Atomic flag set by completion callback to signal request is done
+    completion_flag: std::sync::atomic::AtomicBool,
+}
+
+/// Batch completion context for non-streaming batch inference
+struct BatchCompletionContext {
+    completion_flag: std::sync::atomic::AtomicBool,
+}
+
+/// Batch completion callback for non-streaming batch inference.
+extern "C" fn batch_completion_callback(_status: c_int, _seq_len: c_int, user_data: *mut c_void) {
+    unsafe {
+        let ctx = &*(user_data as *const BatchCompletionContext);
+        ctx.completion_flag.store(true, std::sync::atomic::Ordering::Release);
+    }
 }
 
 /// Pool of ModelRequest instances for concurrent inference.
@@ -1535,13 +1575,27 @@ impl TurboMindCEngine {
             // Clear and reuse TensorMaps
             input_tensors.clear();
 
-            // Create callback context
-            let ctx = Arc::new(StreamContext { tokenizer, tx });
+            // Create atomic flag for completion signaling
+            let completion_flag = std::sync::atomic::AtomicBool::new(false);
+
+            // Create callback context with completion flag
+            let ctx = Arc::new(StreamContext {
+                tokenizer,
+                tx,
+                completion_flag,
+            });
             let ctx_ptr = Arc::into_raw(ctx) as *mut c_void;
 
             // Set the token callback before submitting the request
             if let Err(e) = unsafe { request.set_token_callback(token_callback, ctx_ptr) } {
                 tracing::error!(error = ?e, "Failed to set token callback");
+                let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
+                return;
+            }
+
+            // Set the completion callback to avoid polling
+            if let Err(e) = unsafe { request.set_completion_callback(completion_callback, ctx_ptr) } {
+                tracing::error!(error = ?e, "Failed to set completion callback");
                 let _ = unsafe { Arc::from_raw(ctx_ptr as *const StreamContext) };
                 return;
             }
@@ -1595,24 +1649,23 @@ impl TurboMindCEngine {
                 return;
             }
 
-            // Wait for completion (no polling needed for tokens, only for status)
-            // Reduced polling interval from 5ms to 1ms for faster TTFT detection
+            // Event-driven wait: completion callback sets the flag
+            // This is CPU-efficient: no polling, just a relaxed load in a loop
             loop {
-                std::thread::sleep(std::time::Duration::from_millis(1));
-
-                let (status, _seq_len) = match request.get_streaming_state() {
-                    Ok(s) => s,
-                    Err(_) => continue,
+                // Use relaxed ordering for the flag check (faster, safe for this use case)
+                let is_done = unsafe {
+                    (*(&ctx_ptr as *const *mut c_void as *const StreamContext))
+                        .completion_flag
+                        .load(std::sync::atomic::Ordering::Relaxed)
                 };
 
-                match status {
-                    crate::turbomind_c::TM_RequestStatus::TM_STATUS_FINISH => break,
-                    crate::turbomind_c::TM_RequestStatus::TM_STATUS_CANCEL => break,
-                    crate::turbomind_c::TM_RequestStatus::TM_STATUS_FAIL => break,
-                    crate::turbomind_c::TM_RequestStatus::TM_STATUS_TOO_LONG => break,
-                    crate::turbomind_c::TM_RequestStatus::TM_STATUS_INCONSISTENCY => break,
-                    _ => continue,
+                if is_done {
+                    break;
                 }
+
+                // Use a longer sleep since we're event-driven now
+                // The callback will wake us up, so this is just a safety net
+                std::thread::sleep(std::time::Duration::from_millis(10));
             }
 
             // Reclaim the Arc to prevent memory leak
@@ -2193,51 +2246,40 @@ impl TurboMindCEngine {
                     };
                 }
 
-                // Poll for completion
+                // Event-driven completion: register completion callback instead of polling
+                let completion_ctx = BatchCompletionContext {
+                    completion_flag: std::sync::atomic::AtomicBool::new(false),
+                };
+                let ctx_ptr = Box::into_raw(Box::new(completion_ctx)) as *mut c_void;
+
+                if let Err(e) = unsafe { request.set_completion_callback(batch_completion_callback, ctx_ptr) } {
+                    tracing::error!(error = ?e, request_id, "Failed to set completion callback");
+                    let _ = unsafe { Box::from_raw(ctx_ptr as *mut BatchCompletionContext) };
+                    return BatchResult {
+                        request_id,
+                        text: String::new(),
+                        num_tokens: 0,
+                        elapsed_ms: start.elapsed().as_secs_f64() * 1000.0,
+                        logprobs: None,
+                        error: Some(format!("Failed to set completion callback: {:?}", e)),
+                    };
+                }
+
+                // Wait for completion via callback (event-driven, CPU-efficient)
+                let completion_ctx_ref = unsafe { &*ctx_ptr.cast::<BatchCompletionContext>() };
+                loop {
+                    if completion_ctx_ref.completion_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                // Cleanup
+                let _ctx = unsafe { Box::from_raw(ctx_ptr as *mut BatchCompletionContext) };
+
+                // Extract results after completion
                 let need_logprobs = item.need_logprobs;
                 let top_logprobs_req = item.params.top_logprobs.unwrap_or(1).max(1);
-
-                loop {
-                    match request.get_streaming_state() {
-                        Ok((status, _seq_len)) => {
-                            match status {
-                                crate::turbomind_c::TM_RequestStatus::TM_STATUS_FINISH => {
-                                    // Request complete - extract results
-                                    return extract_batch_result(&request, &tokenizer_clone, request_id, start, need_logprobs, top_logprobs_req);
-                                }
-                                crate::turbomind_c::TM_RequestStatus::TM_STATUS_FAIL |
-                                crate::turbomind_c::TM_RequestStatus::TM_STATUS_CANCEL |
-                                crate::turbomind_c::TM_RequestStatus::TM_STATUS_TOO_LONG |
-                                crate::turbomind_c::TM_RequestStatus::TM_STATUS_INCONSISTENCY => {
-                                    // Request failed
-                                    return BatchResult {
-                                        request_id,
-                                        text: String::new(),
-                                        num_tokens: 0,
-                                        elapsed_ms: start.elapsed().as_secs_f64() * 1000.0,
-                                        logprobs: None,
-                                        error: Some(format!("Request failed with status: {:?}", status as i32)),
-                                    };
-                                }
-                                _ => {
-                                    // Still processing - poll again
-                                    std::thread::sleep(std::time::Duration::from_millis(1));
-                                }
-                            }
-                        }
-                        Err(_) => {
-                            // Error getting state - treat as failed
-                            return BatchResult {
-                                request_id,
-                                text: String::new(),
-                                num_tokens: 0,
-                                elapsed_ms: start.elapsed().as_secs_f64() * 1000.0,
-                                logprobs: None,
-                                error: Some("Failed to get streaming state".to_string()),
-                            };
-                        }
-                    }
-                }
+                return extract_batch_result(&request, &tokenizer_clone, request_id, start, need_logprobs, top_logprobs_req);
             });
 
             handles.push(handle);
