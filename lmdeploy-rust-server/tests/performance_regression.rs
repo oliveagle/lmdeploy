@@ -23,6 +23,7 @@
 //! cargo test --test performance_regression
 //! ```
 
+use futures::StreamExt;
 use lmdeploy_server::model::cpp_engine::{GenerationParams, TurboMindCEngine};
 use std::time::Instant;
 
@@ -50,16 +51,14 @@ fn generate_prompt(target_tokens: usize) -> String {
     SAMPLE_TEXT.repeat(repeats)
 }
 
-/// Performance metrics for a single inference run
+/// Performance metrics for a single streaming inference run
 #[derive(Debug, Clone)]
 struct InferenceMetrics {
-    /// Time to first token (ms)
+    /// Time to first token (ms) - measured from real streaming, not estimated
     ttft_ms: f64,
     /// Total elapsed time (ms)
     elapsed_ms: f64,
-    /// Number of input tokens
-    input_tokens: usize,
-    /// Number of output tokens
+    /// Number of output tokens generated
     output_tokens: usize,
     /// Prefill speed (tokens/second)
     prefill_tps: f64,
@@ -67,39 +66,53 @@ struct InferenceMetrics {
     decode_tps: f64,
 }
 
-/// Calculate inference metrics from token counts and timing
-fn calculate_metrics(
-    input_tokens: usize,
-    output_tokens: usize,
-    elapsed_ms: f64,
+/// Run streaming inference and collect real TTFT and output tokens
+async fn run_streaming_inference(
+    engine: &TurboMindCEngine,
+    prompt: &str,
+    max_tokens: usize,
 ) -> InferenceMetrics {
-    // TTFT is approximately the time until first output token
-    // For non-streaming, we estimate it as a fraction of total time
-    // based on the ratio of prefill to decode work
-    let total_tokens = input_tokens + output_tokens;
-    let prefill_ratio = input_tokens as f64 / total_tokens as f64;
-    let ttft_ms = elapsed_ms * prefill_ratio;
+    let start = Instant::now();
+    let mut stream = engine
+        .generate_stream(
+            prompt,
+            GenerationParams {
+                max_tokens: Some(max_tokens),
+                temperature: Some(0.0),
+                ..Default::default()
+            },
+        )
+        .await;
 
-    // Prefill speed: input tokens / prefill time
-    let prefill_time_sec = ttft_ms / 1000.0;
-    let prefill_tps = if prefill_time_sec > 0.0 {
-        input_tokens as f64 / prefill_time_sec
-    } else {
-        0.0
-    };
+    let mut ttft_ms = 0.0;
+    let mut first_token_received = false;
+    let mut output_tokens = 0usize;
 
-    // Decode speed: output tokens / decode time
-    let decode_time_sec = (elapsed_ms - ttft_ms) / 1000.0;
-    let decode_tps = if decode_time_sec > 0.0 {
-        output_tokens as f64 / decode_time_sec
+    while let Some(_token) = stream.next().await {
+        let elapsed = start.elapsed().as_secs_f64() * 1000.0;
+
+        if !first_token_received {
+            ttft_ms = elapsed;
+            first_token_received = true;
+        }
+        output_tokens += 1;
+    }
+
+    let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+    let prefill_time_sec = if ttft_ms > 0.0 { ttft_ms / 1000.0 } else { 0.0001 };
+    let prefill_tps = output_tokens as f64 / prefill_time_sec;
+
+    let decode_time_sec = if elapsed_ms > ttft_ms {
+        (elapsed_ms - ttft_ms) / 1000.0
     } else {
-        0.0
+        0.0001
     };
+    let decode_tps = output_tokens as f64 / decode_time_sec;
 
     InferenceMetrics {
         ttft_ms,
         elapsed_ms,
-        input_tokens,
         output_tokens,
         prefill_tps,
         decode_tps,
@@ -153,25 +166,8 @@ mod performance_tests {
         warmup_engine(&engine, 2).await;
 
         // Test: 8K context prompt, generate 16 tokens
-        let input_tokens = 8192;
-        let prompt = generate_prompt(input_tokens);
-        let max_tokens = 16;
-
-        let start = Instant::now();
-        let (_text, num_tokens, elapsed_ms) = engine
-            .generate_with_metrics(
-                &prompt,
-                GenerationParams {
-                    max_tokens: Some(max_tokens),
-                    temperature: Some(0.0),
-                    ..Default::default()
-                },
-            )
-            .await;
-        let total_elapsed = start.elapsed().as_secs_f64() * 1000.0;
-
-        let output_tokens = num_tokens.saturating_sub(input_tokens);
-        let metrics = calculate_metrics(input_tokens, output_tokens, total_elapsed);
+        let prompt = generate_prompt(8192);
+        let metrics = run_streaming_inference(&engine, &prompt, 16).await;
 
         println!(
             "Prefill @ 8K: {:.2} tok/s (TTFT: {:.2}ms, total: {:.2}ms)",
@@ -214,25 +210,8 @@ mod performance_tests {
         warmup_engine(&engine, 2).await;
 
         // Test: 1K context prompt, generate 16 tokens
-        let input_tokens = 1024;
-        let prompt = generate_prompt(input_tokens);
-        let max_tokens = 16;
-
-        let start = Instant::now();
-        let (_text, num_tokens, elapsed_ms) = engine
-            .generate_with_metrics(
-                &prompt,
-                GenerationParams {
-                    max_tokens: Some(max_tokens),
-                    temperature: Some(0.0),
-                    ..Default::default()
-                },
-            )
-            .await;
-        let total_elapsed = start.elapsed().as_secs_f64() * 1000.0;
-
-        let output_tokens = num_tokens.saturating_sub(input_tokens);
-        let metrics = calculate_metrics(input_tokens, output_tokens, total_elapsed);
+        let prompt = generate_prompt(1024);
+        let metrics = run_streaming_inference(&engine, &prompt, 16).await;
 
         println!(
             "Prefill @ 1K: {:.2} tok/s (TTFT: {:.2}ms, total: {:.2}ms)",
@@ -275,29 +254,12 @@ mod performance_tests {
         warmup_engine(&engine, 2).await;
 
         // Test: 8K context prompt, generate 256 tokens
-        let input_tokens = 8192;
-        let prompt = generate_prompt(input_tokens);
-        let max_tokens = 256;
-
-        let start = Instant::now();
-        let (_text, num_tokens, elapsed_ms) = engine
-            .generate_with_metrics(
-                &prompt,
-                GenerationParams {
-                    max_tokens: Some(max_tokens),
-                    temperature: Some(0.0),
-                    ..Default::default()
-                },
-            )
-            .await;
-        let total_elapsed = start.elapsed().as_secs_f64() * 1000.0;
-
-        let output_tokens = num_tokens.saturating_sub(input_tokens);
-        let metrics = calculate_metrics(input_tokens, output_tokens, total_elapsed);
+        let prompt = generate_prompt(8192);
+        let metrics = run_streaming_inference(&engine, &prompt, 256).await;
 
         println!(
             "Decode @ 8K: {:.2} tok/s (TTFT: {:.2}ms, total: {:.2}ms, out: {} tokens)",
-            metrics.decode_tps, metrics.ttft_ms, metrics.elapsed_ms, output_tokens
+            metrics.decode_tps, metrics.ttft_ms, metrics.elapsed_ms, metrics.output_tokens
         );
 
         // Baseline assertion: >40 tok/s
@@ -336,25 +298,8 @@ mod performance_tests {
         warmup_engine(&engine, 2).await;
 
         // Test: 8K context prompt, generate 16 tokens
-        let input_tokens = 8192;
-        let prompt = generate_prompt(input_tokens);
-        let max_tokens = 16;
-
-        let start = Instant::now();
-        let (_text, num_tokens, elapsed_ms) = engine
-            .generate_with_metrics(
-                &prompt,
-                GenerationParams {
-                    max_tokens: Some(max_tokens),
-                    temperature: Some(0.0),
-                    ..Default::default()
-                },
-            )
-            .await;
-        let total_elapsed = start.elapsed().as_secs_f64() * 1000.0;
-
-        let output_tokens = num_tokens.saturating_sub(input_tokens);
-        let metrics = calculate_metrics(input_tokens, output_tokens, total_elapsed);
+        let prompt = generate_prompt(8192);
+        let metrics = run_streaming_inference(&engine, &prompt, 16).await;
 
         println!(
             "TTFT @ 8K: {:.2}ms (Prefill: {:.2} tok/s, Decode: {:.2} tok/s)",
@@ -399,22 +344,8 @@ mod performance_tests {
         let mut failures = Vec::new();
 
         // Test 1: Prefill @ 8K
-        let input_tokens = 8192;
-        let prompt = generate_prompt(input_tokens);
-        let start = Instant::now();
-        let (_text, num_tokens, elapsed_ms) = engine
-            .generate_with_metrics(
-                &prompt,
-                GenerationParams {
-                    max_tokens: Some(16),
-                    temperature: Some(0.0),
-                    ..Default::default()
-                },
-            )
-            .await;
-        let total_elapsed = start.elapsed().as_secs_f64() * 1000.0;
-        let output_tokens = num_tokens.saturating_sub(input_tokens);
-        let metrics = calculate_metrics(input_tokens, output_tokens, total_elapsed);
+        let prompt = generate_prompt(8192);
+        let metrics = run_streaming_inference(&engine, &prompt, 16).await;
 
         println!(
             "Comprehensive - Prefill @ 8K: {:.2} tok/s",
@@ -428,20 +359,7 @@ mod performance_tests {
         }
 
         // Test 2: Decode @ 8K
-        let start = Instant::now();
-        let (_text, num_tokens, elapsed_ms) = engine
-            .generate_with_metrics(
-                &prompt,
-                GenerationParams {
-                    max_tokens: Some(256),
-                    temperature: Some(0.0),
-                    ..Default::default()
-                },
-            )
-            .await;
-        let total_elapsed = start.elapsed().as_secs_f64() * 1000.0;
-        let output_tokens = num_tokens.saturating_sub(input_tokens);
-        let metrics = calculate_metrics(input_tokens, output_tokens, total_elapsed);
+        let metrics = run_streaming_inference(&engine, &prompt, 256).await;
 
         println!(
             "Comprehensive - Decode @ 8K: {:.2} tok/s",
@@ -487,26 +405,12 @@ mod performance_tests {
         // Warmup
         warmup_engine(&engine, 2).await;
 
-        let input_tokens = 4096;
-        let prompt = generate_prompt(input_tokens);
+        let prompt = generate_prompt(4096);
         let iterations = 5;
         let mut prefill_speeds = Vec::new();
 
         for _i in 0..iterations {
-            let start = Instant::now();
-            let (_text, num_tokens, elapsed_ms) = engine
-                .generate_with_metrics(
-                    &prompt,
-                    GenerationParams {
-                        max_tokens: Some(16),
-                        temperature: Some(0.0),
-                        ..Default::default()
-                    },
-                )
-                .await;
-            let total_elapsed = start.elapsed().as_secs_f64() * 1000.0;
-            let output_tokens = num_tokens.saturating_sub(input_tokens);
-            let metrics = calculate_metrics(input_tokens, output_tokens, total_elapsed);
+            let metrics = run_streaming_inference(&engine, &prompt, 16).await;
             prefill_speeds.push(metrics.prefill_tps);
         }
 
