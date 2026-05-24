@@ -348,6 +348,50 @@ int TM_ModelRequest_GetOutput(
     size_t* out_size);
 
 // ============================================================
+// Grammar support for guided decoding
+// ============================================================
+
+typedef struct TM_CompiledGrammar TM_CompiledGrammar;
+
+// Create grammar from JSON schema string
+TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema);
+
+// Create grammar from EBNF string
+TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string);
+
+// Create grammar from regex pattern
+TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex);
+
+// Get built-in JSON grammar (singleton, do not destroy)
+const TM_CompiledGrammar* TM_Grammar_GetBuiltinJSON(void);
+
+// Destroy grammar object (except for builtin)
+void TM_Grammar_Destroy(TM_CompiledGrammar* grammar);
+
+// Attach grammar to request (must be called before Forward)
+// Returns 0 on success, negative on error
+int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, const TM_CompiledGrammar* grammar);
+
+// ============================================================
+// DLPack support for zero-copy tensor transfer
+// ============================================================
+
+// Set tensor from DLPack capsule (zero-copy)
+// data: raw pointer from DLPack capsule (GPU or CPU memory)
+// dl_type_code: DLPack type code (0=kBool, 2=kInt, 3=kFloat, 4=kUInt, 5=kBFloat)
+// dl_type_bits: number of bits per element (8, 16, 32, 64)
+// device_type: DLPack device type (1=CPU, 2=CUDA GPU)
+void TM_TensorMap_SetDLPack(
+    TM_TensorMap* map,
+    const char* name,
+    const void* data,
+    int ndim,
+    const int64_t* shape,
+    int dl_type_code,
+    int dl_type_bits,
+    int device_type);
+
+// ============================================================
 // Weight Export / Import
 // ============================================================
 

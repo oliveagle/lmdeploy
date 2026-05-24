@@ -371,6 +371,17 @@ int TM_ModelRequest_GetOutput(
     void** out_data,
     size_t* out_size);
 
+// Token callback type for event-driven streaming
+// token_id: the generated token ID
+// seq_len: the current sequence length (1-indexed position of the token)
+typedef void (*TM_TokenCallback)(int token_id, int seq_len, void* user_data);
+
+// Register a token callback for event-driven streaming.
+// The callback will be invoked from the C++ engine thread whenever a new token is generated.
+// user_data: opaque pointer passed to the callback
+// Returns 0 on success, negative on error
+int TM_ModelRequest_SetTokenCallback(TM_ModelRequest* req, TM_TokenCallback cb, void* user_data);
+
 // ============================================================
 // Weight Export / Import
 // ============================================================

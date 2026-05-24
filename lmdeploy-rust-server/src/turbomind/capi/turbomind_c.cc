@@ -1831,11 +1831,24 @@ void TM_GenerationConfig_SetOutputLogits(TM_GenerationConfig* config, int value)
 // Inference (ModelRequest)
 // ============================================================
 
+struct TM_TokenCallbackWrapper {
+    TM_TokenCallback func;
+    void* user_data;
+    int token_id;
+    int seq_len;
+
+    TM_TokenCallbackWrapper(TM_TokenCallback f, void* ud)
+        : func(f), user_data(ud), token_id(0), seq_len(0) {}
+};
+
 struct TM_ModelRequest {
     turbomind::ModelRequest* req;
     std::shared_ptr<turbomind::TensorMap> output_tensors;
     std::shared_ptr<turbomind::AtomicRequestState> output_state;
     std::shared_ptr<turbomind::RequestMetrics> output_metrics;
+    std::shared_ptr<turbomind::TensorMap> streaming_tensors;
+    std::shared_ptr<turbomind::AtomicRequestState> streaming_state;
+    std::shared_ptr<TM_TokenCallbackWrapper> token_cb_wrapper;
 };
 
 TM_ModelRequest* TM_ModelRequest_Create(TM_TurboMind* tm)
@@ -1966,4 +1979,72 @@ int TM_ModelRequest_GetOutput(
     *out_data = const_cast<void*>(tensor.raw_data());
     *out_size = static_cast<size_t>(tensor.size());
     return 0;
+}
+
+// ============================================================
+// Guided Decoding / Structured Output (grammar stubs)
+// ============================================================
+// Note: xgrammar integration requires adding xgrammar headers and library.
+// These stub implementations provide no-op / placeholder behavior.
+
+struct TM_CompiledGrammar {
+    // Placeholder for xgrammar::CompiledGrammar
+    void* grammar = nullptr;
+};
+
+int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, TM_CompiledGrammar* grammar)
+{
+    if (!req || !grammar) {
+        return TM_ERR_INVALID_ARG;
+    }
+
+    try {
+        // Grammar support requires xgrammar integration
+        // Currently disabled in lmdeploy-rust-server
+        return TM_OK;
+    }
+    catch (const std::exception& e) {
+        SetError(TM_ERR_RUNTIME, e.what());
+        return TM_ERR_RUNTIME;
+    }
+}
+
+TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema)
+{
+    if (!json_schema) {
+        return nullptr;
+    }
+    return new TM_CompiledGrammar{};
+}
+
+TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string)
+{
+    if (!ebnf_string) {
+        return nullptr;
+    }
+    return new TM_CompiledGrammar{};
+}
+
+TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex)
+{
+    if (!regex) {
+        return nullptr;
+    }
+    return new TM_CompiledGrammar{};
+}
+
+void TM_Grammar_Destroy(TM_CompiledGrammar* grammar)
+{
+    delete grammar;
+}
+
+int TM_ModelRequest_SetTokenCallback(TM_ModelRequest* req, TM_TokenCallback cb, void* user_data)
+{
+    if (!req) {
+        SetError(TM_ERR_INVALID_ARG, "NULL argument to TM_ModelRequest_SetTokenCallback");
+        return TM_ERR_INVALID_ARG;
+    }
+
+    req->token_cb_wrapper = std::make_shared<TM_TokenCallbackWrapper>(cb, user_data);
+    return TM_OK;
 }
