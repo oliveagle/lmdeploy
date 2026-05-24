@@ -433,6 +433,7 @@ struct HfModelConfig {
     // MoE configuration
     int num_local_experts = 0;
     int num_experts_per_tok = 0;
+    int moe_intermediate_size = 0;
 
     // MTP (Multi-Token Prediction) configuration
     // Qwen3.5: mtp_num_hidden_layers (mtp.layers.* weights)
@@ -519,15 +520,31 @@ static HfModelConfig ParseHfConfig(const std::string& model_dir)
     config.max_position_embeddings = get_int("max_position_embeddings", config.max_position_embeddings);
 
     // Intermediate size (default to 4x hidden_size if not specified)
-    config.intermediate_size = get_int("intermediate_size", config.hidden_size * 4);
+    // For MoE models, check moe_intermediate_size first (Qwen3.5 MoE)
+    if (get_int("moe_intermediate_size", 0) > 0) {
+        // MoE model: use moe_intermediate_size for expert FFNs
+        config.intermediate_size = get_int("moe_intermediate_size", config.hidden_size * 4);
+    } else {
+        config.intermediate_size = get_int("intermediate_size", config.hidden_size * 4);
+    }
 
     // Model type
     config.model_type = get_string("model_type", "llama");
     config.arch = get_string("arch", config.arch);
 
     // MoE configuration
+    // Qwen3.5: "num_experts" (in text_config); others: "num_local_experts"
     config.num_local_experts = get_int("num_local_experts", 0);
+    if (config.num_local_experts == 0) {
+        config.num_local_experts = get_int("num_experts", 0);
+    }
+    // num_experts_per_tok (same name across models)
     config.num_experts_per_tok = get_int("num_experts_per_tok", 0);
+    // moe_intermediate_size (Qwen3.5) vs intermediate_size (fallback for other models)
+    config.moe_intermediate_size = get_int("moe_intermediate_size", 0);
+    if (config.moe_intermediate_size == 0) {
+        config.moe_intermediate_size = get_int("intermediate_size", 0);
+    }
 
     // MTP (Multi-Token Prediction) configuration
     // Qwen3.5: mtp_num_hidden_layers (mtp.layers.* weights)
@@ -1000,7 +1017,28 @@ static void LoadWeightsFromSafetensors(
 
             // Use param() for O(1) lookup instead of for_each_param() iteration
             const std::string& param_name = parts.back();
-            turbomind::core::Param target_param = current->param(param_name);
+            turbomind::core::Param target_param;
+
+            // Handle nested param names like "w1.weight" (child.param pattern)
+            // This is needed for MoE experts: layers.0.moe_ffn.experts.0.w1.weight
+            // where "w1.weight" means navigate to child "w1" first, then get param "weight"
+            size_t param_dot_pos = param_name.find('.');
+            if (param_dot_pos != std::string::npos) {
+                // Split into child_name and actual param name
+                std::string child_name = param_name.substr(0, param_dot_pos);
+                std::string actual_param = param_name.substr(param_dot_pos + 1);
+                auto* child_module = current->child(child_name);
+                if (child_module) {
+                    target_param = child_module->param(actual_param);
+                } else {
+                    SAFETENSORS_LOG("[C-API] WARNING: Child module '%s' not found for param '%s' (path: %s)\n",
+                                   child_name.c_str(), param_name.c_str(), tm_path.c_str());
+                    ++skip_count;
+                    continue;
+                }
+            } else {
+                target_param = current->param(param_name);
+            }
 
             // For QKV projections, accumulate instead of direct load
             // They'll be fused later
