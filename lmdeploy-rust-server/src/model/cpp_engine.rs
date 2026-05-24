@@ -1227,9 +1227,9 @@ impl TurboMindCEngine {
 
         // CRITICAL: max_prefill_token_num controls prefill performance
         // Default 0 causes max_forward_token_num = max_batch_size (32 tokens)
-        // Setting to 8192 allows single-pass prefill for most contexts
-        // This matches Python's TurbomindEngineConfig default
-        engine_config.set_max_prefill_token_num(8192);
+        // Setting to 32768 enables single-pass prefill for 32K context
+        // This allows the entire 32K context to be processed in one forward pass
+        engine_config.set_max_prefill_token_num(32768);
 
         // max_batch_size: higher values improve throughput but use more memory
         // GPU-adaptive: A100/A800=384, H100/H800/H200/L20Y=1024, default=128
