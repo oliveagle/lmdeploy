@@ -694,6 +694,9 @@ mod tests {
             total_time_ms: 1500.0,
             actual_output_tokens: 512,
             itl_ms: vec![1.5, 1.2, 1.3],
+            tokenization_time_ms: 1.0,
+            pool_acquire_time_ms: 2.0,
+            engine_time_ms: 97.0,
         };
 
         let json = serde_json::to_string(&result).unwrap();
