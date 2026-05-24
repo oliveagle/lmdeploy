@@ -419,6 +419,7 @@ struct HfModelConfig {
     // MoE configuration
     int num_local_experts = 0;
     int num_experts_per_tok = 0;
+    int moe_intermediate_size = 0;
 
     // DeltaNet / Linear Attention
     bool use_linear_attn = false;
@@ -494,16 +495,32 @@ static HfModelConfig ParseHfConfig(const std::string& model_dir)
     config.vocab_size = get_int("vocab_size", config.vocab_size);
     config.max_position_embeddings = get_int("max_position_embeddings", config.max_position_embeddings);
 
-    // Intermediate size (default to 4x hidden_size if not specified)
-    config.intermediate_size = get_int("intermediate_size", config.hidden_size * 4);
-
     // Model type
     config.model_type = get_string("model_type", "llama");
     config.arch = get_string("arch", config.arch);
 
+    // Intermediate size (default to 4x hidden_size if not specified)
+    // For MoE models, check moe_intermediate_size first (Qwen3.5 MoE)
+    if (get_int("moe_intermediate_size", 0) > 0) {
+        // MoE model: use moe_intermediate_size for expert FFNs
+        config.intermediate_size = get_int("moe_intermediate_size", config.hidden_size * 4);
+    } else {
+        config.intermediate_size = get_int("intermediate_size", config.hidden_size * 4);
+    }
+
     // MoE configuration
+    // Qwen3.5: "num_experts" (in text_config); others: "num_local_experts"
     config.num_local_experts = get_int("num_local_experts", 0);
+    if (config.num_local_experts == 0) {
+        config.num_local_experts = get_int("num_experts", 0);
+    }
+    // num_experts_per_tok (same name across models)
     config.num_experts_per_tok = get_int("num_experts_per_tok", 0);
+    // moe_intermediate_size (Qwen3.5) vs intermediate_size (fallback for other models)
+    config.moe_intermediate_size = get_int("moe_intermediate_size", 0);
+    if (config.moe_intermediate_size == 0) {
+        config.moe_intermediate_size = get_int("intermediate_size", 0);
+    }
 
     // DeltaNet / Linear Attention
     // Check for use_linear_attn boolean flag (older models)
@@ -1366,7 +1383,10 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
                     for (int expert_idx = 0; expert_idx < hf_config.num_local_experts; ++expert_idx) {
                         turbomind::core::FfnConfig expert_ffn_cfg;
                         expert_ffn_cfg.hidden_dim = hf_config.hidden_size;
-                        expert_ffn_cfg.inter_size = hf_config.intermediate_size;
+                        // Use moe_intermediate_size for Qwen3.5 MoE, fallback to intermediate_size
+                        expert_ffn_cfg.inter_size = (hf_config.moe_intermediate_size > 0)
+                            ? hf_config.moe_intermediate_size
+                            : hf_config.intermediate_size;
                         expert_ffn_cfg.act_type = 0;  // SiLU
                         expert_ffn_cfg.fuse_silu = true;
                         expert_ffn_cfg.is_expert = true;
@@ -1377,9 +1397,14 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
                         if (expert_ffn_module) {
                             auto* expert_ffn = static_cast<turbomind::FfnWeight*>(expert_ffn_module.get());
 
+                            // Use moe_intermediate_size for expert weights if set
+                            int expert_inter_size = (hf_config.moe_intermediate_size > 0)
+                                ? hf_config.moe_intermediate_size
+                                : hf_config.intermediate_size;
+
                             // Create w1 LinearWeight child for expert
                             auto expert_w1_cfg = CreateAwqLinearConfig(
-                                hf_config.hidden_size, hf_config.intermediate_size,
+                                hf_config.hidden_size, expert_inter_size,
                                 weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
                             auto expert_w1_module = turbomind::core::Module::create(expert_w1_cfg);
                             if (expert_w1_module) {
@@ -1388,7 +1413,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
                             // Create w3 LinearWeight child for expert
                             auto expert_w3_cfg = CreateAwqLinearConfig(
-                                hf_config.hidden_size, hf_config.intermediate_size,
+                                hf_config.hidden_size, expert_inter_size,
                                 weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
                             auto expert_w3_module = turbomind::core::Module::create(expert_w3_cfg);
                             if (expert_w3_module) {
@@ -1397,7 +1422,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
                             // Create w2 LinearWeight child for expert
                             auto expert_w2_cfg = CreateAwqLinearConfig(
-                                hf_config.intermediate_size, hf_config.hidden_size,
+                                expert_inter_size, hf_config.hidden_size,
                                 weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
                             auto expert_w2_module = turbomind::core::Module::create(expert_w2_cfg);
                             if (expert_w2_module) {
