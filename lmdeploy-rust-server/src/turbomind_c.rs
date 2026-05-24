@@ -130,6 +130,102 @@ pub const DL_DTYPE_CODE_FLOAT: u32 = 3;
 pub const DL_DTYPE_CODE_UINT: u32 = 4;
 pub const DL_DTYPE_CODE_BFLOAT: u32 = 5;
 
+/// DLPack-compatible tensor representation (C-compatible struct).
+///
+/// Used for zero-copy tensor sharing via DLPack protocol.
+/// Maps to the TM_Tensor struct in turbomind_c_api.h.
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct TM_Tensor {
+    pub dtype: TM_DataType,         // data type
+    pub ndim: c_int,                // number of dimensions
+    pub shape: [i64; 8],            // max 8 dimensions
+    pub data: *mut c_void,          // data pointer
+    pub device_id: c_int,           // -1 for CPU, >= 0 for CUDA device
+}
+
+// Safety: TM_Tensor is a POD struct that can be safely sent between threads.
+// The data pointer is borrowed and must be kept valid by the caller.
+unsafe impl Send for TM_Tensor {}
+unsafe impl Sync for TM_Tensor {}
+
+impl Default for TM_Tensor {
+    fn default() -> Self {
+        Self {
+            dtype: TM_DataType::TM_DATATYPE_INVALID,
+            ndim: 0,
+            shape: [0; 8],
+            data: std::ptr::null_mut(),
+            device_id: -1,
+        }
+    }
+}
+
+impl TM_Tensor {
+    /// Create a new tensor with the given data type and shape.
+    pub fn new(dtype: TM_DataType, ndim: c_int, shape: [i64; 8], data: *mut c_void, device_id: c_int) -> Self {
+        Self { dtype, ndim, shape, data, device_id }
+    }
+
+    /// Check if the tensor is valid (has non-null data pointer).
+    pub fn is_valid(&self) -> bool {
+        !self.data.is_null() && self.ndim > 0
+    }
+
+    /// Get the total number of elements.
+    pub fn num_elements(&self) -> i64 {
+        let mut count = 1i64;
+        for i in 0..self.ndim as usize {
+            count *= self.shape[i];
+        }
+        count
+    }
+
+    /// Create a TM_Tensor from a DLPack capsule (zero-copy).
+    ///
+    /// # Arguments
+    /// * `dlpack_capsule` - Raw pointer to DLPack capsule (DLManagedTensorVersioned*)
+    ///
+    /// # Returns
+    /// A TM_Tensor that shares memory with the original DLPack tensor.
+    ///
+    /// # Safety
+    /// The caller must ensure the DLPack capsule remains valid for as long
+    /// as the returned TM_Tensor is used. This method does NOT take ownership
+    /// of the capsule.
+    pub unsafe fn from_dlpack(dlpack_capsule: *mut c_void) -> FFResult<Self> {
+        let mut tensor = TM_Tensor::default();
+        let ret = TM_TensorFromDLPack(dlpack_capsule, &mut tensor);
+        if ret != 0 {
+            return Err(FFError::from_last_error().unwrap_or(FFError {
+                code: TM_ErrorCode::TM_ERR_RUNTIME,
+                message: "TM_TensorFromDLPack failed".into(),
+            }));
+        }
+        Ok(tensor)
+    }
+
+    /// Convert this TM_Tensor to a DLPack capsule (zero-copy).
+    ///
+    /// # Returns
+    /// A raw pointer to a DLPack capsule (DLManagedTensorVersioned*).
+    /// The caller is responsible for calling the deleter when done.
+    ///
+    /// # Safety
+    /// The returned capsule borrows memory from this TM_Tensor.
+    /// The TM_Tensor must outlive the DLPack consumer.
+    pub unsafe fn to_dlpack(&self) -> FFResult<*mut c_void> {
+        let capsule = TM_TensorToDLPack(self);
+        if capsule.is_null() {
+            return Err(FFError::from_last_error().unwrap_or(FFError {
+                code: TM_ErrorCode::TM_ERR_RUNTIME,
+                message: "TM_TensorToDLPack failed".into(),
+            }));
+        }
+        Ok(capsule)
+    }
+}
+
 // FFI function signatures
 extern "C" {
     // Error handling
@@ -386,6 +482,10 @@ extern "C" {
     pub fn TM_Grammar_GetBuiltinJSON() -> *const TM_CompiledGrammar;
     pub fn TM_Grammar_Destroy(grammar: *mut TM_CompiledGrammar);
     pub fn TM_ModelRequest_SetGrammar(req: *mut TM_ModelRequest, grammar: *const TM_CompiledGrammar) -> c_int;
+
+    // DLPack / Zero-Copy Tensor Sharing
+    pub fn TM_TensorFromDLPack(dlpack_capsule: *mut c_void, out_tensor: *mut TM_Tensor) -> c_int;
+    pub fn TM_TensorToDLPack(tensor: *const TM_Tensor) -> *mut c_void;
 }
 
 /// Result type for FFI operations
@@ -1175,6 +1275,47 @@ impl ModelRequest {
         }
 
         Ok((out_data as *const u8, out_size))
+    }
+
+    /// Get output tensor as a DLPack TM_Tensor (zero-copy).
+    ///
+    /// Returns a TM_Tensor struct with metadata and data pointer.
+    /// The tensor data is owned by the request and valid until destroyed.
+    ///
+    /// # Arguments
+    /// * `name` - Tensor name (e.g., "output_ids", "last_hidden_state")
+    ///
+    /// # Safety
+    /// The returned TM_Tensor.data pointer is valid until the ModelRequest is dropped.
+    pub unsafe fn get_output_dlpack(&self, name: &str) -> FFResult<TM_Tensor> {
+        let name_c = std::ffi::CString::new(name).unwrap();
+        let mut out_data: *mut c_void = std::ptr::null_mut();
+        let mut out_size: usize = 0;
+
+        let ret = unsafe {
+            TM_ModelRequest_GetOutput(self.0, name_c.as_ptr(), &mut out_data, &mut out_size)
+        };
+
+        if ret != 0 {
+            return Err(FFError::from_last_error().unwrap_or(FFError {
+                code: TM_ErrorCode::TM_ERR_RUNTIME,
+                message: format!("Failed to get output '{}'", name),
+            }));
+        }
+
+        // Infer shape from size and infer dtype from size.
+        // For output_ids: size = num_tokens * 4 bytes (int32)
+        // For last_hidden_state: size = batch * seq_len * hidden_dim * 4 bytes (float32)
+        // We don't have the shape info here, so we return a minimal TM_Tensor.
+        // The caller should use the regular get_output() and compute shape themselves.
+        // This method is primarily for creating DLPack capsules from known tensors.
+        Ok(TM_Tensor {
+            dtype: TM_DataType::TM_DATATYPE_INVALID,  // Caller must set this
+            ndim: 1,
+            shape: [out_size as i64, 1, 1, 1, 1, 1, 1, 1],
+            data: out_data,
+            device_id: 0,  // Assume GPU for output tensors
+        })
     }
 
     /// Submit a non-blocking forward request with stream_output enabled.

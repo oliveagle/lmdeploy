@@ -100,14 +100,14 @@ Python TurboMind 版本参考值 (Qwen3.6-35B-A3B-AWQ, V100 32GB):
 ### 模型权重路径
 
 ```
-/mnt/eaget-4tb/modelscope_models/tclf00/Qwen3___6-35B-A3B-AWQ
+/mnt/data/models/modelscope_models/tclf00/Qwen3___6-35B-A3B-AWQ
 ```
 
 ### 配置参数
 
 ```toml
 [model]
-model_path = "/mnt/eaget-4tb/modelscope_models/tclf00/Qwen3___6-35B-A3B-AWQ"
+model_path = "/mnt/data/models/modelscope_models/tclf00/Qwen3___6-35B-A3B-AWQ"
 session_len = 8192
 batch_size = 1
 tp_size = 1

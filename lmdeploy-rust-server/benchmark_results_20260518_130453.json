@@ -102,7 +102,7 @@
   ],
   "engine": "LMDeploy TurboMind",
   "gpu_memory_used_gb": 0.03125,
-  "model": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ",
+  "model": "/mnt/data/models/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ",
   "summary": [
     {
       "avg_decode_speed_tps": 59.365966380965496,

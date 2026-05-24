@@ -24,7 +24,7 @@
 ### 配置参数
 
 ```bash
-lmdeploy serve api_server /mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ \
+lmdeploy serve api_server /mnt/data/models/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ \
   --backend turbomind \
   --tp 1 \
   --session-len 8192 \

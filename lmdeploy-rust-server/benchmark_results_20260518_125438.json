@@ -102,7 +102,7 @@
   ],
   "engine": "LMDeploy TurboMind",
   "gpu_memory_used_gb": 0.03125,
-  "model": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ",
+  "model": "/mnt/data/models/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ",
   "summary": [],
   "timestamp": "2026-05-18T12:54:38.358090563+00:00"
 }

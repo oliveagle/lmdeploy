@@ -1,6 +1,6 @@
 {
   "engine": "LMDeploy TurboMind",
-  "model": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___5-35B-A3B-AWQ",
+  "model": "/mnt/data/models/modelscope_models/tclf90/Qwen3___5-35B-A3B-AWQ",
   "gpu": "Tesla PG503-216",
   "gpu_memory": "31.7 GB",
   "pytorch_version": "2.5.0+cu124",

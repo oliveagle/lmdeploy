@@ -1,5 +1,5 @@
 {
-  "model": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___5-35B-A3B-AWQ",
+  "model": "/mnt/data/models/modelscope_models/tclf90/Qwen3___5-35B-A3B-AWQ",
   "engine": "turbomind",
   "load_time": 100.45706820487976,
   "results": [

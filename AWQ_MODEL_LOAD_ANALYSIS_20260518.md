@@ -82,7 +82,7 @@ python3 -c "
 from lmdeploy.turbomind import TurboMind
 from lmdeploy.messages import TurbomindEngineConfig
 
-model_path = '/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ'
+model_path = '/mnt/data/models/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ'
 cfg = TurbomindEngineConfig(session_len=4096, max_batch_size=8)
 tm = TurboMind(model_path, engine_config=cfg, trust_remote_code=True)
 # 首次加载会自动完成 HF→TM 转换

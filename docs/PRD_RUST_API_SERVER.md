@@ -479,7 +479,7 @@ lmdeploy-rust-server/
 
 ### C. 参考资料
 
-- LMDeploy 源码: `/mnt/eaget-4tb/data/llm_server/lmdeploy`
+- LMDeploy 源码: `/mnt/data/lmdeploy`
 - Axum 文档: https://axum.rs/
 - Tonic 文档: https://github.com/hyperium/tonic
 - PyO3 文档: https://pyo3.rs/

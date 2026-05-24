@@ -45,7 +45,7 @@
 
 #### 1.1 创建性能测试脚本
 
-**文件**: `/mnt/eaget-4tb/data/llm_server/lmdeploy/scripts/benchmark_tm.py`
+**文件**: `/mnt/data/lmdeploy/scripts/benchmark_tm.py`
 
 ```python
 #!/usr/bin/env python3
@@ -75,7 +75,7 @@ class BenchmarkResult:
 class TurboMindBenchmark:
     def __init__(self, base_url: str = "http://localhost:8001"):
         self.base_url = base_url
-        self.model = "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ"
+        self.model = "/mnt/data/models/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ"
     
     def create_chat_payload(self, prompt: str, max_tokens: int = 128) -> dict:
         return {
@@ -250,7 +250,7 @@ if __name__ == "__main__":
 
 #### 1.2 添加 TurboMind 原生 API 测试
 
-**文件**: `/mnt/eaget-4tb/data/llm_server/lmdeploy/scripts/benchmark_tm_native.py`
+**文件**: `/mnt/data/lmdeploy/scripts/benchmark_tm_native.py`
 
 需要绕过 HTTP server，直接使用 TurboMind Python API 进行测试。
 
@@ -262,7 +262,7 @@ if __name__ == "__main__":
 
 **解决方案**: 添加 Python bridge 到 C API
 
-**文件**: `/mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/capi/hf_loader.py`
+**文件**: `/mnt/data/lmdeploy/src/turbomind/capi/hf_loader.py`
 
 ```python
 #!/usr/bin/env python3
@@ -274,7 +274,7 @@ Called from C++ via popen.
 import sys
 import os
 
-sys.path.insert(0, '/mnt/eaget-4tb/data/llm_server/lmdeploy')
+sys.path.insert(0, '/mnt/data/lmdeploy')
 
 def load_hf_model(model_dir: str, device_id: int = 0, session_len: int = 8192):
     """Load HF model and return model_comm handle info."""
@@ -303,7 +303,7 @@ def load_hf_model(model_dir: str, device_id: int = 0, session_len: int = 8192):
     return tm
 ```
 
-**文件**: `/mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/capi/turbomind_c.cc`
+**文件**: `/mnt/data/lmdeploy/src/turbomind/capi/turbomind_c.cc`
 
 修改 `TM_TurboMind_InitFromHF` 函数：
 
@@ -316,7 +316,7 @@ int TM_TurboMind_InitFromHF(
     int session_len)
 {
     // 调用 Python bridge 加载 HF 模型
-    std::string python_cmd = "python3 /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/capi/hf_loader.py";
+    std::string python_cmd = "python3 /mnt/data/lmdeploy/src/turbomind/capi/hf_loader.py";
     python_cmd += " --model_dir " + std::string(model_dir);
     python_cmd += " --device_id " + std::to_string(device_id);
     python_cmd += " --session_len " + std::to_string(session_len);
@@ -347,12 +347,12 @@ int TM_TurboMind_InitFromHF(
 ```
 
 **修改**: 
-- `/mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/capi/turbomind_c.cc`
-- `/mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/capi/hf_loader.py` (新建)
+- `/mnt/data/lmdeploy/src/turbomind/capi/turbomind_c.cc`
+- `/mnt/data/lmdeploy/src/turbomind/capi/hf_loader.py` (新建)
 
 #### 2.2 修复 Rust Server 计时逻辑
 
-**文件**: `/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/model/engine.rs`
+**文件**: `/mnt/data/lmdeploy/lmdeploy-rust-server/src/model/engine.rs`
 
 当前计时包含了整个请求时间，需要分离 prefill 和 decode。
 
@@ -382,11 +382,11 @@ batch_size = 32
 batch_timeout_ms = 10  # 减少等待时间
 ```
 
-**文件**: `/mnt/eaget-4tb/data/llm_server/lmdeploy/config/default.toml`
+**文件**: `/mnt/data/lmdeploy/config/default.toml`
 
 #### 3.2 添加流式输出支持
 
-**文件**: `/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/handlers/http.rs`
+**文件**: `/mnt/data/lmdeploy/lmdeploy-rust-server/src/handlers/http.rs`
 
 需要实现 SSE 流式输出以准确测量 first_token_latency。
 
@@ -425,18 +425,18 @@ batch_timeout_ms = 10  # 减少等待时间
 
 ### Step 1: 创建测试脚本
 ```bash
-mkdir -p /mnt/eaget-4tb/data/llm_server/lmdeploy/scripts
+mkdir -p /mnt/data/lmdeploy/scripts
 # 创建 benchmark_tm.py 和 benchmark_tm_native.py
 ```
 
 ### Step 2: 测试 Python TurboMind API
 ```bash
 # 启动 server
-lmdeploy serve api_server /mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ \
+lmdeploy serve api_server /mnt/data/models/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ \
   --backend turbomind --tp 1 --session-len 8192 --server-port 8001
 
 # 运行测试
-python3 /mnt/eaget-4tb/data/llm_server/lmdeploy/scripts/benchmark_tm.py
+python3 /mnt/data/lmdeploy/scripts/benchmark_tm.py
 ```
 
 ### Step 3: 修复 Rust Server C API
@@ -449,31 +449,31 @@ python3 setup.py build_ext --inplace
 
 ### Step 4: 测试 Rust Server
 ```bash
-cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+cd /mnt/data/lmdeploy/lmdeploy-rust-server
 cargo run --release
 ```
 
 ### Step 5: 性能对比分析
 ```bash
 # 生成对比报告
-python3 /mnt/eaget-4tb/data/llm_server/lmdeploy/scripts/compare_results.py
+python3 /mnt/data/lmdeploy/scripts/compare_results.py
 ```
 
 ## 文件清单
 
 ### 新建文件
 
-1. `/mnt/eaget-4tb/data/llm_server/lmdeploy/scripts/benchmark_tm.py` - HTTP API 测试脚本
-2. `/mnt/eaget-4tb/data/llm_server/lmdeploy/scripts/benchmark_tm_native.py` - 原生 API 测试脚本
-3. `/mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/capi/hf_loader.py` - Python bridge
+1. `/mnt/data/lmdeploy/scripts/benchmark_tm.py` - HTTP API 测试脚本
+2. `/mnt/data/lmdeploy/scripts/benchmark_tm_native.py` - 原生 API 测试脚本
+3. `/mnt/data/lmdeploy/src/turbomind/capi/hf_loader.py` - Python bridge
 
 ### 修改文件
 
-1. `/mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/capi/turbomind_c.cc` - 添加 Python bridge 调用
-2. `/mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/capi/turbomind_c.h` - 添加函数声明
-3. `/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/model/engine.rs` - 修复计时逻辑
-4. `/mnt/eaget-4tb/data/llm_server/lmdeploy/config/default.toml` - 优化配置
-5. `/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind_c.rs` - 添加新函数绑定
+1. `/mnt/data/lmdeploy/src/turbomind/capi/turbomind_c.cc` - 添加 Python bridge 调用
+2. `/mnt/data/lmdeploy/src/turbomind/capi/turbomind_c.h` - 添加函数声明
+3. `/mnt/data/lmdeploy/lmdeploy-rust-server/src/model/engine.rs` - 修复计时逻辑
+4. `/mnt/data/lmdeploy/config/default.toml` - 优化配置
+5. `/mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind_c.rs` - 添加新函数绑定
 
 ## 依赖
 

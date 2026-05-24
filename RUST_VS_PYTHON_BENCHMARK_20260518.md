@@ -13,10 +13,10 @@
 
 - **引擎**: LMDeploy Python TurboMind
 - **版本**: 0.13.0
-- **模型路径**: `/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ`
+- **模型路径**: `/mnt/data/models/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ`
 - **启动命令**:
 ```bash
-lmdeploy serve api_server /mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ \
+lmdeploy serve api_server /mnt/data/models/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ \
   --backend turbomind \
   --tp 1 \
   --session-len 8192 \
@@ -174,7 +174,7 @@ cp = 1
 
 ```toml
 [model]
-model_path = "/mnt/eaget-4tb/.../workspace"  # 转换后的路径
+model_path = "/mnt/data/.../workspace"  # 转换后的路径
 session_len = 8192
 batch_size = 32
 tp_size = 1

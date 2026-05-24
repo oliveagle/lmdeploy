@@ -1,7 +1,7 @@
 {
   "engine": "LMDeploy Python TurboMind",
   "model": "Qwen3.6-35B-A3B-AWQ",
-  "model_path": "/mnt/eaget-4tb/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ",
+  "model_path": "/mnt/data/models/modelscope_models/tclf90/Qwen3.6-35B-A3B-AWQ",
   "quantization": "AWQ 4-bit",
   "gpu": "Tesla V100 32GB (PG503-216)",
   "cuda": "12.5",

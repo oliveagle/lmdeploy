@@ -99,7 +99,7 @@ C1024_O256      | 28.4       | 32.1       | 38.5       | 46.2       | 58.9
 ```bash
 # 使用 TurboMind 后端
 lmdeploy serve api_server \
-  /mnt/eaget-4tb/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ \
+  /mnt/data/models/modelscope_models/tclf90/Qwen3___6-35B-A3B-AWQ \
   --model-format awq \
   --tp 1 \
   --cache-max-entry-count 0.85

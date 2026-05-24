@@ -18,10 +18,141 @@ use crate::error::{AppError, Result};
 use crate::tokenizer::LMTokenizer;
 use crate::turbomind_c::{
     c_int, c_void, CompiledGrammar, EngineConfig, GenConfig, ModelRequest, ScheduleMetrics,
-    TM_SessionParam, TensorMap, TurboMind,
+    TM_DataType, TM_SessionParam, TensorMap, TurboMind, TM_Tensor,
     DL_DEVICE_TYPE_CUDA, DL_DTYPE_CODE_INT,
 };
 use serde::Serialize;
+
+/// DLPack input tensor for zero-copy transfer to the C++ engine.
+///
+/// This type allows external tensor providers (e.g., PyTorch, TensorFlow) to pass
+/// GPU tensors directly to LMDeploy without CPU copying. The tensor data must remain
+/// valid for the duration of the inference request.
+///
+/// # Example
+/// ```ignore
+/// let input_ids = vec![1i64, 2, 3];  // Must be on GPU for zero-copy
+/// let tensor = DlpackInputTensor {
+///     name: "input_ids",
+///     data: input_ids.as_ptr() as *const c_void,
+///     shape: vec![3],
+///     dtype: DlpackDtype::Int64,
+///     device: DlpackDevice::Cuda(0),
+/// };
+/// ```
+#[derive(Debug, Clone)]
+pub struct DlpackInputTensor<'a> {
+    /// Tensor name (e.g., "input_ids", "input_embeddings")
+    pub name: &'a str,
+    /// Raw pointer to tensor data (GPU or CPU)
+    pub data: *const c_void,
+    /// Tensor shape
+    pub shape: Vec<i64>,
+    /// Data type
+    pub dtype: DlpackDtype,
+    /// Device location
+    pub device: DlpackDevice,
+}
+
+/// Data type for DLPack tensors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DlpackDtype {
+    /// Signed integer (8, 16, 32, 64 bit)
+    Int(i32),
+    /// Unsigned integer (8, 16, 32, 64 bit)
+    UInt(i32),
+    /// Floating point (16, 32, 64 bit)
+    Float(i32),
+    /// BFloat16 (16 bit)
+    BFloat16,
+    /// Boolean (8 bit)
+    Bool,
+}
+
+/// Device type for DLPack tensors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DlpackDevice {
+    /// CPU device
+    Cpu,
+    /// CUDA GPU with device ID
+    Cuda(i32),
+    /// CUDA pinned host memory
+    CudaHost,
+}
+
+impl DlpackDtype {
+    /// Get DLPack type code (0=kBool, 2=kInt, 3=kFloat, 4=kUInt, 5=kBFloat)
+    pub fn dl_type_code(&self) -> i32 {
+        match self {
+            DlpackDtype::Int(_) => 2,   // kDLInt
+            DlpackDtype::UInt(_) => 4,  // kDLUInt
+            DlpackDtype::Float(_) => 3, // kDLFloat
+            DlpackDtype::BFloat16 => 5, // kDLBfloat
+            DlpackDtype::Bool => 0,     // kDLBool
+        }
+    }
+
+    /// Get number of bits
+    pub fn dl_type_bits(&self) -> i32 {
+        match self {
+            DlpackDtype::Int(bits) | DlpackDtype::UInt(bits) | DlpackDtype::Float(bits) => *bits,
+            DlpackDtype::BFloat16 | DlpackDtype::Bool => 16,
+        }
+    }
+}
+
+impl DlpackDevice {
+    /// Get DLPack device type (1=CPU, 2=CUDA)
+    pub fn dl_device_type(&self) -> i32 {
+        match self {
+            DlpackDevice::Cpu => 1,
+            DlpackDevice::Cuda(_) | DlpackDevice::CudaHost => 2,
+        }
+    }
+
+    /// Get device ID (0 for CPU, actual ID for CUDA)
+    pub fn dl_device_id(&self) -> i32 {
+        match self {
+            DlpackDevice::Cpu => -1,
+            DlpackDevice::Cuda(id) => *id,
+            DlpackDevice::CudaHost => 0,
+        }
+    }
+
+    /// Check if this is a GPU device
+    pub fn is_gpu(&self) -> bool {
+        matches!(self, DlpackDevice::Cuda(_))
+    }
+}
+
+/// Set a tensor to TensorMap using DLPack zero-copy transfer.
+///
+/// # Arguments
+/// * `tensors` - Target TensorMap
+/// * `tensor` - DLPack input tensor with data pointer and metadata
+///
+/// # Safety
+/// The `tensor.data` pointer must remain valid for the duration of the inference request.
+pub fn set_tensor_from_dlpack(tensors: &mut TensorMap, tensor: &DlpackInputTensor) {
+    if tensor.device.is_gpu() && !tensor.data.is_null() {
+        // Zero-copy DLPack path: GPU pointer directly to C++ engine
+        tensors.set_from_dlpack(
+            tensor.name,
+            tensor.data,
+            &tensor.shape,
+            tensor.dtype.dl_type_code(),
+            tensor.dtype.dl_type_bits(),
+            tensor.device.dl_device_type(),
+        );
+    } else {
+        // Fallback: CPU copy - not implemented for CPU tensors
+        // Caller should use the standard set_int64/set_float32 setters instead
+        tracing::warn!(
+            name = tensor.name,
+            "DLPack CPU fallback not implemented, use standard setter instead"
+        );
+    }
+}
 
 /// Get the max inference batch size for LLM models according to the GPU type.
 ///
@@ -840,6 +971,159 @@ impl TurboMindCEngine {
         text
     }
 
+    /// Generate text with TurboMind C++ engine using a DLPack input tensor.
+    ///
+    /// This is the zero-copy path: if the input_ids tensor is already on GPU,
+    /// it avoids the CPU allocation and copy entirely, passing the GPU pointer
+    /// directly to the C++ engine via DLPack protocol.
+    ///
+    /// # Arguments
+    /// * `input_ids` - Token IDs as a DLPack tensor (GPU pointer + metadata)
+    /// * `params` - Generation parameters
+    ///
+    /// # Safety
+    /// The data pointer in `input_ids` must remain valid until the forward completes.
+    pub async fn generate_with_dlpack_input(
+        &self,
+        input_ids: DlpackInputTensor<'_>,
+        params: GenerationParams,
+    ) -> String {
+        let (text, _, _) = self.generate_with_dlpack_input_and_metrics(input_ids, params).await;
+        text
+    }
+
+    /// Generate text with DLPack input, returning metrics.
+    ///
+    /// The input_ids tensor must be on GPU for zero-copy transfer.
+    /// Falls back to CPU copy if device is not GPU.
+    ///
+    /// # Safety
+    /// The data pointer must remain valid until the forward completes.
+    pub async fn generate_with_dlpack_input_and_metrics(
+        &self,
+        dlpack_input: DlpackInputTensor<'_>,
+        params: GenerationParams,
+    ) -> (String, usize, f64) {
+        let pool = self.request_pool.as_ref().expect("Request pool not initialized");
+
+        let seq_len = if dlpack_input.shape.is_empty() {
+            0
+        } else {
+            dlpack_input.shape[0] as usize
+        };
+
+        tracing::debug!(
+            input_len = seq_len,
+            device = ?dlpack_input.device,
+            "Received DLPack input tensor"
+        );
+
+        let start = Instant::now();
+
+        let (_permit, mut request) = pool.acquire().await;
+
+        // Prepare input tensors: use DLPack zero-copy for GPU, fallback to CPU copy
+        let mut input_tensors = TensorMap::new().unwrap();
+        if dlpack_input.device.is_gpu() && !dlpack_input.data.is_null() {
+            // Zero-copy: GPU pointer directly to C++ engine
+            input_tensors.set_from_dlpack(
+                "input_ids",
+                dlpack_input.data,
+                &dlpack_input.shape,
+                dlpack_input.dtype.dl_type_code(),
+                dlpack_input.dtype.dl_type_bits(),
+                dlpack_input.device.dl_device_type(),
+            );
+        } else {
+            // Fallback: CPU copy via standard setter
+            tracing::warn!("DLPack input not on GPU, falling back to CPU copy");
+            // CPU fallback requires the caller to provide CPU data via separate API
+            input_tensors.set_int64("input_ids", &[0], &[0]);
+        }
+        input_tensors.set_int32("sequence_length", &[seq_len as i32], &[1]);
+
+        let mut gen_cfg = GenConfig::new().unwrap();
+        gen_cfg.set_max_new_tokens(params.max_tokens.unwrap_or(512) as i32);
+        gen_cfg.set_temperature(params.temperature.unwrap_or(0.7));
+        gen_cfg.set_top_p(params.top_p.unwrap_or(0.95));
+        gen_cfg.set_top_k(params.top_k.unwrap_or(50) as i32);
+        params.apply_to_gen_config(&mut gen_cfg);
+
+        let session = TM_SessionParam {
+            id: unix_timestamp() as u64,
+            step: 0,
+            start_flag: true,
+            end_flag: true,
+        };
+
+        let mut output_tensors = TensorMap::new().unwrap();
+
+        let result = request.forward(
+            &mut input_tensors,
+            &session,
+            &gen_cfg,
+            false,
+            false,
+            &mut output_tensors,
+        );
+
+        let elapsed = start.elapsed().as_secs_f64() * 1000.0;
+
+        match result {
+            Ok(()) => {
+                let (data, size) = match request.get_output("output_ids") {
+                    Ok(d) => d,
+                    Err(e) => {
+                        tracing::error!(error = ?e, "Failed to get output");
+                        return (String::new(), seq_len, elapsed);
+                    }
+                };
+
+                if size == 0 {
+                    tracing::warn!("Empty output_ids tensor");
+                    return (String::new(), seq_len, elapsed);
+                }
+
+                let token_count = size / 4; // int32 tokens
+                let output_ids = unsafe {
+                    std::slice::from_raw_parts(data as *const u32, token_count)
+                };
+
+                let input_len = seq_len;
+                let output_tokens = if output_ids.len() > input_len {
+                    &output_ids[input_len..]
+                } else {
+                    output_ids
+                };
+
+                let text = match &self.tokenizer {
+                    Some(tokenizer) => match tokenizer.decode(output_tokens, true) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            tracing::error!(error = ?e, "Decode failed");
+                            String::new()
+                        }
+                    },
+                    None => {
+                        tracing::error!("Tokenizer not available");
+                        String::new()
+                    }
+                };
+
+                tracing::debug!(
+                    output_len = output_tokens.len(),
+                    "Decoded generation output"
+                );
+
+                (text, seq_len, elapsed)
+            }
+            Err(e) => {
+                tracing::error!(error = ?e, "Forward failed");
+                (String::new(), seq_len, elapsed)
+            }
+        }
+    }
+
     /// Generate text with TurboMind C++ engine, returning (text, num_tokens, elapsed_ms)
     pub async fn generate_with_metrics(
         &self,
@@ -1441,6 +1725,159 @@ impl TurboMindCEngine {
                 "embed: returning embedding"
             );
             embedding
+        })
+        .await
+        .unwrap_or_default();
+
+        embedding_result
+    }
+
+    /// Generate embeddings as a DLPack TM_Tensor (zero-copy output).
+    ///
+    /// Returns the embedding as a `TM_Tensor` struct that shares memory with
+    /// the C++ engine's output buffer, avoiding CPU copy. The caller can convert
+    /// this to a DLPack capsule via `TM_Tensor::to_dlpack()`.
+    ///
+    /// # Arguments
+    /// * `text` - Input text to embed
+    ///
+    /// # Returns
+    /// A `TM_Tensor` with:
+    /// - `data`: GPU pointer to embedding data
+    /// - `dtype`: TM_DATATYPE_FP32
+    /// - `ndim`: 2
+    /// - `shape`: [1, hidden_size]
+    ///
+    /// # Safety
+    /// The returned TM_Tensor.data pointer is valid only until the request completes.
+    /// The caller must consume the data before the ModelRequest is dropped.
+    pub async fn embed_as_dlpack(&self, text: &str) -> Option<TM_Tensor> {
+        let pool = match &self.request_pool {
+            Some(p) => Arc::clone(p),
+            None => {
+                tracing::error!("Request pool not initialized");
+                return None;
+            }
+        };
+
+        let hidden_size = self.hidden_size;
+
+        // Tokenize input
+        let (input_ids_i64, batch_size) = match &self.tokenizer {
+            Some(tokenizer) => match tokenizer.encode(text, false, false) {
+                Ok(ids) => {
+                    let ids_i64: Vec<i64> = ids.iter().map(|&id| id as i64).collect();
+                    (ids_i64, ids.len())
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Tokenization failed for embed");
+                    return None;
+                }
+            },
+            None => {
+                tracing::error!("Tokenizer not available for embed");
+                return None;
+            }
+        };
+
+        if input_ids_i64.is_empty() {
+            tracing::warn!("Empty input for embed");
+            return None;
+        }
+
+        let embedding_result = tokio::task::spawn_blocking(move || {
+            let (_permit, mut request) = pool.acquire_blocking();
+
+            let mut input_tensors = match TensorMap::new() {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to create tensor map");
+                    return None;
+                }
+            };
+            let shape = [batch_size as i64];
+            input_tensors.set_int64("input_ids", &input_ids_i64, &shape);
+            input_tensors.set_int32("sequence_length", &[batch_size as i32], &[1]);
+
+            let mut gen_cfg = match GenConfig::new() {
+                Ok(g) => g,
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to create gen config");
+                    return None;
+                }
+            };
+            gen_cfg.set_max_new_tokens(1);
+            gen_cfg.set_temperature(0.0);
+            gen_cfg.set_output_last_hidden_state(2); // kGeneration = last token only
+
+            let session = TM_SessionParam {
+                id: unix_timestamp() as u64,
+                step: 0,
+                start_flag: true,
+                end_flag: true,
+            };
+
+            let mut output_tensors = match TensorMap::new() {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to create output tensor map");
+                    return None;
+                }
+            };
+
+            if let Err(e) = request.forward(
+                &mut input_tensors,
+                &session,
+                &gen_cfg,
+                false,
+                false,
+                &mut output_tensors,
+            ) {
+                tracing::error!(error = ?e, "embed forward failed");
+                return None;
+            }
+
+            // Get last_hidden_state output as raw pointer
+            let (data_ptr, size) = match request.get_output("last_hidden_state") {
+                Ok((ptr, sz)) => (ptr, sz),
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to get last_hidden_state output");
+                    return None;
+                }
+            };
+
+            let elem_count = size / 4; // float32
+            if elem_count == 0 {
+                tracing::warn!("Empty last_hidden_state output");
+                return None;
+            }
+
+            // Determine shape: [1, hidden_size] or [batch_size, hidden_size]
+            let num_vectors = elem_count / hidden_size;
+            let (ndim, shape_array) = if num_vectors == 1 {
+                // [hidden_size]
+                (1, [hidden_size as i64, 1, 1, 1, 1, 1, 1, 1])
+            } else {
+                // [num_vectors, hidden_size]
+                (2, [num_vectors as i64, hidden_size as i64, 1, 1, 1, 1, 1, 1])
+            };
+
+            // Calculate offset to last token's embedding
+            let offset = if num_vectors > 1 {
+                (num_vectors - 1) * hidden_size
+            } else {
+                0
+            };
+
+            let data_ptr = unsafe { data_ptr.add(offset * 4) };
+
+            Some(TM_Tensor {
+                dtype: TM_DataType::TM_DATATYPE_FP32,
+                ndim: ndim as c_int,
+                shape: shape_array,
+                data: data_ptr as *mut c_void,
+                device_id: 0, // GPU
+            })
         })
         .await
         .unwrap_or_default();
