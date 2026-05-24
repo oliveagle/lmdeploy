@@ -695,21 +695,9 @@ impl LmDeployService for LmDeployServiceImpl {
             })
             .collect();
 
-        // Process batch requests sequentially (the engine handles internal parallelism)
-        let mut batch_results = Vec::with_capacity(batch_items.len());
-        for item in batch_items {
-            let (text, num_tokens, elapsed_ms) = engine
-                .generate_with_metrics(&item.prompt, item.params)
-                .await;
-            batch_results.push(BatchResult {
-                request_id: item.request_id,
-                text,
-                num_tokens,
-                elapsed_ms,
-                logprobs: None,
-                error: None,
-            });
-        }
+        // Vectorized batch: submit all requests simultaneously to C++ gateway
+        // The gateway's ModelExecutor performs dynamic batching on GPU
+        let batch_results = engine.generate_batch(batch_items).await;
 
         let total_latency_ms = batch_results.iter().map(|r| r.elapsed_ms).sum::<f64>();
 
