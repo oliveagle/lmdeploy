@@ -1358,7 +1358,11 @@ impl TensorMap {
     /// This allows the same TensorMap to be reused across multiple forward calls,
     /// avoiding per-request heap allocations and destruction.
     pub fn clear(&mut self) {
-        unsafe { TM_TensorMap_Clear(self.0) }
+        // TM_TensorMap_Clear not available in C++ library - destroy and recreate
+        unsafe {
+            TM_TensorMap_Destroy(self.0);
+            self.0 = TM_TensorMap_Create();
+        }
     }
 }
 
