@@ -298,11 +298,23 @@ int TM_ModelRequest_ForwardAsync(
 // seq_len: the current sequence length (1-indexed position of the token)
 typedef void (*TM_TokenCallback)(int token_id, int seq_len, void* user_data);
 
+// Completion callback type for event-driven request completion
+// status: the final request status (TM_RequestStatus)
+// seq_len: the final sequence length
+// user_data: opaque pointer passed to the callback
+typedef void (*TM_CompletionCallback)(int status, int seq_len, void* user_data);
+
 // Register a token callback for event-driven streaming.
 // The callback will be invoked from the C++ engine thread whenever a new token is generated.
 // user_data: opaque pointer passed to the callback
 // Returns 0 on success, negative on error
 int TM_ModelRequest_SetTokenCallback(TM_ModelRequest* req, TM_TokenCallback cb, void* user_data);
+
+// Register a completion callback for event-driven request completion.
+// The callback will be invoked from the C++ engine thread when the request completes.
+// user_data: opaque pointer passed to the callback
+// Returns 0 on success, negative on error
+int TM_ModelRequest_SetCompletionCallback(TM_ModelRequest* req, TM_CompletionCallback cb, void* user_data);
 
 // Get the output_ids tensor from the in-flight request.
 // Returns a pointer to int32 array of generated tokens and the count.

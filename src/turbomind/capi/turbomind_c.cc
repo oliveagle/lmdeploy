@@ -2618,6 +2618,14 @@ struct TM_TokenCallbackWrapper {
         : func(f), user_data(ud), token_id(0), seq_len(0) {}
 };
 
+struct TM_CompletionCallbackWrapper {
+    TM_CompletionCallback func;
+    void* user_data;
+
+    TM_CompletionCallbackWrapper(TM_CompletionCallback f, void* ud)
+        : func(f), user_data(ud) {}
+};
+
 struct TM_ModelRequest {
     turbomind::ModelRequest* req;
     std::shared_ptr<turbomind::TensorMap> output_tensors;
@@ -2626,6 +2634,7 @@ struct TM_ModelRequest {
     std::shared_ptr<turbomind::TensorMap> streaming_tensors;
     std::shared_ptr<turbomind::AtomicRequestState> streaming_state;
     std::shared_ptr<TM_TokenCallbackWrapper> token_cb_wrapper;
+    std::shared_ptr<TM_CompletionCallbackWrapper> completion_cb_wrapper;
 };
 
 TM_ModelRequest* TM_ModelRequest_Create(TM_TurboMind* tm)
@@ -2733,9 +2742,17 @@ int TM_ModelRequest_ForwardAsync(
             };
         }
 
+        // Wire completion callback if set
+        bool has_completion_cb = req->completion_cb_wrapper.get() != nullptr;
+
         // Submit request asynchronously - don't block, let caller poll state
-        auto out = req->req->Forward(std::move(param), []() {
-            // Completion callback - does nothing in async mode
+        auto out = req->req->Forward(std::move(param), [has_completion_cb, req]() {
+            if (has_completion_cb && req->completion_cb_wrapper) {
+                auto status = req->streaming_state ?
+                    (int)req->streaming_state->load(std::memory_order_acquire) : (int)TM_RequestStatus::TM_STATUS_FINISH;
+                auto seq_len = req->streaming_state ? req->streaming_state->seq_len.load() : 0;
+                req->completion_cb_wrapper->func(status, seq_len, req->completion_cb_wrapper->user_data);
+            }
         });
 
         // Store outputs as shared state for polling
