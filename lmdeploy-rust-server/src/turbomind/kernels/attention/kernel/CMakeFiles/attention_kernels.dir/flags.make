@@ -11,7 +11,7 @@ CUDA_FLAGS =  -Xcompiler -Wall -ldl --expt-extended-lambda --expt-relaxed-conste
 
 CXX_DEFINES = -DBUILD_MULTI_GPU=1 -DENABLE_BF16 -DUSE_NVTX
 
-CXX_INCLUDES = -I/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/_deps/fmt-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy -I/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/_deps/repo-cutlass-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/_deps/repo-cutlass-build/include -isystem /usr/local/cuda-12.5/include -isystem /usr/local/cuda-12.5/include/cccl
+CXX_INCLUDES = -I/mnt/data/lmdeploy/lmdeploy-rust-server/_deps/fmt-src/include -I/mnt/data/lmdeploy -I/include -I/mnt/data/lmdeploy/lmdeploy-rust-server/_deps/repo-cutlass-src/include -I/mnt/data/lmdeploy/lmdeploy-rust-server/_deps/repo-cutlass-build/include -isystem /usr/local/cuda-12.5/include -isystem /usr/local/cuda-12.5/include/cccl
 
 CXX_FLAGS = -O3 -DNDEBUG         -O3 -std=gnu++17 -fPIC -O3
 

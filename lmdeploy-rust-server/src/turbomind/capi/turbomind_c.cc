@@ -529,10 +529,10 @@ static HfModelConfig ParseHfConfig(const std::string& model_dir)
     // For Qwen3.5+, check if layer_types array contains "linear_attention"
     if (!config.use_linear_attn) {
         auto layer_types_val = config_source.get("layer_types");
-        if (layer_types_val.is_array() && layer_types_val.size() > 0) {
+        if (layer_types_val.is_array() && layer_types_val.as_array().size() > 0) {
             // Check if any layer uses "linear_attention"
-            for (size_t i = 0; i < layer_types_val.size(); ++i) {
-                auto layer_type = layer_types_val.get(i);
+            for (size_t i = 0; i < layer_types_val.as_array().size(); ++i) {
+                auto layer_type = layer_types_val[i];
                 if (layer_type.is_string() && layer_type.as_string() == "linear_attention") {
                     config.use_linear_attn = true;
                     break;
@@ -921,8 +921,9 @@ static void LoadWeightsFromSafetensors(
                 auto tensor = param.get();
                 if (tensor && tensor.raw_data()) {
                     size_t copy_size = std::min(data.size(), static_cast<size_t>(tensor.byte_size()));
-                    cudaMemcpyAsync(tensor.raw_data(), data.data(), copy_size, cudaMemcpyHostToDevice, turbomind::core::stream());
-                    cudaStreamSynchronize(turbomind::core::stream().handle());
+                    turbomind::core::Stream stream;
+                    cudaMemcpyAsync(tensor.raw_data(), data.data(), copy_size, cudaMemcpyHostToDevice, cudaStreamDefault);
+                    cudaStreamSynchronize(cudaStreamDefault);
                 }
             }
         }

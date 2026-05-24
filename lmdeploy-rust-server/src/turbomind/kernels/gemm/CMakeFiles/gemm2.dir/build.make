@@ -53,10 +53,10 @@ RM = /home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/bin/cmake -E
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy
+CMAKE_SOURCE_DIR = /mnt/data/lmdeploy
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+CMAKE_BINARY_DIR = /mnt/data/lmdeploy/lmdeploy-rust-server
 
 # Include any dependencies generated for this target.
 include src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/depend.make
@@ -74,10 +74,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/codegen:
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gemm.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gemm.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gemm.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/gemm.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gemm.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/gemm.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gemm.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gemm.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gemm.cu.o -MF CMakeFiles/gemm2.dir/gemm.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/gemm.cu -o CMakeFiles/gemm2.dir/gemm.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gemm.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gemm.cu.o -MF CMakeFiles/gemm2.dir/gemm.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/gemm.cu -o CMakeFiles/gemm2.dir/gemm.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gemm.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/gemm.cu.i"
@@ -89,10 +89,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gemm.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel.cu.o -MF CMakeFiles/gemm2.dir/kernel.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel.cu -o CMakeFiles/gemm2.dir/kernel.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel.cu.o -MF CMakeFiles/gemm2.dir/kernel.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel.cu -o CMakeFiles/gemm2.dir/kernel.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/kernel.cu.i"
@@ -104,10 +104,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/registry.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/registry.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/registry.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/registry.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/registry.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/registry.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/registry.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/registry.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/registry.cu.o -MF CMakeFiles/gemm2.dir/registry.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/registry.cu -o CMakeFiles/gemm2.dir/registry.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/registry.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/registry.cu.o -MF CMakeFiles/gemm2.dir/registry.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/registry.cu -o CMakeFiles/gemm2.dir/registry.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/registry.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/registry.cu.i"
@@ -119,10 +119,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/registry.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dispatch_cache.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dispatch_cache.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dispatch_cache.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/dispatch_cache.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dispatch_cache.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/dispatch_cache.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dispatch_cache.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dispatch_cache.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dispatch_cache.cu.o -MF CMakeFiles/gemm2.dir/dispatch_cache.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/dispatch_cache.cu -o CMakeFiles/gemm2.dir/dispatch_cache.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dispatch_cache.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dispatch_cache.cu.o -MF CMakeFiles/gemm2.dir/dispatch_cache.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/dispatch_cache.cu -o CMakeFiles/gemm2.dir/dispatch_cache.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dispatch_cache.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/dispatch_cache.cu.i"
@@ -134,10 +134,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dispatch_cache.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gpu_metric.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gpu_metric.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gpu_metric.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/gpu_metric.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gpu_metric.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/gpu_metric.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gpu_metric.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gpu_metric.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gpu_metric.cu.o -MF CMakeFiles/gemm2.dir/gpu_metric.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/gpu_metric.cu -o CMakeFiles/gemm2.dir/gpu_metric.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gpu_metric.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gpu_metric.cu.o -MF CMakeFiles/gemm2.dir/gpu_metric.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/gpu_metric.cu -o CMakeFiles/gemm2.dir/gpu_metric.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gpu_metric.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/gpu_metric.cu.i"
@@ -149,10 +149,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/gpu_metric.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/convert_v3.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/convert_v3.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/convert_v3.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/convert_v3.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/convert_v3.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/convert_v3.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/convert_v3.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/convert_v3.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/convert_v3.cu.o -MF CMakeFiles/gemm2.dir/convert_v3.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/convert_v3.cu -o CMakeFiles/gemm2.dir/convert_v3.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/convert_v3.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/convert_v3.cu.o -MF CMakeFiles/gemm2.dir/convert_v3.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/convert_v3.cu -o CMakeFiles/gemm2.dir/convert_v3.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/convert_v3.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/convert_v3.cu.i"
@@ -164,10 +164,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/convert_v3.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cast.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cast.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cast.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/cast.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cast.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/cast.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cast.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cast.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cast.cu.o -MF CMakeFiles/gemm2.dir/cast.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/cast.cu -o CMakeFiles/gemm2.dir/cast.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cast.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cast.cu.o -MF CMakeFiles/gemm2.dir/cast.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/cast.cu -o CMakeFiles/gemm2.dir/cast.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cast.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/cast.cu.i"
@@ -179,10 +179,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cast.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/unpack.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/unpack.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/unpack.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/unpack.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/unpack.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/unpack.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/unpack.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/unpack.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/unpack.cu.o -MF CMakeFiles/gemm2.dir/unpack.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/unpack.cu -o CMakeFiles/gemm2.dir/unpack.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/unpack.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/unpack.cu.o -MF CMakeFiles/gemm2.dir/unpack.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/unpack.cu -o CMakeFiles/gemm2.dir/unpack.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/unpack.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/unpack.cu.i"
@@ -194,10 +194,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/unpack.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/context.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/context.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/context.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/context.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/context.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/context.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/context.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/context.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/context.cu.o -MF CMakeFiles/gemm2.dir/context.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/context.cu -o CMakeFiles/gemm2.dir/context.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/context.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/context.cu.o -MF CMakeFiles/gemm2.dir/context.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/context.cu -o CMakeFiles/gemm2.dir/context.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/context.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/context.cu.i"
@@ -209,10 +209,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/context.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/cache_utils.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/cache_utils.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o -MF CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/cache_utils.cu -o CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o -MF CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/cache_utils.cu -o CMakeFiles/gemm2.dir/tuner/cache_utils.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/cache_utils.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/tuner/cache_utils.cu.i"
@@ -224,10 +224,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/cache_utils.cu.s: cmake_fo
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/measurer.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/measurer.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/measurer.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/measurer.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/measurer.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/measurer.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/measurer.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/measurer.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/measurer.cu.o -MF CMakeFiles/gemm2.dir/tuner/measurer.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/measurer.cu -o CMakeFiles/gemm2.dir/tuner/measurer.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/measurer.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/measurer.cu.o -MF CMakeFiles/gemm2.dir/tuner/measurer.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/measurer.cu -o CMakeFiles/gemm2.dir/tuner/measurer.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/measurer.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/tuner/measurer.cu.i"
@@ -239,10 +239,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/measurer.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/sampler.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/sampler.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/sampler.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/sampler.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/sampler.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/sampler.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/sampler.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/sampler.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/sampler.cu.o -MF CMakeFiles/gemm2.dir/tuner/sampler.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/sampler.cu -o CMakeFiles/gemm2.dir/tuner/sampler.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/sampler.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/sampler.cu.o -MF CMakeFiles/gemm2.dir/tuner/sampler.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/sampler.cu -o CMakeFiles/gemm2.dir/tuner/sampler.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/sampler.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/tuner/sampler.cu.i"
@@ -253,39 +253,39 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/sampler.cu.s: cmake_force
 	$(CMAKE_COMMAND) -E cmake_unimplemented_variable CMAKE_CUDA_CREATE_ASSEMBLY_SOURCE
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/stopping_criterion.cc
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/stopping_criterion.cc
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o -MF CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o.d -o CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/stopping_criterion.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o -MF CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o.d -o CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.o -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/stopping_criterion.cc
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/stopping_criterion.cc > CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/stopping_criterion.cc > CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.i
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/stopping_criterion.cc -o CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/stopping_criterion.cc -o CMakeFiles/gemm2.dir/tuner/stopping_criterion.cc.s
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/params.cc.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/params.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/params.cc
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/params.cc.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/params.cc
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/params.cc.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/params.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/params.cc.o -MF CMakeFiles/gemm2.dir/tuner/params.cc.o.d -o CMakeFiles/gemm2.dir/tuner/params.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/params.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/params.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/params.cc.o -MF CMakeFiles/gemm2.dir/tuner/params.cc.o.d -o CMakeFiles/gemm2.dir/tuner/params.cc.o -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/params.cc
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/params.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/gemm2.dir/tuner/params.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/params.cc > CMakeFiles/gemm2.dir/tuner/params.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/params.cc > CMakeFiles/gemm2.dir/tuner/params.cc.i
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/tuner/params.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/gemm2.dir/tuner/params.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tuner/params.cc -o CMakeFiles/gemm2.dir/tuner/params.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tuner/params.cc -o CMakeFiles/gemm2.dir/tuner/params.cc.s
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_4.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_4.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_4.cu -o CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_4.cu -o CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.i"
@@ -297,10 +297,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_4.cu.s: cmake_fo
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_8.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_8.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_8.cu -o CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_8.cu -o CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.i"
@@ -312,10 +312,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_8.cu.s: cmake_fo
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_16.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_16.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_16.cu -o CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm70_884_16.cu -o CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.i"
@@ -327,10 +327,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm70_884_16.cu.s: cmake_f
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_4.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_4.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_4.cu -o CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_4.cu -o CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.i"
@@ -342,10 +342,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_4.cu.s: cmake_
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_8.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_8.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_8.cu -o CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_8.cu -o CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.i"
@@ -357,10 +357,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_8.cu.s: cmake_
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_16.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_16.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_16.cu -o CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm75_16816_16.cu -o CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.i"
@@ -372,10 +372,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm75_16816_16.cu.s: cmake
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_4.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_4.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_21) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_4.cu -o CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_21) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_4.cu -o CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.i"
@@ -387,10 +387,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_4.cu.s: cmake_
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_8.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_8.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_22) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_8.cu -o CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_22) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_8.cu -o CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.i"
@@ -402,10 +402,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_8.cu.s: cmake_
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_16.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_16.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_23) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_16.cu -o CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_23) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o -MF CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm80_16816_16.cu -o CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.i"
@@ -417,10 +417,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/kernel/sm80_16816_16.cu.s: cmake
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cublas.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cublas.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cublas.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/cublas.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cublas.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/cublas.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cublas.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_24) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cublas.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cublas.cu.o -MF CMakeFiles/gemm2.dir/cublas.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/cublas.cu -o CMakeFiles/gemm2.dir/cublas.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_24) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cublas.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cublas.cu.o -MF CMakeFiles/gemm2.dir/cublas.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/cublas.cu -o CMakeFiles/gemm2.dir/cublas.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cublas.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/cublas.cu.i"
@@ -432,10 +432,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cublas.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/moe_utils_v2.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/moe_utils_v2.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/moe_utils_v2.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/moe_utils_v2.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/moe_utils_v2.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/moe_utils_v2.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/moe_utils_v2.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_25) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/moe_utils_v2.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/moe_utils_v2.cu.o -MF CMakeFiles/gemm2.dir/moe_utils_v2.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/moe_utils_v2.cu -o CMakeFiles/gemm2.dir/moe_utils_v2.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_25) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/moe_utils_v2.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/moe_utils_v2.cu.o -MF CMakeFiles/gemm2.dir/moe_utils_v2.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/moe_utils_v2.cu -o CMakeFiles/gemm2.dir/moe_utils_v2.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/moe_utils_v2.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/moe_utils_v2.cu.i"
@@ -447,10 +447,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/moe_utils_v2.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/test/test_utils.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/test/test_utils.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/test/test_utils.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/test/test_utils.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/test/test_utils.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/test/test_utils.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/test/test_utils.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_26) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/test/test_utils.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/test/test_utils.cu.o -MF CMakeFiles/gemm2.dir/test/test_utils.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/test/test_utils.cu -o CMakeFiles/gemm2.dir/test/test_utils.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_26) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/test/test_utils.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/test/test_utils.cu.o -MF CMakeFiles/gemm2.dir/test/test_utils.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/test/test_utils.cu -o CMakeFiles/gemm2.dir/test/test_utils.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/test/test_utils.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2.dir/test/test_utils.cu.i"
@@ -522,8 +522,8 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cmake_device_link.o: src/turbomi
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cmake_device_link.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/deviceLinkLibs.rsp
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cmake_device_link.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/deviceObjects1.rsp
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cmake_device_link.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/dlink.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_27) "Linking CUDA device code CMakeFiles/gemm2.dir/cmake_device_link.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/gemm2.dir/dlink.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_27) "Linking CUDA device code CMakeFiles/gemm2.dir/cmake_device_link.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/gemm2.dir/dlink.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/build: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cmake_device_link.o
@@ -590,19 +590,19 @@ lib/libgemm2.a: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/test/test_utils.
 lib/libgemm2.a: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/build.make
 lib/libgemm2.a: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/cmake_device_link.o
 lib/libgemm2.a: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_28) "Linking CXX static library ../../../../lib/libgemm2.a"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -P CMakeFiles/gemm2.dir/cmake_clean_target.cmake
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/gemm2.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_28) "Linking CXX static library ../../../../lib/libgemm2.a"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -P CMakeFiles/gemm2.dir/cmake_clean_target.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/gemm2.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/build: lib/libgemm2.a
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/build
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/clean:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -P CMakeFiles/gemm2.dir/cmake_clean.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -P CMakeFiles/gemm2.dir/cmake_clean.cmake
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/clean
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/depend:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/eaget-4tb/data/llm_server/lmdeploy /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/DependInfo.cmake "--color=$(COLOR)" gemm2
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/data/lmdeploy /mnt/data/lmdeploy/src/turbomind/kernels/gemm /mnt/data/lmdeploy/lmdeploy-rust-server /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/DependInfo.cmake "--color=$(COLOR)" gemm2
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/depend
 

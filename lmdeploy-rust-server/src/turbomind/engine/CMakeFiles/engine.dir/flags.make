@@ -4,7 +4,7 @@
 # compile CXX with /bin/c++
 CXX_DEFINES = -DBUILD_MULTI_GPU=1 -DENABLE_BF16 -DUSE_NVTX -DXGRAMMAR_ENABLE_CPPTRACE=0 -DXGRAMMAR_ENABLE_INTERNAL_CHECK=0
 
-CXX_INCLUDES = -I/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/_deps/fmt-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy -I/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/_deps/xgrammar-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/_deps/concurrentqueue-src -isystem /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/_deps/xgrammar-src/3rdparty/picojson -isystem /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/_deps/xgrammar-src/3rdparty/dlpack/include -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include
+CXX_INCLUDES = -I/mnt/data/lmdeploy/lmdeploy-rust-server/_deps/fmt-src/include -I/mnt/data/lmdeploy -I/include -I/mnt/data/lmdeploy/lmdeploy-rust-server/_deps/xgrammar-src/include -I/mnt/data/lmdeploy/lmdeploy-rust-server/_deps/concurrentqueue-src -isystem /mnt/data/lmdeploy/lmdeploy-rust-server/_deps/xgrammar-src/3rdparty/picojson -isystem /mnt/data/lmdeploy/lmdeploy-rust-server/_deps/xgrammar-src/3rdparty/dlpack/include -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include
 
 CXX_FLAGS = -O3 -DNDEBUG         -O3 -std=gnu++17 -fPIC
 

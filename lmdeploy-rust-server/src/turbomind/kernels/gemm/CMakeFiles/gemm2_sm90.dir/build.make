@@ -53,10 +53,10 @@ RM = /home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/bin/cmake -E
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy
+CMAKE_SOURCE_DIR = /mnt/data/lmdeploy
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+CMAKE_BINARY_DIR = /mnt/data/lmdeploy/lmdeploy-rust-server
 
 # Include any dependencies generated for this target.
 include src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/depend.make
@@ -74,10 +74,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/codegen:
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/tma.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/tma.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/tma.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tma.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/tma.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tma.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/tma.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/tma.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/tma.cu.o -MF CMakeFiles/gemm2_sm90.dir/tma.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/tma.cu -o CMakeFiles/gemm2_sm90.dir/tma.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/tma.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/tma.cu.o -MF CMakeFiles/gemm2_sm90.dir/tma.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/tma.cu -o CMakeFiles/gemm2_sm90.dir/tma.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/tma.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2_sm90.dir/tma.cu.i"
@@ -89,10 +89,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/tma.cu.s: cmake_force
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_4.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_4.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o -MF CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_4.cu -o CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o -MF CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_4.cu -o CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.i"
@@ -104,10 +104,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_4.cu.s: c
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_8.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_8.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o -MF CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_8.cu -o CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o -MF CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_8.cu -o CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.i"
@@ -119,10 +119,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_8.cu.s: c
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_16.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_16.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o -MF CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_16.cu -o CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o -MF CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_16816_16.cu -o CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.i"
@@ -134,10 +134,10 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_16816_16.cu.s: 
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/flags.make
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/includes_CUDA.rsp
-src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_64n32_8.cu
+src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o: /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_64n32_8.cu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o -MF CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_64n32_8.cu -o CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CUDA object src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o -MF CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/kernels/gemm/kernel/sm90_64n32_8.cu -o CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.o
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/gemm2_sm90.dir/kernel/sm90_64n32_8.cu.i"
@@ -167,8 +167,8 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/cmake_device_link.o: src/tu
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/cmake_device_link.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/deviceLinkLibs.rsp
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/cmake_device_link.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/deviceObjects1.rsp
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/cmake_device_link.o: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/dlink.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Linking CUDA device code CMakeFiles/gemm2_sm90.dir/cmake_device_link.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/gemm2_sm90.dir/dlink.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Linking CUDA device code CMakeFiles/gemm2_sm90.dir/cmake_device_link.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/gemm2_sm90.dir/dlink.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/build: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/cmake_device_link.o
@@ -193,19 +193,19 @@ lib/libgemm2_sm90.a: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/kernel
 lib/libgemm2_sm90.a: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/build.make
 lib/libgemm2_sm90.a: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/cmake_device_link.o
 lib/libgemm2_sm90.a: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CXX static library ../../../../lib/libgemm2_sm90.a"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -P CMakeFiles/gemm2_sm90.dir/cmake_clean_target.cmake
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/gemm2_sm90.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CXX static library ../../../../lib/libgemm2_sm90.a"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -P CMakeFiles/gemm2_sm90.dir/cmake_clean_target.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/gemm2_sm90.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/build: lib/libgemm2_sm90.a
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/build
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/clean:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -P CMakeFiles/gemm2_sm90.dir/cmake_clean.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm && $(CMAKE_COMMAND) -P CMakeFiles/gemm2_sm90.dir/cmake_clean.cmake
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/clean
 
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/depend:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/eaget-4tb/data/llm_server/lmdeploy /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/kernels/gemm /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/DependInfo.cmake "--color=$(COLOR)" gemm2_sm90
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/data/lmdeploy /mnt/data/lmdeploy/src/turbomind/kernels/gemm /mnt/data/lmdeploy/lmdeploy-rust-server /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/DependInfo.cmake "--color=$(COLOR)" gemm2_sm90
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/depend
 

@@ -57,10 +57,10 @@ RM = /home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/bin/cmake -E
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy
+CMAKE_SOURCE_DIR = /mnt/data/lmdeploy
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+CMAKE_BINARY_DIR = /mnt/data/lmdeploy/lmdeploy-rust-server
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -152,9 +152,9 @@ install/strip/fast: preinstall/fast
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles /mnt/data/lmdeploy/lmdeploy-rust-server//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -178,7 +178,7 @@ preinstall/fast:
 
 # clear depends
 depend:
-	$(CMAKE_COMMAND) -P /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles/VerifyGlobs.cmake
+	$(CMAKE_COMMAND) -P /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles/VerifyGlobs.cmake
 	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
@@ -1285,7 +1285,7 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	$(CMAKE_COMMAND) -P /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles/VerifyGlobs.cmake
-	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+#	$(CMAKE_COMMAND) -P CMakeFiles/VerifyGlobs.cmake
+#	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

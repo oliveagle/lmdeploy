@@ -53,10 +53,10 @@ RM = /home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/bin/cmake -E
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy
+CMAKE_SOURCE_DIR = /mnt/data/lmdeploy
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+CMAKE_BINARY_DIR = /mnt/data/lmdeploy/lmdeploy-rust-server
 
 # Include any dependencies generated for this target.
 include src/turbomind/comm/CMakeFiles/host_comm.dir/depend.make
@@ -73,32 +73,32 @@ src/turbomind/comm/CMakeFiles/host_comm.dir/codegen:
 .PHONY : src/turbomind/comm/CMakeFiles/host_comm.dir/codegen
 
 src/turbomind/comm/CMakeFiles/host_comm.dir/host_comm.cc.o: src/turbomind/comm/CMakeFiles/host_comm.dir/flags.make
-src/turbomind/comm/CMakeFiles/host_comm.dir/host_comm.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/host_comm.cc
+src/turbomind/comm/CMakeFiles/host_comm.dir/host_comm.cc.o: /mnt/data/lmdeploy/src/turbomind/comm/host_comm.cc
 src/turbomind/comm/CMakeFiles/host_comm.dir/host_comm.cc.o: src/turbomind/comm/CMakeFiles/host_comm.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/comm/CMakeFiles/host_comm.dir/host_comm.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/comm/CMakeFiles/host_comm.dir/host_comm.cc.o -MF CMakeFiles/host_comm.dir/host_comm.cc.o.d -o CMakeFiles/host_comm.dir/host_comm.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/host_comm.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/comm/CMakeFiles/host_comm.dir/host_comm.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/comm/CMakeFiles/host_comm.dir/host_comm.cc.o -MF CMakeFiles/host_comm.dir/host_comm.cc.o.d -o CMakeFiles/host_comm.dir/host_comm.cc.o -c /mnt/data/lmdeploy/src/turbomind/comm/host_comm.cc
 
 src/turbomind/comm/CMakeFiles/host_comm.dir/host_comm.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/host_comm.dir/host_comm.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/host_comm.cc > CMakeFiles/host_comm.dir/host_comm.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/comm/host_comm.cc > CMakeFiles/host_comm.dir/host_comm.cc.i
 
 src/turbomind/comm/CMakeFiles/host_comm.dir/host_comm.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/host_comm.dir/host_comm.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/host_comm.cc -o CMakeFiles/host_comm.dir/host_comm.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/comm/host_comm.cc -o CMakeFiles/host_comm.dir/host_comm.cc.s
 
 src/turbomind/comm/CMakeFiles/host_comm.dir/thread_comm.cc.o: src/turbomind/comm/CMakeFiles/host_comm.dir/flags.make
-src/turbomind/comm/CMakeFiles/host_comm.dir/thread_comm.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/thread_comm.cc
+src/turbomind/comm/CMakeFiles/host_comm.dir/thread_comm.cc.o: /mnt/data/lmdeploy/src/turbomind/comm/thread_comm.cc
 src/turbomind/comm/CMakeFiles/host_comm.dir/thread_comm.cc.o: src/turbomind/comm/CMakeFiles/host_comm.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object src/turbomind/comm/CMakeFiles/host_comm.dir/thread_comm.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/comm/CMakeFiles/host_comm.dir/thread_comm.cc.o -MF CMakeFiles/host_comm.dir/thread_comm.cc.o.d -o CMakeFiles/host_comm.dir/thread_comm.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/thread_comm.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object src/turbomind/comm/CMakeFiles/host_comm.dir/thread_comm.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/comm/CMakeFiles/host_comm.dir/thread_comm.cc.o -MF CMakeFiles/host_comm.dir/thread_comm.cc.o.d -o CMakeFiles/host_comm.dir/thread_comm.cc.o -c /mnt/data/lmdeploy/src/turbomind/comm/thread_comm.cc
 
 src/turbomind/comm/CMakeFiles/host_comm.dir/thread_comm.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/host_comm.dir/thread_comm.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/thread_comm.cc > CMakeFiles/host_comm.dir/thread_comm.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/comm/thread_comm.cc > CMakeFiles/host_comm.dir/thread_comm.cc.i
 
 src/turbomind/comm/CMakeFiles/host_comm.dir/thread_comm.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/host_comm.dir/thread_comm.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/thread_comm.cc -o CMakeFiles/host_comm.dir/thread_comm.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/comm/thread_comm.cc -o CMakeFiles/host_comm.dir/thread_comm.cc.s
 
 # Object files for target host_comm
 host_comm_OBJECTS = \
@@ -112,19 +112,19 @@ lib/libhost_comm.a: src/turbomind/comm/CMakeFiles/host_comm.dir/host_comm.cc.o
 lib/libhost_comm.a: src/turbomind/comm/CMakeFiles/host_comm.dir/thread_comm.cc.o
 lib/libhost_comm.a: src/turbomind/comm/CMakeFiles/host_comm.dir/build.make
 lib/libhost_comm.a: src/turbomind/comm/CMakeFiles/host_comm.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX static library ../../../lib/libhost_comm.a"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -P CMakeFiles/host_comm.dir/cmake_clean_target.cmake
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/host_comm.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX static library ../../../lib/libhost_comm.a"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -P CMakeFiles/host_comm.dir/cmake_clean_target.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/host_comm.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/comm/CMakeFiles/host_comm.dir/build: lib/libhost_comm.a
 .PHONY : src/turbomind/comm/CMakeFiles/host_comm.dir/build
 
 src/turbomind/comm/CMakeFiles/host_comm.dir/clean:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -P CMakeFiles/host_comm.dir/cmake_clean.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -P CMakeFiles/host_comm.dir/cmake_clean.cmake
 .PHONY : src/turbomind/comm/CMakeFiles/host_comm.dir/clean
 
 src/turbomind/comm/CMakeFiles/host_comm.dir/depend:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/eaget-4tb/data/llm_server/lmdeploy /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/CMakeFiles/host_comm.dir/DependInfo.cmake "--color=$(COLOR)" host_comm
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/data/lmdeploy /mnt/data/lmdeploy/src/turbomind/comm /mnt/data/lmdeploy/lmdeploy-rust-server /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/CMakeFiles/host_comm.dir/DependInfo.cmake "--color=$(COLOR)" host_comm
 .PHONY : src/turbomind/comm/CMakeFiles/host_comm.dir/depend
 

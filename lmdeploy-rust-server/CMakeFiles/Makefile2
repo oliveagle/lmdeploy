@@ -54,10 +54,10 @@ RM = /home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/bin/cmake -E
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy
+CMAKE_SOURCE_DIR = /mnt/data/lmdeploy
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+CMAKE_BINARY_DIR = /mnt/data/lmdeploy/lmdeploy-rust-server
 
 #=============================================================================
 # Directory level rules for the build root directory
@@ -889,14 +889,14 @@ src/turbomind/utils/clean: src/turbomind/utils/CMakeFiles/weight_serializer.dir/
 _deps/fmt-build/CMakeFiles/fmt.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/fmt-build/CMakeFiles/fmt.dir/build.make _deps/fmt-build/CMakeFiles/fmt.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/fmt-build/CMakeFiles/fmt.dir/build.make _deps/fmt-build/CMakeFiles/fmt.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=30 "Built target fmt"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=30 "Built target fmt"
 .PHONY : _deps/fmt-build/CMakeFiles/fmt.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/fmt-build/CMakeFiles/fmt.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/fmt-build/CMakeFiles/fmt.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/fmt-build/CMakeFiles/fmt.dir/rule
 
 # Convenience name for target.
@@ -906,7 +906,7 @@ fmt: _deps/fmt-build/CMakeFiles/fmt.dir/rule
 # codegen rule for target.
 _deps/fmt-build/CMakeFiles/fmt.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/fmt-build/CMakeFiles/fmt.dir/build.make _deps/fmt-build/CMakeFiles/fmt.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=30 "Finished codegen for target fmt"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=30 "Finished codegen for target fmt"
 .PHONY : _deps/fmt-build/CMakeFiles/fmt.dir/codegen
 
 # clean rule for target.
@@ -921,14 +921,14 @@ _deps/fmt-build/CMakeFiles/fmt.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/build.make _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/build.make _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target cutlass_docs"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target cutlass_docs"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/rule
 
 # Convenience name for target.
@@ -938,7 +938,7 @@ cutlass_docs: _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/build.make _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target cutlass_docs"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target cutlass_docs"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/codegen
 
 # clean rule for target.
@@ -953,14 +953,14 @@ _deps/repo-cutlass-build/CMakeFiles/cutlass_docs.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/build.make _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/build.make _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target Experimental"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target Experimental"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/rule
 
 # Convenience name for target.
@@ -970,7 +970,7 @@ Experimental: _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/build.make _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target Experimental"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target Experimental"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/codegen
 
 # clean rule for target.
@@ -985,14 +985,14 @@ _deps/repo-cutlass-build/CMakeFiles/Experimental.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/build.make _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/build.make _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target Nightly"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target Nightly"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/rule
 
 # Convenience name for target.
@@ -1002,7 +1002,7 @@ Nightly: _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/build.make _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target Nightly"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target Nightly"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/codegen
 
 # clean rule for target.
@@ -1017,14 +1017,14 @@ _deps/repo-cutlass-build/CMakeFiles/Nightly.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/build.make _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/build.make _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target Continuous"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target Continuous"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/rule
 
 # Convenience name for target.
@@ -1034,7 +1034,7 @@ Continuous: _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/build.make _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target Continuous"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target Continuous"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/codegen
 
 # clean rule for target.
@@ -1049,14 +1049,14 @@ _deps/repo-cutlass-build/CMakeFiles/Continuous.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyMemoryCheck"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyMemoryCheck"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/rule
 
 # Convenience name for target.
@@ -1066,7 +1066,7 @@ NightlyMemoryCheck: _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/r
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyMemoryCheck"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyMemoryCheck"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/codegen
 
 # clean rule for target.
@@ -1081,14 +1081,14 @@ _deps/repo-cutlass-build/CMakeFiles/NightlyMemoryCheck.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyStart"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyStart"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/rule
 
 # Convenience name for target.
@@ -1098,7 +1098,7 @@ NightlyStart: _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyStart"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyStart"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/codegen
 
 # clean rule for target.
@@ -1113,14 +1113,14 @@ _deps/repo-cutlass-build/CMakeFiles/NightlyStart.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyUpdate"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyUpdate"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/rule
 
 # Convenience name for target.
@@ -1130,7 +1130,7 @@ NightlyUpdate: _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyUpdate"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyUpdate"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/codegen
 
 # clean rule for target.
@@ -1145,14 +1145,14 @@ _deps/repo-cutlass-build/CMakeFiles/NightlyUpdate.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyConfigure"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyConfigure"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/rule
 
 # Convenience name for target.
@@ -1162,7 +1162,7 @@ NightlyConfigure: _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyConfigure"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyConfigure"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/codegen
 
 # clean rule for target.
@@ -1177,14 +1177,14 @@ _deps/repo-cutlass-build/CMakeFiles/NightlyConfigure.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyBuild"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyBuild"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/rule
 
 # Convenience name for target.
@@ -1194,7 +1194,7 @@ NightlyBuild: _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyBuild"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyBuild"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/codegen
 
 # clean rule for target.
@@ -1209,14 +1209,14 @@ _deps/repo-cutlass-build/CMakeFiles/NightlyBuild.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyTest"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyTest"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/rule
 
 # Convenience name for target.
@@ -1226,7 +1226,7 @@ NightlyTest: _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyTest"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyTest"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/codegen
 
 # clean rule for target.
@@ -1241,14 +1241,14 @@ _deps/repo-cutlass-build/CMakeFiles/NightlyTest.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyCoverage"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyCoverage"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/rule
 
 # Convenience name for target.
@@ -1258,7 +1258,7 @@ NightlyCoverage: _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyCoverage"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyCoverage"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/codegen
 
 # clean rule for target.
@@ -1273,14 +1273,14 @@ _deps/repo-cutlass-build/CMakeFiles/NightlyCoverage.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyMemCheck"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlyMemCheck"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/rule
 
 # Convenience name for target.
@@ -1290,7 +1290,7 @@ NightlyMemCheck: _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyMemCheck"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlyMemCheck"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/codegen
 
 # clean rule for target.
@@ -1305,14 +1305,14 @@ _deps/repo-cutlass-build/CMakeFiles/NightlyMemCheck.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlySubmit"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target NightlySubmit"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/rule
 
 # Convenience name for target.
@@ -1322,7 +1322,7 @@ NightlySubmit: _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/build.make _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlySubmit"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target NightlySubmit"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/codegen
 
 # clean rule for target.
@@ -1337,14 +1337,14 @@ _deps/repo-cutlass-build/CMakeFiles/NightlySubmit.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalStart"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalStart"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/rule
 
 # Convenience name for target.
@@ -1354,7 +1354,7 @@ ExperimentalStart: _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/rul
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalStart"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalStart"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/codegen
 
 # clean rule for target.
@@ -1369,14 +1369,14 @@ _deps/repo-cutlass-build/CMakeFiles/ExperimentalStart.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalUpdate"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalUpdate"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/rule
 
 # Convenience name for target.
@@ -1386,7 +1386,7 @@ ExperimentalUpdate: _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/r
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalUpdate"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalUpdate"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/codegen
 
 # clean rule for target.
@@ -1401,14 +1401,14 @@ _deps/repo-cutlass-build/CMakeFiles/ExperimentalUpdate.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalConfigure"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalConfigure"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/rule
 
 # Convenience name for target.
@@ -1418,7 +1418,7 @@ ExperimentalConfigure: _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalConfigure"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalConfigure"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/codegen
 
 # clean rule for target.
@@ -1433,14 +1433,14 @@ _deps/repo-cutlass-build/CMakeFiles/ExperimentalConfigure.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalBuild"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalBuild"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/rule
 
 # Convenience name for target.
@@ -1450,7 +1450,7 @@ ExperimentalBuild: _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/rul
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalBuild"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalBuild"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/codegen
 
 # clean rule for target.
@@ -1465,14 +1465,14 @@ _deps/repo-cutlass-build/CMakeFiles/ExperimentalBuild.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalTest"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalTest"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/rule
 
 # Convenience name for target.
@@ -1482,7 +1482,7 @@ ExperimentalTest: _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalTest"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalTest"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/codegen
 
 # clean rule for target.
@@ -1497,14 +1497,14 @@ _deps/repo-cutlass-build/CMakeFiles/ExperimentalTest.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalCoverage"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalCoverage"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/rule
 
 # Convenience name for target.
@@ -1514,7 +1514,7 @@ ExperimentalCoverage: _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.d
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalCoverage"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalCoverage"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/codegen
 
 # clean rule for target.
@@ -1529,14 +1529,14 @@ _deps/repo-cutlass-build/CMakeFiles/ExperimentalCoverage.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalMemCheck"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalMemCheck"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/rule
 
 # Convenience name for target.
@@ -1546,7 +1546,7 @@ ExperimentalMemCheck: _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.d
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalMemCheck"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalMemCheck"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/codegen
 
 # clean rule for target.
@@ -1561,14 +1561,14 @@ _deps/repo-cutlass-build/CMakeFiles/ExperimentalMemCheck.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalSubmit"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ExperimentalSubmit"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/rule
 
 # Convenience name for target.
@@ -1578,7 +1578,7 @@ ExperimentalSubmit: _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/r
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalSubmit"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ExperimentalSubmit"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/codegen
 
 # clean rule for target.
@@ -1593,14 +1593,14 @@ _deps/repo-cutlass-build/CMakeFiles/ExperimentalSubmit.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousStart"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousStart"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/rule
 
 # Convenience name for target.
@@ -1610,7 +1610,7 @@ ContinuousStart: _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousStart"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousStart"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/codegen
 
 # clean rule for target.
@@ -1625,14 +1625,14 @@ _deps/repo-cutlass-build/CMakeFiles/ContinuousStart.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousUpdate"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousUpdate"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/rule
 
 # Convenience name for target.
@@ -1642,7 +1642,7 @@ ContinuousUpdate: _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousUpdate"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousUpdate"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/codegen
 
 # clean rule for target.
@@ -1657,14 +1657,14 @@ _deps/repo-cutlass-build/CMakeFiles/ContinuousUpdate.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousConfigure"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousConfigure"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/rule
 
 # Convenience name for target.
@@ -1674,7 +1674,7 @@ ContinuousConfigure: _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousConfigure"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousConfigure"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/codegen
 
 # clean rule for target.
@@ -1689,14 +1689,14 @@ _deps/repo-cutlass-build/CMakeFiles/ContinuousConfigure.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousBuild"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousBuild"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/rule
 
 # Convenience name for target.
@@ -1706,7 +1706,7 @@ ContinuousBuild: _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousBuild"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousBuild"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/codegen
 
 # clean rule for target.
@@ -1721,14 +1721,14 @@ _deps/repo-cutlass-build/CMakeFiles/ContinuousBuild.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousTest"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousTest"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/rule
 
 # Convenience name for target.
@@ -1738,7 +1738,7 @@ ContinuousTest: _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousTest"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousTest"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/codegen
 
 # clean rule for target.
@@ -1753,14 +1753,14 @@ _deps/repo-cutlass-build/CMakeFiles/ContinuousTest.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousCoverage"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousCoverage"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/rule
 
 # Convenience name for target.
@@ -1770,7 +1770,7 @@ ContinuousCoverage: _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/r
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousCoverage"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousCoverage"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/codegen
 
 # clean rule for target.
@@ -1785,14 +1785,14 @@ _deps/repo-cutlass-build/CMakeFiles/ContinuousCoverage.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousMemCheck"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousMemCheck"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/rule
 
 # Convenience name for target.
@@ -1802,7 +1802,7 @@ ContinuousMemCheck: _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/r
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousMemCheck"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousMemCheck"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/codegen
 
 # clean rule for target.
@@ -1817,14 +1817,14 @@ _deps/repo-cutlass-build/CMakeFiles/ContinuousMemCheck.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousSubmit"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target ContinuousSubmit"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/rule
 
 # Convenience name for target.
@@ -1834,7 +1834,7 @@ ContinuousSubmit: _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/build.make _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousSubmit"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target ContinuousSubmit"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/codegen
 
 # clean rule for target.
@@ -1849,14 +1849,14 @@ _deps/repo-cutlass-build/CMakeFiles/ContinuousSubmit.dir/clean:
 _deps/repo-cutlass-build/CMakeFiles/test_all.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/test_all.dir/build.make _deps/repo-cutlass-build/CMakeFiles/test_all.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/test_all.dir/build.make _deps/repo-cutlass-build/CMakeFiles/test_all.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target test_all"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target test_all"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/test_all.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/repo-cutlass-build/CMakeFiles/test_all.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/repo-cutlass-build/CMakeFiles/test_all.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/test_all.dir/rule
 
 # Convenience name for target.
@@ -1866,7 +1866,7 @@ test_all: _deps/repo-cutlass-build/CMakeFiles/test_all.dir/rule
 # codegen rule for target.
 _deps/repo-cutlass-build/CMakeFiles/test_all.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/repo-cutlass-build/CMakeFiles/test_all.dir/build.make _deps/repo-cutlass-build/CMakeFiles/test_all.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target test_all"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target test_all"
 .PHONY : _deps/repo-cutlass-build/CMakeFiles/test_all.dir/codegen
 
 # clean rule for target.
@@ -1881,14 +1881,14 @@ _deps/repo-cutlass-build/CMakeFiles/test_all.dir/clean:
 _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/build.make _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/build.make _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=89,90,91,92,93,94,95,96,97,98 "Built target yaml-cpp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=89,90,91,92,93,94,95,96,97,98 "Built target yaml-cpp"
 .PHONY : _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 10
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 10
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/rule
 
 # Convenience name for target.
@@ -1898,7 +1898,7 @@ yaml-cpp: _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/rule
 # codegen rule for target.
 _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/build.make _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=89,90,91,92,93,94,95,96,97,98 "Finished codegen for target yaml-cpp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=89,90,91,92,93,94,95,96,97,98 "Finished codegen for target yaml-cpp"
 .PHONY : _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/codegen
 
 # clean rule for target.
@@ -1913,14 +1913,14 @@ _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/clean:
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/all: _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/all
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/build.make _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/build.make _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=100 "Built target yaml-cpp-sandbox"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=100 "Built target yaml-cpp-sandbox"
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 11
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 11
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/rule
 
 # Convenience name for target.
@@ -1930,7 +1930,7 @@ yaml-cpp-sandbox: _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/rule
 # codegen rule for target.
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/build.make _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=100 "Finished codegen for target yaml-cpp-sandbox"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=100 "Finished codegen for target yaml-cpp-sandbox"
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/codegen
 
 # clean rule for target.
@@ -1945,14 +1945,14 @@ _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-sandbox.dir/clean:
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/all: _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/all
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/build.make _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/build.make _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target yaml-cpp-parse"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target yaml-cpp-parse"
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 10
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 10
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/rule
 
 # Convenience name for target.
@@ -1962,7 +1962,7 @@ yaml-cpp-parse: _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/rule
 # codegen rule for target.
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/build.make _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target yaml-cpp-parse"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target yaml-cpp-parse"
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/codegen
 
 # clean rule for target.
@@ -1977,14 +1977,14 @@ _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-parse.dir/clean:
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/all: _deps/yaml-cpp-build/CMakeFiles/yaml-cpp.dir/all
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/build.make _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/build.make _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=99 "Built target yaml-cpp-read"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=99 "Built target yaml-cpp-read"
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 11
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 11
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/rule
 
 # Convenience name for target.
@@ -1994,7 +1994,7 @@ yaml-cpp-read: _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/rule
 # codegen rule for target.
 _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/build.make _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=99 "Finished codegen for target yaml-cpp-read"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=99 "Finished codegen for target yaml-cpp-read"
 .PHONY : _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/codegen
 
 # clean rule for target.
@@ -2009,14 +2009,14 @@ _deps/yaml-cpp-build/util/CMakeFiles/yaml-cpp-read.dir/clean:
 _deps/xgrammar-build/CMakeFiles/xgrammar.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/xgrammar-build/CMakeFiles/xgrammar.dir/build.make _deps/xgrammar-build/CMakeFiles/xgrammar.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/xgrammar-build/CMakeFiles/xgrammar.dir/build.make _deps/xgrammar-build/CMakeFiles/xgrammar.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=83,84,85,86,87,88 "Built target xgrammar"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=83,84,85,86,87,88 "Built target xgrammar"
 .PHONY : _deps/xgrammar-build/CMakeFiles/xgrammar.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/xgrammar-build/CMakeFiles/xgrammar.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 6
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 6
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/xgrammar-build/CMakeFiles/xgrammar.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/xgrammar-build/CMakeFiles/xgrammar.dir/rule
 
 # Convenience name for target.
@@ -2026,7 +2026,7 @@ xgrammar: _deps/xgrammar-build/CMakeFiles/xgrammar.dir/rule
 # codegen rule for target.
 _deps/xgrammar-build/CMakeFiles/xgrammar.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/xgrammar-build/CMakeFiles/xgrammar.dir/build.make _deps/xgrammar-build/CMakeFiles/xgrammar.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=83,84,85,86,87,88 "Finished codegen for target xgrammar"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=83,84,85,86,87,88 "Finished codegen for target xgrammar"
 .PHONY : _deps/xgrammar-build/CMakeFiles/xgrammar.dir/codegen
 
 # clean rule for target.
@@ -2075,14 +2075,14 @@ src/turbomind/CMakeFiles/turbomind.dir/all: src/turbomind/models/CMakeFiles/mode
 src/turbomind/CMakeFiles/turbomind.dir/all: src/turbomind/engine/CMakeFiles/engine.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/CMakeFiles/turbomind.dir/build.make src/turbomind/CMakeFiles/turbomind.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/CMakeFiles/turbomind.dir/build.make src/turbomind/CMakeFiles/turbomind.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=80 "Built target turbomind"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=80 "Built target turbomind"
 .PHONY : src/turbomind/CMakeFiles/turbomind.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/CMakeFiles/turbomind.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 85
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 85
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/CMakeFiles/turbomind.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/CMakeFiles/turbomind.dir/rule
 
 # Convenience name for target.
@@ -2092,7 +2092,7 @@ turbomind: src/turbomind/CMakeFiles/turbomind.dir/rule
 # codegen rule for target.
 src/turbomind/CMakeFiles/turbomind.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/CMakeFiles/turbomind.dir/build.make src/turbomind/CMakeFiles/turbomind.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=80 "Finished codegen for target turbomind"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=80 "Finished codegen for target turbomind"
 .PHONY : src/turbomind/CMakeFiles/turbomind.dir/codegen
 
 # clean rule for target.
@@ -2107,14 +2107,14 @@ src/turbomind/CMakeFiles/turbomind.dir/clean:
 src/turbomind/utils/CMakeFiles/cuda_utils.dir/all: _deps/fmt-build/CMakeFiles/fmt.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/cuda_utils.dir/build.make src/turbomind/utils/CMakeFiles/cuda_utils.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/cuda_utils.dir/build.make src/turbomind/utils/CMakeFiles/cuda_utils.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=25 "Built target cuda_utils"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=25 "Built target cuda_utils"
 .PHONY : src/turbomind/utils/CMakeFiles/cuda_utils.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/utils/CMakeFiles/cuda_utils.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 2
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/cuda_utils.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/utils/CMakeFiles/cuda_utils.dir/rule
 
 # Convenience name for target.
@@ -2124,7 +2124,7 @@ cuda_utils: src/turbomind/utils/CMakeFiles/cuda_utils.dir/rule
 # codegen rule for target.
 src/turbomind/utils/CMakeFiles/cuda_utils.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/cuda_utils.dir/build.make src/turbomind/utils/CMakeFiles/cuda_utils.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=25 "Finished codegen for target cuda_utils"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=25 "Finished codegen for target cuda_utils"
 .PHONY : src/turbomind/utils/CMakeFiles/cuda_utils.dir/codegen
 
 # clean rule for target.
@@ -2139,14 +2139,14 @@ src/turbomind/utils/CMakeFiles/cuda_utils.dir/clean:
 src/turbomind/utils/CMakeFiles/nvtx_utils.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/nvtx_utils.dir/build.make src/turbomind/utils/CMakeFiles/nvtx_utils.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/nvtx_utils.dir/build.make src/turbomind/utils/CMakeFiles/nvtx_utils.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=71 "Built target nvtx_utils"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=71 "Built target nvtx_utils"
 .PHONY : src/turbomind/utils/CMakeFiles/nvtx_utils.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/utils/CMakeFiles/nvtx_utils.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/nvtx_utils.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/utils/CMakeFiles/nvtx_utils.dir/rule
 
 # Convenience name for target.
@@ -2156,7 +2156,7 @@ nvtx_utils: src/turbomind/utils/CMakeFiles/nvtx_utils.dir/rule
 # codegen rule for target.
 src/turbomind/utils/CMakeFiles/nvtx_utils.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/nvtx_utils.dir/build.make src/turbomind/utils/CMakeFiles/nvtx_utils.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=71 "Finished codegen for target nvtx_utils"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=71 "Finished codegen for target nvtx_utils"
 .PHONY : src/turbomind/utils/CMakeFiles/nvtx_utils.dir/codegen
 
 # clean rule for target.
@@ -2172,14 +2172,14 @@ src/turbomind/utils/CMakeFiles/memory_utils.dir/all: _deps/fmt-build/CMakeFiles/
 src/turbomind/utils/CMakeFiles/memory_utils.dir/all: src/turbomind/utils/CMakeFiles/cuda_utils.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/memory_utils.dir/build.make src/turbomind/utils/CMakeFiles/memory_utils.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/memory_utils.dir/build.make src/turbomind/utils/CMakeFiles/memory_utils.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=61 "Built target memory_utils"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=61 "Built target memory_utils"
 .PHONY : src/turbomind/utils/CMakeFiles/memory_utils.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/utils/CMakeFiles/memory_utils.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 3
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 3
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/memory_utils.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/utils/CMakeFiles/memory_utils.dir/rule
 
 # Convenience name for target.
@@ -2189,7 +2189,7 @@ memory_utils: src/turbomind/utils/CMakeFiles/memory_utils.dir/rule
 # codegen rule for target.
 src/turbomind/utils/CMakeFiles/memory_utils.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/memory_utils.dir/build.make src/turbomind/utils/CMakeFiles/memory_utils.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=61 "Finished codegen for target memory_utils"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=61 "Finished codegen for target memory_utils"
 .PHONY : src/turbomind/utils/CMakeFiles/memory_utils.dir/codegen
 
 # clean rule for target.
@@ -2205,14 +2205,14 @@ src/turbomind/utils/CMakeFiles/anomaly_handler.dir/all: _deps/fmt-build/CMakeFil
 src/turbomind/utils/CMakeFiles/anomaly_handler.dir/all: src/turbomind/utils/CMakeFiles/cuda_utils.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/anomaly_handler.dir/build.make src/turbomind/utils/CMakeFiles/anomaly_handler.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/anomaly_handler.dir/build.make src/turbomind/utils/CMakeFiles/anomaly_handler.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=4 "Built target anomaly_handler"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=4 "Built target anomaly_handler"
 .PHONY : src/turbomind/utils/CMakeFiles/anomaly_handler.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/utils/CMakeFiles/anomaly_handler.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 3
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 3
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/anomaly_handler.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/utils/CMakeFiles/anomaly_handler.dir/rule
 
 # Convenience name for target.
@@ -2222,7 +2222,7 @@ anomaly_handler: src/turbomind/utils/CMakeFiles/anomaly_handler.dir/rule
 # codegen rule for target.
 src/turbomind/utils/CMakeFiles/anomaly_handler.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/anomaly_handler.dir/build.make src/turbomind/utils/CMakeFiles/anomaly_handler.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=4 "Finished codegen for target anomaly_handler"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=4 "Finished codegen for target anomaly_handler"
 .PHONY : src/turbomind/utils/CMakeFiles/anomaly_handler.dir/codegen
 
 # clean rule for target.
@@ -2237,14 +2237,14 @@ src/turbomind/utils/CMakeFiles/anomaly_handler.dir/clean:
 src/turbomind/utils/CMakeFiles/parser.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/parser.dir/build.make src/turbomind/utils/CMakeFiles/parser.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/parser.dir/build.make src/turbomind/utils/CMakeFiles/parser.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target parser"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target parser"
 .PHONY : src/turbomind/utils/CMakeFiles/parser.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/utils/CMakeFiles/parser.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/parser.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/utils/CMakeFiles/parser.dir/rule
 
 # Convenience name for target.
@@ -2254,7 +2254,7 @@ parser: src/turbomind/utils/CMakeFiles/parser.dir/rule
 # codegen rule for target.
 src/turbomind/utils/CMakeFiles/parser.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/parser.dir/build.make src/turbomind/utils/CMakeFiles/parser.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target parser"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target parser"
 .PHONY : src/turbomind/utils/CMakeFiles/parser.dir/codegen
 
 # clean rule for target.
@@ -2296,14 +2296,14 @@ src/turbomind/utils/CMakeFiles/weight_serializer.dir/all: src/turbomind/generati
 src/turbomind/utils/CMakeFiles/weight_serializer.dir/all: src/turbomind/models/CMakeFiles/models.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/weight_serializer.dir/build.make src/turbomind/utils/CMakeFiles/weight_serializer.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/weight_serializer.dir/build.make src/turbomind/utils/CMakeFiles/weight_serializer.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=82 "Built target weight_serializer"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=82 "Built target weight_serializer"
 .PHONY : src/turbomind/utils/CMakeFiles/weight_serializer.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/utils/CMakeFiles/weight_serializer.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 64
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 64
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/utils/CMakeFiles/weight_serializer.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/utils/CMakeFiles/weight_serializer.dir/rule
 
 # Convenience name for target.
@@ -2313,7 +2313,7 @@ weight_serializer: src/turbomind/utils/CMakeFiles/weight_serializer.dir/rule
 # codegen rule for target.
 src/turbomind/utils/CMakeFiles/weight_serializer.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/utils/CMakeFiles/weight_serializer.dir/build.make src/turbomind/utils/CMakeFiles/weight_serializer.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=82 "Finished codegen for target weight_serializer"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=82 "Finished codegen for target weight_serializer"
 .PHONY : src/turbomind/utils/CMakeFiles/weight_serializer.dir/codegen
 
 # clean rule for target.
@@ -2329,14 +2329,14 @@ src/turbomind/core/CMakeFiles/core.dir/all: _deps/fmt-build/CMakeFiles/fmt.dir/a
 src/turbomind/core/CMakeFiles/core.dir/all: src/turbomind/utils/CMakeFiles/cuda_utils.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/core/CMakeFiles/core.dir/build.make src/turbomind/core/CMakeFiles/core.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/core/CMakeFiles/core.dir/build.make src/turbomind/core/CMakeFiles/core.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=18,19,20,21,22 "Built target core"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=18,19,20,21,22 "Built target core"
 .PHONY : src/turbomind/core/CMakeFiles/core.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/core/CMakeFiles/core.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 7
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 7
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/core/CMakeFiles/core.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/core/CMakeFiles/core.dir/rule
 
 # Convenience name for target.
@@ -2346,7 +2346,7 @@ core: src/turbomind/core/CMakeFiles/core.dir/rule
 # codegen rule for target.
 src/turbomind/core/CMakeFiles/core.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/core/CMakeFiles/core.dir/build.make src/turbomind/core/CMakeFiles/core.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=18,19,20,21,22 "Finished codegen for target core"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=18,19,20,21,22 "Finished codegen for target core"
 .PHONY : src/turbomind/core/CMakeFiles/core.dir/codegen
 
 # clean rule for target.
@@ -2361,14 +2361,14 @@ src/turbomind/core/CMakeFiles/core.dir/clean:
 src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/build.make src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/build.make src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=17 "Built target ban_bad_words"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=17 "Built target ban_bad_words"
 .PHONY : src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/rule
 
 # Convenience name for target.
@@ -2378,7 +2378,7 @@ ban_bad_words: src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/build.make src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=17 "Finished codegen for target ban_bad_words"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=17 "Finished codegen for target ban_bad_words"
 .PHONY : src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/codegen
 
 # clean rule for target.
@@ -2393,14 +2393,14 @@ src/turbomind/kernels/CMakeFiles/ban_bad_words.dir/clean:
 src/turbomind/kernels/CMakeFiles/stop_criteria.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/stop_criteria.dir/build.make src/turbomind/kernels/CMakeFiles/stop_criteria.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/stop_criteria.dir/build.make src/turbomind/kernels/CMakeFiles/stop_criteria.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=78 "Built target stop_criteria"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=78 "Built target stop_criteria"
 .PHONY : src/turbomind/kernels/CMakeFiles/stop_criteria.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/stop_criteria.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/stop_criteria.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/stop_criteria.dir/rule
 
 # Convenience name for target.
@@ -2410,7 +2410,7 @@ stop_criteria: src/turbomind/kernels/CMakeFiles/stop_criteria.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/stop_criteria.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/stop_criteria.dir/build.make src/turbomind/kernels/CMakeFiles/stop_criteria.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=78 "Finished codegen for target stop_criteria"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=78 "Finished codegen for target stop_criteria"
 .PHONY : src/turbomind/kernels/CMakeFiles/stop_criteria.dir/codegen
 
 # clean rule for target.
@@ -2425,14 +2425,14 @@ src/turbomind/kernels/CMakeFiles/stop_criteria.dir/clean:
 src/turbomind/kernels/CMakeFiles/activation_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/activation_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/activation_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/activation_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/activation_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=3 "Built target activation_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=3 "Built target activation_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/activation_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/activation_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/activation_kernels.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/activation_kernels.dir/rule
 
 # Convenience name for target.
@@ -2442,7 +2442,7 @@ activation_kernels: src/turbomind/kernels/CMakeFiles/activation_kernels.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/activation_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/activation_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/activation_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=3 "Finished codegen for target activation_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=3 "Finished codegen for target activation_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/activation_kernels.dir/codegen
 
 # clean rule for target.
@@ -2457,14 +2457,14 @@ src/turbomind/kernels/CMakeFiles/activation_kernels.dir/clean:
 src/turbomind/kernels/CMakeFiles/activation.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/activation.dir/build.make src/turbomind/kernels/CMakeFiles/activation.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/activation.dir/build.make src/turbomind/kernels/CMakeFiles/activation.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=2 "Built target activation"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=2 "Built target activation"
 .PHONY : src/turbomind/kernels/CMakeFiles/activation.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/activation.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/activation.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/activation.dir/rule
 
 # Convenience name for target.
@@ -2474,7 +2474,7 @@ activation: src/turbomind/kernels/CMakeFiles/activation.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/activation.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/activation.dir/build.make src/turbomind/kernels/CMakeFiles/activation.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=2 "Finished codegen for target activation"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=2 "Finished codegen for target activation"
 .PHONY : src/turbomind/kernels/CMakeFiles/activation.dir/codegen
 
 # clean rule for target.
@@ -2489,14 +2489,14 @@ src/turbomind/kernels/CMakeFiles/activation.dir/clean:
 src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=72 "Built target quantization_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=72 "Built target quantization_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/rule
 
 # Convenience name for target.
@@ -2506,7 +2506,7 @@ quantization_kernels: src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=72 "Finished codegen for target quantization_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=72 "Finished codegen for target quantization_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/codegen
 
 # clean rule for target.
@@ -2521,14 +2521,14 @@ src/turbomind/kernels/CMakeFiles/quantization_kernels.dir/clean:
 src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target logprob_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target logprob_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/rule
 
 # Convenience name for target.
@@ -2538,7 +2538,7 @@ logprob_kernels: src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target logprob_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target logprob_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/codegen
 
 # clean rule for target.
@@ -2553,14 +2553,14 @@ src/turbomind/kernels/CMakeFiles/logprob_kernels.dir/clean:
 src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=81 "Built target unfused_attention_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=81 "Built target unfused_attention_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/rule
 
 # Convenience name for target.
@@ -2570,7 +2570,7 @@ unfused_attention_kernels: src/turbomind/kernels/CMakeFiles/unfused_attention_ke
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=81 "Finished codegen for target unfused_attention_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=81 "Finished codegen for target unfused_attention_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/codegen
 
 # clean rule for target.
@@ -2585,14 +2585,14 @@ src/turbomind/kernels/CMakeFiles/unfused_attention_kernels.dir/clean:
 src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=26 "Built target decoding_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=26 "Built target decoding_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/rule
 
 # Convenience name for target.
@@ -2602,7 +2602,7 @@ decoding_kernels: src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=26 "Finished codegen for target decoding_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=26 "Finished codegen for target decoding_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/codegen
 
 # clean rule for target.
@@ -2617,14 +2617,14 @@ src/turbomind/kernels/CMakeFiles/decoding_kernels.dir/clean:
 src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=58 "Built target gpt_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=58 "Built target gpt_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/rule
 
 # Convenience name for target.
@@ -2634,7 +2634,7 @@ gpt_kernels: src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=58 "Finished codegen for target gpt_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=58 "Finished codegen for target gpt_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/codegen
 
 # clean rule for target.
@@ -2649,14 +2649,14 @@ src/turbomind/kernels/CMakeFiles/gpt_kernels.dir/clean:
 src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=76 "Built target sampling_topk_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=76 "Built target sampling_topk_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/rule
 
 # Convenience name for target.
@@ -2666,7 +2666,7 @@ sampling_topk_kernels: src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.di
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=76 "Finished codegen for target sampling_topk_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=76 "Finished codegen for target sampling_topk_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/codegen
 
 # clean rule for target.
@@ -2681,14 +2681,14 @@ src/turbomind/kernels/CMakeFiles/sampling_topk_kernels.dir/clean:
 src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=77 "Built target sampling_topp_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=77 "Built target sampling_topp_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/rule
 
 # Convenience name for target.
@@ -2698,7 +2698,7 @@ sampling_topp_kernels: src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.di
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=77 "Finished codegen for target sampling_topp_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=77 "Finished codegen for target sampling_topp_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/codegen
 
 # clean rule for target.
@@ -2713,14 +2713,14 @@ src/turbomind/kernels/CMakeFiles/sampling_topp_kernels.dir/clean:
 src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=75 "Built target sampling_penalty_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=75 "Built target sampling_penalty_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/rule
 
 # Convenience name for target.
@@ -2730,7 +2730,7 @@ sampling_penalty_kernels: src/turbomind/kernels/CMakeFiles/sampling_penalty_kern
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=75 "Finished codegen for target sampling_penalty_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=75 "Finished codegen for target sampling_penalty_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/codegen
 
 # clean rule for target.
@@ -2745,14 +2745,14 @@ src/turbomind/kernels/CMakeFiles/sampling_penalty_kernels.dir/clean:
 src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=74 "Built target sampling_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=74 "Built target sampling_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/rule
 
 # Convenience name for target.
@@ -2762,7 +2762,7 @@ sampling_kernels: src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/build.make src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=74 "Finished codegen for target sampling_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=74 "Finished codegen for target sampling_kernels"
 .PHONY : src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/codegen
 
 # clean rule for target.
@@ -2777,14 +2777,14 @@ src/turbomind/kernels/CMakeFiles/sampling_kernels.dir/clean:
 src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/build.make src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/build.make src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target apply_token_bitmask_inplace_cuda"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target apply_token_bitmask_inplace_cuda"
 .PHONY : src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/rule
 
 # Convenience name for target.
@@ -2794,7 +2794,7 @@ apply_token_bitmask_inplace_cuda: src/turbomind/kernels/CMakeFiles/apply_token_b
 # codegen rule for target.
 src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/build.make src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target apply_token_bitmask_inplace_cuda"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target apply_token_bitmask_inplace_cuda"
 .PHONY : src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/codegen
 
 # clean rule for target.
@@ -2809,14 +2809,14 @@ src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/clean:
 src/turbomind/kernels/attention/CMakeFiles/attention.dir/all: src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/attention/CMakeFiles/attention.dir/build.make src/turbomind/kernels/attention/CMakeFiles/attention.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/attention/CMakeFiles/attention.dir/build.make src/turbomind/kernels/attention/CMakeFiles/attention.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=5,6,7 "Built target attention"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=5,6,7 "Built target attention"
 .PHONY : src/turbomind/kernels/attention/CMakeFiles/attention.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/attention/CMakeFiles/attention.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 12
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 12
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/attention/CMakeFiles/attention.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/attention/CMakeFiles/attention.dir/rule
 
 # Convenience name for target.
@@ -2826,7 +2826,7 @@ attention: src/turbomind/kernels/attention/CMakeFiles/attention.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/attention/CMakeFiles/attention.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/attention/CMakeFiles/attention.dir/build.make src/turbomind/kernels/attention/CMakeFiles/attention.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=5,6,7 "Finished codegen for target attention"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=5,6,7 "Finished codegen for target attention"
 .PHONY : src/turbomind/kernels/attention/CMakeFiles/attention.dir/codegen
 
 # clean rule for target.
@@ -2841,14 +2841,14 @@ src/turbomind/kernels/attention/CMakeFiles/attention.dir/clean:
 src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/build.make src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/build.make src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=8,9,10,11,12,13,14,15,16 "Built target attention_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=8,9,10,11,12,13,14,15,16 "Built target attention_kernels"
 .PHONY : src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 9
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 9
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/rule
 
 # Convenience name for target.
@@ -2858,7 +2858,7 @@ attention_kernels: src/turbomind/kernels/attention/kernel/CMakeFiles/attention_k
 # codegen rule for target.
 src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/build.make src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=8,9,10,11,12,13,14,15,16 "Finished codegen for target attention_kernels"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=8,9,10,11,12,13,14,15,16 "Finished codegen for target attention_kernels"
 .PHONY : src/turbomind/kernels/attention/kernel/CMakeFiles/attention_kernels.dir/codegen
 
 # clean rule for target.
@@ -2874,14 +2874,14 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/all: src/turbomind/utils/CMakeFi
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/all: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/build.make src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/build.make src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=31,32,33,34,35,36,37,38,39 "Built target gemm2"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=31,32,33,34,35,36,37,38,39 "Built target gemm2"
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 11
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 11
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/rule
 
 # Convenience name for target.
@@ -2891,7 +2891,7 @@ gemm2: src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/build.make src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=31,32,33,34,35,36,37,38,39 "Finished codegen for target gemm2"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=31,32,33,34,35,36,37,38,39 "Finished codegen for target gemm2"
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/codegen
 
 # clean rule for target.
@@ -2906,14 +2906,14 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2.dir/clean:
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/all: src/turbomind/utils/CMakeFiles/parser.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/build.make src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/build.make src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=40,41 "Built target gemm2_sm90"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=40,41 "Built target gemm2_sm90"
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 2
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/rule
 
 # Convenience name for target.
@@ -2923,7 +2923,7 @@ gemm2_sm90: src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/build.make src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=40,41 "Finished codegen for target gemm2_sm90"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=40,41 "Finished codegen for target gemm2_sm90"
 .PHONY : src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/codegen
 
 # clean rule for target.
@@ -2938,14 +2938,14 @@ src/turbomind/kernels/gemm/CMakeFiles/gemm2_sm90.dir/clean:
 src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/all:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/build.make src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/build.make src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=73 "Built target rms_norm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=73 "Built target rms_norm"
 .PHONY : src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/rule
 
 # Convenience name for target.
@@ -2955,7 +2955,7 @@ rms_norm: src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/rule
 # codegen rule for target.
 src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/build.make src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=73 "Finished codegen for target rms_norm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=73 "Finished codegen for target rms_norm"
 .PHONY : src/turbomind/kernels/norm/CMakeFiles/rms_norm.dir/codegen
 
 # clean rule for target.
@@ -2972,14 +2972,14 @@ src/turbomind/comm/CMakeFiles/host_comm.dir/all: src/turbomind/utils/CMakeFiles/
 src/turbomind/comm/CMakeFiles/host_comm.dir/all: src/turbomind/core/CMakeFiles/core.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/CMakeFiles/host_comm.dir/build.make src/turbomind/comm/CMakeFiles/host_comm.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/CMakeFiles/host_comm.dir/build.make src/turbomind/comm/CMakeFiles/host_comm.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=60 "Built target host_comm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=60 "Built target host_comm"
 .PHONY : src/turbomind/comm/CMakeFiles/host_comm.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/comm/CMakeFiles/host_comm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 8
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 8
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/comm/CMakeFiles/host_comm.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/comm/CMakeFiles/host_comm.dir/rule
 
 # Convenience name for target.
@@ -2989,7 +2989,7 @@ host_comm: src/turbomind/comm/CMakeFiles/host_comm.dir/rule
 # codegen rule for target.
 src/turbomind/comm/CMakeFiles/host_comm.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/CMakeFiles/host_comm.dir/build.make src/turbomind/comm/CMakeFiles/host_comm.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=60 "Finished codegen for target host_comm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=60 "Finished codegen for target host_comm"
 .PHONY : src/turbomind/comm/CMakeFiles/host_comm.dir/codegen
 
 # clean rule for target.
@@ -3006,14 +3006,14 @@ src/turbomind/comm/CMakeFiles/device_comm.dir/all: src/turbomind/utils/CMakeFile
 src/turbomind/comm/CMakeFiles/device_comm.dir/all: src/turbomind/core/CMakeFiles/core.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/CMakeFiles/device_comm.dir/build.make src/turbomind/comm/CMakeFiles/device_comm.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/CMakeFiles/device_comm.dir/build.make src/turbomind/comm/CMakeFiles/device_comm.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=27 "Built target device_comm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=27 "Built target device_comm"
 .PHONY : src/turbomind/comm/CMakeFiles/device_comm.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/comm/CMakeFiles/device_comm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 8
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 8
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/comm/CMakeFiles/device_comm.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/comm/CMakeFiles/device_comm.dir/rule
 
 # Convenience name for target.
@@ -3023,7 +3023,7 @@ device_comm: src/turbomind/comm/CMakeFiles/device_comm.dir/rule
 # codegen rule for target.
 src/turbomind/comm/CMakeFiles/device_comm.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/CMakeFiles/device_comm.dir/build.make src/turbomind/comm/CMakeFiles/device_comm.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=27 "Finished codegen for target device_comm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=27 "Finished codegen for target device_comm"
 .PHONY : src/turbomind/comm/CMakeFiles/device_comm.dir/codegen
 
 # clean rule for target.
@@ -3045,14 +3045,14 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/all: src/turbomind/comm
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/all: _deps/gloo-build/gloo/CMakeFiles/gloo.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/build.make src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/build.make src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=23,24 "Built target cuda_ipc_comm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=23,24 "Built target cuda_ipc_comm"
 .PHONY : src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 31
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 31
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/rule
 
 # Convenience name for target.
@@ -3062,7 +3062,7 @@ cuda_ipc_comm: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/rule
 # codegen rule for target.
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/build.make src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=23,24 "Finished codegen for target cuda_ipc_comm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=23,24 "Finished codegen for target cuda_ipc_comm"
 .PHONY : src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/codegen
 
 # clean rule for target.
@@ -3082,14 +3082,14 @@ src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/all: src/turbomind/comm/CMakeFi
 src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/all: _deps/gloo-build/gloo/CMakeFiles/gloo.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/build.make src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/build.make src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=57 "Built target gloo_comm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=57 "Built target gloo_comm"
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 28
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 28
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/rule
 
 # Convenience name for target.
@@ -3099,7 +3099,7 @@ gloo_comm: src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/rule
 # codegen rule for target.
 src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/build.make src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=57 "Finished codegen for target gloo_comm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=57 "Finished codegen for target gloo_comm"
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/gloo_comm.dir/codegen
 
 # clean rule for target.
@@ -3120,14 +3120,14 @@ src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/all: src/turbomind/comm/glo
 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/all: _deps/gloo-build/gloo/CMakeFiles/gloo.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/build.make src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/build.make src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=79 "Built target test_ipc_comm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=79 "Built target test_ipc_comm"
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 29
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 29
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/rule
 
 # Convenience name for target.
@@ -3137,7 +3137,7 @@ test_ipc_comm: src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/rule
 # codegen rule for target.
 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/build.make src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=79 "Finished codegen for target test_ipc_comm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=79 "Finished codegen for target test_ipc_comm"
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/codegen
 
 # clean rule for target.
@@ -3152,14 +3152,14 @@ src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/clean:
 _deps/gloo-build/gloo/CMakeFiles/gloo.dir/all:
 	$(MAKE) $(MAKESILENT) -f _deps/gloo-build/gloo/CMakeFiles/gloo.dir/build.make _deps/gloo-build/gloo/CMakeFiles/gloo.dir/depend
 	$(MAKE) $(MAKESILENT) -f _deps/gloo-build/gloo/CMakeFiles/gloo.dir/build.make _deps/gloo-build/gloo/CMakeFiles/gloo.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=44,45,46,47,48,49,50,51,52,53,54,55,56 "Built target gloo"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=44,45,46,47,48,49,50,51,52,53,54,55,56 "Built target gloo"
 .PHONY : _deps/gloo-build/gloo/CMakeFiles/gloo.dir/all
 
 # Build rule for subdir invocation for target.
 _deps/gloo-build/gloo/CMakeFiles/gloo.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 13
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 13
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _deps/gloo-build/gloo/CMakeFiles/gloo.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : _deps/gloo-build/gloo/CMakeFiles/gloo.dir/rule
 
 # Convenience name for target.
@@ -3169,7 +3169,7 @@ gloo: _deps/gloo-build/gloo/CMakeFiles/gloo.dir/rule
 # codegen rule for target.
 _deps/gloo-build/gloo/CMakeFiles/gloo.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _deps/gloo-build/gloo/CMakeFiles/gloo.dir/build.make _deps/gloo-build/gloo/CMakeFiles/gloo.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=44,45,46,47,48,49,50,51,52,53,54,55,56 "Finished codegen for target gloo"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=44,45,46,47,48,49,50,51,52,53,54,55,56 "Finished codegen for target gloo"
 .PHONY : _deps/gloo-build/gloo/CMakeFiles/gloo.dir/codegen
 
 # clean rule for target.
@@ -3188,14 +3188,14 @@ src/turbomind/generation/CMakeFiles/guided_decoding.dir/all: src/turbomind/core/
 src/turbomind/generation/CMakeFiles/guided_decoding.dir/all: src/turbomind/kernels/CMakeFiles/apply_token_bitmask_inplace_cuda.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/generation/CMakeFiles/guided_decoding.dir/build.make src/turbomind/generation/CMakeFiles/guided_decoding.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/generation/CMakeFiles/guided_decoding.dir/build.make src/turbomind/generation/CMakeFiles/guided_decoding.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=59 "Built target guided_decoding"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=59 "Built target guided_decoding"
 .PHONY : src/turbomind/generation/CMakeFiles/guided_decoding.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/generation/CMakeFiles/guided_decoding.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 14
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 14
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/generation/CMakeFiles/guided_decoding.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/generation/CMakeFiles/guided_decoding.dir/rule
 
 # Convenience name for target.
@@ -3205,7 +3205,7 @@ guided_decoding: src/turbomind/generation/CMakeFiles/guided_decoding.dir/rule
 # codegen rule for target.
 src/turbomind/generation/CMakeFiles/guided_decoding.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/generation/CMakeFiles/guided_decoding.dir/build.make src/turbomind/generation/CMakeFiles/guided_decoding.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=59 "Finished codegen for target guided_decoding"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=59 "Finished codegen for target guided_decoding"
 .PHONY : src/turbomind/generation/CMakeFiles/guided_decoding.dir/codegen
 
 # clean rule for target.
@@ -3232,14 +3232,14 @@ src/turbomind/generation/CMakeFiles/generation.dir/all: src/turbomind/kernels/CM
 src/turbomind/generation/CMakeFiles/generation.dir/all: src/turbomind/generation/CMakeFiles/guided_decoding.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/generation/CMakeFiles/generation.dir/build.make src/turbomind/generation/CMakeFiles/generation.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/generation/CMakeFiles/generation.dir/build.make src/turbomind/generation/CMakeFiles/generation.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=42,43 "Built target generation"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=42,43 "Built target generation"
 .PHONY : src/turbomind/generation/CMakeFiles/generation.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/generation/CMakeFiles/generation.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 23
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 23
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/generation/CMakeFiles/generation.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/generation/CMakeFiles/generation.dir/rule
 
 # Convenience name for target.
@@ -3249,7 +3249,7 @@ generation: src/turbomind/generation/CMakeFiles/generation.dir/rule
 # codegen rule for target.
 src/turbomind/generation/CMakeFiles/generation.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/generation/CMakeFiles/generation.dir/build.make src/turbomind/generation/CMakeFiles/generation.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=42,43 "Finished codegen for target generation"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=42,43 "Finished codegen for target generation"
 .PHONY : src/turbomind/generation/CMakeFiles/generation.dir/codegen
 
 # clean rule for target.
@@ -3290,14 +3290,14 @@ src/turbomind/models/CMakeFiles/models.dir/all: src/turbomind/generation/CMakeFi
 src/turbomind/models/CMakeFiles/models.dir/all: src/turbomind/generation/CMakeFiles/generation.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/models/CMakeFiles/models.dir/build.make src/turbomind/models/CMakeFiles/models.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/models/CMakeFiles/models.dir/build.make src/turbomind/models/CMakeFiles/models.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=62,63,64,65,66,67,68,69,70 "Built target models"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=62,63,64,65,66,67,68,69,70 "Built target models"
 .PHONY : src/turbomind/models/CMakeFiles/models.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/models/CMakeFiles/models.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 63
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 63
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/models/CMakeFiles/models.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/models/CMakeFiles/models.dir/rule
 
 # Convenience name for target.
@@ -3307,7 +3307,7 @@ models: src/turbomind/models/CMakeFiles/models.dir/rule
 # codegen rule for target.
 src/turbomind/models/CMakeFiles/models.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/models/CMakeFiles/models.dir/build.make src/turbomind/models/CMakeFiles/models.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=62,63,64,65,66,67,68,69,70 "Finished codegen for target models"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=62,63,64,65,66,67,68,69,70 "Finished codegen for target models"
 .PHONY : src/turbomind/models/CMakeFiles/models.dir/codegen
 
 # clean rule for target.
@@ -3325,14 +3325,14 @@ src/turbomind/engine/CMakeFiles/engine.dir/all: src/turbomind/utils/CMakeFiles/c
 src/turbomind/engine/CMakeFiles/engine.dir/all: src/turbomind/core/CMakeFiles/core.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/engine/CMakeFiles/engine.dir/build.make src/turbomind/engine/CMakeFiles/engine.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/engine/CMakeFiles/engine.dir/build.make src/turbomind/engine/CMakeFiles/engine.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=28,29 "Built target engine"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=28,29 "Built target engine"
 .PHONY : src/turbomind/engine/CMakeFiles/engine.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/engine/CMakeFiles/engine.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 15
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 15
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/engine/CMakeFiles/engine.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/engine/CMakeFiles/engine.dir/rule
 
 # Convenience name for target.
@@ -3342,7 +3342,7 @@ engine: src/turbomind/engine/CMakeFiles/engine.dir/rule
 # codegen rule for target.
 src/turbomind/engine/CMakeFiles/engine.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/engine/CMakeFiles/engine.dir/build.make src/turbomind/engine/CMakeFiles/engine.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=28,29 "Finished codegen for target engine"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=28,29 "Finished codegen for target engine"
 .PHONY : src/turbomind/engine/CMakeFiles/engine.dir/codegen
 
 # clean rule for target.
@@ -3392,14 +3392,14 @@ src/turbomind/python/CMakeFiles/_turbomind.dir/all: src/turbomind/models/CMakeFi
 src/turbomind/python/CMakeFiles/_turbomind.dir/all: src/turbomind/engine/CMakeFiles/engine.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/python/CMakeFiles/_turbomind.dir/build.make src/turbomind/python/CMakeFiles/_turbomind.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/python/CMakeFiles/_turbomind.dir/build.make src/turbomind/python/CMakeFiles/_turbomind.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target _turbomind"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target _turbomind"
 .PHONY : src/turbomind/python/CMakeFiles/_turbomind.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/python/CMakeFiles/_turbomind.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 85
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 85
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/python/CMakeFiles/_turbomind.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/python/CMakeFiles/_turbomind.dir/rule
 
 # Convenience name for target.
@@ -3409,7 +3409,7 @@ _turbomind: src/turbomind/python/CMakeFiles/_turbomind.dir/rule
 # codegen rule for target.
 src/turbomind/python/CMakeFiles/_turbomind.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/python/CMakeFiles/_turbomind.dir/build.make src/turbomind/python/CMakeFiles/_turbomind.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target _turbomind"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target _turbomind"
 .PHONY : src/turbomind/python/CMakeFiles/_turbomind.dir/codegen
 
 # clean rule for target.
@@ -3427,14 +3427,14 @@ src/turbomind/python/CMakeFiles/_xgrammar.dir/all: src/turbomind/utils/CMakeFile
 src/turbomind/python/CMakeFiles/_xgrammar.dir/all: src/turbomind/core/CMakeFiles/core.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/python/CMakeFiles/_xgrammar.dir/build.make src/turbomind/python/CMakeFiles/_xgrammar.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/python/CMakeFiles/_xgrammar.dir/build.make src/turbomind/python/CMakeFiles/_xgrammar.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=1 "Built target _xgrammar"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=1 "Built target _xgrammar"
 .PHONY : src/turbomind/python/CMakeFiles/_xgrammar.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/python/CMakeFiles/_xgrammar.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 14
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 14
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/python/CMakeFiles/_xgrammar.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/python/CMakeFiles/_xgrammar.dir/rule
 
 # Convenience name for target.
@@ -3444,7 +3444,7 @@ _xgrammar: src/turbomind/python/CMakeFiles/_xgrammar.dir/rule
 # codegen rule for target.
 src/turbomind/python/CMakeFiles/_xgrammar.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/python/CMakeFiles/_xgrammar.dir/build.make src/turbomind/python/CMakeFiles/_xgrammar.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=1 "Finished codegen for target _xgrammar"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=1 "Finished codegen for target _xgrammar"
 .PHONY : src/turbomind/python/CMakeFiles/_xgrammar.dir/codegen
 
 # clean rule for target.
@@ -3495,14 +3495,14 @@ src/turbomind/capi/CMakeFiles/turbomind_c.dir/all: src/turbomind/models/CMakeFil
 src/turbomind/capi/CMakeFiles/turbomind_c.dir/all: src/turbomind/engine/CMakeFiles/engine.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/turbomind_c.dir/build.make src/turbomind/capi/CMakeFiles/turbomind_c.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/turbomind_c.dir/build.make src/turbomind/capi/CMakeFiles/turbomind_c.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target turbomind_c"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target turbomind_c"
 .PHONY : src/turbomind/capi/CMakeFiles/turbomind_c.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/capi/CMakeFiles/turbomind_c.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 86
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 86
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/capi/CMakeFiles/turbomind_c.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/capi/CMakeFiles/turbomind_c.dir/rule
 
 # Convenience name for target.
@@ -3512,7 +3512,7 @@ turbomind_c: src/turbomind/capi/CMakeFiles/turbomind_c.dir/rule
 # codegen rule for target.
 src/turbomind/capi/CMakeFiles/turbomind_c.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/turbomind_c.dir/build.make src/turbomind/capi/CMakeFiles/turbomind_c.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target turbomind_c"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target turbomind_c"
 .PHONY : src/turbomind/capi/CMakeFiles/turbomind_c.dir/codegen
 
 # clean rule for target.
@@ -3564,14 +3564,14 @@ src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/en
 src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all: src/turbomind/capi/CMakeFiles/turbomind_c.dir/all
 	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target test_initfrompath_stepby"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Built target test_initfrompath_stepby"
 .PHONY : src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all
 
 # Build rule for subdir invocation for target.
 src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 86
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 86
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles 0
 .PHONY : src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/rule
 
 # Convenience name for target.
@@ -3581,7 +3581,7 @@ test_initfrompath_stepby: src/turbomind/capi/CMakeFiles/test_initfrompath_stepby
 # codegen rule for target.
 src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/build.make src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target test_initfrompath_stepby"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num= "Finished codegen for target test_initfrompath_stepby"
 .PHONY : src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/codegen
 
 # clean rule for target.
@@ -3596,7 +3596,7 @@ src/turbomind/capi/CMakeFiles/test_initfrompath_stepby.dir/clean:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	$(CMAKE_COMMAND) -P /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles/VerifyGlobs.cmake
+	# disabled
 	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

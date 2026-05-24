@@ -53,10 +53,10 @@ RM = /home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/bin/cmake -E
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy
+CMAKE_SOURCE_DIR = /mnt/data/lmdeploy
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+CMAKE_BINARY_DIR = /mnt/data/lmdeploy/lmdeploy-rust-server
 
 # Include any dependencies generated for this target.
 include src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/depend.make
@@ -73,18 +73,18 @@ src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/codegen:
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/codegen
 
 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o: src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/flags.make
-src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/gloo/test_ipc_comm.cc
+src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o: /mnt/data/lmdeploy/src/turbomind/comm/gloo/test_ipc_comm.cc
 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o: src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o -MF CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o.d -o CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/gloo/test_ipc_comm.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o -MF CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o.d -o CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.o -c /mnt/data/lmdeploy/src/turbomind/comm/gloo/test_ipc_comm.cc
 
 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/gloo/test_ipc_comm.cc > CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/comm/gloo/test_ipc_comm.cc > CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.i
 
 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/gloo/test_ipc_comm.cc -o CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/comm/gloo/test_ipc_comm.cc -o CMakeFiles/test_ipc_comm.dir/test_ipc_comm.cc.s
 
 # Object files for target test_ipc_comm
 test_ipc_comm_OBJECTS = \
@@ -109,18 +109,18 @@ bin/test_ipc_comm: /usr/local/cuda-12.5/targets/x86_64-linux/lib/stubs/libcuda.s
 bin/test_ipc_comm: /usr/lib/x86_64-linux-gnu/librt.a
 bin/test_ipc_comm: _deps/fmt-build/libfmt.a
 bin/test_ipc_comm: src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable ../../../../bin/test_ipc_comm"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/test_ipc_comm.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable ../../../../bin/test_ipc_comm"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/test_ipc_comm.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/build: bin/test_ipc_comm
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/build
 
 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/clean:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo && $(CMAKE_COMMAND) -P CMakeFiles/test_ipc_comm.dir/cmake_clean.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo && $(CMAKE_COMMAND) -P CMakeFiles/test_ipc_comm.dir/cmake_clean.cmake
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/clean
 
 src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/depend:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/eaget-4tb/data/llm_server/lmdeploy /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/gloo /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/DependInfo.cmake "--color=$(COLOR)" test_ipc_comm
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/data/lmdeploy /mnt/data/lmdeploy/src/turbomind/comm/gloo /mnt/data/lmdeploy/lmdeploy-rust-server /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/DependInfo.cmake "--color=$(COLOR)" test_ipc_comm
 .PHONY : src/turbomind/comm/gloo/CMakeFiles/test_ipc_comm.dir/depend
 

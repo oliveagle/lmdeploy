@@ -4,7 +4,7 @@
 # compile CXX with /bin/c++
 CXX_DEFINES = -DBUILD_MULTI_GPU=1 -DENABLE_BF16 -DUSE_NVTX
 
-CXX_INCLUDES = -I/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/_deps/fmt-src/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy -I/include -I/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/_deps/concurrentqueue-src -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include
+CXX_INCLUDES = -I/mnt/data/lmdeploy/lmdeploy-rust-server/_deps/fmt-src/include -I/mnt/data/lmdeploy -I/include -I/mnt/data/lmdeploy/lmdeploy-rust-server/_deps/concurrentqueue-src -isystem /usr/local/cuda-12.5/targets/x86_64-linux/include
 
 CXX_FLAGS = -O3 -DNDEBUG         -O3 -std=gnu++17 -fPIC
 

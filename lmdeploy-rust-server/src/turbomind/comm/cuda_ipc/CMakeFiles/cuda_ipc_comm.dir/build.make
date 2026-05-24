@@ -53,10 +53,10 @@ RM = /home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/bin/cmake -E
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy
+CMAKE_SOURCE_DIR = /mnt/data/lmdeploy
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+CMAKE_BINARY_DIR = /mnt/data/lmdeploy/lmdeploy-rust-server
 
 # Include any dependencies generated for this target.
 include src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/depend.make
@@ -74,10 +74,10 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/codegen:
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/flags.make
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/includes_CUDA.rsp
-src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/cuda_ipc_comm.cu
+src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o: /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/cuda_ipc_comm.cu
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/cuda_ipc_comm.cu -o CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/cuda_ipc_comm.cu -o CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.o
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.i"
@@ -89,10 +89,10 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cuda_ipc_comm.cu.s: cma
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/flags.make
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/includes_CUDA.rsp
-src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/allreduce.cu
+src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o: /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/allreduce.cu
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/allreduce.cu -o CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/allreduce.cu -o CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.o
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.i"
@@ -104,10 +104,10 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allreduce.cu.s: cmake_f
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/flags.make
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/includes_CUDA.rsp
-src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/allgather.cu
+src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o: /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/allgather.cu
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/allgather.cu -o CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/allgather.cu -o CMakeFiles/cuda_ipc_comm.dir/allgather.cu.o
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/cuda_ipc_comm.dir/allgather.cu.i"
@@ -119,10 +119,10 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/allgather.cu.s: cmake_f
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/flags.make
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/includes_CUDA.rsp
-src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/fused_allreduce.cu
+src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o: /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/fused_allreduce.cu
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/fused_allreduce.cu -o CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/fused_allreduce.cu -o CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.o
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.i"
@@ -134,10 +134,10 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce.cu.s: c
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/flags.make
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/includes_CUDA.rsp
-src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/fused_allreduce_ex.cu
+src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o: /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/fused_allreduce_ex.cu
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/fused_allreduce_ex.cu -o CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/fused_allreduce_ex.cu -o CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.o
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.i"
@@ -149,10 +149,10 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/fused_allreduce_ex.cu.s
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/flags.make
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/includes_CUDA.rsp
-src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/broadcast.cu
+src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o: /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/broadcast.cu
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o.d -x cu -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc/broadcast.cu -o CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CUDA object src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && /usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o -MF CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o.d -x cu -c /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc/broadcast.cu -o CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.o
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/cuda_ipc_comm.dir/broadcast.cu.i"
@@ -184,8 +184,8 @@ src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cmake_device_link.o: sr
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cmake_device_link.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/deviceLinkLibs.rsp
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cmake_device_link.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/deviceObjects1.rsp
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cmake_device_link.o: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/dlink.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CUDA device code CMakeFiles/cuda_ipc_comm.dir/cmake_device_link.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/cuda_ipc_comm.dir/dlink.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CUDA device code CMakeFiles/cuda_ipc_comm.dir/cmake_device_link.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/cuda_ipc_comm.dir/dlink.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/build: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cmake_device_link.o
@@ -212,19 +212,19 @@ lib/libcuda_ipc_comm.a: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir
 lib/libcuda_ipc_comm.a: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/build.make
 lib/libcuda_ipc_comm.a: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/cmake_device_link.o
 lib/libcuda_ipc_comm.a: src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX static library ../../../../lib/libcuda_ipc_comm.a"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && $(CMAKE_COMMAND) -P CMakeFiles/cuda_ipc_comm.dir/cmake_clean_target.cmake
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/cuda_ipc_comm.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX static library ../../../../lib/libcuda_ipc_comm.a"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && $(CMAKE_COMMAND) -P CMakeFiles/cuda_ipc_comm.dir/cmake_clean_target.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/cuda_ipc_comm.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/build: lib/libcuda_ipc_comm.a
 .PHONY : src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/build
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/clean:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && $(CMAKE_COMMAND) -P CMakeFiles/cuda_ipc_comm.dir/cmake_clean.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc && $(CMAKE_COMMAND) -P CMakeFiles/cuda_ipc_comm.dir/cmake_clean.cmake
 .PHONY : src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/clean
 
 src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/depend:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/eaget-4tb/data/llm_server/lmdeploy /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/cuda_ipc /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/DependInfo.cmake "--color=$(COLOR)" cuda_ipc_comm
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/data/lmdeploy /mnt/data/lmdeploy/src/turbomind/comm/cuda_ipc /mnt/data/lmdeploy/lmdeploy-rust-server /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/DependInfo.cmake "--color=$(COLOR)" cuda_ipc_comm
 .PHONY : src/turbomind/comm/cuda_ipc/CMakeFiles/cuda_ipc_comm.dir/depend
 

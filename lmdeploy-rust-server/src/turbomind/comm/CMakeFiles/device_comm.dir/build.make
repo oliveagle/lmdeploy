@@ -53,10 +53,10 @@ RM = /home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/bin/cmake -E
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy
+CMAKE_SOURCE_DIR = /mnt/data/lmdeploy
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+CMAKE_BINARY_DIR = /mnt/data/lmdeploy/lmdeploy-rust-server
 
 # Include any dependencies generated for this target.
 include src/turbomind/comm/CMakeFiles/device_comm.dir/depend.make
@@ -73,18 +73,18 @@ src/turbomind/comm/CMakeFiles/device_comm.dir/codegen:
 .PHONY : src/turbomind/comm/CMakeFiles/device_comm.dir/codegen
 
 src/turbomind/comm/CMakeFiles/device_comm.dir/device_comm.cc.o: src/turbomind/comm/CMakeFiles/device_comm.dir/flags.make
-src/turbomind/comm/CMakeFiles/device_comm.dir/device_comm.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/device_comm.cc
+src/turbomind/comm/CMakeFiles/device_comm.dir/device_comm.cc.o: /mnt/data/lmdeploy/src/turbomind/comm/device_comm.cc
 src/turbomind/comm/CMakeFiles/device_comm.dir/device_comm.cc.o: src/turbomind/comm/CMakeFiles/device_comm.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/comm/CMakeFiles/device_comm.dir/device_comm.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/comm/CMakeFiles/device_comm.dir/device_comm.cc.o -MF CMakeFiles/device_comm.dir/device_comm.cc.o.d -o CMakeFiles/device_comm.dir/device_comm.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/device_comm.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/comm/CMakeFiles/device_comm.dir/device_comm.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/comm/CMakeFiles/device_comm.dir/device_comm.cc.o -MF CMakeFiles/device_comm.dir/device_comm.cc.o.d -o CMakeFiles/device_comm.dir/device_comm.cc.o -c /mnt/data/lmdeploy/src/turbomind/comm/device_comm.cc
 
 src/turbomind/comm/CMakeFiles/device_comm.dir/device_comm.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/device_comm.dir/device_comm.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/device_comm.cc > CMakeFiles/device_comm.dir/device_comm.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/comm/device_comm.cc > CMakeFiles/device_comm.dir/device_comm.cc.i
 
 src/turbomind/comm/CMakeFiles/device_comm.dir/device_comm.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/device_comm.dir/device_comm.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm/device_comm.cc -o CMakeFiles/device_comm.dir/device_comm.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/comm/device_comm.cc -o CMakeFiles/device_comm.dir/device_comm.cc.s
 
 # Object files for target device_comm
 device_comm_OBJECTS = \
@@ -98,8 +98,8 @@ src/turbomind/comm/CMakeFiles/device_comm.dir/cmake_device_link.o: src/turbomind
 src/turbomind/comm/CMakeFiles/device_comm.dir/cmake_device_link.o: src/turbomind/comm/CMakeFiles/device_comm.dir/deviceLinkLibs.rsp
 src/turbomind/comm/CMakeFiles/device_comm.dir/cmake_device_link.o: src/turbomind/comm/CMakeFiles/device_comm.dir/deviceObjects1.rsp
 src/turbomind/comm/CMakeFiles/device_comm.dir/cmake_device_link.o: src/turbomind/comm/CMakeFiles/device_comm.dir/dlink.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CUDA device code CMakeFiles/device_comm.dir/cmake_device_link.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/device_comm.dir/dlink.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CUDA device code CMakeFiles/device_comm.dir/cmake_device_link.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/device_comm.dir/dlink.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/comm/CMakeFiles/device_comm.dir/build: src/turbomind/comm/CMakeFiles/device_comm.dir/cmake_device_link.o
@@ -116,19 +116,19 @@ lib/libdevice_comm.a: src/turbomind/comm/CMakeFiles/device_comm.dir/device_comm.
 lib/libdevice_comm.a: src/turbomind/comm/CMakeFiles/device_comm.dir/build.make
 lib/libdevice_comm.a: src/turbomind/comm/CMakeFiles/device_comm.dir/cmake_device_link.o
 lib/libdevice_comm.a: src/turbomind/comm/CMakeFiles/device_comm.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX static library ../../../lib/libdevice_comm.a"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -P CMakeFiles/device_comm.dir/cmake_clean_target.cmake
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/device_comm.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX static library ../../../lib/libdevice_comm.a"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -P CMakeFiles/device_comm.dir/cmake_clean_target.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/device_comm.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/comm/CMakeFiles/device_comm.dir/build: lib/libdevice_comm.a
 .PHONY : src/turbomind/comm/CMakeFiles/device_comm.dir/build
 
 src/turbomind/comm/CMakeFiles/device_comm.dir/clean:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -P CMakeFiles/device_comm.dir/cmake_clean.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm && $(CMAKE_COMMAND) -P CMakeFiles/device_comm.dir/cmake_clean.cmake
 .PHONY : src/turbomind/comm/CMakeFiles/device_comm.dir/clean
 
 src/turbomind/comm/CMakeFiles/device_comm.dir/depend:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/eaget-4tb/data/llm_server/lmdeploy /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/comm /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/CMakeFiles/device_comm.dir/DependInfo.cmake "--color=$(COLOR)" device_comm
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/data/lmdeploy /mnt/data/lmdeploy/src/turbomind/comm /mnt/data/lmdeploy/lmdeploy-rust-server /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/comm/CMakeFiles/device_comm.dir/DependInfo.cmake "--color=$(COLOR)" device_comm
 .PHONY : src/turbomind/comm/CMakeFiles/device_comm.dir/depend
 

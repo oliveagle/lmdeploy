@@ -53,10 +53,10 @@ RM = /home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/bin/cmake -E
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy
+CMAKE_SOURCE_DIR = /mnt/data/lmdeploy
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+CMAKE_BINARY_DIR = /mnt/data/lmdeploy/lmdeploy-rust-server
 
 # Include any dependencies generated for this target.
 include src/turbomind/engine/CMakeFiles/engine.dir/depend.make
@@ -73,88 +73,88 @@ src/turbomind/engine/CMakeFiles/engine.dir/codegen:
 .PHONY : src/turbomind/engine/CMakeFiles/engine.dir/codegen
 
 src/turbomind/engine/CMakeFiles/engine.dir/gateway.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/flags.make
-src/turbomind/engine/CMakeFiles/engine.dir/gateway.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/gateway.cc
+src/turbomind/engine/CMakeFiles/engine.dir/gateway.cc.o: /mnt/data/lmdeploy/src/turbomind/engine/gateway.cc
 src/turbomind/engine/CMakeFiles/engine.dir/gateway.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/gateway.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/gateway.cc.o -MF CMakeFiles/engine.dir/gateway.cc.o.d -o CMakeFiles/engine.dir/gateway.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/gateway.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/gateway.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/gateway.cc.o -MF CMakeFiles/engine.dir/gateway.cc.o.d -o CMakeFiles/engine.dir/gateway.cc.o -c /mnt/data/lmdeploy/src/turbomind/engine/gateway.cc
 
 src/turbomind/engine/CMakeFiles/engine.dir/gateway.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/engine.dir/gateway.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/gateway.cc > CMakeFiles/engine.dir/gateway.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/engine/gateway.cc > CMakeFiles/engine.dir/gateway.cc.i
 
 src/turbomind/engine/CMakeFiles/engine.dir/gateway.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/engine.dir/gateway.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/gateway.cc -o CMakeFiles/engine.dir/gateway.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/engine/gateway.cc -o CMakeFiles/engine.dir/gateway.cc.s
 
 src/turbomind/engine/CMakeFiles/engine.dir/request.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/flags.make
-src/turbomind/engine/CMakeFiles/engine.dir/request.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/request.cc
+src/turbomind/engine/CMakeFiles/engine.dir/request.cc.o: /mnt/data/lmdeploy/src/turbomind/engine/request.cc
 src/turbomind/engine/CMakeFiles/engine.dir/request.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/request.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/request.cc.o -MF CMakeFiles/engine.dir/request.cc.o.d -o CMakeFiles/engine.dir/request.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/request.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/request.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/request.cc.o -MF CMakeFiles/engine.dir/request.cc.o.d -o CMakeFiles/engine.dir/request.cc.o -c /mnt/data/lmdeploy/src/turbomind/engine/request.cc
 
 src/turbomind/engine/CMakeFiles/engine.dir/request.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/engine.dir/request.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/request.cc > CMakeFiles/engine.dir/request.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/engine/request.cc > CMakeFiles/engine.dir/request.cc.i
 
 src/turbomind/engine/CMakeFiles/engine.dir/request.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/engine.dir/request.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/request.cc -o CMakeFiles/engine.dir/request.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/engine/request.cc -o CMakeFiles/engine.dir/request.cc.s
 
 src/turbomind/engine/CMakeFiles/engine.dir/request_queue.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/flags.make
-src/turbomind/engine/CMakeFiles/engine.dir/request_queue.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/request_queue.cc
+src/turbomind/engine/CMakeFiles/engine.dir/request_queue.cc.o: /mnt/data/lmdeploy/src/turbomind/engine/request_queue.cc
 src/turbomind/engine/CMakeFiles/engine.dir/request_queue.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/request_queue.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/request_queue.cc.o -MF CMakeFiles/engine.dir/request_queue.cc.o.d -o CMakeFiles/engine.dir/request_queue.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/request_queue.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/request_queue.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/request_queue.cc.o -MF CMakeFiles/engine.dir/request_queue.cc.o.d -o CMakeFiles/engine.dir/request_queue.cc.o -c /mnt/data/lmdeploy/src/turbomind/engine/request_queue.cc
 
 src/turbomind/engine/CMakeFiles/engine.dir/request_queue.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/engine.dir/request_queue.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/request_queue.cc > CMakeFiles/engine.dir/request_queue.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/engine/request_queue.cc > CMakeFiles/engine.dir/request_queue.cc.i
 
 src/turbomind/engine/CMakeFiles/engine.dir/request_queue.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/engine.dir/request_queue.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/request_queue.cc -o CMakeFiles/engine.dir/request_queue.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/engine/request_queue.cc -o CMakeFiles/engine.dir/request_queue.cc.s
 
 src/turbomind/engine/CMakeFiles/engine.dir/model_request.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/flags.make
-src/turbomind/engine/CMakeFiles/engine.dir/model_request.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/model_request.cc
+src/turbomind/engine/CMakeFiles/engine.dir/model_request.cc.o: /mnt/data/lmdeploy/src/turbomind/engine/model_request.cc
 src/turbomind/engine/CMakeFiles/engine.dir/model_request.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/model_request.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/model_request.cc.o -MF CMakeFiles/engine.dir/model_request.cc.o.d -o CMakeFiles/engine.dir/model_request.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/model_request.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/model_request.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/model_request.cc.o -MF CMakeFiles/engine.dir/model_request.cc.o.d -o CMakeFiles/engine.dir/model_request.cc.o -c /mnt/data/lmdeploy/src/turbomind/engine/model_request.cc
 
 src/turbomind/engine/CMakeFiles/engine.dir/model_request.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/engine.dir/model_request.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/model_request.cc > CMakeFiles/engine.dir/model_request.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/engine/model_request.cc > CMakeFiles/engine.dir/model_request.cc.i
 
 src/turbomind/engine/CMakeFiles/engine.dir/model_request.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/engine.dir/model_request.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/model_request.cc -o CMakeFiles/engine.dir/model_request.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/engine/model_request.cc -o CMakeFiles/engine.dir/model_request.cc.s
 
 src/turbomind/engine/CMakeFiles/engine.dir/model_executor.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/flags.make
-src/turbomind/engine/CMakeFiles/engine.dir/model_executor.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/model_executor.cc
+src/turbomind/engine/CMakeFiles/engine.dir/model_executor.cc.o: /mnt/data/lmdeploy/src/turbomind/engine/model_executor.cc
 src/turbomind/engine/CMakeFiles/engine.dir/model_executor.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/model_executor.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/model_executor.cc.o -MF CMakeFiles/engine.dir/model_executor.cc.o.d -o CMakeFiles/engine.dir/model_executor.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/model_executor.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/model_executor.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/model_executor.cc.o -MF CMakeFiles/engine.dir/model_executor.cc.o.d -o CMakeFiles/engine.dir/model_executor.cc.o -c /mnt/data/lmdeploy/src/turbomind/engine/model_executor.cc
 
 src/turbomind/engine/CMakeFiles/engine.dir/model_executor.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/engine.dir/model_executor.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/model_executor.cc > CMakeFiles/engine.dir/model_executor.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/engine/model_executor.cc > CMakeFiles/engine.dir/model_executor.cc.i
 
 src/turbomind/engine/CMakeFiles/engine.dir/model_executor.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/engine.dir/model_executor.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/model_executor.cc -o CMakeFiles/engine.dir/model_executor.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/engine/model_executor.cc -o CMakeFiles/engine.dir/model_executor.cc.s
 
 src/turbomind/engine/CMakeFiles/engine.dir/engine.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/flags.make
-src/turbomind/engine/CMakeFiles/engine.dir/engine.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/engine.cc
+src/turbomind/engine/CMakeFiles/engine.dir/engine.cc.o: /mnt/data/lmdeploy/src/turbomind/engine/engine.cc
 src/turbomind/engine/CMakeFiles/engine.dir/engine.cc.o: src/turbomind/engine/CMakeFiles/engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/engine.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/engine.cc.o -MF CMakeFiles/engine.dir/engine.cc.o.d -o CMakeFiles/engine.dir/engine.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/engine.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object src/turbomind/engine/CMakeFiles/engine.dir/engine.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/engine/CMakeFiles/engine.dir/engine.cc.o -MF CMakeFiles/engine.dir/engine.cc.o.d -o CMakeFiles/engine.dir/engine.cc.o -c /mnt/data/lmdeploy/src/turbomind/engine/engine.cc
 
 src/turbomind/engine/CMakeFiles/engine.dir/engine.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/engine.dir/engine.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/engine.cc > CMakeFiles/engine.dir/engine.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/engine/engine.cc > CMakeFiles/engine.dir/engine.cc.i
 
 src/turbomind/engine/CMakeFiles/engine.dir/engine.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/engine.dir/engine.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine/engine.cc -o CMakeFiles/engine.dir/engine.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/engine/engine.cc -o CMakeFiles/engine.dir/engine.cc.s
 
 # Object files for target engine
 engine_OBJECTS = \
@@ -178,8 +178,8 @@ src/turbomind/engine/CMakeFiles/engine.dir/cmake_device_link.o: src/turbomind/en
 src/turbomind/engine/CMakeFiles/engine.dir/cmake_device_link.o: src/turbomind/engine/CMakeFiles/engine.dir/deviceLinkLibs.rsp
 src/turbomind/engine/CMakeFiles/engine.dir/cmake_device_link.o: src/turbomind/engine/CMakeFiles/engine.dir/deviceObjects1.rsp
 src/turbomind/engine/CMakeFiles/engine.dir/cmake_device_link.o: src/turbomind/engine/CMakeFiles/engine.dir/dlink.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CUDA device code CMakeFiles/engine.dir/cmake_device_link.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/engine.dir/dlink.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CUDA device code CMakeFiles/engine.dir/cmake_device_link.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/engine.dir/dlink.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/engine/CMakeFiles/engine.dir/build: src/turbomind/engine/CMakeFiles/engine.dir/cmake_device_link.o
@@ -206,19 +206,19 @@ lib/libengine.a: src/turbomind/engine/CMakeFiles/engine.dir/engine.cc.o
 lib/libengine.a: src/turbomind/engine/CMakeFiles/engine.dir/build.make
 lib/libengine.a: src/turbomind/engine/CMakeFiles/engine.dir/cmake_device_link.o
 lib/libengine.a: src/turbomind/engine/CMakeFiles/engine.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX static library ../../../lib/libengine.a"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && $(CMAKE_COMMAND) -P CMakeFiles/engine.dir/cmake_clean_target.cmake
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/engine.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX static library ../../../lib/libengine.a"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && $(CMAKE_COMMAND) -P CMakeFiles/engine.dir/cmake_clean_target.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/engine.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/engine/CMakeFiles/engine.dir/build: lib/libengine.a
 .PHONY : src/turbomind/engine/CMakeFiles/engine.dir/build
 
 src/turbomind/engine/CMakeFiles/engine.dir/clean:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && $(CMAKE_COMMAND) -P CMakeFiles/engine.dir/cmake_clean.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine && $(CMAKE_COMMAND) -P CMakeFiles/engine.dir/cmake_clean.cmake
 .PHONY : src/turbomind/engine/CMakeFiles/engine.dir/clean
 
 src/turbomind/engine/CMakeFiles/engine.dir/depend:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/eaget-4tb/data/llm_server/lmdeploy /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/engine /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/engine/CMakeFiles/engine.dir/DependInfo.cmake "--color=$(COLOR)" engine
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/data/lmdeploy /mnt/data/lmdeploy/src/turbomind/engine /mnt/data/lmdeploy/lmdeploy-rust-server /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/engine/CMakeFiles/engine.dir/DependInfo.cmake "--color=$(COLOR)" engine
 .PHONY : src/turbomind/engine/CMakeFiles/engine.dir/depend
 

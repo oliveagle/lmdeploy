@@ -53,10 +53,10 @@ RM = /home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/bin/cmake -E
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy
+CMAKE_SOURCE_DIR = /mnt/data/lmdeploy
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+CMAKE_BINARY_DIR = /mnt/data/lmdeploy/lmdeploy-rust-server
 
 # Include any dependencies generated for this target.
 include src/turbomind/generation/CMakeFiles/generation.dir/depend.make
@@ -73,60 +73,60 @@ src/turbomind/generation/CMakeFiles/generation.dir/codegen:
 .PHONY : src/turbomind/generation/CMakeFiles/generation.dir/codegen
 
 src/turbomind/generation/CMakeFiles/generation.dir/generation.cc.o: src/turbomind/generation/CMakeFiles/generation.dir/flags.make
-src/turbomind/generation/CMakeFiles/generation.dir/generation.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/generation.cc
+src/turbomind/generation/CMakeFiles/generation.dir/generation.cc.o: /mnt/data/lmdeploy/src/turbomind/generation/generation.cc
 src/turbomind/generation/CMakeFiles/generation.dir/generation.cc.o: src/turbomind/generation/CMakeFiles/generation.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/generation/CMakeFiles/generation.dir/generation.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/generation/CMakeFiles/generation.dir/generation.cc.o -MF CMakeFiles/generation.dir/generation.cc.o.d -o CMakeFiles/generation.dir/generation.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/generation.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/generation/CMakeFiles/generation.dir/generation.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/generation/CMakeFiles/generation.dir/generation.cc.o -MF CMakeFiles/generation.dir/generation.cc.o.d -o CMakeFiles/generation.dir/generation.cc.o -c /mnt/data/lmdeploy/src/turbomind/generation/generation.cc
 
 src/turbomind/generation/CMakeFiles/generation.dir/generation.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/generation.dir/generation.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/generation.cc > CMakeFiles/generation.dir/generation.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/generation/generation.cc > CMakeFiles/generation.dir/generation.cc.i
 
 src/turbomind/generation/CMakeFiles/generation.dir/generation.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/generation.dir/generation.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/generation.cc -o CMakeFiles/generation.dir/generation.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/generation/generation.cc -o CMakeFiles/generation.dir/generation.cc.s
 
 src/turbomind/generation/CMakeFiles/generation.dir/logits_processor.cc.o: src/turbomind/generation/CMakeFiles/generation.dir/flags.make
-src/turbomind/generation/CMakeFiles/generation.dir/logits_processor.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/logits_processor.cc
+src/turbomind/generation/CMakeFiles/generation.dir/logits_processor.cc.o: /mnt/data/lmdeploy/src/turbomind/generation/logits_processor.cc
 src/turbomind/generation/CMakeFiles/generation.dir/logits_processor.cc.o: src/turbomind/generation/CMakeFiles/generation.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object src/turbomind/generation/CMakeFiles/generation.dir/logits_processor.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/generation/CMakeFiles/generation.dir/logits_processor.cc.o -MF CMakeFiles/generation.dir/logits_processor.cc.o.d -o CMakeFiles/generation.dir/logits_processor.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/logits_processor.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object src/turbomind/generation/CMakeFiles/generation.dir/logits_processor.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/generation/CMakeFiles/generation.dir/logits_processor.cc.o -MF CMakeFiles/generation.dir/logits_processor.cc.o.d -o CMakeFiles/generation.dir/logits_processor.cc.o -c /mnt/data/lmdeploy/src/turbomind/generation/logits_processor.cc
 
 src/turbomind/generation/CMakeFiles/generation.dir/logits_processor.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/generation.dir/logits_processor.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/logits_processor.cc > CMakeFiles/generation.dir/logits_processor.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/generation/logits_processor.cc > CMakeFiles/generation.dir/logits_processor.cc.i
 
 src/turbomind/generation/CMakeFiles/generation.dir/logits_processor.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/generation.dir/logits_processor.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/logits_processor.cc -o CMakeFiles/generation.dir/logits_processor.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/generation/logits_processor.cc -o CMakeFiles/generation.dir/logits_processor.cc.s
 
 src/turbomind/generation/CMakeFiles/generation.dir/sampling.cc.o: src/turbomind/generation/CMakeFiles/generation.dir/flags.make
-src/turbomind/generation/CMakeFiles/generation.dir/sampling.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/sampling.cc
+src/turbomind/generation/CMakeFiles/generation.dir/sampling.cc.o: /mnt/data/lmdeploy/src/turbomind/generation/sampling.cc
 src/turbomind/generation/CMakeFiles/generation.dir/sampling.cc.o: src/turbomind/generation/CMakeFiles/generation.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object src/turbomind/generation/CMakeFiles/generation.dir/sampling.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/generation/CMakeFiles/generation.dir/sampling.cc.o -MF CMakeFiles/generation.dir/sampling.cc.o.d -o CMakeFiles/generation.dir/sampling.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/sampling.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object src/turbomind/generation/CMakeFiles/generation.dir/sampling.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/generation/CMakeFiles/generation.dir/sampling.cc.o -MF CMakeFiles/generation.dir/sampling.cc.o.d -o CMakeFiles/generation.dir/sampling.cc.o -c /mnt/data/lmdeploy/src/turbomind/generation/sampling.cc
 
 src/turbomind/generation/CMakeFiles/generation.dir/sampling.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/generation.dir/sampling.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/sampling.cc > CMakeFiles/generation.dir/sampling.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/generation/sampling.cc > CMakeFiles/generation.dir/sampling.cc.i
 
 src/turbomind/generation/CMakeFiles/generation.dir/sampling.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/generation.dir/sampling.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/sampling.cc -o CMakeFiles/generation.dir/sampling.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/generation/sampling.cc -o CMakeFiles/generation.dir/sampling.cc.s
 
 src/turbomind/generation/CMakeFiles/generation.dir/stop_criteria.cc.o: src/turbomind/generation/CMakeFiles/generation.dir/flags.make
-src/turbomind/generation/CMakeFiles/generation.dir/stop_criteria.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/stop_criteria.cc
+src/turbomind/generation/CMakeFiles/generation.dir/stop_criteria.cc.o: /mnt/data/lmdeploy/src/turbomind/generation/stop_criteria.cc
 src/turbomind/generation/CMakeFiles/generation.dir/stop_criteria.cc.o: src/turbomind/generation/CMakeFiles/generation.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object src/turbomind/generation/CMakeFiles/generation.dir/stop_criteria.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/generation/CMakeFiles/generation.dir/stop_criteria.cc.o -MF CMakeFiles/generation.dir/stop_criteria.cc.o.d -o CMakeFiles/generation.dir/stop_criteria.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/stop_criteria.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object src/turbomind/generation/CMakeFiles/generation.dir/stop_criteria.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/generation/CMakeFiles/generation.dir/stop_criteria.cc.o -MF CMakeFiles/generation.dir/stop_criteria.cc.o.d -o CMakeFiles/generation.dir/stop_criteria.cc.o -c /mnt/data/lmdeploy/src/turbomind/generation/stop_criteria.cc
 
 src/turbomind/generation/CMakeFiles/generation.dir/stop_criteria.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/generation.dir/stop_criteria.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/stop_criteria.cc > CMakeFiles/generation.dir/stop_criteria.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/generation/stop_criteria.cc > CMakeFiles/generation.dir/stop_criteria.cc.i
 
 src/turbomind/generation/CMakeFiles/generation.dir/stop_criteria.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/generation.dir/stop_criteria.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation/stop_criteria.cc -o CMakeFiles/generation.dir/stop_criteria.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/generation/stop_criteria.cc -o CMakeFiles/generation.dir/stop_criteria.cc.s
 
 # Object files for target generation
 generation_OBJECTS = \
@@ -146,8 +146,8 @@ src/turbomind/generation/CMakeFiles/generation.dir/cmake_device_link.o: src/turb
 src/turbomind/generation/CMakeFiles/generation.dir/cmake_device_link.o: src/turbomind/generation/CMakeFiles/generation.dir/deviceLinkLibs.rsp
 src/turbomind/generation/CMakeFiles/generation.dir/cmake_device_link.o: src/turbomind/generation/CMakeFiles/generation.dir/deviceObjects1.rsp
 src/turbomind/generation/CMakeFiles/generation.dir/cmake_device_link.o: src/turbomind/generation/CMakeFiles/generation.dir/dlink.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Linking CUDA device code CMakeFiles/generation.dir/cmake_device_link.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/generation.dir/dlink.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Linking CUDA device code CMakeFiles/generation.dir/cmake_device_link.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/generation.dir/dlink.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/generation/CMakeFiles/generation.dir/build: src/turbomind/generation/CMakeFiles/generation.dir/cmake_device_link.o
@@ -170,19 +170,19 @@ lib/libgeneration.a: src/turbomind/generation/CMakeFiles/generation.dir/stop_cri
 lib/libgeneration.a: src/turbomind/generation/CMakeFiles/generation.dir/build.make
 lib/libgeneration.a: src/turbomind/generation/CMakeFiles/generation.dir/cmake_device_link.o
 lib/libgeneration.a: src/turbomind/generation/CMakeFiles/generation.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Linking CXX static library ../../../lib/libgeneration.a"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && $(CMAKE_COMMAND) -P CMakeFiles/generation.dir/cmake_clean_target.cmake
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/generation.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Linking CXX static library ../../../lib/libgeneration.a"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && $(CMAKE_COMMAND) -P CMakeFiles/generation.dir/cmake_clean_target.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/generation.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/generation/CMakeFiles/generation.dir/build: lib/libgeneration.a
 .PHONY : src/turbomind/generation/CMakeFiles/generation.dir/build
 
 src/turbomind/generation/CMakeFiles/generation.dir/clean:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && $(CMAKE_COMMAND) -P CMakeFiles/generation.dir/cmake_clean.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation && $(CMAKE_COMMAND) -P CMakeFiles/generation.dir/cmake_clean.cmake
 .PHONY : src/turbomind/generation/CMakeFiles/generation.dir/clean
 
 src/turbomind/generation/CMakeFiles/generation.dir/depend:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/eaget-4tb/data/llm_server/lmdeploy /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/generation /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/generation/CMakeFiles/generation.dir/DependInfo.cmake "--color=$(COLOR)" generation
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/data/lmdeploy /mnt/data/lmdeploy/src/turbomind/generation /mnt/data/lmdeploy/lmdeploy-rust-server /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/generation/CMakeFiles/generation.dir/DependInfo.cmake "--color=$(COLOR)" generation
 .PHONY : src/turbomind/generation/CMakeFiles/generation.dir/depend
 

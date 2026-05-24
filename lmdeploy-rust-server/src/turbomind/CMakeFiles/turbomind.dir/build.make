@@ -53,10 +53,10 @@ RM = /home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/bin/cmake -E
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy
+CMAKE_SOURCE_DIR = /mnt/data/lmdeploy
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server
+CMAKE_BINARY_DIR = /mnt/data/lmdeploy/lmdeploy-rust-server
 
 # Include any dependencies generated for this target.
 include src/turbomind/CMakeFiles/turbomind.dir/depend.make
@@ -73,18 +73,18 @@ src/turbomind/CMakeFiles/turbomind.dir/codegen:
 .PHONY : src/turbomind/CMakeFiles/turbomind.dir/codegen
 
 src/turbomind/CMakeFiles/turbomind.dir/turbomind.cc.o: src/turbomind/CMakeFiles/turbomind.dir/flags.make
-src/turbomind/CMakeFiles/turbomind.dir/turbomind.cc.o: /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/turbomind.cc
+src/turbomind/CMakeFiles/turbomind.dir/turbomind.cc.o: /mnt/data/lmdeploy/src/turbomind/turbomind.cc
 src/turbomind/CMakeFiles/turbomind.dir/turbomind.cc.o: src/turbomind/CMakeFiles/turbomind.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/CMakeFiles/turbomind.dir/turbomind.cc.o"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/CMakeFiles/turbomind.dir/turbomind.cc.o -MF CMakeFiles/turbomind.dir/turbomind.cc.o.d -o CMakeFiles/turbomind.dir/turbomind.cc.o -c /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/turbomind.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/turbomind/CMakeFiles/turbomind.dir/turbomind.cc.o"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/turbomind/CMakeFiles/turbomind.dir/turbomind.cc.o -MF CMakeFiles/turbomind.dir/turbomind.cc.o.d -o CMakeFiles/turbomind.dir/turbomind.cc.o -c /mnt/data/lmdeploy/src/turbomind/turbomind.cc
 
 src/turbomind/CMakeFiles/turbomind.dir/turbomind.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/turbomind.dir/turbomind.cc.i"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/turbomind.cc > CMakeFiles/turbomind.dir/turbomind.cc.i
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/data/lmdeploy/src/turbomind/turbomind.cc > CMakeFiles/turbomind.dir/turbomind.cc.i
 
 src/turbomind/CMakeFiles/turbomind.dir/turbomind.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/turbomind.dir/turbomind.cc.s"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/turbomind.cc -o CMakeFiles/turbomind.dir/turbomind.cc.s
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind && /bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/data/lmdeploy/src/turbomind/turbomind.cc -o CMakeFiles/turbomind.dir/turbomind.cc.s
 
 # Object files for target turbomind
 turbomind_OBJECTS = \
@@ -96,19 +96,19 @@ turbomind_EXTERNAL_OBJECTS =
 lib/libturbomind.a: src/turbomind/CMakeFiles/turbomind.dir/turbomind.cc.o
 lib/libturbomind.a: src/turbomind/CMakeFiles/turbomind.dir/build.make
 lib/libturbomind.a: src/turbomind/CMakeFiles/turbomind.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX static library ../../lib/libturbomind.a"
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind && $(CMAKE_COMMAND) -P CMakeFiles/turbomind.dir/cmake_clean_target.cmake
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/turbomind.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/data/lmdeploy/lmdeploy-rust-server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX static library ../../lib/libturbomind.a"
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind && $(CMAKE_COMMAND) -P CMakeFiles/turbomind.dir/cmake_clean_target.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/turbomind.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/turbomind/CMakeFiles/turbomind.dir/build: lib/libturbomind.a
 .PHONY : src/turbomind/CMakeFiles/turbomind.dir/build
 
 src/turbomind/CMakeFiles/turbomind.dir/clean:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind && $(CMAKE_COMMAND) -P CMakeFiles/turbomind.dir/cmake_clean.cmake
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind && $(CMAKE_COMMAND) -P CMakeFiles/turbomind.dir/cmake_clean.cmake
 .PHONY : src/turbomind/CMakeFiles/turbomind.dir/clean
 
 src/turbomind/CMakeFiles/turbomind.dir/depend:
-	cd /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/eaget-4tb/data/llm_server/lmdeploy /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind /mnt/eaget-4tb/data/llm_server/lmdeploy/lmdeploy-rust-server/src/turbomind/CMakeFiles/turbomind.dir/DependInfo.cmake "--color=$(COLOR)" turbomind
+	cd /mnt/data/lmdeploy/lmdeploy-rust-server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /mnt/data/lmdeploy /mnt/data/lmdeploy/src/turbomind /mnt/data/lmdeploy/lmdeploy-rust-server /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind /mnt/data/lmdeploy/lmdeploy-rust-server/src/turbomind/CMakeFiles/turbomind.dir/DependInfo.cmake "--color=$(COLOR)" turbomind
 .PHONY : src/turbomind/CMakeFiles/turbomind.dir/depend
 
