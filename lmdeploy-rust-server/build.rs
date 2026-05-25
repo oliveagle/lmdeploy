@@ -6,8 +6,8 @@ fn main() {
     let build_dir = manifest_dir.parent().unwrap().join("build/lib");
 
     // CUDA library paths
-    let cuda_lib = "/usr/local/cuda/lib64";
-    let cuda_stubs = "/usr/local/cuda/targets/x86_64-linux/lib/stubs";
+    let cuda_lib = "/usr/local/cuda-12.5/lib64";
+    let cuda_stubs = "/usr/local/cuda-12.5/targets/x86_64-linux/lib/stubs";
     let system_cuda = "/usr/lib/x86_64-linux-gnu";
 
     println!("cargo:rustc-link-search=native={}", build_dir.display());
@@ -24,6 +24,12 @@ fn main() {
     println!("cargo:rustc-link-lib=dylib=cublasLt");
     println!("cargo:rustc-link-lib=dylib=cublas");
     println!("cargo:rustc-link-lib=dylib=cuda");
+
+    // Set rpath to find CUDA and custom libraries at runtime
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", build_dir.display());
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lmdeploy_lib.display());
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", cuda_lib);
+
     println!("cargo:rerun-if-changed={}", build_dir.display());
 
     // Generate gRPC code from protos
