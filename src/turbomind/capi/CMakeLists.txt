@@ -3,6 +3,8 @@
 
 add_library(turbomind_c SHARED turbomind_c.cc)
 target_include_directories(turbomind_c PUBLIC ${CMAKE_SOURCE_DIR})
+target_include_directories(turbomind_c PRIVATE ${xgrammar_SOURCE_DIR}/include)
+target_include_directories(turbomind_c PRIVATE ${xgrammar_SOURCE_DIR}/cpp/include)
 
 # Force-link all objects from static libraries that contain self-registration
 # globals (module type registrars).  Without --whole-archive, the linker
