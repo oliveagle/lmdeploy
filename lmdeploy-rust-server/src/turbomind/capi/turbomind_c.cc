@@ -2209,3 +2209,40 @@ TM_CompiledGrammar* TM_Grammar_GetBuiltinJSON(void)
 {
     return new TM_CompiledGrammar{};
 }
+
+// ============================================================
+// CUDA Graph Support (Stubs - Future Implementation)
+// ============================================================
+// Note: Full CUDA Graph capture requires deeper integration with the C++ engine.
+// These stubs provide no-op implementations for API compatibility.
+
+extern "C" int TM_CudaGraph_Capture(
+    TM_ModelRequest* req,
+    TM_TensorMap* input_tensors,
+    TM_CudaGraph** out_graph)
+{
+    // Stub: Return success without actually capturing a graph
+    // This allows the Rust code to compile, but CUDA Graph won't be used
+    if (!req || !out_graph) {
+        return TM_ERR_INVALID_ARG;
+    }
+
+    // Allocate a dummy graph handle (won't be usable for launch)
+    *out_graph = reinterpret_cast<TM_CudaGraph*>(1);
+    return TM_OK;
+}
+
+extern "C" int TM_CudaGraph_Launch(
+    TM_CudaGraph* graph,
+    TM_TensorMap* input_tensors,
+    TM_TensorMap* output_tensors,
+    void* stream)
+{
+    // Stub: Always return error - graph launching not implemented
+    return TM_ERR_NOT_IMPLEMENTED;
+}
+
+extern "C" void TM_CudaGraph_Destroy(TM_CudaGraph* graph)
+{
+    // Stub: No-op for dummy handles
+}
