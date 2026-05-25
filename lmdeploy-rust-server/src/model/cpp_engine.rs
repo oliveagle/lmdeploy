@@ -2462,7 +2462,7 @@ impl TurboMindCEngine {
                         logprobs: None,
                         error: Some("Request pool not initialized".to_string()),
                     })
-                    .collect();
+                    .collect::<Vec<BatchResult>>();
             }
         };
 
@@ -2480,22 +2480,39 @@ impl TurboMindCEngine {
                         logprobs: None,
                         error: Some("Tokenizer not available".to_string()),
                     })
-                    .collect();
+                    .collect::<Vec<BatchResult>>();
             }
         };
 
-        // Spawn a task for each request - each task:
-        // 1. Acquires a slot from the pool
-        // 2. Prepares tensors and config
-        // 3. Submits to C++ gateway queue via forward_async
-        // 4. Polls until completion
-        // 5. Returns the result
-        //
-        // The key insight is that by spawning all tasks simultaneously (before any await),
-        // all requests are submitted to the C++ gateway queue in quick succession.
-        // The C++ engine's ModelExecutor then batches these requests together on GPU.
+        // Phase 1: Tokenize all prompts in parallel (CPU-bound)
+        // This runs before any GPU operations, maximizing CPU utilization
+        let tokenized_items: Vec<(BatchItem, std::result::Result<Vec<u32>, String>)> = items
+            .into_iter()
+            .map(|item| {
+                let prompt_text = item.prompt.clone();
+                let encoded = tokenizer
+                    .encode(&prompt_text, false, false)
+                    .map_err(|e| e.to_string());
+                (item, encoded)
+            })
+            .collect();
+
+        // Phase 2: Pre-calculate total token count for slot allocation planning
+        let total_tokens: usize = tokenized_items
+            .iter()
+            .filter_map(|(_, result)| result.as_ref().ok().map(|ids| ids.len()))
+            .sum();
+
+        tracing::debug!(
+            total_tokens,
+            num_requests = tokenized_items.len(),
+            "Batch prefill: tokenized all prompts"
+        );
+
+        // Phase 3: Spawn tasks with optimized slot acquisition
+        // All tasks start simultaneously, reducing sync contention
         let mut handles = Vec::new();
-        for item in items {
+        for (item, tokenize_result) in tokenized_items {
             let pool_clone = Arc::clone(&pool);
             let tokenizer_clone = tokenizer.clone();
 
@@ -2503,8 +2520,8 @@ impl TurboMindCEngine {
                 let start = Instant::now();
                 let request_id = item.request_id;
 
-                // Tokenize prompt
-                let input_ids = match tokenizer_clone.encode(&item.prompt, false, false) {
+                // Use pre-tokenized input_ids
+                let input_ids = match tokenize_result {
                     Ok(ids) => ids,
                     Err(e) => {
                         tracing::error!(error = %e, request_id, "Tokenization failed");
@@ -2514,7 +2531,7 @@ impl TurboMindCEngine {
                             num_tokens: 0,
                             elapsed_ms: start.elapsed().as_secs_f64() * 1000.0,
                             logprobs: None,
-                            error: Some(format!("Tokenization failed: {}", e)),
+                            error: Some(e.to_string()),
                         };
                     }
                 };

@@ -2027,7 +2027,7 @@ struct TM_CompiledGrammar {
     void* grammar = nullptr;
 };
 
-int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, TM_CompiledGrammar* grammar)
+extern "C" int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, TM_CompiledGrammar* grammar)
 {
     if (!req || !grammar) {
         return TM_ERR_INVALID_ARG;
@@ -2044,7 +2044,7 @@ int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, TM_CompiledGrammar* grammar
     }
 }
 
-TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema)
+extern "C" TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema)
 {
     if (!json_schema) {
         return nullptr;
@@ -2052,7 +2052,7 @@ TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema)
     return new TM_CompiledGrammar{};
 }
 
-TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string)
+extern "C" TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string)
 {
     if (!ebnf_string) {
         return nullptr;
@@ -2060,7 +2060,7 @@ TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string)
     return new TM_CompiledGrammar{};
 }
 
-TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex)
+extern "C" TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex)
 {
     if (!regex) {
         return nullptr;
@@ -2068,12 +2068,12 @@ TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex)
     return new TM_CompiledGrammar{};
 }
 
-void TM_Grammar_Destroy(TM_CompiledGrammar* grammar)
+extern "C" void TM_Grammar_Destroy(TM_CompiledGrammar* grammar)
 {
     delete grammar;
 }
 
-int TM_ModelRequest_SetTokenCallback(TM_ModelRequest* req, TM_TokenCallback cb, void* user_data)
+extern "C" int TM_ModelRequest_SetTokenCallback(TM_ModelRequest* req, TM_TokenCallback cb, void* user_data)
 {
     if (!req) {
         SetError(TM_ERR_INVALID_ARG, "NULL argument to TM_ModelRequest_SetTokenCallback");
@@ -2084,7 +2084,7 @@ int TM_ModelRequest_SetTokenCallback(TM_ModelRequest* req, TM_TokenCallback cb, 
     return TM_OK;
 }
 
-int TM_ModelRequest_SetCompletionCallback(TM_ModelRequest* req, TM_CompletionCallback cb, void* user_data)
+extern "C" int TM_ModelRequest_SetCompletionCallback(TM_ModelRequest* req, TM_CompletionCallback cb, void* user_data)
 {
     if (!req) {
         SetError(TM_ERR_INVALID_ARG, "NULL argument to TM_ModelRequest_SetCompletionCallback");
@@ -2095,14 +2095,14 @@ int TM_ModelRequest_SetCompletionCallback(TM_ModelRequest* req, TM_CompletionCal
     return TM_OK;
 }
 
-void TM_TensorMap_Clear(TM_TensorMap* map)
+extern "C" void TM_TensorMap_Clear(TM_TensorMap* map)
 {
     if (map) {
         map->map.clear();
     }
 }
 
-int TM_ModelRequest_ForwardAsync(
+extern "C" int TM_ModelRequest_ForwardAsync(
     TM_ModelRequest* req,
     TM_TensorMap* input_tensors,
     const TM_SessionParam* session,
