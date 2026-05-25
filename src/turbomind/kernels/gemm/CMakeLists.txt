@@ -63,7 +63,7 @@ add_library(gemm2
         test/test_utils.cu
 )
 
-target_link_libraries(gemm2 PRIVATE parser nvidia::cutlass::cutlass CUDA::cuda_driver)
+target_link_libraries(gemm2 PRIVATE parser nvidia::cutlass::cutlass CUDA::cuda_driver CUDA::cublas)
 
 # cublasGemmGroupedBatchedEx (CUDA 12.5+): grouped batched GEMM for MoE on SM100
 set(_has_sm100 FALSE)
@@ -99,7 +99,7 @@ if(GEMM2_ARCH_90_ENABLED)
             --generate-line-info
             --threads 16>
     )
-    target_link_libraries(gemm2_sm90 PRIVATE parser nvidia::cutlass::cutlass CUDA::cuda_driver)
+    target_link_libraries(gemm2_sm90 PRIVATE parser nvidia::cutlass::cutlass CUDA::cuda_driver CUDA::cublas)
     target_link_libraries(gemm2 PRIVATE gemm2_sm90)
 
     target_compile_definitions(gemm2 PRIVATE GEMM2_ARCH_90_ENABLED)
