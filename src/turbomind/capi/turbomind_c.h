@@ -391,6 +391,17 @@ int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, const TM_CompiledGrammar* g
 // DLPack support for zero-copy tensor transfer
 // ============================================================
 
+/// DLPack-compatible tensor representation (C-compatible struct).
+///
+/// Used for zero-copy tensor sharing via DLPack protocol.
+typedef struct {
+    TM_DataType dtype;  // data type
+    int         ndim;   // number of dimensions
+    int64_t     shape[8];  // max 8 dimensions
+    void*       data;   // data pointer
+    int         device_id;  // -1 for CPU, >= 0 for CUDA device
+} TM_Tensor;
+
 // Set tensor from DLPack capsule (zero-copy)
 // data: raw pointer from DLPack capsule (GPU or CPU memory)
 // dl_type_code: DLPack type code (0=kBool, 2=kInt, 3=kFloat, 4=kUInt, 5=kBFloat)
@@ -405,6 +416,17 @@ void TM_TensorMap_SetDLPack(
     int dl_type_code,
     int dl_type_bits,
     int device_type);
+
+// Create TM_Tensor from DLPack capsule (zero-copy)
+// dlpack_capsule: pointer to DLManagedTensorVersioned or DLManagedTensor
+// out_tensor: output TM_Tensor struct to populate
+// Returns 0 on success, negative error code on failure
+int TM_TensorFromDLPack(void* dlpack_capsule, TM_Tensor* out_tensor);
+
+// Create DLPack capsule from TM_Tensor (zero-copy)
+// tensor: TM_Tensor struct to convert
+// Returns pointer to DLManagedTensorVersioned capsule, NULL on failure
+void* TM_TensorToDLPack(const TM_Tensor* tensor);
 
 // ============================================================
 // Weight Export / Import

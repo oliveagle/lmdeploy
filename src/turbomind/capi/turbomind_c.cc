@@ -5,6 +5,9 @@
 #include <cuda_runtime.h>
 #include <cstdio>
 
+// DLPack header for tensor exchange protocol
+#include "../python/dlpack.h"
+
 // Compile-time debug flag for safetensors loading
 // Define to 1 to enable verbose debug output during weight loading
 #define SAFETENSORS_DEBUG 0
@@ -2334,10 +2337,9 @@ std::once_flag g_builtin_json_init_flag;
 
 // Initialize the builtin JSON grammar
 void InitBuiltinJSONGrammar() {
+    // Stub implementation - xgrammar API requires TokenizerInfo
     try {
-        auto grammar = xgrammar::Grammar::BuiltinJSONGrammar();
-        auto compiled = xgrammar::GrammarCompiler::CompileBuiltinJSONGrammar();
-        g_builtin_json_grammar = reinterpret_cast<TM_CompiledGrammar*>(new xgrammar::CompiledGrammar(std::move(compiled)));
+        // TODO: Initialize builtin JSON grammar with proper tokenizer info
     }
     catch (const std::exception& e) {
         fprintf(stderr, "[C-API] Failed to initialize builtin JSON grammar: %s\n", e.what());
@@ -2356,14 +2358,10 @@ TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema)
         SetError(TM_ERR_INVALID_ARG, "json_schema must not be NULL");
         return nullptr;
     }
-
     try {
-        auto grammar = xgrammar::Grammar::FromJSONSchema(json_schema);
-        auto compiler = xgrammar::GrammarCompiler();
-        auto compiled = compiler.CompileJSONSchema(json_schema);
-        auto* wrapper = new TM_CompiledGrammar{};
-        wrapper->grammar = std::make_shared<xgrammar::CompiledGrammar>(std::move(compiled));
-        return wrapper;
+        // TODO: Create grammar with proper TokenizerInfo
+        SetError(TM_ERR_RUNTIME, "xgrammar GrammarCompiler requires TokenizerInfo - not yet implemented");
+        return nullptr;
     }
     catch (const std::exception& e) {
         SetError(TM_ERR_RUNTIME, e.what());
@@ -2377,14 +2375,10 @@ TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string)
         SetError(TM_ERR_INVALID_ARG, "ebnf_string must not be NULL");
         return nullptr;
     }
-
     try {
-        auto grammar = xgrammar::Grammar::FromEBNF(ebnf_string);
-        auto compiler = xgrammar::GrammarCompiler();
-        auto compiled = compiler.CompileEBNF(ebnf_string);
-        auto* wrapper = new TM_CompiledGrammar{};
-        wrapper->grammar = std::make_shared<xgrammar::CompiledGrammar>(std::move(compiled));
-        return wrapper;
+        // TODO: Create grammar with proper TokenizerInfo
+        SetError(TM_ERR_RUNTIME, "xgrammar GrammarCompiler requires TokenizerInfo - not yet implemented");
+        return nullptr;
     }
     catch (const std::exception& e) {
         SetError(TM_ERR_RUNTIME, e.what());
@@ -2398,14 +2392,10 @@ TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex)
         SetError(TM_ERR_INVALID_ARG, "regex must not be NULL");
         return nullptr;
     }
-
     try {
-        auto grammar = xgrammar::Grammar::FromRegex(regex);
-        auto compiler = xgrammar::GrammarCompiler();
-        auto compiled = compiler.CompileRegex(regex);
-        auto* wrapper = new TM_CompiledGrammar{};
-        wrapper->grammar = std::make_shared<xgrammar::CompiledGrammar>(std::move(compiled));
-        return wrapper;
+        // TODO: Create grammar with proper TokenizerInfo
+        SetError(TM_ERR_RUNTIME, "xgrammar GrammarCompiler requires TokenizerInfo - not yet implemented");
+        return nullptr;
     }
     catch (const std::exception& e) {
         SetError(TM_ERR_RUNTIME, e.what());
@@ -2413,7 +2403,7 @@ TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex)
     }
 }
 
-TM_CompiledGrammar* TM_Grammar_GetBuiltinJSON(void)
+const TM_CompiledGrammar* TM_Grammar_GetBuiltinJSON(void)
 {
     std::call_once(g_builtin_json_init_flag, InitBuiltinJSONGrammar);
     return g_builtin_json_grammar;
@@ -2488,6 +2478,171 @@ void TM_TensorMap_SetInt64GPU(TM_TensorMap* map, const char* name, const int64_t
 void TM_TensorMap_SetFloat32GPU(TM_TensorMap* map, const char* name, const float* data, int ndim, const int64_t* shape)
 {
     SetTensorCommon(&map->map, name, data, ndim, shape, turbomind::DeviceType::kDEVICE);
+}
+
+// DLPack dtype code -> turbomind::DataType
+static turbomind::DataType DLPackDtypeToTurbomind(int dl_type_code, int dl_type_bits)
+{
+    switch (dl_type_code) {
+        case 0: // kDLBool
+            return turbomind::DataType::kBool;
+        case 2: // kDLInt
+            if (dl_type_bits == 8) return turbomind::DataType::kInt8;
+            if (dl_type_bits == 16) return turbomind::DataType::kInt16;
+            if (dl_type_bits == 32) return turbomind::DataType::kInt32;
+            if (dl_type_bits == 64) return turbomind::DataType::kInt64;
+            return turbomind::DataType::kNull;
+        case 3: // kDLFloat
+            if (dl_type_bits == 16) return turbomind::DataType::kHalf;
+            if (dl_type_bits == 32) return turbomind::DataType::kFloat32;
+            if (dl_type_bits == 64) return turbomind::DataType::kFloat64;
+            return turbomind::DataType::kNull;
+        case 4: // kDLUInt
+            if (dl_type_bits == 8) return turbomind::DataType::kUint8;
+            if (dl_type_bits == 16) return turbomind::DataType::kUint16;
+            if (dl_type_bits == 32) return turbomind::DataType::kUint32;
+            if (dl_type_bits == 64) return turbomind::DataType::kUint64;
+            return turbomind::DataType::kNull;
+        case 5: // kDLBfloat
+            return turbomind::DataType::kBfloat16;
+        default:
+            return turbomind::DataType::kNull;
+    }
+}
+
+void TM_TensorMap_SetDLPack(
+    TM_TensorMap* map,
+    const char* name,
+    const void* data,
+    int ndim,
+    const int64_t* shape,
+    int dl_type_code,
+    int dl_type_bits,
+    int device_type)
+{
+    turbomind::DataType dtype = DLPackDtypeToTurbomind(dl_type_code, dl_type_bits);
+    if (dtype == turbomind::DataType::kNull) {
+        // Unsupported dtype, create a uint8 tensor as fallback
+        dtype = turbomind::DataType::kUint8;
+    }
+
+    turbomind::DeviceType dev = (device_type == 2) ? turbomind::DeviceType::kDEVICE : turbomind::DeviceType::kCPU;
+    std::vector<turbomind::core::ssize_t> shape_vec(shape, shape + ndim);
+    turbomind::Layout layout{shape_vec};
+
+    auto tensor = turbomind::core::Tensor(
+        const_cast<void*>(data),
+        layout,
+        dtype,
+        dev);
+
+    map->map[name] = std::move(tensor);
+}
+
+int TM_TensorFromDLPack(void* dlpack_capsule, TM_Tensor* out_tensor)
+{
+    if (!dlpack_capsule || !out_tensor) {
+        return -1;
+    }
+
+    const DLManagedTensorVersioned* dmt =
+        static_cast<const DLManagedTensorVersioned*>(dlpack_capsule);
+
+    if (dmt->version.major != DLPACK_MAJOR_VERSION) {
+        return -1;
+    }
+
+    const DLTensor& dt = dmt->dl_tensor;
+
+    out_tensor->dtype = ToCDataType(DLPackDtypeToTurbomind(dt.dtype.code, dt.dtype.bits));
+    out_tensor->ndim = dt.ndim;
+    out_tensor->data = dt.data;
+    out_tensor->device_id = (dt.device.device_type == kDLCUDA || dt.device.device_type == kDLCUDAManaged) ? dt.device.device_id : -1;
+
+    for (int i = 0; i < dt.ndim && i < 8; ++i) {
+        out_tensor->shape[i] = dt.shape[i];
+    }
+
+    return 0;
+}
+
+void* TM_TensorToDLPack(const TM_Tensor* tensor)
+{
+    if (!tensor || !tensor->data || tensor->ndim <= 0) {
+        return nullptr;
+    }
+
+    auto dtype = static_cast<turbomind::DataType>(tensor->dtype);
+
+    DLDataType dl_dtype;
+    switch (dtype) {
+        case turbomind::DataType::kBool:
+            dl_dtype = {6, 8, 1}; break;
+        case turbomind::DataType::kInt8:
+            dl_dtype = {0, 8, 1}; break;
+        case turbomind::DataType::kInt16:
+            dl_dtype = {0, 16, 1}; break;
+        case turbomind::DataType::kInt32:
+            dl_dtype = {0, 32, 1}; break;
+        case turbomind::DataType::kInt64:
+            dl_dtype = {0, 64, 1}; break;
+        case turbomind::DataType::kUint8:
+            dl_dtype = {1, 8, 1}; break;
+        case turbomind::DataType::kUint16:
+            dl_dtype = {1, 16, 1}; break;
+        case turbomind::DataType::kUint32:
+            dl_dtype = {1, 32, 1}; break;
+        case turbomind::DataType::kUint64:
+            dl_dtype = {1, 64, 1}; break;
+        case turbomind::DataType::kHalf:
+            dl_dtype = {2, 16, 1}; break;
+        case turbomind::DataType::kFloat32:
+            dl_dtype = {2, 32, 1}; break;
+        case turbomind::DataType::kFloat64:
+            dl_dtype = {2, 64, 1}; break;
+        case turbomind::DataType::kBfloat16:
+            dl_dtype = {4, 16, 1}; break;
+        default:
+            return nullptr;
+    }
+
+    DLDevice dl_device;
+    if (tensor->device_id >= 0) {
+        dl_device.device_type = kDLCUDA;
+        dl_device.device_id = tensor->device_id;
+    }
+    else {
+        dl_device.device_type = kDLCPU;
+        dl_device.device_id = 0;
+    }
+
+    int64_t* shape = new int64_t[tensor->ndim];
+    for (int i = 0; i < tensor->ndim; ++i) {
+        shape[i] = tensor->shape[i];
+    }
+
+    DLTensor dl_tensor{
+        tensor->data,
+        dl_device,
+        tensor->ndim,
+        dl_dtype,
+        shape,
+        nullptr,
+        0
+    };
+
+    auto* dmt = new DLManagedTensorVersioned{};
+    dmt->version.major = DLPACK_MAJOR_VERSION;
+    dmt->version.minor = DLPACK_MINOR_VERSION;
+    dmt->dl_tensor = dl_tensor;
+    dmt->flags = 0;
+    dmt->manager_ctx = shape;
+    dmt->deleter = [](DLManagedTensorVersioned* self) {
+        delete[] static_cast<int64_t*>(self->manager_ctx);
+        delete self;
+    };
+
+    return dmt;
 }
 
 bool TM_TensorMap_Get(
@@ -2748,9 +2903,9 @@ int TM_ModelRequest_ForwardAsync(
         // Submit request asynchronously - don't block, let caller poll state
         auto out = req->req->Forward(std::move(param), [has_completion_cb, req]() {
             if (has_completion_cb && req->completion_cb_wrapper) {
-                auto status = req->streaming_state ?
-                    (int)req->streaming_state->load(std::memory_order_acquire) : (int)TM_RequestStatus::TM_STATUS_FINISH;
-                auto seq_len = req->streaming_state ? req->streaming_state->seq_len.load() : 0;
+                auto state = req->streaming_state ? req->streaming_state->exchange(nullptr) : nullptr;
+                auto status = state ? state->status : (int)TM_RequestStatus::TM_STATUS_FINISH;
+                auto seq_len = state ? state->seq_len : 0;
                 req->completion_cb_wrapper->func(status, seq_len, req->completion_cb_wrapper->user_data);
             }
         });
@@ -2776,6 +2931,17 @@ int TM_ModelRequest_SetTokenCallback(TM_ModelRequest* req, TM_TokenCallback cb, 
     }
 
     req->token_cb_wrapper = std::make_shared<TM_TokenCallbackWrapper>(cb, user_data);
+    return TM_OK;
+}
+
+int TM_ModelRequest_SetCompletionCallback(TM_ModelRequest* req, TM_CompletionCallback cb, void* user_data)
+{
+    if (!req) {
+        SetError(TM_ERR_INVALID_ARG, "NULL argument to TM_ModelRequest_SetCompletionCallback");
+        return TM_ERR_INVALID_ARG;
+    }
+
+    req->completion_cb_wrapper = std::make_shared<TM_CompletionCallbackWrapper>(cb, user_data);
     return TM_OK;
 }
 
