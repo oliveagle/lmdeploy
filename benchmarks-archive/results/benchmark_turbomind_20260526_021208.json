@@ -1,0 +1,53 @@
+{
+  "engine": "LMDeploy TurboMind",
+  "model": "/mnt/data/repos/gitee.com/oliveagle/ole_llm_npu_mobile/models/hf/Qwen3-0.6B",
+  "backend": "turbomind",
+  "date": "2026-05-26 02:12:08",
+  "lmdeploy_version": "0.13.0",
+  "results": {
+    "short_context": {
+      "scenario": "short_context",
+      "input_len": 1024,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 173.56164949978847,
+      "ttft_ms_p99": 0.21279928300100437,
+      "itl_ms_avg": 9.669277486135815,
+      "total_time_ms_avg": 1367.8113789997951,
+      "throughput_tps": 374.32061749215546
+    },
+    "medium_context": {
+      "scenario": "medium_context",
+      "input_len": 4096,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 601.9624762000603,
+      "ttft_ms_p99": 1.0110168739993242,
+      "itl_ms_avg": 15.3496559834457,
+      "total_time_ms_avg": 2838.3162363996234,
+      "throughput_tps": 180.38863796567892
+    },
+    "long_context": {
+      "scenario": "long_context",
+      "input_len": 8192,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 1488.416321600198,
+      "ttft_ms_p99": 2.6990360939998936,
+      "itl_ms_avg": 21.621809648701003,
+      "total_time_ms_avg": 11477.813914799844,
+      "throughput_tps": 44.60779759983838
+    },
+    "long_context_large_output": {
+      "scenario": "long_context_large_output",
+      "input_len": 8192,
+      "output_len": 2048,
+      "completed": 10,
+      "ttft_ms_avg": 1488.588205799897,
+      "ttft_ms_p99": 2.698700585999177,
+      "itl_ms_avg": 21.626129709673844,
+      "total_time_ms_avg": 39953.782391500135,
+      "throughput_tps": 51.25922697210506
+    }
+  }
+}
