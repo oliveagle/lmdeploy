@@ -11,11 +11,13 @@ fn main() {
     let system_cuda = "/usr/lib/x86_64-linux-gnu";
 
     println!("cargo:rustc-link-search=native={}", build_dir.display());
+    // Also search lmdeploy/lib for shim library
+    let lmdeploy_lib = manifest_dir.parent().unwrap().join("lmdeploy/lib");
+    println!("cargo:rustc-link-search=native={}", lmdeploy_lib.display());
     println!("cargo:rustc-link-search=native={}", cuda_lib);
     println!("cargo:rustc-link-search=native={}", cuda_stubs);
     println!("cargo:rustc-link-search=native={}", system_cuda);
     println!("cargo:rustc-link-lib=dylib=turbomind_c");
-    println!("cargo:rustc-link-lib=dylib=tm_shim");
     println!("cargo:rustc-link-lib=dylib=cudart");
     println!("cargo:rustc-link-lib=dylib=cublasLt");
     println!("cargo:rustc-link-lib=dylib=cuda");
