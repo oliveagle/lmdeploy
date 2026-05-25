@@ -17,7 +17,7 @@ use std::sync::Mutex as StdMutex;
 use std::time::Instant;
 
 use crate::error::{AppError, Result};
-use crate::tokenizer::LMTokenizer;
+use crate::tokenizer::{LMTokenizer, LMTokenizerWithGpu};
 use crate::turbomind_c::{
     c_int, c_void, cudaFree, cudaFreeHost, cudaMalloc, cudaMallocHost, cudaMemcpy, cudaMemcpyAsync,
     cudaMemcpyKind, cudaStreamCreate, cudaStreamDestroy, cudaStream_t, CompiledGrammar,
@@ -1225,6 +1225,8 @@ pub struct TurboMindCEngine {
 
     // Tokenizer for encoding/decoding
     tokenizer: Option<LMTokenizer>,
+    /// GPU-enabled tokenizer for zero-copy tokenization
+    gpu_tokenizer: Option<LMTokenizerWithGpu>,
 
     // Configuration
     session_len: i32,
@@ -1409,6 +1411,22 @@ impl TurboMindCEngine {
             }
         };
 
+        // Load GPU tokenizer for zero-copy tokenization
+        tracing::info!("Initializing GPU tokenizer for zero-copy path...");
+        let gpu_tokenizer = match LMTokenizerWithGpu::from_path(model_path) {
+            Ok(t) => {
+                tracing::info!(
+                    vocab_size = t.vocab_size(),
+                    "GPU tokenizer initialized successfully"
+                );
+                Some(t)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to initialize GPU tokenizer, zero-copy path disabled");
+                None
+            }
+        };
+
         // Create C API engine config
         let mut engine_config = EngineConfig::new().map_err(|e| {
             AppError::ModelLoadFailed(format!("Failed to create engine config: {:?}", e))
@@ -1511,6 +1529,7 @@ impl TurboMindCEngine {
             tm: Some(Arc::new(tm)),
             request_pool: Some(request_pool),
             tokenizer,
+            gpu_tokenizer,
             session_len: 65536,
             max_batch_size,
             quant_policy,
@@ -1558,6 +1577,7 @@ impl TurboMindCEngine {
         self.tm = new_engine.tm;
         self.request_pool = new_engine.request_pool;
         self.tokenizer = new_engine.tokenizer;
+        self.gpu_tokenizer = new_engine.gpu_tokenizer;
         self.model_path = new_model_path.to_string();
         self.model_name = new_engine.model_name;
         self.state = ModelState::Ready;
@@ -1574,10 +1594,167 @@ impl TurboMindCEngine {
         Ok(())
     }
 
-    /// Generate text with TurboMind C++ engine
+    /// Generate text with TurboMind C++ engine.
+    ///
+    /// This uses the GPU tokenizer zero-copy path by default, which:
+    /// 1. Tokenizes directly to pinned memory (eliminates Vec<u32> allocation)
+    /// 2. Async copies to GPU
+    /// 3. Zero-copy transfer via DLPack to C++
+    ///
+    /// Falls back to CPU tokenizer path if GPU tokenizer is unavailable.
     pub async fn generate(&self, prompt: &str, params: GenerationParams) -> String {
-        let (text, _, _) = self.generate_with_metrics(prompt, params).await;
+        self.generate_with_gpu_tokenizer(prompt, params).await
+    }
+
+    /// Generate text using the GPU tokenizer zero-copy path.
+    ///
+    /// This eliminates the intermediate `Vec<u32>` allocation and reduces
+    /// memory copies from 2 to 1 by using the GPU tokenizer.
+    ///
+    /// # Flow
+    /// 1. Tokenize directly to pinned memory
+    /// 2. Async copy to GPU
+    /// 3. Zero-copy transfer via DLPack to C++
+    /// 4. Run inference
+    ///
+    /// Falls back to regular generate if GPU tokenizer is unavailable.
+    pub async fn generate_with_gpu_tokenizer(&self, prompt: &str, params: GenerationParams) -> String {
+        let (text, _, _) = self.generate_with_gpu_tokenizer_and_metrics(prompt, params).await;
         text
+    }
+
+    /// Generate text with GPU tokenizer, returning metrics.
+    pub async fn generate_with_gpu_tokenizer_and_metrics(
+        &self,
+        prompt: &str,
+        params: GenerationParams,
+    ) -> (String, usize, f64) {
+        // Check if GPU tokenizer is available
+        if self.gpu_tokenizer.is_none() {
+            tracing::warn!(
+                "GPU tokenizer not available, falling back to regular tokenizer"
+            );
+            return self.generate_with_metrics(prompt, params).await;
+        }
+
+        let pool = self
+            .request_pool
+            .as_ref()
+            .expect("Request pool not initialized");
+
+        // Tokenize directly to GPU using zero-copy path
+        let gpu_tokenizer = self.gpu_tokenizer.as_ref().expect("GPU tokenizer missing");
+
+        let gpu_tensor = match gpu_tokenizer.encode_to_gpu(prompt, false) {
+            Ok(tensor) => tensor,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "GPU tokenization failed, falling back to regular tokenizer"
+                );
+                return self.generate_with_metrics(prompt, params).await;
+            }
+        };
+
+        let seq_len = gpu_tensor.len;
+
+        tracing::debug!(
+            input_len = seq_len,
+            "GPU tokenization complete (zero-copy path)"
+        );
+
+        let start = Instant::now();
+
+        let (_permit, mut request, mut input_tensors, mut output_tensors) = pool.acquire().await;
+
+        // Clear and reuse TensorMaps instead of allocating new ones
+        input_tensors.clear();
+        output_tensors.clear();
+
+        // Prepare DLPack input tensor for zero-copy transfer to C++
+        let dlpack_input = DlpackInputTensor {
+            name: "input_ids",
+            data: gpu_tensor.gpu_ptr as *const std::ffi::c_void,
+            shape: vec![seq_len as i64],
+            dtype: crate::model::cpp_engine::DlpackDtype::UInt(32),
+            device: crate::model::cpp_engine::DlpackDevice::Cuda(0),
+        };
+
+        // Zero-copy transfer via DLPack
+        set_tensor_from_dlpack(&mut input_tensors, &dlpack_input);
+        input_tensors.set_sequence_length(seq_len as i32);
+
+        // Sync on the event to ensure GPU transfer is complete
+        if let Some(ref event) = gpu_tensor.sync_event {
+            let _ = event.sync();
+        }
+
+        // Prepare generation config
+        let mut gen_cfg = GenConfig::new().unwrap();
+        gen_cfg.set_max_new_tokens(params.max_tokens.unwrap_or(512) as i32);
+        gen_cfg.set_temperature(params.temperature.unwrap_or(0.7));
+        gen_cfg.set_top_p(params.top_p.unwrap_or(0.95));
+        gen_cfg.set_top_k(params.top_k.unwrap_or(50) as i32);
+        params.apply_to_gen_config(&mut gen_cfg);
+
+        let session = TM_SessionParam {
+            id: unix_timestamp() as u64,
+            step: 0,
+            start_flag: true,
+            end_flag: true,
+        };
+
+        // Run inference
+        match request.forward(
+            &mut input_tensors,
+            &session,
+            &gen_cfg,
+            false,
+            true,
+            &mut output_tensors,
+        ) {
+            Ok(_) => {
+                let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+                // Get output tokens from the request
+                match request.get_output("output_ids") {
+                    Ok((data_ptr, size)) => {
+                        // data_ptr points to int32 array
+                        let token_count = size / 4;
+                        let output_ids: Vec<i32> = unsafe {
+                            std::slice::from_raw_parts(data_ptr as *const i32, token_count)
+                                .to_vec()
+                        };
+
+                        // Decode output tokens
+                        let text = if let Some(ref tokenizer) = self.tokenizer {
+                            match tokenizer.decode(
+                                &output_ids.iter().map(|&id| id as u32).collect::<Vec<_>>(),
+                                true,
+                            ) {
+                                Ok(t) => t,
+                                Err(e) => {
+                                    tracing::error!(error = %e, "Decoding failed");
+                                    format!("[decode error: {}]", e)
+                                }
+                            }
+                        } else {
+                            format!("{:?}", output_ids)
+                        };
+
+                        (text, token_count, elapsed_ms)
+                    }
+                    Err(e) => {
+                        tracing::error!(error = ?e, "Failed to get output_ids");
+                        (String::new(), 0, elapsed_ms)
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::error!(error = ?e, "C++ inference failed");
+                (String::new(), 0, 0.0)
+            }
+        }
     }
 
     /// Generate text with TurboMind C++ engine using a DLPack input tensor.
@@ -2199,6 +2376,11 @@ impl TurboMindCEngine {
     /// Get the tokenizer
     pub fn tokenizer(&self) -> Option<&LMTokenizer> {
         self.tokenizer.as_ref()
+    }
+
+    /// Get the GPU tokenizer (zero-copy path).
+    pub fn gpu_tokenizer(&self) -> Option<&LMTokenizerWithGpu> {
+        self.gpu_tokenizer.as_ref()
     }
 
     /// Get the request pool for benchmark timing
