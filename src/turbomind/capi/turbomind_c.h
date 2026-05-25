@@ -447,6 +447,40 @@ int TM_ExportWeightsToBin(
     int num_kv_heads,
     int vocab_size);
 
+// ============================================================
+// CUDA Graph Support (Experimental)
+// ============================================================
+
+// Opaque handle to a captured CUDA Graph
+typedef struct TM_CudaGraph* TM_CudaGraphHandle;
+
+// Capture a CUDA Graph for a given input configuration
+// This captures the GPU kernel launch sequence for later replay
+// req: Model request (must be initialized)
+// input_tensors: Input tensor configuration to capture graph for
+// out_graph: Output handle for the captured graph
+// Returns 0 on success, negative error code on failure
+int TM_CudaGraph_Capture(
+    TM_ModelRequest* req,
+    TM_TensorMap* input_tensors,
+    TM_CudaGraphHandle* out_graph);
+
+// Launch a previously captured CUDA Graph
+// graph: Graph handle from TM_CudaGraph_Capture
+// input_tensors: Input tensors matching the captured configuration
+// output_tensors: Output tensor map to store results
+// stream: CUDA stream to launch on (0 = default stream)
+// Returns 0 on success, negative error code on failure
+int TM_CudaGraph_Launch(
+    TM_CudaGraphHandle graph,
+    TM_TensorMap* input_tensors,
+    TM_TensorMap* output_tensors,
+    void* stream);
+
+// Destroy a CUDA Graph and release associated resources
+void TM_CudaGraph_Destroy(TM_CudaGraphHandle graph);
+
+// ============================================================
 #ifdef __cplusplus
 }
 #endif

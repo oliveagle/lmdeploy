@@ -2945,6 +2945,95 @@ int TM_ModelRequest_SetCompletionCallback(TM_ModelRequest* req, TM_CompletionCal
     return TM_OK;
 }
 
+// ============================================================
+// CUDA Graph Support (Experimental)
+// ============================================================
+
+namespace {
+
+// Internal CUDA Graph structure
+struct CudaGraph {
+    cudaGraph_t graph = nullptr;
+    cudaGraphExec_t exec = nullptr;
+    std::vector<std::pair<void*, size_t>> buffer_allocations;  // For memory pool management
+
+    ~CudaGraph() {
+        if (exec) {
+            cudaGraphExecDestroy(exec);
+        }
+        if (graph) {
+            cudaGraphDestroy(graph);
+        }
+        // Note: buffer_allocations would need proper cleanup in real implementation
+    }
+};
+
+}  // anonymous namespace
+
+int TM_CudaGraph_Capture(
+    TM_ModelRequest* req,
+    TM_TensorMap* input_tensors,
+    TM_CudaGraphHandle* out_graph)
+{
+    if (!req || !input_tensors || !out_graph) {
+        SetError(TM_ERR_INVALID_ARG, "NULL argument to TM_CudaGraph_Capture");
+        return TM_ERR_INVALID_ARG;
+    }
+
+    try {
+        // Placeholder: CUDA Graph capture would require:
+        // 1. Capturing the graph during a forward pass
+        // 2. Instantiating the graph for replay
+        // 3. Managing memory pools for deterministic allocation
+        //
+        // Full implementation requires:
+        // - cudaStreamCaptureBegin/End
+        // - cudaGraphInstantiate
+        // - Custom memory pool for deterministic allocations
+
+        // For now, return not implemented
+        SetError(TM_ERR_RUNTIME, "CUDA Graph capture not yet implemented - requires engine-level support");
+        return TM_ERR_RUNTIME;
+    }
+    catch (const std::exception& e) {
+        SetError(TM_ERR_RUNTIME, e.what());
+        return TM_ERR_RUNTIME;
+    }
+}
+
+int TM_CudaGraph_Launch(
+    TM_CudaGraphHandle graph,
+    TM_TensorMap* input_tensors,
+    TM_TensorMap* output_tensors,
+    void* stream)
+{
+    if (!graph || !input_tensors || !output_tensors) {
+        SetError(TM_ERR_INVALID_ARG, "NULL argument to TM_CudaGraph_Launch");
+        return TM_ERR_INVALID_ARG;
+    }
+
+    try {
+        // Placeholder: CUDA Graph launch would:
+        // 1. Update input tensor pointers in the graph
+        // 2. cudaGraphLaunch with the appropriate stream
+        // 3. Handle output tensor extraction
+
+        SetError(TM_ERR_RUNTIME, "CUDA Graph launch not yet implemented");
+        return TM_ERR_RUNTIME;
+    }
+    catch (const std::exception& e) {
+        SetError(TM_ERR_RUNTIME, e.what());
+        return TM_ERR_RUNTIME;
+    }
+}
+
+void TM_CudaGraph_Destroy(TM_CudaGraphHandle graph)
+{
+    if (graph) {
+        delete static_cast<CudaGraph*>(graph);
+    }
+}
+
 int TM_ModelRequest_GetStreamToken(
     TM_ModelRequest* req,
     void** out_data,

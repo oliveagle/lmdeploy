@@ -663,7 +663,24 @@ extern "C" {
     // DLPack / Zero-Copy Tensor Sharing
     pub fn TM_TensorFromDLPack(dlpack_capsule: *mut c_void, out_tensor: *mut TM_Tensor) -> c_int;
     pub fn TM_TensorToDLPack(tensor: *const TM_Tensor) -> *mut c_void;
+
+    // CUDA Graph Support (Experimental)
+    pub fn TM_CudaGraph_Capture(
+        req: *mut TM_ModelRequest,
+        input_tensors: *mut TM_TensorMap,
+        out_graph: *mut CudaGraphHandle,
+    ) -> c_int;
+    pub fn TM_CudaGraph_Launch(
+        graph: CudaGraphHandle,
+        input_tensors: *mut TM_TensorMap,
+        output_tensors: *mut TM_TensorMap,
+        stream: *mut c_void,
+    ) -> c_int;
+    pub fn TM_CudaGraph_Destroy(graph: CudaGraphHandle);
 }
+
+/// Opaque handle to a captured CUDA Graph
+pub type CudaGraphHandle = *mut c_void;
 
 /// Result type for FFI operations
 pub type FFResult<T> = Result<T, FFError>;
