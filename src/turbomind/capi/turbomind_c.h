@@ -208,6 +208,7 @@ void TM_TensorMap_SetBytes(TM_TensorMap* map, const char* name, const void* data
 void TM_TensorMap_SetInt32GPU(TM_TensorMap* map, const char* name, const int32_t* data, int ndim, const int64_t* shape);
 void TM_TensorMap_SetInt64GPU(TM_TensorMap* map, const char* name, const int64_t* data, int ndim, const int64_t* shape);
 void TM_TensorMap_SetFloat32GPU(TM_TensorMap* map, const char* name, const float* data, int ndim, const int64_t* shape);
+void TM_TensorMap_SetUInt32GPU(TM_TensorMap* map, const char* name, const uint32_t* data, int ndim, const int64_t* shape);
 
 // Get tensor from map (caller does not own)
 bool TM_TensorMap_Get(

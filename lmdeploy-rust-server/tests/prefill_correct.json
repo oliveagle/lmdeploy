@@ -1,34 +1,31 @@
 {
-  "engine": "LMDeploy Python TurboMind",
-  "model": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
-  "date": 1779643112.4006007,
   "results": {
     "1K": {
       "context_length": 1024,
       "output_tokens": 512,
-      "ttft_ms_avg": 190.7000223339613,
-      "total_time_ms_avg": 12511.732357665702,
-      "prefill_speed_tps_avg": 5369.689984654178,
-      "decode_speed_tps_avg": 41.55495952492479,
-      "avg_itl_ms_avg": 24.064516279944804
+      "ttft_ms_avg": 126.07569766684416,
+      "total_time_ms_avg": 8311.555891666407,
+      "prefill_speed_tps_avg": 8122.104568526176,
+      "decode_speed_tps_avg": 41.6998545282109,
+      "avg_output_tokens": 341.3333333333333
     },
     "4K": {
       "context_length": 4096,
       "output_tokens": 512,
       "ttft_ms_avg": 0.0,
-      "total_time_ms_avg": 678.2604486652417,
+      "total_time_ms_avg": 678.1647056668589,
       "prefill_speed_tps_avg": 0,
       "decode_speed_tps_avg": 0.0,
-      "avg_itl_ms_avg": 0
+      "avg_output_tokens": 0.0
     },
     "8K": {
       "context_length": 8192,
       "output_tokens": 512,
       "ttft_ms_avg": 0.0,
-      "total_time_ms_avg": 1568.6251936664728,
+      "total_time_ms_avg": 1563.5176919995502,
       "prefill_speed_tps_avg": 0,
       "decode_speed_tps_avg": 0.0,
-      "avg_itl_ms_avg": 0
+      "avg_output_tokens": 0.0
     }
   },
   "historical": {

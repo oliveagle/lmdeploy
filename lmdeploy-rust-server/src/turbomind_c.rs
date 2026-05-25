@@ -526,6 +526,21 @@ extern "C" {
         ndim: c_int,
         shape: *const i64,
     );
+    /// Set uint32 tensor with GPU pointer (zero-copy).
+    /// This function is defined in the C++ lib if it was recently built.
+    /// Falls back to DLPack path if not available.
+    ///
+    /// NOTE: Currently using DLPack path instead (set_from_dlpack with kDLUInt).
+    /// Uncomment this when C++ library is rebuilt with TM_TensorMap_SetUInt32GPU.
+    /*
+    pub fn TM_TensorMap_SetUInt32GPU(
+        map: *mut TM_TensorMap,
+        name: *const c_char,
+        data: *const u32,
+        ndim: c_int,
+        shape: *const i64,
+    );
+    */
     /// Set tensor from DLPack memory pointer (zero-copy).
     /// `data` is a raw pointer from DLPack capsule (GPU or CPU).
     /// `dl_type_code`: DLPack type code (0=kBool, 2=kInt, 3=kFloat, 4=kUInt, 5=kBFloat)
@@ -1298,6 +1313,19 @@ impl TensorMap {
         }
     }
 
+    /// Set uint32 tensor with GPU pointer (zero-copy) - uses cached key
+    /// Uses DLPack path to pass uint32 GPU data to C++ engine.
+    pub fn set_uint32_gpu(&mut self, name: &str, data: *const u32, shape: &[i64]) {
+        self.set_from_dlpack(
+            name,
+            data as *const c_void,
+            shape,
+            4,  // kDLUInt
+            32, // 32 bits
+            2,  // kDLCUDA
+        );
+    }
+
     /// Set tensor from a DLPack memory pointer (zero-copy transfer).
     ///
     /// # Arguments
@@ -1364,6 +1392,20 @@ impl TensorMap {
                 shape.as_ptr(),
             );
         }
+    }
+
+    /// Set input_ids tensor with GPU pointer (zero-copy) using uint32 data directly.
+    /// Avoids u32 -> i64 conversion overhead. Uses cached "input_ids" key.
+    /// Uses DLPack path to pass uint32 GPU data to C++ engine.
+    pub fn set_input_ids_gpu_uint32(&mut self, data: *const u32, shape: &[i64]) {
+        self.set_from_dlpack(
+            "input_ids",
+            data as *const c_void,
+            shape,
+            4,  // kDLUInt
+            32, // 32 bits
+            2,  // kDLCUDA
+        );
     }
 
     /// Set output_ids tensor (int64) - uses cached "output_ids" key

@@ -1,0 +1,54 @@
+{
+  "engine": "LMDeploy Python TurboMind",
+  "model": "Qwen3.6-35B-A3B-AWQ",
+  "model_path": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "backend": "turbomind",
+  "date": "2026-05-26 01:54:28",
+  "lmdeploy_version": "0.13.0",
+  "results": {
+    "short_context": {
+      "scenario": "short_context",
+      "input_len": 1024,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 0,
+      "ttft_ms_p99": 0,
+      "itl_ms_avg": 0,
+      "total_time_ms_avg": 0,
+      "throughput_tps": 5120.0
+    },
+    "medium_context": {
+      "scenario": "medium_context",
+      "input_len": 4096,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 0,
+      "ttft_ms_p99": 0,
+      "itl_ms_avg": 0,
+      "total_time_ms_avg": 0,
+      "throughput_tps": 5120.0
+    },
+    "long_context": {
+      "scenario": "long_context",
+      "input_len": 8192,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 0,
+      "ttft_ms_p99": 0,
+      "itl_ms_avg": 0,
+      "total_time_ms_avg": 0,
+      "throughput_tps": 5120.0
+    },
+    "long_context_large_output": {
+      "scenario": "long_context_large_output",
+      "input_len": 8192,
+      "output_len": 2048,
+      "completed": 10,
+      "ttft_ms_avg": 0,
+      "ttft_ms_p99": 0,
+      "itl_ms_avg": 0,
+      "total_time_ms_avg": 0,
+      "throughput_tps": 20480.0
+    }
+  }
+}

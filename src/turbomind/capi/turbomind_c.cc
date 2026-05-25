@@ -2480,6 +2480,11 @@ void TM_TensorMap_SetFloat32GPU(TM_TensorMap* map, const char* name, const float
     SetTensorCommon(&map->map, name, data, ndim, shape, turbomind::DeviceType::kDEVICE);
 }
 
+void TM_TensorMap_SetUInt32GPU(TM_TensorMap* map, const char* name, const uint32_t* data, int ndim, const int64_t* shape)
+{
+    SetTensorCommon(&map->map, name, data, ndim, shape, turbomind::DeviceType::kDEVICE);
+}
+
 // DLPack dtype code -> turbomind::DataType
 static turbomind::DataType DLPackDtypeToTurbomind(int dl_type_code, int dl_type_bits)
 {

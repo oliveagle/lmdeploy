@@ -170,12 +170,151 @@ impl Drop for PinnedHostBuffer {
     }
 }
 
+/// GPU buffer for uint32 input_ids.
+/// Uses uint32_t allocation to match tokenizer output directly,
+/// avoiding the u32->i64 conversion and enabling zero-copy to C++.
+struct GpuUint32Buffer {
+    gpu_ptr: *mut c_void,
+    capacity: usize,
+    stream: cudaStream_t,
+}
+
+unsafe impl Send for GpuUint32Buffer {}
+
+impl GpuUint32Buffer {
+    fn new(initial_capacity: usize) -> Self {
+        let mut gpu_ptr = std::ptr::null_mut();
+        let size = initial_capacity * std::mem::size_of::<u32>();
+        unsafe {
+            let ret = cudaMalloc(&mut gpu_ptr, size);
+            if ret != 0 {
+                tracing::warn!(
+                    ret,
+                    "cudaMalloc failed for uint32 GPU buffer"
+                );
+            }
+        }
+        let mut stream: cudaStream_t = std::ptr::null_mut();
+        unsafe {
+            let ret = cudaStreamCreate(&mut stream);
+            if ret != 0 {
+                tracing::warn!(
+                    ret,
+                    "cudaStreamCreate failed for uint32 buffer"
+                );
+            }
+        }
+        Self {
+            gpu_ptr,
+            capacity: initial_capacity,
+            stream,
+        }
+    }
+
+    fn get_or_grow(&mut self, needed_elements: usize) -> *mut c_void {
+        if needed_elements > self.capacity {
+            if !self.gpu_ptr.is_null() {
+                unsafe { cudaFree(self.gpu_ptr) };
+            }
+            let new_capacity = needed_elements.next_power_of_two().max(self.capacity * 2);
+            let mut new_ptr = std::ptr::null_mut();
+            let size = new_capacity * std::mem::size_of::<u32>();
+            unsafe {
+                if cudaMalloc(&mut new_ptr, size) == 0 {
+                    self.gpu_ptr = new_ptr;
+                    self.capacity = new_capacity;
+                } else {
+                    tracing::warn!("cudaMalloc failed to grow uint32 GPU buffer");
+                    return std::ptr::null_mut();
+                }
+            }
+        }
+        self.gpu_ptr
+    }
+
+    fn stream(&self) -> cudaStream_t {
+        self.stream
+    }
+}
+
+impl Drop for GpuUint32Buffer {
+    fn drop(&mut self) {
+        if !self.gpu_ptr.is_null() {
+            unsafe { cudaFree(self.gpu_ptr) };
+        }
+        if !self.stream.is_null() {
+            unsafe { cudaStreamDestroy(self.stream) };
+        }
+    }
+}
+
+/// Pinned host buffer for uint32 input_ids.
+struct PinnedUint32Buffer {
+    host_ptr: *mut c_void,
+    capacity: usize,
+}
+
+unsafe impl Send for PinnedUint32Buffer {}
+
+impl PinnedUint32Buffer {
+    fn new(initial_capacity: usize) -> Self {
+        let mut host_ptr = std::ptr::null_mut();
+        let size = initial_capacity * std::mem::size_of::<u32>();
+        unsafe {
+            if cudaMallocHost(&mut host_ptr, size) != 0 {
+                tracing::warn!("cudaMallocHost failed for uint32 pinned buffer");
+                host_ptr = std::ptr::null_mut();
+            }
+        }
+        Self {
+            host_ptr,
+            capacity: initial_capacity,
+        }
+    }
+
+    fn get_or_grow(&mut self, needed_elements: usize) -> *mut c_void {
+        if needed_elements > self.capacity {
+            if !self.host_ptr.is_null() {
+                unsafe { cudaFreeHost(self.host_ptr) };
+            }
+            let new_capacity = needed_elements.next_power_of_two().max(self.capacity * 2);
+            let mut new_ptr = std::ptr::null_mut();
+            let size = new_capacity * std::mem::size_of::<u32>();
+            unsafe {
+                if cudaMallocHost(&mut new_ptr, size) == 0 {
+                    self.host_ptr = new_ptr;
+                    self.capacity = new_capacity;
+                } else {
+                    self.host_ptr = std::ptr::null_mut();
+                }
+            }
+        }
+        self.host_ptr
+    }
+}
+
+impl Drop for PinnedUint32Buffer {
+    fn drop(&mut self) {
+        if !self.host_ptr.is_null() {
+            unsafe { cudaFreeHost(self.host_ptr) };
+        }
+    }
+}
+
 thread_local! {
     static GPU_INPUT_BUFFER: RefCell<GpuInputIdsBuffer> = RefCell::new(
         GpuInputIdsBuffer::new(8192)
     );
     static PINNED_HOST_BUFFER: RefCell<PinnedHostBuffer> = RefCell::new(
         PinnedHostBuffer::new(8192)
+    );
+    // GPU buffer for uint32 input_ids (zero-copy to C++ without u32->i64 conversion)
+    static GPU_UINT32_BUFFER: RefCell<GpuUint32Buffer> = RefCell::new(
+        GpuUint32Buffer::new(8192)
+    );
+    // Pinned buffer for uint32 input_ids
+    static PINNED_UINT32_BUFFER: RefCell<PinnedUint32Buffer> = RefCell::new(
+        PinnedUint32Buffer::new(8192)
     );
 }
 
@@ -331,6 +470,62 @@ fn set_input_ids_i64(tensors: &mut TensorMap, input_ids: &[i64]) {
         tensors.set_input_ids(&buf, &shape);
     });
     tensors.set_sequence_length(input_ids.len() as i32);
+}
+
+/// Set input_ids on TensorMap using GPU tensor path with uint32 data directly.
+///
+/// This function eliminates the u32->i64 conversion overhead by:
+/// 1. Copying input_ids directly to pinned host memory (no conversion)
+/// 2. Async copy from pinned to GPU via cudaMemcpyAsync
+/// 3. Setting the GPU tensor using set_input_ids_gpu_uint32 (zero-copy to C++)
+///
+/// The result is a single memory copy path: CPU Vec<u32> -> Pinned -> GPU.
+/// This matches the Python path's single copy behavior.
+///
+/// Returns `Some(CudaEvent)` if async transfer was used. Caller must sync before forward.
+fn set_input_ids_gpu_uint32_async(tensors: &mut TensorMap, input_ids: &[u32]) -> Option<CudaEvent> {
+    let gpu_size = input_ids.len();
+    GPU_UINT32_BUFFER.with(|gpu_buf_cell| {
+        PINNED_UINT32_BUFFER.with(|pinned_cell| {
+            let mut gpu_buf = gpu_buf_cell.borrow_mut();
+            let mut pinned_buf = pinned_cell.borrow_mut();
+            let gpu_ptr = gpu_buf.get_or_grow(gpu_size);
+            if gpu_ptr.is_null() {
+                // Fallback to i64 path if GPU allocation fails
+                set_input_ids_gpu(tensors, input_ids);
+                return None;
+            }
+            let pinned_ptr = pinned_buf.get_or_grow(gpu_size);
+            if !pinned_ptr.is_null() {
+                // Copy u32 directly to pinned buffer (no conversion needed)
+                let pinned_slice: &mut [u32] =
+                    unsafe { std::slice::from_raw_parts_mut(pinned_ptr as *mut u32, gpu_size) };
+                pinned_slice.copy_from_slice(input_ids);
+
+                if let Ok(event) = CudaEvent::new() {
+                    let stream = gpu_buf.stream();
+                    unsafe {
+                        cudaMemcpyAsync(
+                            gpu_ptr,
+                            pinned_ptr,
+                            gpu_size * std::mem::size_of::<u32>(),
+                            cudaMemcpyKind::HostToDevice,
+                            stream,
+                        )
+                    };
+                    let _ = event.record(stream);
+                    let shape = [gpu_size as i64];
+                    // Use the uint32 GPU setter - C++ will receive GPU pointer directly
+                    tensors.set_input_ids_gpu_uint32(gpu_ptr as *const u32, &shape);
+                    tensors.set_sequence_length(input_ids.len() as i32);
+                    return Some(event);
+                }
+            }
+            // Fallback to sync copy
+            set_input_ids_gpu(tensors, input_ids);
+            None
+        })
+    })
 }
 
 /// DLPack input tensor for zero-copy transfer to the C++ engine.
@@ -1584,7 +1779,7 @@ impl TurboMindCEngine {
 
         // Start async GPU transfer for input_ids - CPU continues with config prep
         // while H2D happens in the background
-        if let Some(event) = set_input_ids_gpu_async(&mut input_tensors, &input_ids) {
+        if let Some(event) = set_input_ids_gpu_uint32_async(&mut input_tensors, &input_ids) {
             // Sync on the event before forward to ensure data is ready on GPU
             // This sync point is necessary to guarantee correctness
             let _ = event.sync();
@@ -1717,7 +1912,7 @@ impl TurboMindCEngine {
 
         // Start async GPU transfer for input_ids - CPU continues with config prep
         // while H2D happens in the background
-        if let Some(event) = set_input_ids_gpu_async(&mut input_tensors, &input_ids) {
+        if let Some(event) = set_input_ids_gpu_uint32_async(&mut input_tensors, &input_ids) {
             // Sync on the event before forward to ensure data is ready on GPU
             let _ = event.sync();
         }
@@ -1923,7 +2118,7 @@ impl TurboMindCEngine {
 
             // Start async GPU transfer for input_ids - CPU continues with config prep
             // while H2D happens in the background
-            if let Some(event) = set_input_ids_gpu_async(&mut input_tensors, &input_ids) {
+            if let Some(event) = set_input_ids_gpu_uint32_async(&mut input_tensors, &input_ids) {
                 // Sync on the event before forward to ensure data is ready on GPU
                 let _ = event.sync();
             }
@@ -2545,7 +2740,7 @@ impl TurboMindCEngine {
 
                 // Start async GPU transfer for input_ids - CPU continues with config prep
                 // while H2D happens in the background
-                if let Some(event) = set_input_ids_gpu_async(&mut input_tensors, &input_ids) {
+                if let Some(event) = set_input_ids_gpu_uint32_async(&mut input_tensors, &input_ids) {
                     // Sync on the event before forward to ensure data is ready on GPU
                     let _ = event.sync();
                 }

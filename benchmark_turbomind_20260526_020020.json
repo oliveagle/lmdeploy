@@ -1,0 +1,53 @@
+{
+  "engine": "LMDeploy Python TurboMind",
+  "model": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "backend": "turbomind",
+  "date": "2026-05-26 02:00:20",
+  "lmdeploy_version": "0.13.0",
+  "results": {
+    "short_context": {
+      "scenario": "short_context",
+      "input_len": 1024,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 1134.2895808000321,
+      "ttft_ms_p99": 1.3925658549997024,
+      "itl_ms_avg": 32.788500367651025,
+      "total_time_ms_avg": 14828.171725600441,
+      "throughput_tps": 34.528869065904175
+    },
+    "medium_context": {
+      "scenario": "medium_context",
+      "input_len": 4096,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 3815.079302599952,
+      "ttft_ms_p99": 6.425469226000132,
+      "itl_ms_avg": 53.06943341643928,
+      "total_time_ms_avg": 25224.99587150014,
+      "throughput_tps": 20.297327405253252
+    },
+    "long_context": {
+      "scenario": "long_context",
+      "input_len": 8192,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 9128.410869800064,
+      "ttft_ms_p99": 16.505242918001386,
+      "itl_ms_avg": 82.29544825563801,
+      "total_time_ms_avg": 48208.70328480014,
+      "throughput_tps": 10.620488939005126
+    },
+    "long_context_large_output": {
+      "scenario": "long_context_large_output",
+      "input_len": 8192,
+      "output_len": 2048,
+      "completed": 10,
+      "ttft_ms_avg": 9135.096588399756,
+      "ttft_ms_p99": 16.518805878999046,
+      "itl_ms_avg": 79.97619496932437,
+      "total_time_ms_avg": 47509.52457529984,
+      "throughput_tps": 43.10714574198778
+    }
+  }
+}

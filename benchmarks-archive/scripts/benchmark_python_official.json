@@ -1,0 +1,51 @@
+{
+  "engine": "LMDeploy Python TurboMind",
+  "model": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "date": 1779723057.9258301,
+  "results": {
+    "1K": {
+      "context_length": 1024,
+      "output_tokens": 512,
+      "ttft_ms_avg": 189.30907533346422,
+      "total_time_ms_avg": 12369.058947000061,
+      "prefill_speed_tps_avg": 5409.143741240319,
+      "decode_speed_tps_avg": 42.03698806582645,
+      "avg_itl_ms_avg": 23.788573968098824
+    },
+    "4K": {
+      "context_length": 4096,
+      "output_tokens": 512,
+      "ttft_ms_avg": 0.0,
+      "total_time_ms_avg": 676.0039099993568,
+      "prefill_speed_tps_avg": 0,
+      "decode_speed_tps_avg": 0.0,
+      "avg_itl_ms_avg": 0
+    },
+    "8K": {
+      "context_length": 8192,
+      "output_tokens": 512,
+      "ttft_ms_avg": 0.0,
+      "total_time_ms_avg": 1561.8271556665302,
+      "prefill_speed_tps_avg": 0,
+      "decode_speed_tps_avg": 0.0,
+      "avg_itl_ms_avg": 0
+    }
+  },
+  "historical": {
+    "1K": {
+      "ttft": 69.62,
+      "prefill": 14827.2,
+      "decode": 41.2
+    },
+    "4K": {
+      "ttft": 122.06,
+      "prefill": 33727.5,
+      "decode": 41.0
+    },
+    "8K": {
+      "ttft": 191.37,
+      "prefill": 42875.0,
+      "decode": 40.6
+    }
+  }
+}
