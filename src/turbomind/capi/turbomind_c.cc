@@ -2352,7 +2352,7 @@ struct TM_CompiledGrammar {
     std::shared_ptr<xgrammar::CompiledGrammar> grammar;
 };
 
-TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema)
+extern "C" TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema)
 {
     if (!json_schema) {
         SetError(TM_ERR_INVALID_ARG, "json_schema must not be NULL");
@@ -2369,7 +2369,7 @@ TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema)
     }
 }
 
-TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string)
+extern "C" TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string)
 {
     if (!ebnf_string) {
         SetError(TM_ERR_INVALID_ARG, "ebnf_string must not be NULL");
@@ -2386,7 +2386,7 @@ TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string)
     }
 }
 
-TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex)
+extern "C" TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex)
 {
     if (!regex) {
         SetError(TM_ERR_INVALID_ARG, "regex must not be NULL");
@@ -2403,13 +2403,13 @@ TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex)
     }
 }
 
-const TM_CompiledGrammar* TM_Grammar_GetBuiltinJSON(void)
+extern "C" const TM_CompiledGrammar* TM_Grammar_GetBuiltinJSON(void)
 {
     std::call_once(g_builtin_json_init_flag, InitBuiltinJSONGrammar);
     return g_builtin_json_grammar;
 }
 
-void TM_Grammar_Destroy(TM_CompiledGrammar* grammar)
+extern "C" void TM_Grammar_Destroy(TM_CompiledGrammar* grammar)
 {
     // Don't destroy the builtin singleton
     if (grammar && grammar != g_builtin_json_grammar) {
@@ -2417,7 +2417,7 @@ void TM_Grammar_Destroy(TM_CompiledGrammar* grammar)
     }
 }
 
-int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, TM_CompiledGrammar* grammar)
+extern "C" int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, const TM_CompiledGrammar* grammar)
 {
     // Stub implementation - xgrammar integration requires full headers
     return TM_OK;
