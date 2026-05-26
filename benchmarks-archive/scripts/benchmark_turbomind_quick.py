@@ -12,7 +12,7 @@ import aiohttp
 from datetime import datetime
 
 # 配置
-MODEL_PATH = "/mnt/data/models/modelscope_models/Qwen3___6-27B-AWQ"
+MODEL_PATH = "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ"
 PORT = 23333
 BACKEND = "turbomind"
 
