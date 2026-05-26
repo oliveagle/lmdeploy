@@ -94,9 +94,50 @@ Layer/norm/head mappings per model family are defined directly in `calibrate.py`
 - `lmdeploy/tokenizer.py` — HuggingFace/SentencePiece tokenizer wrapper.
 - `lmdeploy/serve/openai/` — OpenAI-compatible API server.
 
-- `lmdeploy-rust-server/tests/benchmark_python_official.py` — 官方 Python TurboMind benchmark 脚本
-- `lmdeploy-rust-server/tests/prefill_benchmark_awq.py` — AWQ 模型 prefill 专用 benchmark
-- `BENCHMARK_PYTHON_TM_20260518.json` — 历史基准数据 (42,875 tok/s prefill)
+## 性能基准测试
+
+**所有性能基准测试的脚本、结果和报告已固化在以下目录：**
+
+`benchmarks-archive/python-turbomind_35b_awq_20260526/`
+
+### 目录结构
+
+```
+benchmarks-archive/python-turbomind_35b_awq_20260526/
+├── README.md                                    # 测试报告（Prefill/Decode 分开）
+├── scripts/
+│   ├── run_benchmark.sh                        # 主测试脚本
+│   └── benchmark_turbomind_quick.py            # 自定义测试脚本
+└── results/
+    ├── profile_throughput_35b_random_512_512.csv
+    ├── profile_throughput_35b_random_1024_512.csv
+    ├── profile_throughput_35b_random_4096_512.csv
+    ├── profile_throughput_35b_random_8192_512.csv
+    └── benchmark_turbomind_20260526_134258.json
+```
+
+### 测试结果（Qwen3.6-35B-A3B-AWQ, TurboMind）
+
+| 输入 | 输出 | TTFT | Prefill (tok/s) | Decode (tok/s) |
+|------|------|------|-----------------|----------------|
+| 512 | 512 | 80ms | 6,408 | 42.6 |
+| 1024 | 512 | 139ms | 7,356 | 42.2 |
+| 4096 | 512 | 402ms | 10,190 | 40.5 |
+| 8192 | 512 | 649ms | 12,614 | 39.8 |
+
+**重要说明**：
+- Prefill 和 Decode 必须分开统计
+- Prefill 吞吐量 = input_len / ttft
+- Decode 吞吐量 = 1000 / tpot
+- 测试必须使用 `--concurrency 1` 串行测试，避免并发干扰
+- 数据以 CSV 文件中的实测数据为准，不得推测或估算
+
+### 运行测试
+
+```bash
+cd /mnt/data/lmdeploy
+bash benchmarks-archive/python-turbomind_35b_awq_20260526/scripts/run_benchmark.sh
+```
 
 ## Adding a New PyTorch Model
 
