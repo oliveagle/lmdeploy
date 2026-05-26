@@ -773,6 +773,43 @@ pub struct GuidedGrammar {
     pub grammar: Arc<CompiledGrammar>,
 }
 
+/// Configuration for CUDA warmup during engine initialization.
+///
+/// Warmup ensures:
+/// - JIT-compiled kernels are cached in CUDA's kernel cache
+/// - GPU memory pools are allocated and stabilized
+/// - Attention kernels are compiled for the target batch sizes
+/// - GPU tokenizer paths are exercised (zero-copy DLPack transfer)
+/// - KV cache allocator is warmed up
+/// - First-request overhead is eliminated from actual inference
+#[derive(Clone, Debug)]
+pub struct WarmupConfig {
+    /// Whether warmup is enabled. Default: true.
+    pub enabled: bool,
+    /// Number of iterations per token length. Default: 2.
+    pub iterations_per_length: usize,
+    /// Token lengths to warm up (simulates different batch sizes).
+    /// Default: [64, 256, 1024, 2048, 4096].
+    pub token_lengths: Vec<usize>,
+}
+
+impl WarmupConfig {
+    /// Total number of warmup iterations.
+    pub fn total(&self) -> usize {
+        self.iterations_per_length * self.token_lengths.len()
+    }
+}
+
+impl Default for WarmupConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            iterations_per_length: 2,
+            token_lengths: vec![64, 256, 1024, 2048, 4096],
+        }
+    }
+}
+
 /// Generation parameters from HTTP/gRPC requests.
 ///
 /// These parameters are applied to the GenConfig when calling the C++ engine.
@@ -1546,7 +1583,8 @@ impl TurboMindCEngine {
             "TurboMind C++ engine initialized successfully"
         );
 
-        Ok(Self {
+        // Build engine instance before warmup
+        let engine = Self {
             model_path: model_path.to_string(),
             model_name,
             state: ModelState::Ready,
@@ -1562,7 +1600,125 @@ impl TurboMindCEngine {
             max_batch_size,
             quant_policy,
             hidden_size,
-        })
+        };
+
+        // Run CUDA warmup: preheat JIT kernels, memory pools, attention kernels, GPU tokenizer
+        // C++ TurboMind's WarmUp() is called automatically during init_from_path() via need_warm_up_ flag
+        // This adds Rust-level warmup to exercise the full inference pipeline end-to-end
+        engine.run_warmup().await;
+
+        Ok(engine)
+    }
+
+    /// Run CUDA warmup passes to preheat the full inference pipeline.
+    ///
+    /// This ensures:
+    /// - JIT-compiled kernels are cached in CUDA's kernel cache
+    /// - GPU memory pools are allocated and stabilized
+    /// - Attention kernels are compiled for the target batch sizes
+    /// - GPU tokenizer paths are exercised (zero-copy DLPack transfer)
+    /// - KV cache allocator is warmed up
+    /// - First-request overhead is eliminated from actual inference
+    ///
+    /// Warmup uses a short synthetic prompt to minimize warmup time while maximizing
+    /// kernel cache coverage across different token lengths.
+    pub async fn run_warmup(&self) {
+        let warmup_config = WarmupConfig::default();
+        self.run_warmup_with_config(warmup_config).await
+    }
+
+    /// Run CUDA warmup with custom configuration.
+    pub async fn run_warmup_with_config(&self, config: WarmupConfig) {
+        if !config.enabled {
+            tracing::debug!("CUDA warmup is disabled");
+            return;
+        }
+
+        tracing::info!(
+            iterations = config.total(),
+            "Starting CUDA warmup - preheating JIT kernels, memory pools, and GPU paths"
+        );
+
+        // Use a short synthetic prompt for warmup (repeating token to maximize kernel reuse)
+        let warmup_prompt = "The quick brown fox jumps over the lazy dog. ";
+        let default_params = GenerationParams {
+            max_tokens: Some(1),
+            temperature: None,
+            top_p: None,
+            top_k: None,
+            min_p: None,
+            repetition_penalty: None,
+            seed: None,
+            stop: None,
+            logprobs: None,
+            top_logprobs: None,
+            grammar: None,
+        };
+
+        // Check if request pool is available
+        if self.request_pool.is_none() {
+            tracing::warn!("Request pool not available, skipping warmup");
+            return;
+        }
+
+        // Iterate through different token lengths to warm up kernels at various batch sizes
+        // This mirrors the C++ WarmUp() behavior which iterates through the tuning sequence
+        for (idx, &token_len) in config.token_lengths.iter().enumerate() {
+            // Generate a prompt of approximately the target length
+            let warmup_prompt = Self::generate_warmup_prompt_for_length(
+                warmup_prompt,
+                token_len,
+                self.tokenizer.as_ref(),
+            );
+
+            for iter in 0..config.iterations_per_length {
+                let start = Instant::now();
+
+                let params = GenerationParams {
+                    max_tokens: Some(1),
+                    ..default_params.clone()
+                };
+
+                // Use the GPU tokenizer path for zero-copy warmup
+                // This exercises: tokenization -> pinned memory -> async H2D -> DLPack -> C++ forward
+                let result = self
+                    .generate_with_gpu_tokenizer_and_metrics(&warmup_prompt, params)
+                    .await;
+
+                let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+                tracing::debug!(
+                    warmup_iter = idx * config.iterations_per_length + iter + 1,
+                    total_warmups = config.total(),
+                    token_len,
+                    warmup_time_ms = elapsed_ms,
+                    result_tokens = result.1,
+                    "Warmup pass completed"
+                );
+            }
+        }
+
+        tracing::info!("CUDA warmup completed - inference pipeline is ready");
+    }
+
+    /// Generate a warmup prompt of approximately the target token length.
+    fn generate_warmup_prompt_for_length(
+        base: &str,
+        target_len: usize,
+        tokenizer: Option<&LMTokenizer>,
+    ) -> String {
+        let base_len = tokenizer
+            .and_then(|t| t.encode(base, false, false).ok())
+            .map(|ids| ids.len())
+            .unwrap_or(30);
+
+        if base_len >= target_len {
+            return base.to_string();
+        }
+
+        // Repeat the base prompt to reach the target length
+        let repeats = (target_len / base_len) + 1;
+        base.repeat(repeats)
     }
 
     /// Check if the model is ready for inference

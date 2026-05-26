@@ -1,0 +1,74 @@
+{
+  "engine_type": "PythonTurboMindEngine",
+  "engine_name": "Python TurboMind",
+  "model_path": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "config": {
+    "model_path": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+    "test_cases": [
+      [
+        "1K",
+        1024
+      ],
+      [
+        "2K",
+        2048
+      ]
+    ],
+    "warmup_iterations": 2,
+    "measurement_iterations": 2,
+    "max_new_tokens": 1,
+    "stream_output": true,
+    "enable_prefix_caching": false,
+    "session_len": 16384,
+    "cache_max_entry_count": 0.4,
+    "tp": 1,
+    "max_batch_size": 1,
+    "model_format": "awq",
+    "repeat_text": "The quick brown fox jumps over the lazy dog. "
+  },
+  "timestamp": 1779780546.2227938,
+  "test_cases": {
+    "1K": {
+      "label": "1K",
+      "target_tokens": 1024,
+      "actual_tokens": 1021,
+      "ttft_ms_list": [
+        187.19509299990023,
+        19.23945999442367
+      ],
+      "ttft_avg_ms": 103.21727649716195,
+      "ttft_min_ms": 19.23945999442367,
+      "ttft_max_ms": 187.19509299990023,
+      "ttft_std_ms": 118.76256703665159,
+      "prefill_tps_list": [
+        5454.202797936291,
+        53068.01751691185
+      ],
+      "prefill_tps_avg": 29261.11015742407,
+      "prefill_tps_min": 5454.202797936291,
+      "prefill_tps_max": 53068.01751691185,
+      "prefill_tps_std": 33668.05126594747
+    },
+    "2K": {
+      "label": "2K",
+      "target_tokens": 2048,
+      "actual_tokens": 2041,
+      "ttft_ms_list": [
+        160.84939899883466,
+        308.0244040029356
+      ],
+      "ttft_avg_ms": 234.43690150088514,
+      "ttft_min_ms": 160.84939899883466,
+      "ttft_max_ms": 308.0244040029356,
+      "ttft_std_ms": 104.06844405956386,
+      "prefill_tps_list": [
+        12688.887945517203,
+        6626.098365831262
+      ],
+      "prefill_tps_avg": 9657.493155674232,
+      "prefill_tps_min": 6626.098365831262,
+      "prefill_tps_max": 12688.887945517203,
+      "prefill_tps_std": 4287.039624703068
+    }
+  }
+}
