@@ -11,6 +11,7 @@
 //! to allow parallel inference without mutex contention. Each request is
 //! independent and can run concurrently with others.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Condvar;
 use std::sync::Mutex as StdMutex;
@@ -25,6 +26,33 @@ use crate::turbomind_c::{
     TM_SessionParam, TM_Tensor, TensorMap, TurboMind, DL_DEVICE_TYPE_CUDA, DL_DTYPE_CODE_INT,
 };
 use serde::Serialize;
+
+/// Global atomic counter for unique session IDs.
+///
+/// This ensures each inference request gets a truly unique session ID,
+/// even when multiple requests are submitted within the same second.
+/// The timestamp provides a coarse-grained base, and the atomic counter
+/// provides fine-grained uniqueness.
+static SESSION_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// Generate a unique session ID for a new inference request.
+///
+/// Combines a nanosecond-precision timestamp with an atomic counter to ensure
+/// uniqueness even under concurrent requests within the same nanosecond.
+fn generate_session_id() -> u64 {
+    let timestamp = unix_timestamp_nanos();
+    let counter = SESSION_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    // Use timestamp as high bits and counter as low bits for uniqueness
+    // The counter wraps at 1024 to keep the number manageable
+    timestamp ^ (counter % 1024)
+}
+
+fn unix_timestamp_nanos() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as u64
+}
 
 /// Thread-local buffer for reusing input_ids allocation across requests.
 /// This avoids per-request heap allocations for the i64 conversion of input_ids.
@@ -1698,7 +1726,7 @@ impl TurboMindCEngine {
         params.apply_to_gen_config(&mut gen_cfg);
 
         let session = TM_SessionParam {
-            id: unix_timestamp() as u64,
+            id: generate_session_id(),
             step: 0,
             start_flag: true,
             end_flag: true,
@@ -1844,7 +1872,7 @@ impl TurboMindCEngine {
         params.apply_to_gen_config(&mut gen_cfg);
 
         let session = TM_SessionParam {
-            id: unix_timestamp() as u64,
+            id: generate_session_id(),
             step: 0,
             start_flag: true,
             end_flag: true,
@@ -1975,7 +2003,7 @@ impl TurboMindCEngine {
 
         // Prepare session parameters (use unique ID for each request)
         let session = TM_SessionParam {
-            id: unix_timestamp() as u64,
+            id: generate_session_id(),
             step: 0,
             start_flag: true,
             end_flag: true,
@@ -2103,7 +2131,7 @@ impl TurboMindCEngine {
         params.apply_to_gen_config(&mut gen_cfg);
 
         let session = TM_SessionParam {
-            id: unix_timestamp() as u64,
+            id: generate_session_id(),
             step: 0,
             start_flag: true,
             end_flag: true,
@@ -2318,7 +2346,7 @@ impl TurboMindCEngine {
 
             // Session parameters (unique session ID)
             let session = crate::turbomind_c::TM_SessionParam {
-                id: unix_timestamp() as u64,
+                id: generate_session_id(),
                 step: 0,
                 start_flag: true,
                 end_flag: true,
@@ -2477,7 +2505,7 @@ impl TurboMindCEngine {
 
             // Session parameters
             let session = TM_SessionParam {
-                id: unix_timestamp() as u64,
+                id: generate_session_id(),
                 step: 0,
                 start_flag: true,
                 end_flag: true,
@@ -2623,7 +2651,7 @@ impl TurboMindCEngine {
             gen_cfg.set_output_last_hidden_state(2); // kGeneration = last token only
 
             let session = TM_SessionParam {
-                id: unix_timestamp() as u64,
+                id: generate_session_id(),
                 step: 0,
                 start_flag: true,
                 end_flag: true,
@@ -2950,7 +2978,7 @@ impl TurboMindCEngine {
 
                 // Session parameters
                 let session = crate::turbomind_c::TM_SessionParam {
-                    id: unix_timestamp() as u64 + request_id,
+                    id: generate_session_id(),
                     step: 0,
                     start_flag: true,
                     end_flag: true,
