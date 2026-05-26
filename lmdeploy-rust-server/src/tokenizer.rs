@@ -54,6 +54,13 @@ impl Drop for GpuTensor<'_> {
     }
 }
 
+// SAFETY: GpuTensor contains raw pointers to GPU and pinned host memory.
+// It is safe to Send because:
+// 1. The memory regions are explicitly managed (not accessed after drop)
+// 2. Synchronization is handled via CudaEvent.sync() before concurrent use
+// 3. The lifetime parameter ensures host memory outlives the tensor
+unsafe impl Send for GpuTensor<'_> {}
+
 /// LMDeploy tokenizer wrapper backed by splintr
 #[derive(Clone)]
 pub struct LMTokenizer {
