@@ -126,3 +126,4 @@ lmdeploy-rust-server/build/
 *.d
 **/*.d
 .beads/
+*.bak
