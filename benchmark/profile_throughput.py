@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import random
+import time
 from queue import Queue
 
 import numpy as np
@@ -155,12 +156,13 @@ class Engine:
         self.pbar = None
 
     async def _inference(self, req_queue: Queue, session_id: int, temperature: float, top_p: float, top_k: int,
-                         stream_output: bool, skip_tokenize: bool, skip_detokenize: bool, concurrency: int):
+                         stream_output: bool, skip_tokenize: bool, skip_detokenize: bool, concurrency: int, profiler=None):
         model_inst = self.tm_model.create_instance()
         sess: Session = None
         for prompt, _, output_seqlen, cancel_after, sess in iter(req_queue.get_nowait, None):
 
-            sess.tick(0)
+            if profiler is not None:
+                sess.tick(0)
 
             if skip_tokenize:
                 input_ids = prompt
@@ -188,10 +190,12 @@ class Engine:
                     token_ids += outputs.token_ids
                     if not skip_detokenize:
                         _, state = self.tokenizer.detokenize_incrementally(token_ids, state)
-                    sess.tick(n_token)
+                    if profiler is not None:
+                        sess.tick(n_token)
                     if n_token > cancel_after:
                         break
-                sess.finish(Session.SUCCESS)
+                if profiler is not None:
+                    sess.finish(Session.SUCCESS)
             finally:
                 await generator.aclose()
 
@@ -199,8 +203,38 @@ class Engine:
             if self.backend == 'pytorch':
                 await model_inst.async_end(session_id)
 
-            self.pbar.update(1)
+            if profiler is not None:
+                self.pbar.update(1)
             session_id += concurrency
+
+    def warmup(self, warmup_requests: int, concurrency: int, temperature: float, top_p: float, top_k: int):
+        """Run warmup requests without profiling."""
+        import random
+        from tqdm import tqdm
+
+        # Create simple warmup requests
+        warmup_prompts = ["Hello, how are you?"] * warmup_requests
+        warmup_data = [(prompt, 10, 5, 5, None) for prompt in warmup_prompts]  # (prompt, input_len, output_len, cancel_after, sess)
+
+        req_queue = Queue()
+        for req in warmup_data:
+            req_queue.put(req)
+        for i in range(concurrency):
+            req_queue.put(None)
+
+        tasks = []
+        for i in range(concurrency):
+            task = self._inference(req_queue, i, temperature, top_p, top_k, stream_output=False,
+                                   skip_tokenize=False, skip_detokenize=True, concurrency=concurrency,
+                                   profiler=None)
+            tasks.append(task)
+
+        async def _run_warmup():
+            await asyncio.gather(*tasks)
+
+        print(f"Warmup: {warmup_requests} requests with concurrency={concurrency}...", end=' ', flush=True)
+        asyncio.run(_run_warmup())
+        print("OK")
 
     def process_request(self, requests, profiler: Profiler, concurrency, temperature, top_p, top_k, stream_output,
                         skip_tokenize, skip_detokenize, cancel_rate):
@@ -418,6 +452,17 @@ def main():
     stream_output = not args.no_stream_output
 
     profiler = Profiler(stream_output, [50, 75, 95, 99])
+
+    warmup_count = 3
+    concurrency_val = args.concurrency if args.concurrency < args.num_prompts else args.num_prompts
+    engine.warmup(warmup_requests=warmup_count,
+                  concurrency=concurrency_val,
+                  temperature=args.temperature,
+                  top_p=args.top_p,
+                  top_k=args.top_k)
+
+    # Small delay between warmup and measurement
+    time.sleep(1)
 
     engine.process_request(requests,
                            profiler,
