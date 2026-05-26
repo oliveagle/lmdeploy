@@ -13,6 +13,13 @@ use splintr::Tokenizer;
 
 use crate::turbomind_c::{cudaMallocHost, cudaFreeHost, cudaStream_t, CudaEvent, cudaMemcpyAsync, cudaMemcpyKind};
 
+/// Thread-local buffer for reusing tokenizer output allocation.
+/// Eliminates per-request heap allocation by reusing capacity across calls.
+use std::cell::RefCell;
+thread_local! {
+    static TOKEN_ID_BUFFER: RefCell<Vec<u32>> = RefCell::new(Vec::with_capacity(8192));
+}
+
 /// GPU tensor result from tokenization.
 /// Contains pointer and length for DLPack transfer to C++ engine.
 #[derive(Debug)]
@@ -479,67 +486,95 @@ impl LMTokenizerWithGpu {
     /// via DLPack with zero additional copies.
     ///
     /// # Flow
-    /// 1. Tokenize directly to pinned host memory (no Vec<u32> allocation)
-    /// 2. Async copy to GPU via dedicated CUDA stream
-    /// 3. Record sync event
-    /// 4. Return GPU tensor ready for DLPack transfer
+    /// 1. Tokenize using thread-local buffer (reuses capacity, no per-request allocation)
+    /// 2. Copy to pinned memory (single copy)
+    /// 3. Async copy to GPU via dedicated CUDA stream
+    /// 4. Record sync event
+    /// 5. Return GPU tensor ready for DLPack transfer
     ///
     /// The caller must call `tensor.sync_event.sync()` before using the
     /// GPU data to ensure the async transfer completes.
     pub fn encode_to_gpu(&self, text: &str, add_bos: bool) -> Result<GpuTensor<'_>> {
-        // Tokenize directly to pinned buffer (no Vec<u32> allocation)
-        let mut token_ids = self.tokenizer.tokenizer.encode(text);
+        // Tokenize using thread-local buffer to avoid per-request allocation
+        // Thread-local buffer reuses capacity across calls (amortized O(1) append)
+        let (token_ids_ptr, token_count) = TOKEN_ID_BUFFER.with(|buf_cell| {
+            let mut buf = buf_cell.borrow_mut();
+            buf.clear();
 
-        if add_bos {
-            if let Some(bos_id) = self.tokenizer.bos_token_id {
-                token_ids.insert(0, bos_id);
+            // Get raw tokens from splintr tokenizer
+            let raw_tokens = self.tokenizer.tokenizer.encode(text);
+            let base_count = raw_tokens.len();
+
+            // Reserve capacity for BOS token if needed
+            if add_bos && self.tokenizer.bos_token_id.is_some() {
+                buf.reserve(base_count + 1);
+            } else {
+                buf.reserve(base_count);
             }
-        }
 
-        // Duplicate BOS detection
-        if token_ids.len() >= 2 {
-            if let Some(bos_id) = self.tokenizer.bos_token_id {
-                if token_ids[0] == bos_id && token_ids[1] == bos_id {
-                    tracing::warn!(
-                        "Detected duplicate bos token {} in prompt, removing one",
-                        bos_id
-                    );
-                    token_ids.remove(0);
+            // Add BOS token if requested
+            if add_bos {
+                if let Some(bos_id) = self.tokenizer.bos_token_id {
+                    buf.push(bos_id);
                 }
             }
-        }
 
-        let token_count = token_ids.len();
+            // Extend with raw tokens
+            buf.extend(raw_tokens);
 
-        // Get pinned buffer (grow if needed)
-        let mut pinned_buffer = self.pinned_buffer.lock().unwrap();
-        let pinned_ptr = pinned_buffer.get_or_grow(token_count);
-        if pinned_ptr.is_null() {
-            return Err(anyhow!("Failed to allocate pinned buffer"));
-        }
+            // Duplicate BOS detection
+            if buf.len() >= 2 {
+                if let Some(bos_id) = self.tokenizer.bos_token_id {
+                    if buf[0] == bos_id && buf[1] == bos_id {
+                        tracing::warn!(
+                            "Detected duplicate bos token {} in prompt, removing one",
+                            bos_id
+                        );
+                        buf.remove(0);
+                    }
+                }
+            }
 
-        // Write directly to pinned buffer (no Vec<u32> allocation)
-        let pinned_slice = pinned_buffer.as_slice_mut(token_count);
-        pinned_slice.copy_from_slice(&token_ids);
+            // Return raw pointer to buffer data (valid until next mutable borrow)
+            (buf.as_ptr(), buf.len())
+        });
 
-        // Get GPU buffer (grow if needed)
-        let mut gpu_buffer = self.gpu_buffer.lock().unwrap();
-        let gpu_ptr = gpu_buffer.get_or_grow(token_count);
-        if gpu_ptr.is_null() {
-            return Err(anyhow!("Failed to allocate GPU buffer"));
-        }
+        // Get pinned buffer (grow if needed) and copy data in one lock scope
+        let (gpu_ptr, pinned_ptr, stream) = {
+            let mut pinned_buffer = self.pinned_buffer.lock().unwrap();
+            let pinned_ptr = pinned_buffer.get_or_grow(token_count);
+            if pinned_ptr.is_null() {
+                return Err(anyhow!("Failed to allocate pinned buffer"));
+            }
 
-        // Async copy to GPU
-        let stream = gpu_buffer.stream();
-        unsafe {
-            cudaMemcpyAsync(
-                gpu_ptr,
-                pinned_ptr,
-                token_count * std::mem::size_of::<u32>(),
-                cudaMemcpyKind::HostToDevice,
-                stream,
-            );
-        }
+            // Copy from thread-local buffer to pinned memory (single copy)
+            // Safety: token_ids_ptr is valid, pinned_ptr is valid, non-overlapping
+            let pinned_slice = pinned_buffer.as_slice_mut(token_count);
+            unsafe {
+                std::ptr::copy_nonoverlapping(token_ids_ptr, pinned_slice.as_mut_ptr(), token_count);
+            }
+
+            // Get GPU buffer (grow if needed)
+            let mut gpu_buffer = self.gpu_buffer.lock().unwrap();
+            let gpu_ptr = gpu_buffer.get_or_grow(token_count);
+            if gpu_ptr.is_null() {
+                return Err(anyhow!("Failed to allocate GPU buffer"));
+            }
+
+            // Async copy to GPU
+            let stream = gpu_buffer.stream();
+            unsafe {
+                cudaMemcpyAsync(
+                    gpu_ptr,
+                    pinned_ptr,
+                    token_count * std::mem::size_of::<u32>(),
+                    cudaMemcpyKind::HostToDevice,
+                    stream,
+                );
+            }
+
+            (gpu_ptr, pinned_ptr, stream)
+        };
 
         // Create sync event
         let sync_event = CudaEvent::new().ok();

@@ -203,6 +203,24 @@ async def benchmark_scenario(session, scenario, num_requests, model_name, tokeni
     itls_flat = [itl for r in valid_results for itl in r["itls"]]
     total_times = [r["total_time"] for r in valid_results if r["total_time"] is not None]
 
+    # 分离 prefill 和 decode 阶段的指标
+    # Prefill 阶段：TTFT 时间内的 token 处理 = input_len 个 prompt tokens
+    # Decode 阶段：(total_time - TTFT) 时间内生成 output_len 个 token
+    prefill_times = ttfts  # 每个请求的 prefill 时间 = TTFT
+    decode_times = []
+    for r in valid_results:
+        if r["ttft"] is not None and r["total_time"] is not None:
+            decode_time = r["total_time"] - r["ttft"]
+            decode_times.append(decode_time)
+
+    # Prefill 吞吐量 = 总输入 tokens / 总 prefill 时间
+    total_prefill_time = sum(prefill_times) if prefill_times else 0
+    prefill_tps = len(valid_results) * scenario["input_len"] / total_prefill_time if total_prefill_time > 0 else 0
+
+    # Decode 吞吐量 = 总输出 tokens / 总 decode 时间
+    total_decode_time = sum(decode_times) if decode_times else 0
+    decode_tps = len(valid_results) * scenario["output_len"] / total_decode_time if total_decode_time > 0 else 0
+
     stats = {
         "scenario": scenario["name"],
         "input_len": scenario["input_len"],
@@ -212,6 +230,10 @@ async def benchmark_scenario(session, scenario, num_requests, model_name, tokeni
         "ttft_ms_p99": sorted(ttfts)[int(len(ttfts) * 0.99)] if ttfts else 0,
         "itl_ms_avg": sum(itls_flat) / len(itls_flat) * 1000 if itls_flat else 0,
         "total_time_ms_avg": sum(total_times) / len(total_times) * 1000 if total_times else 0,
+        "prefill_time_ms_avg": total_prefill_time / len(prefill_times) * 1000 if prefill_times else 0,
+        "decode_time_ms_avg": sum(decode_times) / len(decode_times) * 1000 if decode_times else 0,
+        "prefill_throughput_tps": prefill_tps,
+        "decode_throughput_tps": decode_tps,
         "throughput_tps": len(valid_results) * scenario["output_len"] / (sum(total_times) if total_times else 1),
     }
 
@@ -219,8 +241,11 @@ async def benchmark_scenario(session, scenario, num_requests, model_name, tokeni
     print(f"  Completed: {stats['completed']}/{num_requests}")
     print(f"  TTFT avg: {stats['ttft_ms_avg']:.2f} ms (P99: {stats['ttft_ms_p99']:.2f} ms)")
     print(f"  ITL avg: {stats['itl_ms_avg']:.2f} ms")
+    print(f"  Prefill time avg: {stats['prefill_time_ms_avg']:.2f} ms")
+    print(f"  Decode time avg: {stats['decode_time_ms_avg']:.2f} ms")
+    print(f"  Prefill throughput: {stats['prefill_throughput_tps']:.2f} tok/s")
+    print(f"  Decode throughput: {stats['decode_throughput_tps']:.2f} tok/s")
     print(f"  Total time avg: {stats['total_time_ms_avg']:.2f} ms")
-    print(f"  Throughput: {stats['throughput_tps']:.2f} tok/s")
 
     return stats
 
@@ -291,11 +316,13 @@ async def main():
     print(f"{'='*60}")
 
     # 打印摘要
-    print(f"\n{'='*60}")
+    print(f"\n{'='*80}")
     print("SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'='*80}")
+    print(f"{'Scenario':30s} | {'TTFT (ms)':>10s} | {'Prefill (tok/s)':>18s} | {'Decode (tok/s)':>18s}")
+    print(f"{'-'*80}")
     for r in all_results:
-        print(f"{r['scenario']:30s} | TTFT: {r['ttft_ms_avg']:7.2f}ms | ITL: {r['itl_ms_avg']:6.2f}ms | Throughput: {r['throughput_tps']:6.0f} tok/s")
+        print(f"{r['scenario']:30s} | {r['ttft_ms_avg']:10.2f} | {r['prefill_throughput_tps']:18.2f} | {r['decode_throughput_tps']:18.2f}")
 
 
 if __name__ == "__main__":
