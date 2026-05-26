@@ -19,7 +19,8 @@ void dispatchAttention(const AttentionParams<T>& params)
     desc.head_dim  = params.size_per_head;
     desc.data_type = data_type_v<T>;
 
-    auto* kernel = reg.Find(desc);
+    // Use context-length aware kernel selection for large contexts
+    auto* kernel = reg.Find(desc, params.max_k_len);
 
     TM_CHECK(kernel) << "No attention kernel found: " + to_string(desc);
 

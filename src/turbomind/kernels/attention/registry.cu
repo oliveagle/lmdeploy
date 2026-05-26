@@ -82,6 +82,46 @@ const Kernel* Registry::Find(const AttnDesc& desc) const
     return best;
 }
 
+const Kernel* Registry::Find(const AttnDesc& desc, int context_len) const
+{
+    const int threshold = static_cast<int>(kMaxWasteRatio * desc.query_group_sz);
+
+    const Kernel*             best = nullptr;
+    std::tuple<int, int, int> cost{};
+
+    for (const auto* k : ptrs_) {
+        const auto& d = k->desc();
+        if (d.mode != desc.mode || d.head_dim != desc.head_dim  //
+            || d.data_type != desc.data_type || d.kv_quant != desc.kv_quant) {
+            continue;
+        }
+        if (desc.mode == AttnDesc::kDecoding) {
+            const int ctas  = cdiv(desc.query_group_sz, d.qh);
+            const int waste = d.qh * ctas - desc.query_group_sz;
+
+            const auto v = std::make_tuple(waste > threshold, ctas, waste);
+            if (!best || v < cost) {
+                best = k;
+                cost = v;
+            }
+        }
+        else {  // prefill with context length awareness
+            // For large contexts (>= 16K), prefer kernels registered later (larger CTA_S)
+            // This works because kernels are registered in CMakeLists.txt order
+            if (!best) {
+                best = k;
+            } else if (context_len >= 16384) {
+                // For large contexts, prefer later kernels (larger tile sizes)
+                best = k;
+            } else {
+                // For small contexts, prefer earlier kernels (smaller tile sizes)
+                break;
+            }
+        }
+    }
+    return best;
+}
+
 Registry& Registry::instance()
 {
     struct DeviceState {

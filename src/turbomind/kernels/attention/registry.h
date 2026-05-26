@@ -20,6 +20,7 @@ public:
     }
 
     const Kernel* Find(const AttnDesc& desc) const;
+    const Kernel* Find(const AttnDesc& desc, int context_len) const;  // Context-length aware selection
 
     [[nodiscard]] const std::vector<Kernel*>& kernels() const
     {
