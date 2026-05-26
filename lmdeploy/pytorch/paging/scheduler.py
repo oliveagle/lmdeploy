@@ -200,15 +200,30 @@ class Scheduler:
             return running, swap_in_map, swap_out_map, copy_map
 
         waiting = _reorder_waiting()
-        while len(waiting) > 0 and len(running) < max_batches:
-            seq = waiting.pop(0)
 
-            if (len(running) > 0 and token_count + seq.num_token_ids > self.cache_config.max_prefill_token_num):
+        # Pre-calculate batch-level token_num for scheduling optimization.
+        # This avoids repeated token_count checks and allows batch-aware
+        # allocation decisions upfront.
+        max_prefill_tokens = self.cache_config.max_prefill_token_num
+
+        # Select sequences that fit within the batch token budget.
+        selected_seqs = []
+        batch_token_count = 0
+        for seq in waiting:
+            if len(selected_seqs) >= max_batches:
                 break
+            if len(selected_seqs) > 0 and batch_token_count + seq.num_token_ids > max_prefill_tokens:
+                break
+            selected_seqs.append(seq)
+            batch_token_count += seq.num_token_ids
 
+        # Batch allocate: evict and allocate all selected sequences together.
+        # This reduces fragmentation by processing eviction decisions with
+        # full knowledge of total block requirements upfront.
+        for seq in selected_seqs:
             self.block_trie.match(seq)
 
-            if not __evict_for_seq(seq, waiting):
+            if not __evict_for_seq(seq, []):
                 break
 
             # allocate session memory
