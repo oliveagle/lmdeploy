@@ -241,15 +241,30 @@ class CudaOpsBackend(DefaultOpsBackend):
                            backend_config: BackendConfig, device: torch.device):
         """Build graph runner."""
         from .graph_runner import CUDAGraphRunner
-        from .warmup_manager import WarmupMeta, get_warmup_manager
 
-        # warmup ops.
+        # Register and run kernel warmups with full model config.
+        from .kernel_warmup import register_kernel_warmups
+        from .warmup_manager import WarmupMeta, get_warmup_manager
+        register_kernel_warmups()
+
         warmup_meta = WarmupMeta(
             max_num_tokens=cache_config.max_prefill_token_num,
             max_batch_size=cache_config.max_batches,
             dtype=model_config.dtype,
+            num_hidden_layers=model_config.num_hidden_layers,
+            num_attention_heads=model_config.num_attention_heads,
+            num_kv_heads=model_config.num_key_value_heads,
+            head_dim=model_config.head_dim,
+            head_dim_v=getattr(model_config, 'v_head_dim', model_config.head_dim),
+            hidden_size=model_config.hidden_size,
+            intermediate_size=getattr(model_config, 'intermediate_size',
+                                     model_config.hidden_size * 4),
+            block_size=cache_config.block_size,
+            vocab_size=model_config.vocab_size,
+            quant_config=getattr(model_config, 'quantization_config', ''),
         )
-        get_warmup_manager().warmup(warmup_meta)
+        # Use full warmup: JIT compilation with minimal inputs + kernel preheat with production sizes
+        get_warmup_manager().warmup_full(warmup_meta)
 
         # make graph runner.
         return CUDAGraphRunner(model, model_config, cache_config, backend_config, device)

@@ -52996,3 +52996,91 @@ events:
         - "/home/oliveagle/.claude/plugins/cache/claude-plugins-official/gopls-lsp/1.0.0/bin"
         - "/home/oliveagle/.claude/plugins/cache/claude-plugins-official/typescript-lsp/1.0.0/bin"
         - "/home/oliveagle/.claude/plugins/cache/claude-plugins-official/jdtls-lsp/1.0.0/bin"
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.2/Modules/CMakeDetermineCompilerId.cmake:1290 (message)"
+      - "/home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.2/Modules/CMakeDetermineCUDACompiler.cmake:99 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the CUDA compiler is NVIDIA using "" matched "nvcc: [^
+      ]+ Cuda compiler driver":
+      nvcc: NVIDIA (R) Cuda compiler driver
+      Copyright (c) 2005-2023 NVIDIA Corporation
+      Built on Fri_Jan__6_16:45:21_PST_2023
+      Cuda compilation tools, release 12.0, V12.0.140
+      Build cuda_12.0.r12.0/compiler.32267302_0
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.2/Modules/CMakeDetermineCompilerId.cmake:462 (find_file)"
+      - "/home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.2/Modules/CMakeDetermineCompilerId.cmake:500 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.2/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.2/Modules/CMakeDetermineCompilerId.cmake:53 (__determine_compiler_id_test)"
+      - "/home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.2/Modules/CMakeDetermineCUDACompiler.cmake:163 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeCUDACompilerId.cu.in"
+    candidate_directories:
+      - "/home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.2/Modules/"
+    found: "/home/oliveagle/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.2/Modules/CMakeCUDACompilerId.cu.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/oliveagle/.moon/bin"
+        - "/home/oliveagle/.bun/bin"
+        - "/run/user/1000/fnm_multishells/200846_1779796446669/bin"
+        - "/home/oliveagle/.local/bin"
+        - "/opt/qcom/aistack/qairt/2.31.0.250130/bin/x86_64-linux-clang"
+        - "/opt/xilinx/xrt/bin"
+        - "/home/oliveagle/Xilinx/2025.2.1/Vivado/bin"
+        - "/home/oliveagle/Xilinx/2025.2.1/Vitis/bin"
+        - "/home/oliveagle/Xilinx/2025.2.1/Model_Composer/bin"
+        - "/home/oliveagle/Xilinx/2025.2.1/Vivado/bin"
+        - "/home/oliveagle/Xilinx/2025.2.1/PDM/bin"
+        - "/home/oliveagle/Xilinx/2025.2.1/Vitis/bin"
+        - "/home/oliveagle/Xilinx/2025.2.1/Vitis/bin"
+        - "/home/oliveagle/Xilinx/2025.2.1/Vitis/gnu/riscv/linux_toolchain/lin32/bin"
+        - "/home/oliveagle/Xilinx/2025.2.1/Vitis/gnu/riscv/linux_toolchain/lin64/bin"
+        - "/home/oliveagle/Xilinx/DocNav"
+        - "/home/oliveagle/opt/golang/current/bin"
+        - "/opt/rocm/bin"
+        - "/home/oliveagle/venvs/therock/lib/python3.12/site-packages/_rocm_sdk_core/bin"
+        - "/usr/local/cuda-12.5/bin"
+        - "/home/oliveagle/opt/golang/current/bin"
+        - "/mnt/data/gopath/bin"
+        - "/home/oliveagle/.agents/bin"
+        - "/home/oliveagle/bin"
+        - "/home/oliveagle/.local/bin"
+        - "/home/oliveagle/.cargo/bin"
+        - "/home/oliveagle/.cargo/bin"
+        - "/home/oliveagle/.local/bin"
+        - "/usr/local/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/home/oliveagle/Xilinx/2025.2.1/Vitis/bin"
+        - "/home/oliveagle/Xilinx/2025.2.1/Vivado/bin"
+        - "/home/oliveagle/opt/android/cmdline-tools/latest/bin"
+        - "/home/oliveagle/opt/android/android-ndk-r26b"
+        - "/home/oliveagle/opt/android/platform-tools"
+        - "/home/oliveagle/.claude/plugins/cache/claude-code-plugins/ralph-wiggum/1.0.0/bin"
+        - "/home/oliveagle/.claude/plugins/cache/claude-plugins-official/rust-analyzer-lsp/1.0.0/bin"
+        - "/home/oliveagle/.claude/plugins/cache/claude-plugins-official/pyright-lsp/1.0.0/bin"
+        - "/home/oliveagle/.claude/plugins/cache/claude-plugins-official/clangd-lsp/1.0.0/bin"
+        - "/home/oliveagle/.claude/plugins/cache/claude-plugins-official/gopls-lsp/1.0.0/bin"
+        - "/home/oliveagle/.claude/plugins/cache/claude-plugins-official/typescript-lsp/1.0.0/bin"
+        - "/home/oliveagle/.claude/plugins/cache/claude-plugins-official/jdtls-lsp/1.0.0/bin"
+...

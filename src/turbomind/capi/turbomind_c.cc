@@ -3035,7 +3035,7 @@ int TM_CudaGraph_Launch(
 void TM_CudaGraph_Destroy(TM_CudaGraphHandle graph)
 {
     if (graph) {
-        delete static_cast<CudaGraph*>(graph);
+        delete reinterpret_cast<CudaGraph*>(graph);
     }
 }
 
