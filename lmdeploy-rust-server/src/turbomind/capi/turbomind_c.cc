@@ -906,7 +906,9 @@ static void LoadWeightsFromSafetensors(
 
             // Allocate and copy the tensor
             auto param = current->param(param_name);
-            if (param) {
+            // Use .get() instead of operator bool() to check if param slot exists
+            // (not if tensor is allocated - w_qkv.weight is intentionally unallocated before fusion)
+            if (param.get()) {
                 // Convert shape from size_t to int64_t for compatibility
                 std::vector<int64_t> shape64;
                 for (const auto& dim : meta->shape) {
@@ -919,7 +921,7 @@ static void LoadWeightsFromSafetensors(
 
                 // Copy data: host to GPU via cudaMemcpyAsync
                 auto tensor = param.get();
-                if (tensor && tensor.raw_data()) {
+                if (tensor.raw_data()) {
                     size_t copy_size = std::min(data.size(), static_cast<size_t>(tensor.byte_size()));
                     turbomind::core::Stream stream;
                     cudaMemcpyAsync(tensor.raw_data(), data.data(), copy_size, cudaMemcpyHostToDevice, cudaStreamDefault);
@@ -1264,31 +1266,17 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             if (attn_module) {
                 auto* attn = static_cast<turbomind::AttentionWeight*>(attn_module.get());
 
-                // Create q_proj LinearWeight child
-                auto q_proj_cfg = CreateAwqLinearConfig(
-                    hf_config.hidden_size, hf_config.num_attention_heads * head_dim,
+                // Create fused w_qkv LinearWeight child (matches TurboMind's AttentionWeight)
+                // HF uses separate q_proj/k_proj/v_proj, but TM uses fused w_qkv
+                // The fused output dimension = num_q_heads * head_dim + 2 * num_kv_heads * head_dim
+                const int qkv_out_dim = hf_config.num_attention_heads * head_dim
+                                      + 2 * hf_config.num_key_value_heads * head_dim;
+                auto w_qkv_cfg = CreateAwqLinearConfig(
+                    hf_config.hidden_size, qkv_out_dim,
                     weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
-                auto q_proj_module = turbomind::core::Module::create(q_proj_cfg);
-                if (q_proj_module) {
-                    attn->add_child("q_proj", std::move(q_proj_module));
-                }
-
-                // Create k_proj LinearWeight child
-                auto k_proj_cfg = CreateAwqLinearConfig(
-                    hf_config.hidden_size, hf_config.num_key_value_heads * head_dim,
-                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
-                auto k_proj_module = turbomind::core::Module::create(k_proj_cfg);
-                if (k_proj_module) {
-                    attn->add_child("k_proj", std::move(k_proj_module));
-                }
-
-                // Create v_proj LinearWeight child
-                auto v_proj_cfg = CreateAwqLinearConfig(
-                    hf_config.hidden_size, hf_config.num_key_value_heads * head_dim,
-                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
-                auto v_proj_module = turbomind::core::Module::create(v_proj_cfg);
-                if (v_proj_module) {
-                    attn->add_child("v_proj", std::move(v_proj_module));
+                auto w_qkv_module = turbomind::core::Module::create(w_qkv_cfg);
+                if (w_qkv_module) {
+                    attn->add_child("w_qkv", std::move(w_qkv_module));
                 }
 
                 // Create wo LinearWeight child
