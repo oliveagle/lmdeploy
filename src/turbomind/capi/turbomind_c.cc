@@ -1091,7 +1091,9 @@ static void LoadWeightsFromSafetensors(
                 }
             }
 
-            if (!target_param) {
+            // Check if target param slot exists (not if tensor is allocated)
+            // get() returns empty Tensor if slot_ is nullptr
+            if (!target_param.get()) {
                 ++skip_count;
                 continue;
             }
@@ -1186,10 +1188,12 @@ static void LoadWeightsFromSafetensors(
                     continue;
                 }
 
-                // Allocate w_qkv tensor
+                // Get the weight param slot (the tensor is intentionally unallocated,
+                // awaiting fusion - do NOT check bool(), which would fail for empty tensors)
                 turbomind::core::Param w_qkv_param = w_qkv_module->param("weight");
-                if (!w_qkv_param) {
-                    fprintf(stderr, "[C-API] ERROR: Cannot find w_qkv.weight param for %s\n", key.c_str());
+                if (!w_qkv_param.get()) {
+                    // get() returns empty tensor if slot_ is nullptr (param not found)
+                    fprintf(stderr, "[C-API] ERROR: w_qkv.weight param slot not found for %s\n", key.c_str());
                     continue;
                 }
 
