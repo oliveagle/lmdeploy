@@ -90,6 +90,12 @@ private:
     LlamaLinear& linear_;
     const int    arch_{};
 
+    // Workspace buffer dimensions (cached for dynamic reallocation)
+    int local_head_num_{};
+    int size_per_head_{};
+    int tp_size_{};
+    DataType attn_dtype_{};
+
     cudaStream_t aux_stream_;
     cudaEvent_t  qkv_event_;
     cudaEvent_t  aux_event_;

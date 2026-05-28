@@ -164,6 +164,12 @@ UnifiedAttentionLayer::UnifiedAttentionLayer(int                           quant
         const int   local_head_num = w.head_num / tp_size;
         const int   size_per_head  = w.head_dim;
 
+        // Cache dimensions for dynamic reallocation in Setup()
+        tp_size_        = tp_size;
+        local_head_num_ = local_head_num;
+        size_per_head_  = size_per_head;
+        attn_dtype_     = w.data_type;
+
         TM_CHECK_EQ(w.head_num % tp_size, 0) << w.head_num << " " << tp_size;
         TM_CHECK_EQ(w.head_num % w.kv_head_num, 0) << w.head_num << " " << w.kv_head_num;
 
@@ -271,6 +277,28 @@ void UnifiedAttentionLayer::Setup(int phase, TensorMap& env)
 
     // auto &D = d.decode, &P = d.prefill;
     // dbg(D.n, D.k_sum, D.k_max, P.n, P.q_sum, P.q_max, P.k_sum, P.k_max);
+
+    /// dynamically resize workspace buffers based on actual token count to reduce prefill OOM risk
+    {
+        const int actual_token_count = d.decode.n + d.prefill.q_sum;
+        const int needed_workspace    = std::max(actual_token_count, (int)kMaxWorkspaceTokens);
+        if (needed_workspace > partial_O_.shape(0)) {
+            Allocator alloc = core::Context::device_alloc();
+            if (engine_param_.attn_cp_size > 1) {
+                alloc = GetSymmAllocator(context_.comm.d_comm);
+            }
+            partial_O_  = Tensor_<float>({needed_workspace, local_head_num_, size_per_head_}, kDEVICE);
+            partial_ML_ = Tensor_<float>({engine_param_.attn_cp_size, needed_workspace, local_head_num_, 2}, alloc);
+            split_cnt_  = Tensor_<int>({needed_workspace}, kDEVICE);
+            Clear(split_cnt_.buffer());
+        }
+        // tmp_attn_ is used for attention output storage
+        const int tmp_attn_needed = d.decode.q_sum + d.prefill.q_sum;
+        if (init_ && tmp_attn_needed > tmp_attn_.shape(0)) {
+            const int dim = local_head_num_ * size_per_head_;
+            tmp_attn_     = Tensor{{tmp_attn_needed, dim}, attn_dtype_, kDEVICE};
+        }
+    }
 
     /// handling different RoPE types
     if (rope_param_.type == RopeType::kDynamic) {
