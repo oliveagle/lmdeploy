@@ -2,7 +2,7 @@
 //!
 //! These tests verify that the semaphore-based concurrency limiting works correctly:
 //! 1. No more than N requests run simultaneously
-//! 2. Slots are distributed evenly via round-robin
+//! 2. Slots are distributed evenly via lock-free atomic increment
 //! 3. No deadlocks under high contention
 //! 4. Correct acquisition and release ordering
 
@@ -14,12 +14,13 @@ use tokio::sync::Semaphore;
 
 /// Simulates the RequestPool's slot selection logic and semaphore behavior.
 /// This mirrors the real RequestPool implementation to verify correctness
-/// of the round-robin slot distribution algorithm.
+/// of the lock-free atomic increment slot distribution algorithm.
 struct SimulatedPool {
     semaphore: Arc<Semaphore>,
     active_count: AtomicUsize,
     max_concurrent: AtomicUsize,
     slot_count: usize,
+    next_slot: AtomicUsize,
     slot_usage: Vec<AtomicUsize>,
 }
 
@@ -30,6 +31,7 @@ impl SimulatedPool {
             active_count: AtomicUsize::new(0),
             max_concurrent: AtomicUsize::new(0),
             slot_count: concurrency,
+            next_slot: AtomicUsize::new(0),
             slot_usage: (0..concurrency).map(|_| AtomicUsize::new(0)).collect(),
         }
     }
@@ -44,11 +46,10 @@ impl SimulatedPool {
         drop(permit);
     }
 
-    /// Mirrors the slot selection logic from RequestPool::acquire()
+    /// Mirrors the lock-free slot selection logic from RequestPool::acquire()
     /// and RequestPool::acquire_blocking() in cpp_engine.rs
     fn select_slot(&self) -> usize {
-        let active = self.slot_count - self.semaphore.available_permits() - 1;
-        active % self.slot_count
+        self.next_slot.fetch_add(1, Ordering::Relaxed) % self.slot_count
     }
 }
 

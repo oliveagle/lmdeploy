@@ -55,12 +55,11 @@ bash benchmarks-archive/python-turbomind_35b_awq_20260526/scripts/run_benchmark.
 ### 测试命令
 ```bash
 cd /mnt/data/lmdeploy/lmdeploy-rust-server
-cargo run --release --example unified_benchmark -- \
+cargo run --release --bin prefill_benchmark -- \
     --model /mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ \
-    --input-lengths 512 1024 4096 8192 \
-    --output-length 512 \
     --warmup 2 \
-    --measure 5
+    --measure 5 \
+    --output tests/prefill_benchmark_rust.json
 ```
 
 ### 实测数据

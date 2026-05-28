@@ -1,11 +1,16 @@
-//! Rust Server Prefill Benchmark
-//!
-//! Measures prefill performance of the Rust server using the same methodology
-//! as the Python TurboMind benchmark. Directly calls TurboMindCEngine (no gRPC
-//! overhead) for 1K/2K/4K/8K context lengths.
-//!
-//! Usage:
-//!     cargo run --bin prefill_benchmark [--model /path/to/model] [--output tests/prefill_benchmark_rust.json]
+/// Rust Server Prefill Benchmark
+///
+/// Measures prefill performance of the Rust server using the same methodology
+/// as the Python TurboMind benchmark. Directly calls TurboMindCEngine (no gRPC
+/// overhead). Uses UNIFIED TESTING PARAMETERS:
+///   - Input lengths: 512, 1024, 4096, 8192
+///   - Output length: 512 (for decode testing)
+///   - Warmup runs: 2
+///   - Measure runs: 5
+///   - Concurrency: 1
+///
+/// Usage:
+///     cargo run --bin prefill_benchmark [--model /path/to/model] [--output tests/prefill_benchmark_rust.json]
 
 use std::time::Instant;
 use clap::Parser;
@@ -16,11 +21,12 @@ use lmdeploy_server::model::cpp_engine::{GenerationParams, TurboMindCEngine};
 mod bench;
 
 /// Test context configurations (label, target token count)
+/// Matches Python TurboMind benchmark exactly: 512, 1024, 4096, 8192
 const TEST_CONTEXTS: &[(&str, usize)] = &[
-    ("1K", 1000),
-    ("2K", 2000),
-    ("4K", 4000),
-    ("8K", 8000),
+    ("512", 512),
+    ("1K", 1024),
+    ("4K", 4096),
+    ("8K", 8192),
 ];
 
 const REPEAT_TEXT: &str = "The quick brown fox jumps over the lazy dog. ";
@@ -157,7 +163,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("总结 - Rust Server Prefill 性能");
     println!("{SEPARATOR}");
 
-    for &label in &["1K", "2K", "4K", "8K"] {
+    for &label in &["512", "1K", "4K", "8K"] {
         if let Some(r) = results.get(label) {
             println!("  {label:>6}: {:>10.1} tok/s (TTFT: {:>8.1}ms)", r.avg_tps, r.avg_ms);
         }

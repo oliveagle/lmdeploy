@@ -11,7 +11,7 @@
 //! to allow parallel inference without mutex contention. Each request is
 //! independent and can run concurrently with others.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Condvar;
 use std::sync::Mutex as StdMutex;
@@ -1061,11 +1061,19 @@ extern "C" fn batch_completion_callback(_status: c_int, _seq_len: c_int, user_da
 /// Uses a `tokio::sync::Semaphore` to limit concurrent inference requests
 /// and `tokio::sync::Mutex` per slot so that the async runtime can yield
 /// during blocking FFI calls instead of parking OS threads.
+///
+/// ## Lock-Free Slot Selection
+///
+/// Each request atomically increments `next_slot` and uses the returned
+/// value as an index. This eliminates the race condition where multiple
+/// requests could observe the same `available_permits()` value.
 pub(crate) struct RequestPool {
     /// Per-slot tokio mutex - yields during FFI calls
     slots: Vec<tokio::sync::Mutex<ModelRequest>>,
     /// Semaphore limits concurrent inference requests
     semaphore: tokio::sync::Semaphore,
+    /// Lock-free slot selection counter (atomic increment)
+    next_slot: AtomicUsize,
     /// Reusable TensorMap per slot for input tensors (avoids per-forward allocation).
     /// Each slot has its own TensorMap cleared before each forward call.
     input_tensor_maps: Vec<tokio::sync::Mutex<TensorMap>>,
@@ -1107,6 +1115,7 @@ impl RequestPool {
         Ok(Self {
             slots,
             semaphore: tokio::sync::Semaphore::new(concurrency),
+            next_slot: AtomicUsize::new(0),
             input_tensor_maps,
             output_tensor_maps,
         })
@@ -1116,8 +1125,9 @@ impl RequestPool {
     /// permit and the mutex guards. The slot is released when the guard is
     /// dropped.
     ///
-    /// The slot selection uses round-robin to distribute load across slots.
-    /// Each permit acquisition corresponds to one available inference slot.
+    /// The slot selection uses lock-free atomic increment to distribute
+    /// load across slots. Each request atomically increments `next_slot`
+    /// and uses the value modulo slot count.
     pub(crate) async fn acquire(
         &self,
     ) -> (
@@ -1127,8 +1137,8 @@ impl RequestPool {
         tokio::sync::MutexGuard<'_, TensorMap>,
     ) {
         let permit = self.semaphore.acquire().await.expect("semaphore closed");
-        let active = self.slots.len() - self.semaphore.available_permits() - 1;
-        let idx = active % self.slots.len();
+        // Lock-free: increment atomically, no race condition with available_permits()
+        let idx = self.next_slot.fetch_add(1, Ordering::Relaxed) % self.slots.len();
         let guard = self.slots[idx].lock().await;
         let input_map = self.input_tensor_maps[idx].lock().await;
         let output_map = self.output_tensor_maps[idx].lock().await;
@@ -1137,6 +1147,8 @@ impl RequestPool {
 
     /// Acquire a slot (blocking, for use in spawn_blocking). Returns a
     /// permit and the mutex guards.
+    ///
+    /// Uses lock-free atomic increment for slot selection.
     fn acquire_blocking(
         &self,
     ) -> (
@@ -1149,8 +1161,8 @@ impl RequestPool {
             tokio::runtime::Handle::current().block_on(self.semaphore.acquire())
         })
         .expect("semaphore closed");
-        let active = self.slots.len() - self.semaphore.available_permits() - 1;
-        let idx = active % self.slots.len();
+        // Lock-free: increment atomically, no race condition with available_permits()
+        let idx = self.next_slot.fetch_add(1, Ordering::Relaxed) % self.slots.len();
         let guard = self.slots[idx].blocking_lock();
         let input_map = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(self.input_tensor_maps[idx].lock())
@@ -2537,8 +2549,8 @@ impl TurboMindCEngine {
             let mut done = lock.lock().unwrap();
             while !*done {
                 // Safety: Condvar::wait_timeout returns Err only if lock is poisoned
-                // Use 100ms timeout as safety net against missed notifications
-                let result = cvar.wait_timeout(done, std::time::Duration::from_millis(100));
+                // Use 10ms timeout as safety net against missed notifications
+                let result = cvar.wait_timeout(done, std::time::Duration::from_millis(10));
                 done = match result {
                     Ok((guard, _timeout)) => guard,
                     Err(poisoned) => {
@@ -3195,7 +3207,7 @@ impl TurboMindCEngine {
                 let (lock, cvar) = &*completion;
                 let mut done = lock.lock().unwrap();
                 while !*done {
-                    let result = cvar.wait_timeout(done, std::time::Duration::from_millis(100));
+                    let result = cvar.wait_timeout(done, std::time::Duration::from_millis(10));
                     done = match result {
                         Ok((guard, _timeout)) => guard,
                         Err(poisoned) => {
