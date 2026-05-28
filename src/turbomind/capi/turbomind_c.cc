@@ -1755,50 +1755,56 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             }
 
             // 4c. Create attention (AttentionWeight) with its child modules
-            turbomind::core::AttentionConfig attn_cfg;
-            attn_cfg.hidden_dim = hf_config.hidden_size;
-            attn_cfg.head_dim = head_dim;
-            attn_cfg.head_num = hf_config.num_attention_heads;
-            attn_cfg.kv_head_num = hf_config.num_key_value_heads;
-            attn_cfg.kv_lora_rank = 0;
-            attn_cfg.q_lora_rank = 0;
-            attn_cfg.qk_rope_dim = 0;
-            attn_cfg.v_head_dim = 0;
-            attn_cfg.tp_size = 1;
-            attn_cfg.tp_rank = 0;
-            attn_cfg.data_type = weight_cfg.data_type;
-            attn_cfg.window_size = 0;
-            attn_cfg.output_gate = false;  // Set to true for Qwen3.5
-            attn_cfg.softmax_scale = 0.0f;
-            attn_cfg.use_logn_attn = false;
-            attn_cfg.rope = turbomind::core::RopeConfig{};
-            auto attn_module = turbomind::core::Module::create(attn_cfg);
-            if (attn_module) {
-                auto* attn = static_cast<turbomind::AttentionWeight*>(attn_module.get());
+            // Skip for linear_attn layers (they use DeltaNetWeight instead)
+            bool is_linear_attn = layer_idx < (int)hf_config.layer_is_linear_attn.size() &&
+                                  hf_config.layer_is_linear_attn[layer_idx];
 
-                // Create fused w_qkv LinearWeight child (matches TurboMind's AttentionWeight)
-                // HF uses separate q_proj/k_proj/v_proj, but TM uses fused w_qkv
-                // The fused output dimension = num_q_heads * head_dim + 2 * num_kv_heads * head_dim
-                const int qkv_out_dim = hf_config.num_attention_heads * head_dim
-                                      + 2 * hf_config.num_key_value_heads * head_dim;
-                auto w_qkv_cfg = CreateAwqLinearConfig(
-                    hf_config.hidden_size, qkv_out_dim,
-                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
-                auto w_qkv_module = turbomind::core::Module::create(w_qkv_cfg);
-                if (w_qkv_module) {
-                    attn->add_child("w_qkv", std::move(w_qkv_module));
+            if (!is_linear_attn) {
+                turbomind::core::AttentionConfig attn_cfg;
+                attn_cfg.hidden_dim = hf_config.hidden_size;
+                attn_cfg.head_dim = head_dim;
+                attn_cfg.head_num = hf_config.num_attention_heads;
+                attn_cfg.kv_head_num = hf_config.num_key_value_heads;
+                attn_cfg.kv_lora_rank = 0;
+                attn_cfg.q_lora_rank = 0;
+                attn_cfg.qk_rope_dim = 0;
+                attn_cfg.v_head_dim = 0;
+                attn_cfg.tp_size = 1;
+                attn_cfg.tp_rank = 0;
+                attn_cfg.data_type = weight_cfg.data_type;
+                attn_cfg.window_size = 0;
+                attn_cfg.output_gate = false;  // Set to true for Qwen3.5
+                attn_cfg.softmax_scale = 0.0f;
+                attn_cfg.use_logn_attn = false;
+                attn_cfg.rope = turbomind::core::RopeConfig{};
+                auto attn_module = turbomind::core::Module::create(attn_cfg);
+                if (attn_module) {
+                    auto* attn = static_cast<turbomind::AttentionWeight*>(attn_module.get());
+
+                    // Create fused w_qkv LinearWeight child (matches TurboMind's AttentionWeight)
+                    // HF uses separate q_proj/k_proj/v_proj, but TM uses fused w_qkv
+                    // The fused output dimension = num_q_heads * head_dim + 2 * num_kv_heads * head_dim
+                    const int qkv_out_dim = hf_config.num_attention_heads * head_dim
+                                          + 2 * hf_config.num_key_value_heads * head_dim;
+                    auto w_qkv_cfg = CreateAwqLinearConfig(
+                        hf_config.hidden_size, qkv_out_dim,
+                        weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                    auto w_qkv_module = turbomind::core::Module::create(w_qkv_cfg);
+                    if (w_qkv_module) {
+                        attn->add_child("w_qkv", std::move(w_qkv_module));
+                    }
+
+                    // Create wo LinearWeight child
+                    auto wo_cfg = CreateAwqLinearConfig(
+                        hf_config.num_attention_heads * head_dim, hf_config.hidden_size,
+                        weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
+                    auto wo_module = turbomind::core::Module::create(wo_cfg);
+                    if (wo_module) {
+                        attn->add_child("wo", std::move(wo_module));
+                    }
+
+                    decoder_layer->add_child("attention", std::move(attn_module));
                 }
-
-                // Create wo LinearWeight child
-                auto wo_cfg = CreateAwqLinearConfig(
-                    hf_config.num_attention_heads * head_dim, hf_config.hidden_size,
-                    weight_cfg.data_type, hf_config.is_awq, hf_config.awq_group_size);
-                auto wo_module = turbomind::core::Module::create(wo_cfg);
-                if (wo_module) {
-                    attn->add_child("wo", std::move(wo_module));
-                }
-
-                decoder_layer->add_child("attention", std::move(attn_module));
             }
 
             // 4d. Create feed_forward (FfnWeight) with its child modules
