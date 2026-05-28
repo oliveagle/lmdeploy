@@ -1,0 +1,71 @@
+{
+  "engine": "Python TurboMind",
+  "model": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "backend": "turbomind",
+  "date": "2026-05-29 00:12:10",
+  "config": {
+    "input_lengths": [
+      512,
+      1024,
+      2048,
+      4096,
+      8192
+    ],
+    "output_length": 512,
+    "warmup_runs": 2,
+    "measure_runs": 5,
+    "concurrency": 1
+  },
+  "results": [
+    {
+      "input_len": 512,
+      "output_len": 512,
+      "ttft_ms": 344.3764668001677,
+      "ttft_ms_p99": 403.5502830010955,
+      "decode_time_ms": 10830.330158000288,
+      "total_time_ms": 11174.706624800456,
+      "prefill_tps": 1486.74502865232,
+      "decode_tps": 47.27464375790883
+    },
+    {
+      "input_len": 1024,
+      "output_len": 512,
+      "ttft_ms": 619.2383425994194,
+      "ttft_ms_p99": 730.069037002977,
+      "decode_time_ms": 11350.07885319792,
+      "total_time_ms": 11969.317195797339,
+      "prefill_tps": 1653.6443717317063,
+      "decode_tps": 45.10981876180908
+    },
+    {
+      "input_len": 2048,
+      "output_len": 512,
+      "ttft_ms": 1222.875722196477,
+      "ttft_ms_p99": 1445.2474579957197,
+      "decode_time_ms": 12410.481499601156,
+      "total_time_ms": 13633.357221797633,
+      "prefill_tps": 1674.7409101568146,
+      "decode_tps": 41.255450081969386
+    },
+    {
+      "input_len": 4096,
+      "output_len": 512,
+      "ttft_ms": 2207.6746825987357,
+      "ttft_ms_p99": 3193.1358220026596,
+      "decode_time_ms": 16253.009927400853,
+      "total_time_ms": 18460.68460999959,
+      "prefill_tps": 1855.3458225912373,
+      "decode_tps": 31.501857335164868
+    },
+    {
+      "input_len": 8192,
+      "output_len": 512,
+      "ttft_ms": 4962.822840799345,
+      "ttft_ms_p99": 8230.30783500144,
+      "decode_time_ms": 23925.95507200167,
+      "total_time_ms": 28888.777912801015,
+      "prefill_tps": 1650.6734700770708,
+      "decode_tps": 21.39935473669539
+    }
+  ]
+}

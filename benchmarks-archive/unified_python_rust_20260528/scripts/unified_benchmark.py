@@ -47,6 +47,20 @@ def start_server(model_path: str, port: int, backend: str = "turbomind"):
     return proc
 
 
+def get_model_name(port: int) -> str:
+    """Get the model name from the server."""
+    url = f"http://localhost:{port}/v1/models"
+    try:
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            models = resp.json().get("data", [])
+            if models:
+                return models[0]["id"]
+    except Exception as e:
+        print(f"Failed to get model name: {e}")
+    return "default"
+
+
 def wait_server_ready(port: int, max_wait: int = 120) -> bool:
     """Wait for server to be ready."""
     url = f"http://localhost:{port}/v1/models"
@@ -75,12 +89,12 @@ def stop_server(proc):
             proc.kill()
 
 
-async def run_single_request(session, port: int, prompt: str, output_len: int):
+async def run_single_request(session, port: int, prompt: str, output_len: int, model_name: str):
     """Execute a single request and measure TTFT and decode metrics."""
     url = f"http://localhost:{port}/v1/chat/completions"
 
     payload = {
-        "model": "default",
+        "model": model_name,
         "messages": [{"role": "user", "content": prompt}],
         "max_completion_tokens": output_len,
         "temperature": 0.0,
@@ -151,6 +165,9 @@ async def run_benchmark(port: int, scenarios: list, warmup_runs: int, measure_ru
     """Run benchmarks for all scenarios."""
     from transformers import AutoTokenizer
 
+    model_name = get_model_name(port)
+    print(f"Using model: {model_name}")
+
     tokenizer = AutoTokenizer.from_pretrained(
         DEFAULT_MODEL_PATH,
         trust_remote_code=True
@@ -175,7 +192,7 @@ async def run_benchmark(port: int, scenarios: list, warmup_runs: int, measure_ru
             # Warmup
             print(f"  Warmup ({warmup_runs} runs)...", end=" ", flush=True)
             for _ in range(warmup_runs):
-                await run_single_request(session, port, prompt[:500], 32)
+                await run_single_request(session, port, prompt[:500], output_len, model_name)
             print("OK")
             await asyncio.sleep(2)
 
@@ -183,7 +200,7 @@ async def run_benchmark(port: int, scenarios: list, warmup_runs: int, measure_ru
             print(f"  Measuring ({measure_runs} runs)...", end=" ", flush=True)
             tasks = []
             for _ in range(measure_runs):
-                tasks.append(run_single_request(session, port, prompt, output_len))
+                tasks.append(run_single_request(session, port, prompt, output_len, model_name))
 
             all_results = await asyncio.gather(*tasks)
             print("OK")

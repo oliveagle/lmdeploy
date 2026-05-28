@@ -1,5 +1,5 @@
 src/turbomind/utils/CMakeFiles/parser.dir/parser.cc.o: \
- /mnt/eaget-4tb/data/llm_server/lmdeploy/src/turbomind/utils/parser.cc \
+ /mnt/data/lmdeploy/src/turbomind/utils/parser.cc \
  /usr/include/stdc-predef.h /usr/include/c++/13/iostream \
  /usr/include/c++/13/bits/requires_hosted.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/c++config.h \

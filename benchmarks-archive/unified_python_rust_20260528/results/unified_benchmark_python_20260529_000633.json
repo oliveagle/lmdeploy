@@ -1,0 +1,20 @@
+{
+  "engine": "Python TurboMind",
+  "model": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "backend": "turbomind",
+  "date": "2026-05-29 00:06:33",
+  "config": {
+    "input_lengths": [
+      512,
+      1024,
+      2048,
+      4096,
+      8192
+    ],
+    "output_length": 512,
+    "warmup_runs": 2,
+    "measure_runs": 5,
+    "concurrency": 1
+  },
+  "results": []
+}
