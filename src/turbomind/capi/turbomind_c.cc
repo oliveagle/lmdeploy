@@ -1178,8 +1178,16 @@ static void LoadWeightsFromSafetensors(
                     continue;
                 }
 
+                // Navigate to the w_qkv child module first, then get the weight param
+                // This matches the nested param access pattern used in Phase 1
+                auto* w_qkv_module = attn_module->child("w_qkv");
+                if (!w_qkv_module) {
+                    fprintf(stderr, "[C-API] ERROR: Cannot find w_qkv child module for %s\n", key.c_str());
+                    continue;
+                }
+
                 // Allocate w_qkv tensor
-                turbomind::core::Param w_qkv_param = attn_module->param("w_qkv.weight");
+                turbomind::core::Param w_qkv_param = w_qkv_module->param("weight");
                 if (!w_qkv_param) {
                     fprintf(stderr, "[C-API] ERROR: Cannot find w_qkv.weight param for %s\n", key.c_str());
                     continue;
@@ -1756,8 +1764,9 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
             // 4c. Create attention (AttentionWeight) with its child modules
             // Skip for linear_attn layers (they use DeltaNetWeight instead)
-            bool is_linear_attn = layer_idx < (int)hf_config.layer_is_linear_attn.size() &&
-                                  hf_config.layer_is_linear_attn[layer_idx];
+            // Declare once here and reuse below in section 4f
+            const bool is_linear_attn = layer_idx < (int)hf_config.layer_is_linear_attn.size() &&
+                                        hf_config.layer_is_linear_attn[layer_idx];
 
             if (!is_linear_attn) {
                 turbomind::core::AttentionConfig attn_cfg;
@@ -1940,8 +1949,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
             // 4f. Create linear_attn (DeltaNetWeight) if this layer uses linear attention
             // or create attention (AttentionWeight) if this layer uses full attention
-            bool is_linear_attn = layer_idx < (int)hf_config.layer_is_linear_attn.size() &&
-                                  hf_config.layer_is_linear_attn[layer_idx];
+            // Reuse is_linear_attn from section 4c
 
             if (is_linear_attn) {
                 turbomind::core::DeltaNetConfig delta_cfg;
