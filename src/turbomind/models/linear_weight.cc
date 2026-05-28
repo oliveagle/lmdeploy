@@ -279,7 +279,53 @@ TM_MODULE_REGISTER(LinearWeight, core::LinearConfig);
     X(scales)                                                                                                          \
     X(zeros)
 
-TM_MODULE_METHODS(LinearWeight, LINEAR_WEIGHT_CHILDREN, LINEAR_WEIGHT_PARAMS)
+// Manually expand TM_MODULE_METHODS for LinearWeight to fix param() method
+// Issue: TM_MODULE_METHODS macro may not correctly generate param() method
+
+// add_child method (no children, always return nullptr)
+core::Module* LinearWeight::add_child(std::string name, std::unique_ptr<core::Module> child)
+{
+    return nullptr;
+}
+
+// child method (no children, always return nullptr)
+core::Module* LinearWeight::child(const std::string& name_str) const
+{
+    return nullptr;
+}
+
+// param method - manually implement to fix the bug
+core::Param LinearWeight::param(const std::string& name_str)
+{
+    if (name_str == "weight") {
+        return core::Param{&weight};
+    }
+    if (name_str == "bias") {
+        return core::Param{&bias};
+    }
+    if (name_str == "scales") {
+        return core::Param{&scales};
+    }
+    if (name_str == "zeros") {
+        return core::Param{&zeros};
+    }
+    return {};
+}
+
+// for_each_child method (no children, no-op)
+void LinearWeight::for_each_child(std::function<void(const char*, core::Module*)> visitor) const
+{
+    // No children
+}
+
+// for_each_param method
+void LinearWeight::for_each_param(std::function<void(const char*, core::Tensor&)> visitor)
+{
+    visitor("weight", weight);
+    visitor("bias", bias);
+    visitor("scales", scales);
+    visitor("zeros", zeros);
+}
 
 #undef LINEAR_WEIGHT_CHILDREN
 #undef LINEAR_WEIGHT_PARAMS
