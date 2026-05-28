@@ -1002,25 +1002,44 @@ extern "C" fn completion_callback(status: c_int, seq_len: c_int, user_data: *mut
     }
 }
 
+// Thread-local token buffer for pre-allocated decode input.
+// Avoids per-token heap allocation in the C++ callback thread.
+thread_local! {
+    static TOKEN_BUFFER: RefCell<Vec<u32>> = RefCell::new(Vec::with_capacity(1));
+}
+
 /// Token callback for event-driven streaming.
 ///
 /// Invoked by the C++ engine whenever a new token is generated.
-/// Decodes the token and sends (token_id, text) tuple through the channel.
-/// Optimized for minimal latency: uses try_send and stack-allocated buffer (no heap allocation).
+/// Optimized to minimize C++ thread blocking time:
+///
+/// Performance optimizations:
+/// 1. Thread-local buffer reuse (no heap allocation per token)
+/// 2. Single-element decode (minimal blocking)
+/// 3. Non-blocking send (prevents C++ thread blocking)
+///
+/// Note: decode() still blocks the C++ thread briefly, but the overhead is
+/// minimized by reusing pre-allocated buffers and avoiding Vec allocation.
 extern "C" fn token_callback(token_id: c_int, _seq_len: c_int, user_data: *mut c_void) {
     unsafe {
         let ctx = &*(user_data as *const StreamContext);
 
-        // Stack-allocated array avoids heap allocation (0.01-0.1us saved per token)
-        let token_ids = [token_id as u32];
-        let token_str = match ctx.tokenizer.decode(&token_ids, true) {
-            Ok(s) if !s.is_empty() => s,
-            _ => return,
-        };
+        // Use thread-local buffer to avoid per-token Vec allocation
+        TOKEN_BUFFER.with(|buf_cell| {
+            let mut buf = buf_cell.borrow_mut();
+            buf.clear();
+            buf.push(token_id as u32);
 
-        // Use try_send for non-blocking send - if channel is full, drop this token
-        // This prevents blocking the C++ callback thread and improves TTFT
-        let _ = ctx.tx.try_send((token_id as u32, token_str));
+            // Decode the token (necessary blocking operation for text conversion)
+            let token_str = match ctx.tokenizer.decode(&buf, true) {
+                Ok(s) if !s.is_empty() => s,
+                _ => return,
+            };
+
+            // Non-blocking send - if channel is full, this token is dropped
+            // This prevents blocking the C++ callback thread and maintains TTFT
+            let _ = ctx.tx.try_send((token_id as u32, token_str));
+        });
     }
 }
 
@@ -2446,7 +2465,7 @@ impl TurboMindCEngine {
             .clone();
         let params_clone = params.clone();
 
-        let (tx, rx) = tokio::sync::mpsc::channel::<(u32, String)>(32);
+        let (tx, rx) = tokio::sync::mpsc::channel::<(u32, String)>(128);
 
         // Use tokio::task::spawn instead of spawn_blocking to avoid OS thread overhead.
         // Only the pool acquisition is blocking (uses block_in_place internally),

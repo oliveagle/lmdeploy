@@ -22,7 +22,7 @@ from pathlib import Path
 from datetime import datetime
 
 # Unified test configuration (matches Python baseline exactly)
-UNIFIED_INPUT_LENGTHS = [512, 1024, 4096, 8192]
+UNIFIED_INPUT_LENGTHS = [512, 1024, 2048, 4096, 8192]
 UNIFIED_OUTPUT_LENGTH = 512
 UNIFIED_WARMUP_RUNS = 2
 UNIFIED_MEASURE_RUNS = 5

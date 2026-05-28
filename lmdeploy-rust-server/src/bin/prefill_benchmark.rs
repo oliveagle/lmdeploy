@@ -1,40 +1,39 @@
-/// Rust Server Prefill Benchmark
-///
-/// Measures prefill performance of the Rust server using the same methodology
-/// as the Python TurboMind benchmark. Directly calls TurboMindCEngine (no gRPC
-/// overhead). Uses UNIFIED TESTING PARAMETERS:
-///   - Input lengths: 512, 1024, 4096, 8192
-///   - Output length: 512 (for decode testing)
-///   - Warmup runs: 2
-///   - Measure runs: 5
-///   - Concurrency: 1
-///
-/// Usage:
-///     cargo run --bin prefill_benchmark [--model /path/to/model] [--output tests/prefill_benchmark_rust.json]
+//! Rust Server Prefill/Decode Benchmark
+//!
+//! 统一测试方法 - 与 Python TurboMind benchmark 完全一致：
+//! - 输入长度: 512, 1024, 2048, 4096, 8192 (与 Python 完全相同)
+//! - 输出长度: 512 tokens (与 Python 相同)
+//! - 预热: 2 次，测量: 5 次 (与 Python 相同)
+//! - 并发度: 1 (串行测试，与 Python 相同)
+//! - 计算公式: Prefill (tok/s) = input_len / (ttft_ms / 1000)
+//!           Decode (tok/s) = 1000 / tpot_ms
+//!
+//! Usage:
+//!     cargo run --bin prefill_benchmark [--model /path/to/model] [--output results.json]
 
+use std::sync::Arc;
 use std::time::Instant;
 use clap::Parser;
+use futures::StreamExt;
 
 use lmdeploy_server::model::cpp_engine::{GenerationParams, TurboMindCEngine};
 
-/// Benchmark output module
-mod bench;
-
 /// Test context configurations (label, target token count)
-/// Matches Python TurboMind benchmark exactly: 512, 1024, 4096, 8192
+/// Matches Python TurboMind benchmark exactly: 512, 1024, 2048, 4096, 8192
 const TEST_CONTEXTS: &[(&str, usize)] = &[
     ("512", 512),
     ("1K", 1024),
+    ("2K", 2048),
     ("4K", 4096),
     ("8K", 8192),
 ];
 
 const REPEAT_TEXT: &str = "The quick brown fox jumps over the lazy dog. ";
-const SEPARATOR: &str = "================================================================================";
+const OUTPUT_LENGTH: usize = 512;
 
 #[derive(Parser, Debug)]
 #[command(name = "prefill_benchmark")]
-#[command(about = "Benchmark Rust server prefill performance")]
+#[command(about = "Unified prefill/decode benchmark matching Python methodology")]
 struct Args {
     /// Model path
     #[arg(long)]
@@ -53,12 +52,116 @@ struct Args {
     measure: usize,
 }
 
+/// Benchmark result for a single iteration
+#[derive(Debug, Clone, serde::Serialize)]
+struct IterationResult {
+    iteration: usize,
+    input_len: usize,
+    ttft_ms: f64,
+    total_time_ms: f64,
+    prefill_tps: f64,
+    decode_tps: f64,
+}
+
+/// Summary for a context length
+#[derive(Debug, Clone, serde::Serialize)]
+struct ContextSummary {
+    input_len: usize,
+    output_len: usize,
+    iterations: usize,
+    ttft_ms_avg: f64,
+    ttft_ms_p99: f64,
+    prefill_tps: f64,
+    decode_tps: f64,
+    total_time_ms_avg: f64,
+}
+
+/// Full benchmark report
+#[derive(Debug, Clone, serde::Serialize)]
+struct BenchmarkReport {
+    engine: String,
+    model: String,
+    backend: String,
+    date: String,
+    input_lengths: Vec<usize>,
+    output_length: usize,
+    warmup_runs: usize,
+    measure_runs: usize,
+    summaries: Vec<ContextSummary>,
+}
+
 /// Generate a prompt with approximately target_token_count tokens
 fn gen_prompt(target_token_count: usize) -> String {
     let chars_per_token = 4;
     let target_chars = target_token_count * chars_per_token;
     let repeats = (target_chars / REPEAT_TEXT.len()) + 1;
     REPEAT_TEXT.repeat(repeats)
+}
+
+/// Run a single iteration using streaming for accurate TTFT measurement
+async fn run_iteration(
+    engine: &TurboMindCEngine,
+    input_len: usize,
+    output_len: usize,
+    iteration: usize,
+) -> Result<IterationResult, String> {
+    let prompt = gen_prompt(input_len);
+
+    let params = GenerationParams {
+        max_tokens: Some(output_len),
+        temperature: Some(0.0),  // Deterministic output
+        top_p: Some(1.0),
+        ..Default::default()
+    };
+
+    let start = Instant::now();
+    let mut stream = engine.generate_stream(&prompt, params).await;
+    futures::pin_mut!(stream);
+
+    let mut ttft_ms = 0.0;
+    let mut first_token_received = false;
+    let mut last_token_time = 0.0;
+    let mut token_count = 0;
+
+    while let Some((_, _)) = stream.next().await {
+        let elapsed = start.elapsed().as_secs_f64() * 1000.0;
+
+        if !first_token_received {
+            ttft_ms = elapsed;
+            first_token_received = true;
+        }
+
+        last_token_time = elapsed;
+        token_count += 1;
+    }
+
+    let total_time_ms = last_token_time;
+    let decode_time_ms = total_time_ms - ttft_ms;
+
+    // Calculate throughput: same formula as Python
+    // Prefill (tok/s) = input_len / (ttft_ms / 1000)
+    let prefill_tps = if ttft_ms > 0.0 {
+        input_len as f64 / (ttft_ms / 1000.0)
+    } else {
+        0.0
+    };
+
+    // Decode (tok/s) = 1000 / tpot_ms, where tpot_ms = decode_time / output_tokens
+    let decode_tps = if token_count > 0 && decode_time_ms > 0.0 {
+        let tpot_ms = decode_time_ms / token_count as f64;
+        1000.0 / tpot_ms
+    } else {
+        0.0
+    };
+
+    Ok(IterationResult {
+        iteration,
+        input_len,
+        ttft_ms,
+        total_time_ms,
+        prefill_tps,
+        decode_tps,
+    })
 }
 
 #[tokio::main]
@@ -69,24 +172,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ".to_string()
     });
 
-    println!("{SEPARATOR}");
-    println!("Rust Server Prefill 性能测试");
-    println!("{SEPARATOR}");
-    println!();
-    println!("Model:   {model_path}");
-    println!("Warmup:  {}, Measure: {}", args.warmup, args.measure);
+    println!("\n{}", "=".repeat(80));
+    println!("LMDeploy Rust Server Benchmark (统一测试方法)");
+    println!("{}", "=".repeat(80));
+    println!("Model:   {}", model_path);
+    println!("Backend: turbomind (C++)");
+    println!("Input:   512, 1024, 2048, 4096, 8192 (与 Python 完全一致)");
+    println!("Output:  512 tokens (与 Python 一致)");
+    println!("Warmup:  {} runs", args.warmup);
+    println!("Measure:  {} runs per context", args.measure);
+    println!("Concurrency: 1 (串行测试)");
+    println!("{}", "=".repeat(80));
 
-    // Create engine
-    println!();
-    println!("[1/3] 加载模型...");
-    let engine = TurboMindCEngine::new(&model_path).await?;
-    println!("模型加载成功");
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .init();
 
-    let tokenizer = engine.tokenizer().ok_or("Tokenizer not available")?;
+    // Load engine
+    println!("\n[1/3] Loading TurboMind engine...");
+    let engine = Arc::new(TurboMindCEngine::new(&model_path).await?);
+    println!("Engine loaded successfully");
 
     // Warmup
-    println!();
-    println!("[2/3] Warmup ({} runs)...", args.warmup);
+    println!("\n[2/3] Warmup ({} runs)...", args.warmup);
     let warmup_prompt = gen_prompt(2048);
     for i in 0..args.warmup {
         let params = default_gen_params(1);
@@ -95,100 +203,126 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("OK");
     }
 
-    // Measure prefill performance
-    println!();
-    println!("[3/3] 测量预填充性能 ({} runs)...", args.measure);
+    // Measure performance
+    println!("\n[3/3] Measuring Prefill/Decode performance...");
     println!();
     println!(
-        "{:>8} | {:>8} | {:>10} | {:>10} | {:>12} | {:>12}",
-        "Context", "Tokens", "Avg TTFT", "Min TTFT", "Avg TPS", "Max TPS"
+        "{:<8} | {:>10} | {:>10} | {:>12} | {:>12}",
+        "Context", "TTFT (ms)", "Prefill (tok/s)", "Decode (tok/s)", "Total (ms)"
     );
-    println!("{SEPARATOR}");
+    println!("{}", "-".repeat(80));
 
-    let mut results: std::collections::HashMap<String, bench::ContextResult> =
-        std::collections::HashMap::new();
+    let mut all_results: Vec<IterationResult> = Vec::new();
 
     for &(label, target_tokens) in TEST_CONTEXTS {
-        let prompt = gen_prompt(target_tokens);
+        let input_len = target_tokens;
+        let output_len = OUTPUT_LENGTH;
 
-        let actual_tokens = tokenizer
-            .encode(&prompt, false, false)
-            .map(|ids| ids.len())
-            .unwrap_or(target_tokens);
+        print!("{:<8} (input={:>6}, out={:>5})... ", label, input_len, output_len);
 
-        let mut run_times: Vec<f64> = Vec::new();
+        let mut context_results = Vec::new();
 
-        print!("{:>8} ({:>6} tok)... ", label, actual_tokens);
-
-        for _r in 0..args.measure {
-            let params = default_gen_params(1);
-            let start = Instant::now();
-            engine.generate(&prompt, params).await;
-            let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
-            run_times.push(elapsed_ms);
-            print!("{:.1}ms ", elapsed_ms);
+        for iter in 1..=args.measure {
+            match run_iteration(&engine, input_len, output_len, iter).await {
+                Ok(result) => {
+                    context_results.push(result.clone());
+                    all_results.push(result.clone());
+                    print!(
+                        "{:6.1} ",
+                        result.ttft_ms
+                    );
+                }
+                Err(e) => {
+                    eprintln!("| ERROR: {}", e);
+                }
+            }
         }
 
-        if run_times.len() == args.measure {
-            let avg_ms = run_times.iter().sum::<f64>() / run_times.len() as f64;
-            let min_ms = run_times.iter().cloned().fold(f64::INFINITY, f64::min);
-            let max_ms = run_times.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let avg_tps = actual_tokens as f64 / avg_ms * 1000.0;
-            let max_tps = actual_tokens as f64 / min_ms * 1000.0;
+        if !context_results.is_empty() {
+            let avg_ttft: f64 = context_results.iter().map(|r| r.ttft_ms).sum::<f64>()
+                / context_results.len() as f64;
+            let avg_prefill: f64 = context_results.iter().map(|r| r.prefill_tps).sum::<f64>()
+                / context_results.len() as f64;
+            let avg_decode: f64 = context_results.iter().map(|r| r.decode_tps).sum::<f64>()
+                / context_results.len() as f64;
 
-            results.insert(
-                label.to_string(),
-                bench::ContextResult {
-                    ctx_tokens: actual_tokens,
-                    avg_ms,
-                    min_ms,
-                    max_ms,
-                    avg_tps,
-                    max_tps,
-                },
-            );
+            let mut sorted_ttfts: Vec<f64> = context_results.iter().map(|r| r.ttft_ms).collect();
+            sorted_ttfts.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let ttft_p99 = if sorted_ttfts.len() > 1 {
+                let idx = (sorted_ttfts.len() as f64 * 0.99) as usize;
+                *sorted_ttfts.get(idx).unwrap_or(&0.0)
+            } else {
+                0.0
+            };
 
             println!(
-                "| Avg {:>8.1} tok/s, Max {:>8.1} tok/s (TTFT: {:.1}ms)",
-                avg_tps, max_tps, avg_ms
+                "| Avg TTFT: {:7.2}ms (P99: {:7.2}ms), Prefill: {:>10.1} tok/s, Decode: {:>10.1} tok/s",
+                avg_ttft, ttft_p99, avg_prefill, avg_decode
             );
-        } else {
-            println!("| ERROR - insufficient results");
         }
     }
 
-    // Summary
-    println!();
-    println!("{SEPARATOR}");
-    println!("总结 - Rust Server Prefill 性能");
-    println!("{SEPARATOR}");
+    // Generate summary report
+    let mut summaries = Vec::new();
+    for &input_len in &[512, 1024, 2048, 4096, 8192] {
+        let context_results: Vec<_> = all_results
+            .iter()
+            .filter(|r| r.input_len == input_len)
+            .cloned()
+            .collect();
 
-    for &label in &["512", "1K", "4K", "8K"] {
-        if let Some(r) = results.get(label) {
-            println!("  {label:>6}: {:>10.1} tok/s (TTFT: {:>8.1}ms)", r.avg_tps, r.avg_ms);
+        if !context_results.is_empty() {
+            let avg_ttft = context_results.iter().map(|r| r.ttft_ms).sum::<f64>()
+                / context_results.len() as f64;
+            let avg_prefill = context_results.iter().map(|r| r.prefill_tps).sum::<f64>()
+                / context_results.len() as f64;
+            let avg_decode = context_results.iter().map(|r| r.decode_tps).sum::<f64>()
+                / context_results.len() as f64;
+            let avg_total = context_results.iter().map(|r| r.total_time_ms).sum::<f64>()
+                / context_results.len() as f64;
+
+            summaries.push(ContextSummary {
+                input_len,
+                output_len: OUTPUT_LENGTH,
+                iterations: context_results.len(),
+                ttft_ms_avg: avg_ttft,
+                ttft_ms_p99: 0.0, // Placeholder
+                prefill_tps: avg_prefill,
+                decode_tps: avg_decode,
+                total_time_ms_avg: avg_total,
+            });
         }
     }
 
-    // Save results
-    let output = bench::BenchmarkResult {
+    // Create report
+    let report = BenchmarkReport {
+        engine: "LMDeploy TurboMind C++".to_string(),
         model: model_path.clone(),
-        config: bench::BenchmarkConfig {
-            warmup_runs: args.warmup,
-            measure_runs: args.measure,
-            engine: "pure_cpp".to_string(),
-        },
-        results,
-        timestamp: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs_f64(),
+        backend: "turbomind".to_string(),
+        date: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        input_lengths: vec![512, 1024, 2048, 4096, 8192],
+        output_length: OUTPUT_LENGTH,
+        warmup_runs: args.warmup,
+        measure_runs: args.measure,
+        summaries,
     };
 
-    let output_path = args.output.unwrap_or_else(|| "tests/prefill_benchmark_rust.json".to_string());
-    bench::save_benchmark(&output_path, &output)?;
+    // Save to JSON
+    let output_path = args.output.unwrap_or_else(|| {
+        format!("results/prefill_benchmark_rust_{}.json", chrono::Utc::now().format("%Y%m%d_%H%M%S"))
+    });
 
-    println!();
-    println!("结果已保存: {output_path}");
+    // Create output directory if needed
+    if let Some(parent) = std::path::Path::new(&output_path).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let json = serde_json::to_string_pretty(&report)?;
+    std::fs::write(&output_path, json)?;
+
+    println!("\n{}", "=".repeat(80));
+    println!("Results saved to: {}", output_path);
+    println!("{}", "=".repeat(80));
 
     Ok(())
 }
