@@ -19,7 +19,8 @@ BACKEND = "turbomind"
 # 测试场景
 SCENARIOS = [
     {"name": "short_context", "input_len": 1024, "output_len": 512},
-    {"name": "medium_context", "input_len": 4096, "output_len": 512},
+    {"name": "medium_context", "input_len": 2048, "output_len": 512},
+    {"name": "long_context", "input_len": 4096, "output_len": 512},
     {"name": "long_context", "input_len": 8192, "output_len": 512},
     {"name": "long_context_large_output", "input_len": 8192, "output_len": 2048},
 ]
