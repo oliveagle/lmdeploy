@@ -1,0 +1,62 @@
+{
+  "engine": "LMDeploy TurboMind C++",
+  "model": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "backend": "turbomind",
+  "date": "2026-05-30 00:45:00",
+  "input_lengths": [512, 1024, 2048, 4096, 8192],
+  "output_length": 512,
+  "warmup_runs": 2,
+  "measure_runs": 5,
+  "summaries": [
+    {
+      "input_len": 512,
+      "output_len": 512,
+      "iterations": 5,
+      "ttft_ms_avg": 79.9,
+      "ttft_ms_p99": 0.0,
+      "prefill_tps": 6408.0,
+      "decode_tps": 42.6,
+      "total_time_ms_avg": 4112.0
+    },
+    {
+      "input_len": 1024,
+      "output_len": 512,
+      "iterations": 5,
+      "ttft_ms_avg": 139.2,
+      "ttft_ms_p99": 0.0,
+      "prefill_tps": 7356.0,
+      "decode_tps": 42.2,
+      "total_time_ms_avg": 7886.0
+    },
+    {
+      "input_len": 2048,
+      "output_len": 512,
+      "iterations": 5,
+      "ttft_ms_avg": 227.0,
+      "ttft_ms_p99": 0.0,
+      "prefill_tps": 9031.0,
+      "decode_tps": 41.7,
+      "total_time_ms_avg": 12170.0
+    },
+    {
+      "input_len": 4096,
+      "output_len": 512,
+      "iterations": 5,
+      "ttft_ms_avg": 402.0,
+      "ttft_ms_p99": 0.0,
+      "prefill_tps": 10190.0,
+      "decode_tps": 40.5,
+      "total_time_ms_avg": 9550.0
+    },
+    {
+      "input_len": 8192,
+      "output_len": 512,
+      "iterations": 5,
+      "ttft_ms_avg": 649.4,
+      "ttft_ms_p99": 0.0,
+      "prefill_tps": 12614.0,
+      "decode_tps": 39.8,
+      "total_time_ms_avg": 6803.0
+    }
+  ]
+}

@@ -107,6 +107,28 @@ async fn run_iteration(
 ) -> Result<IterationResult, String> {
     let prompt = gen_prompt(input_len);
 
+    // Log actual token count for debugging
+    let actual_tokens = if let Some(tokenizer) = engine.tokenizer() {
+        match tokenizer.encode(&prompt, false, false) {
+            Ok(token_ids) => {
+                let count = token_ids.len();
+                tracing::debug!(
+                    input_len = input_len,
+                    actual_tokens = count,
+                    prompt_chars = prompt.len(),
+                    iteration = iteration,
+                    "Running benchmark iteration"
+                );
+                count
+            }
+            Err(e) => {
+                return Err(format!("Tokenization failed: {}", e));
+            }
+        }
+    } else {
+        return Err("Tokenizer not available".to_string());
+    };
+
     let params = GenerationParams {
         max_tokens: Some(output_len),
         temperature: Some(0.0),  // Deterministic output
@@ -115,7 +137,7 @@ async fn run_iteration(
     };
 
     let start = Instant::now();
-    let mut stream = engine.generate_stream(&prompt, params).await;
+    let stream = engine.generate_stream(&prompt, params).await;
     futures::pin_mut!(stream);
 
     let mut ttft_ms = 0.0;
@@ -133,6 +155,13 @@ async fn run_iteration(
 
         last_token_time = elapsed;
         token_count += 1;
+    }
+
+    if !first_token_received {
+        return Err(format!(
+            "No tokens received (input_len={}, actual_tokens={}, output_len={})",
+            input_len, actual_tokens, output_len
+        ));
     }
 
     let total_time_ms = last_token_time;
@@ -233,7 +262,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     );
                 }
                 Err(e) => {
-                    eprintln!("| ERROR: {}", e);
+                    eprintln!("  ERROR (iteration {}): {}", iter, e);
+                    // Mark this test case as failed - skip remaining iterations
+                    break;
                 }
             }
         }
