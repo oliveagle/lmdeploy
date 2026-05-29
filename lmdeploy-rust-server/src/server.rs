@@ -410,7 +410,7 @@ pub async fn start_server(config: &AppConfig) -> Result<()> {
     Ok(())
 }
 
-fn create_router(state: Arc<AppState>) -> Router {
+pub fn create_router(state: Arc<AppState>) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(AllowOrigin::mirror_request())
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])

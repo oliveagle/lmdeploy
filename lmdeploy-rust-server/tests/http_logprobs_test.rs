@@ -10,42 +10,45 @@ use axum::{
 use http_body_util::BodyExt;
 use serde_json::Value;
 use std::sync::Arc;
+use tokio::sync::Semaphore;
 use tower::ServiceExt;
 
-use lmdeploy_server::config::Config;
-use lmdeploy_server::model::ModelManager;
-use lmdeploy_server::server::AppState;
-use lmdeploy_server::tokenizer::LMTokenizer;
+use lmdeploy_server::cache::TokenizeCache;
+use lmdeploy_server::config::AppConfig;
+use lmdeploy_server::metrics::AppMetrics;
+use lmdeploy_server::model::{ModelLoadTracker, ModelManager};
+use lmdeploy_server::server::{create_router, AppState, BatchStats};
 
 /// Create a test app with the given state
 async fn create_test_app() -> Result<axum::Router, Box<dyn std::error::Error>> {
-    let config = Arc::new(tokio::sync::RwLock::new(Config::default()));
+    let config = Arc::new(tokio::sync::RwLock::new(AppConfig::default()));
 
     let model_path = std::env::var("MODEL_PATH")
         .unwrap_or_else(|_| "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ".to_string());
 
-    // Load tokenizer
-    let tokenizer = LMTokenizer::from_path(&model_path)?;
+    // Create model manager with the loaded model
+    let engine_type = lmdeploy_server::model::cpp_engine::EngineType::PureCpp;
+    let model_manager = ModelManager::with_default_model_and_type(&model_path, engine_type).await?;
 
-    // Create model manager
-    let model_manager = Arc::new(tokio::sync::RwLock::new(ModelManager::new()));
+    // Create app state with actual fields
+    let (config_reload_tx, _config_reload_rx) = tokio::sync::mpsc::channel::<()>(32);
 
-    // Create app state
     let state = AppState {
+        model_manager: Arc::new(tokio::sync::RwLock::new(model_manager)),
+        tokenizer_cache: Arc::new(TokenizeCache::new(1000, 3600)),
         config: config.clone(),
-        model_manager,
-        tokenizer_cache: Arc::new(lmdeploy_server::cache::TokenizeCache::new(1000)),
-        metrics: Arc::new(lmdeploy_server::metrics::Metrics::new()),
-        batch_stats: Arc::new(lmdeploy_server::server::BatchStats::new()),
+        request_semaphore: Arc::new(Semaphore::new(10000)),
         batch_sender: None,
-        model_load_tracker: Arc::new(lmdeploy_server::server::ModelLoadTracker::new()),
+        batch_stats: Arc::new(BatchStats::new()),
+        metrics: Arc::new(AppMetrics::new()),
+        config_reload_tx,
+        model_load_tracker: Arc::new(ModelLoadTracker::new()),
         global_rate_limiter: None,
         per_ip_rate_limiter: None,
-        start_time: std::time::Instant::now(),
     };
 
     // Create router with the test handlers
-    let app = lmdeploy_server::handlers::http::create_router(Arc::new(state));
+    let app = create_router(Arc::new(state));
 
     Ok(app)
 }

@@ -1396,6 +1396,7 @@ dependencies = [
  "config",
  "criterion",
  "futures",
+ "http-body-util",
  "lru 0.12.5",
  "metrics",
  "metrics-exporter-prometheus",

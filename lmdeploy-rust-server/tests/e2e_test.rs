@@ -193,6 +193,7 @@ mod config_detection_tests {
 }
 
 mod awq_inference_tests {
+    use lmdeploy_server::model::cpp_engine::GenerationParams;
     use lmdeploy_server::model::cpp_engine::ModelState;
     use lmdeploy_server::model::cpp_engine::TurboMindCEngine;
 
@@ -271,7 +272,11 @@ mod awq_inference_tests {
             .await
             .expect("Engine must load");
 
-        let result = engine.generate("Hello, ", 10).await;
+        let params = GenerationParams {
+            max_tokens: Some(10),
+            ..Default::default()
+        };
+        let result = engine.generate("Hello, ", params).await;
         assert!(!result.is_empty(), "Generated text must not be empty");
     }
 
@@ -288,8 +293,12 @@ mod awq_inference_tests {
             .await
             .expect("Engine must load");
 
+        let params = GenerationParams {
+            max_tokens: Some(10),
+            ..Default::default()
+        };
         let (text, num_tokens, elapsed_ms) =
-            engine.generate_with_metrics("What is 2+2? ", 10).await;
+            engine.generate_with_metrics("What is 2+2? ", params).await;
         assert!(!text.is_empty(), "Generated text must not be empty");
         assert!(num_tokens > 0, "Must generate at least one token");
         assert!(elapsed_ms > 0.0, "Must take non-zero time");
