@@ -17,7 +17,7 @@ use crate::turbomind_c::{cudaMallocHost, cudaFreeHost, cudaStream_t, CudaEvent, 
 /// Eliminates per-request heap allocation by reusing capacity across calls.
 use std::cell::RefCell;
 thread_local! {
-    static TOKEN_ID_BUFFER: RefCell<Vec<u32>> = RefCell::new(Vec::with_capacity(8192));
+    static TOKEN_ID_BUFFER: RefCell<Vec<u32>> = RefCell::new(Vec::with_capacity(16384));
 }
 
 /// GPU tensor result from tokenization.
@@ -473,8 +473,8 @@ impl LMTokenizerWithGpu {
         let tokenizer = LMTokenizer::from_path(model_dir)?;
         Ok(Self {
             tokenizer,
-            pinned_buffer: std::sync::Mutex::new(PinnedTokenBuffer::new(8192)),
-            gpu_buffer: std::sync::Mutex::new(GpuTokenBuffer::new(8192)),
+            pinned_buffer: std::sync::Mutex::new(PinnedTokenBuffer::new(16384)),
+            gpu_buffer: std::sync::Mutex::new(GpuTokenBuffer::new(16384)),
         })
     }
 
@@ -482,8 +482,8 @@ impl LMTokenizerWithGpu {
     pub fn from_tokenizer(tokenizer: LMTokenizer) -> Self {
         Self {
             tokenizer,
-            pinned_buffer: std::sync::Mutex::new(PinnedTokenBuffer::new(8192)),
-            gpu_buffer: std::sync::Mutex::new(GpuTokenBuffer::new(8192)),
+            pinned_buffer: std::sync::Mutex::new(PinnedTokenBuffer::new(16384)),
+            gpu_buffer: std::sync::Mutex::new(GpuTokenBuffer::new(16384)),
         }
     }
 

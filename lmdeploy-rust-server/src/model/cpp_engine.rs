@@ -56,6 +56,7 @@ fn unix_timestamp_nanos() -> u64 {
 
 /// Thread-local buffer for reusing input_ids allocation across requests.
 /// This avoids per-request heap allocations for the i64 conversion of input_ids.
+/// Sized for 16K tokens to avoid growth on most requests.
 ///
 /// The buffer is used in the following pattern:
 /// 1. Clear the buffer
@@ -64,7 +65,7 @@ fn unix_timestamp_nanos() -> u64 {
 /// 4. Buffer can be reused for next request
 use std::cell::RefCell;
 thread_local! {
-    static INPUT_ID_BUFFER: RefCell<Vec<i64>> = RefCell::new(Vec::with_capacity(8192));
+    static INPUT_ID_BUFFER: RefCell<Vec<i64>> = RefCell::new(Vec::with_capacity(16384));
 }
 
 /// Reusable GPU buffer for input_ids.
@@ -331,18 +332,18 @@ impl Drop for PinnedUint32Buffer {
 
 thread_local! {
     static GPU_INPUT_BUFFER: RefCell<GpuInputIdsBuffer> = RefCell::new(
-        GpuInputIdsBuffer::new(8192)
+        GpuInputIdsBuffer::new(16384)
     );
     static PINNED_HOST_BUFFER: RefCell<PinnedHostBuffer> = RefCell::new(
-        PinnedHostBuffer::new(8192)
+        PinnedHostBuffer::new(16384)
     );
     // GPU buffer for uint32 input_ids (zero-copy to C++ without u32->i64 conversion)
     static GPU_UINT32_BUFFER: RefCell<GpuUint32Buffer> = RefCell::new(
-        GpuUint32Buffer::new(8192)
+        GpuUint32Buffer::new(16384)
     );
     // Pinned buffer for uint32 input_ids
     static PINNED_UINT32_BUFFER: RefCell<PinnedUint32Buffer> = RefCell::new(
-        PinnedUint32Buffer::new(8192)
+        PinnedUint32Buffer::new(16384)
     );
 }
 
@@ -1893,10 +1894,7 @@ impl TurboMindCEngine {
         set_tensor_from_dlpack(&mut input_tensors, &dlpack_input);
         input_tensors.set_sequence_length(seq_len as i32);
 
-        // Sync on the event to ensure GPU transfer is complete
-        if let Some(ref event) = gpu_tensor.sync_event {
-            let _ = event.sync();
-        }
+        // No need to sync on event here - forward_async handles GPU synchronization internally
 
         // Prepare generation config
         let mut gen_cfg = GenConfig::new().unwrap();
