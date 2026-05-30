@@ -1,0 +1,69 @@
+{
+  "engine": "LMDeploy TurboMind",
+  "model": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "backend": "turbomind",
+  "date": "2026-05-30 15:31:48",
+  "lmdeploy_version": "0.13.0",
+  "results": {
+    "short_context": {
+      "scenario": "short_context",
+      "input_len": 1024,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 1144.4605177000994,
+      "ttft_ms_p99": 1.403469478000261,
+      "itl_ms_avg": 32.42246368739465,
+      "total_time_ms_avg": 14730.102496100335,
+      "prefill_time_ms_avg": 1144.4605177000994,
+      "decode_time_ms_avg": 13585.641978400236,
+      "prefill_throughput_tps": 894.7447152286422,
+      "decode_throughput_tps": 37.686846217059674,
+      "throughput_tps": 34.758753385154485
+    },
+    "medium_context": {
+      "scenario": "medium_context",
+      "input_len": 2048,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 1920.465991799938,
+      "ttft_ms_p99": 2.865588001001015,
+      "itl_ms_avg": 39.37153286056696,
+      "total_time_ms_avg": 17229.80775410033,
+      "prefill_time_ms_avg": 1920.465991799938,
+      "decode_time_ms_avg": 15309.341762300392,
+      "prefill_throughput_tps": 1066.4078451504013,
+      "decode_throughput_tps": 33.443632518598015,
+      "throughput_tps": 29.71594386351495
+    },
+    "long_context": {
+      "scenario": "long_context",
+      "input_len": 8192,
+      "output_len": 512,
+      "completed": 10,
+      "ttft_ms_avg": 9100.281906800046,
+      "ttft_ms_p99": 16.453351754000323,
+      "itl_ms_avg": 81.66794884538544,
+      "total_time_ms_avg": 46743.83847439967,
+      "prefill_time_ms_avg": 9100.281906800046,
+      "decode_time_ms_avg": 37643.556567599626,
+      "prefill_throughput_tps": 900.1918933828471,
+      "decode_throughput_tps": 13.601265307664528,
+      "throughput_tps": 10.953315275561044
+    },
+    "long_context_large_output": {
+      "scenario": "long_context_large_output",
+      "input_len": 8192,
+      "output_len": 2048,
+      "completed": 10,
+      "ttft_ms_avg": 9112.49274180027,
+      "ttft_ms_p99": 16.482924881000145,
+      "itl_ms_avg": 78.06175988661852,
+      "total_time_ms_avg": 48130.51148969989,
+      "prefill_time_ms_avg": 9112.49274180027,
+      "decode_time_ms_avg": 39018.01874789962,
+      "prefill_throughput_tps": 898.9856268880367,
+      "decode_throughput_tps": 52.48856978701016,
+      "throughput_tps": 42.55097102880944
+    }
+  }
+}

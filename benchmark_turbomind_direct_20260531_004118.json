@@ -1,0 +1,9 @@
+{
+  "engine": "LMDeploy TurboMind (direct)",
+  "model": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "backend": "turbomind",
+  "method": "direct_engine_call",
+  "date": "2026-05-31 00:41:18",
+  "lmdeploy_version": "0.13.0",
+  "results": {}
+}

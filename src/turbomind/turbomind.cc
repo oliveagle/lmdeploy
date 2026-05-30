@@ -359,9 +359,21 @@ void TurboMind::Impl::WarmUp(int index)
 
         if (!bss.empty()) {
             const auto                         max_bs = *std::max_element(bss.begin(), bss.end());
+
+            // Safety check: ensure weights and text_model are valid
+            TM_CHECK(weights_[index] != nullptr) << "weights_[" << index << "] is null";
+            auto* text_model = weights_[index]->text_model_ptr();
+            TM_CHECK(text_model != nullptr) << "text_model_ptr is null for index " << index;
+            TM_CHECK(text_model->vocab_size > 0) << "Invalid vocab_size: " << text_model->vocab_size;
+
             Buffer_<int>                       input_ids(max_bs, kCPU);
+            if (!input_ids) {
+                TM_LOG_ERROR("Failed to allocate CPU buffer for warmup (size=%d)", max_bs);
+                return;
+            }
+
             std::mt19937                       g{};
-            std::uniform_int_distribution<int> d{0, (int)weights_[index]->text_model_ptr()->vocab_size - 1};
+            std::uniform_int_distribution<int> d{0, (int)text_model->vocab_size - 1};
             for (auto& x : input_ids) {
                 x = d(g);
             }

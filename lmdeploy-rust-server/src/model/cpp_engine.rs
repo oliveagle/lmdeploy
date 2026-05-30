@@ -394,7 +394,7 @@ fn set_input_ids_gpu_async(tensors: &mut TensorMap, input_ids: &[u32]) -> Option
                         )
                     };
                     // Record event on the same stream for synchronization
-                    let _ = event.record(stream);
+                    let _ = unsafe { event.record(stream) };
                     let shape = [gpu_size as i64];
                     tensors.set_input_ids_gpu(gpu_ptr.cast(), &shape);
                     tensors.set_sequence_length(input_ids.len() as i32);
@@ -541,7 +541,7 @@ fn set_input_ids_gpu_uint32_async(tensors: &mut TensorMap, input_ids: &[u32]) ->
                             stream,
                         )
                     };
-                    let _ = event.record(stream);
+                    let _ = unsafe { event.record(stream) };
                     let shape = [gpu_size as i64];
                     // Use the uint32 GPU setter - C++ will receive GPU pointer directly
                     tensors.set_input_ids_gpu_uint32(gpu_ptr as *const u32, &shape);
@@ -1532,21 +1532,23 @@ impl TurboMindCEngine {
         // data_type is the activation dtype (kHalf), not the weight dtype.
         // AWQ weights are kUint4 but computations happen in fp16.
         engine_config.set_data_type(crate::turbomind_c::TM_DataType::TM_DATATYPE_FP16);
-        engine_config.set_session_len(65536);
+        // session_len will be auto-adjusted by C++ based on available memory
+        engine_config.set_session_len(154880);
 
         // CRITICAL: max_prefill_token_num controls prefill performance
         // Default 0 causes max_forward_token_num = max_batch_size (32 tokens)
-        // Setting to 32768 enables single-pass prefill for 32K context
-        // This allows the entire 32K context to be processed in one forward pass
-        engine_config.set_max_prefill_token_num(32768);
+        // Setting to 8192 (Python default) for single-pass prefill without OOM
+        engine_config.set_max_prefill_token_num(8192);
 
         // max_batch_size: higher values improve throughput but use more memory
-        // GPU-adaptive: A100/A800=384, H100/H800/H200/L20Y=1024, default=128
-        // This matches Python's get_max_batch_size('cuda') behavior
-        let max_batch_size = get_max_batch_size();
+        // For 35B AWQ model on 32GB GPU, we need to use smaller batch size
+        // to avoid linear-state memory overflow
+        let max_batch_size = 32i32; // Fixed value for 35B model on 32GB GPU
         engine_config.set_max_batch_size(max_batch_size);
         engine_config.set_cache_block_seq_len(64);
-        engine_config.set_cache_max_block_count(0.8);
+        // Use smaller cache_max_entry_count for 35B model to leave room for weights
+        // Python uses 0.8 by default, but 0.5 works better for 35B on 32GB GPU
+        engine_config.set_cache_max_block_count(0.5);
         // cache_chunk_size: Python default -1 means allocate cache_max_entry_count blocks
         // When 0: allocates sqrt(cache_max_entry_count) blocks
         // When -1: allocates cache_max_entry_count blocks (matches Python behavior)
@@ -1579,17 +1581,19 @@ impl TurboMindCEngine {
         engine_config.add_device(0); // GPU 0
 
         // Create TurboMind instance via C API
+        // Python passes empty string for model_dir, actual loading via init_from_path
         tracing::info!("Creating TurboMind C++ instance...");
-        let tm = TurboMind::create(model_path, &mut engine_config).map_err(|e| {
+        let tm = TurboMind::create("", &mut engine_config).map_err(|e| {
             AppError::ModelLoadFailed(format!("Failed to create TurboMind: {:?}", e))
         })?;
 
         // Initialize from model path (builds module tree, loads weights)
+        // This is the correct initialization pattern matching Python's _create_weight + ModelLoader.export
         tracing::info!("Loading weights from safetensors...");
         let device_id = 0;
         let trust_remote_code = true;
 
-        // The InitFromPath function does the full initialization:
+        // InitFromPath does the full initialization:
         // 1. CreateContext
         // 2. CreateRoot
         // 3. Build ModelWeight module tree
@@ -1627,7 +1631,7 @@ impl TurboMindCEngine {
             request_pool: Some(request_pool),
             tokenizer,
             gpu_tokenizer,
-            session_len: 65536,
+                    session_len: 192320,  // What Python auto-truncates to with max_batch_size=32
             max_batch_size,
             quant_policy,
             hidden_size,
@@ -1845,12 +1849,7 @@ impl TurboMindCEngine {
         params: GenerationParams,
     ) -> (String, usize, f64) {
         // Check if GPU tokenizer is available
-        if self.gpu_tokenizer.is_none() {
-            tracing::warn!(
-                "GPU tokenizer not available, falling back to regular tokenizer"
-            );
-            return self.generate_with_metrics(prompt, params).await;
-        }
+        let gpu_tokenizer = self.gpu_tokenizer.as_ref().expect("GPU tokenizer required - caller should check");
 
         let pool = self
             .request_pool
@@ -1858,16 +1857,11 @@ impl TurboMindCEngine {
             .expect("Request pool not initialized");
 
         // Tokenize directly to GPU using zero-copy path
-        let gpu_tokenizer = self.gpu_tokenizer.as_ref().expect("GPU tokenizer missing");
-
         let gpu_tensor = match gpu_tokenizer.encode_to_gpu(prompt, false) {
             Ok(tensor) => tensor,
             Err(e) => {
-                tracing::warn!(
-                    error = %e,
-                    "GPU tokenization failed, falling back to regular tokenizer"
-                );
-                return self.generate_with_metrics(prompt, params).await;
+                tracing::error!(error = %e, "GPU tokenization failed");
+                return (String::new(), 0, 0.0);
             }
         };
 
@@ -1919,55 +1913,75 @@ impl TurboMindCEngine {
             end_flag: true,
         };
 
-        // Run inference
-        match request.forward(
+        // Async forward: set completion callback, submit, wait on Condvar
+        // This avoids the blocking promise/future path used by forward()
+        let completion = Arc::new((StdMutex::new(false), Condvar::new()));
+        let ctx = Arc::new(BatchCompletionContext {
+            completion: Arc::clone(&completion),
+        });
+        let ctx_ptr = Arc::into_raw(ctx) as *mut c_void;
+
+        // Set completion callback for event-driven waiting
+        if let Err(e) = unsafe { request.set_completion_callback(batch_completion_callback, ctx_ptr) } {
+            tracing::error!(error = ?e, "Failed to set completion callback");
+            let _ = unsafe { Arc::from_raw(ctx_ptr as *const BatchCompletionContext) };
+            return (String::new(), 0, 0.0);
+        }
+
+        // Submit async forward (non-blocking)
+        if let Err(e) = request.forward_async(
             &mut input_tensors,
             &session,
             &gen_cfg,
-            false,
-            true,
-            &mut output_tensors,
+            false, // stream_output
+            true,  // enable_metrics
         ) {
-            Ok(_) => {
-                let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+            tracing::error!(error = ?e, "ForwardAsync failed");
+            let _ = unsafe { Arc::from_raw(ctx_ptr as *const BatchCompletionContext) };
+            return (String::new(), 0, 0.0);
+        }
 
-                // Get output tokens from the request
-                match request.get_output("output_ids") {
-                    Ok((data_ptr, size)) => {
-                        // data_ptr points to int32 array
-                        let token_count = size / 4;
-                        let output_ids: Vec<i32> = unsafe {
-                            std::slice::from_raw_parts(data_ptr as *const i32, token_count)
-                                .to_vec()
-                        };
+        // Event-driven wait: no polling, no timeout
+        let (lock, cvar) = &*completion;
+        let mut done = lock.lock().unwrap();
+        while !*done {
+            done = cvar.wait(done).map_err(|poisoned| {
+                poisoned.into_inner()
+            }).unwrap_or_else(|guard| lock.lock().unwrap());
+        }
+        let _ctx = unsafe { Arc::from_raw(ctx_ptr as *const BatchCompletionContext) };
 
-                        // Decode output tokens
-                        let text = if let Some(ref tokenizer) = self.tokenizer {
-                            match tokenizer.decode(
-                                &output_ids.iter().map(|&id| id as u32).collect::<Vec<_>>(),
-                                true,
-                            ) {
-                                Ok(t) => t,
-                                Err(e) => {
-                                    tracing::error!(error = %e, "Decoding failed");
-                                    format!("[decode error: {}]", e)
-                                }
-                            }
-                        } else {
-                            format!("{:?}", output_ids)
-                        };
+        // Measure elapsed time after completion
+        let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
-                        (text, token_count, elapsed_ms)
+        // Get output and decode
+        match request.get_output("output_ids") {
+            Ok((data_ptr, size)) => {
+                let num_tokens = size / 4;
+                let output_ids: Vec<i32> = unsafe {
+                    std::slice::from_raw_parts(data_ptr as *const i32, num_tokens).to_vec()
+                };
+
+                let text = if let Some(tokenizer) = &self.tokenizer {
+                    match tokenizer.decode(
+                        &output_ids.iter().map(|&id| id as u32).collect::<Vec<_>>(),
+                        true,
+                    ) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            tracing::error!(error = %e, "Decoding failed");
+                            format!("[decode error: {}]", e)
+                        }
                     }
-                    Err(e) => {
-                        tracing::error!(error = ?e, "Failed to get output_ids");
-                        (String::new(), 0, elapsed_ms)
-                    }
-                }
+                } else {
+                    format!("{:?}", output_ids)
+                };
+
+                (text, num_tokens, elapsed_ms)
             }
             Err(e) => {
-                tracing::error!(error = ?e, "C++ inference failed");
-                (String::new(), 0, 0.0)
+                tracing::error!(error = ?e, "Failed to get output_ids");
+                (String::new(), 0, elapsed_ms)
             }
         }
     }
@@ -2131,17 +2145,30 @@ impl TurboMindCEngine {
     }
 
     /// Generate text with TurboMind C++ engine, returning (text, num_tokens, elapsed_ms)
+    ///
+    /// Uses GPU tokenizer zero-copy path for minimum latency:
+    /// 1. Tokenize directly to GPU memory (eliminates Vec<u32> allocation + CPU→GPU copy)
+    /// 2. Zero-copy DLPack transfer to C++ engine
+    /// 3. Async forward with event-driven completion (no blocking promise/future)
     pub async fn generate_with_metrics(
         &self,
         prompt: &str,
         params: GenerationParams,
     ) -> (String, usize, f64) {
+        // Use GPU tokenizer if available (zero-copy path)
+        if self.gpu_tokenizer.is_some() {
+            let (text, num_tokens, elapsed_ms) =
+                self.generate_with_gpu_tokenizer_and_metrics(prompt, params.clone()).await;
+            return (text, num_tokens, elapsed_ms);
+        }
+
+        // Fallback: CPU tokenizer path (original implementation)
         let pool = self
             .request_pool
             .as_ref()
             .expect("Request pool not initialized");
 
-        // Tokenize input (outside the lock to minimize critical section)
+        // Tokenize input
         let input_ids = match &self.tokenizer {
             Some(tokenizer) => match tokenizer.encode(prompt, false, false) {
                 Ok(ids) => ids,
@@ -2160,35 +2187,23 @@ impl TurboMindCEngine {
 
         let start = Instant::now();
 
-        // Acquire a slot (semaphore permit + mutex guard for the slot).
-        // tokio::sync::Mutex allows the runtime to yield while waiting,
-        // enabling true parallel inference without blocking threads.
         let (_permit, mut request, mut input_tensors, mut output_tensors) = pool.acquire().await;
 
-        // Clear and reuse TensorMaps instead of allocating new ones
         input_tensors.clear();
         output_tensors.clear();
 
-        // Start async GPU transfer for input_ids - CPU continues with config prep
-        // while H2D happens in the background
+        // GPU transfer via uint32 async path
         if let Some(event) = set_input_ids_gpu_uint32_async(&mut input_tensors, &input_ids) {
-            // Sync on the event before forward to ensure data is ready on GPU
-            // This sync point is necessary to guarantee correctness
             let _ = event.sync();
-        } else {
-            // Fallback path: already synced in set_input_ids_gpu
         }
 
-        // Prepare generation config with HTTP parameters
         let mut gen_cfg = GenConfig::new().unwrap();
         gen_cfg.set_max_new_tokens(params.max_tokens.unwrap_or(512) as i32);
         gen_cfg.set_temperature(params.temperature.unwrap_or(0.7));
         gen_cfg.set_top_p(params.top_p.unwrap_or(0.95));
         gen_cfg.set_top_k(params.top_k.unwrap_or(50) as i32);
-        // Apply any additional parameters (min_p, repetition_penalty, seed)
         params.apply_to_gen_config(&mut gen_cfg);
 
-        // Prepare session parameters (use unique ID for each request)
         let session = TM_SessionParam {
             id: generate_session_id(),
             step: 0,
@@ -2196,9 +2211,6 @@ impl TurboMindCEngine {
             end_flag: true,
         };
 
-        // Prepare output tensors (reused from pool)
-
-        // Attach grammar for guided decoding if provided
         if let Some(grammar) = &params.grammar {
             if let Err(e) = request.set_grammar(grammar) {
                 tracing::warn!(error = ?e, "Failed to attach grammar");
@@ -2206,56 +2218,74 @@ impl TurboMindCEngine {
             }
         }
 
-        // Run inference. The request is Send+Sync and the C++ engine handles
-        // its own internal synchronization, so we can proceed without holding
-        // the tokio mutex during the blocking FFI call.
-        match request.forward(
+        // Async forward pattern: setup completion callback, submit, wait
+        let completion = Arc::new((StdMutex::new(false), Condvar::new()));
+        let ctx = Arc::new(BatchCompletionContext {
+            completion: Arc::clone(&completion),
+        });
+        let ctx_ptr = Arc::into_raw(ctx) as *mut c_void;
+
+        // Set completion callback for event-driven waiting
+        if let Err(e) = unsafe { request.set_completion_callback(batch_completion_callback, ctx_ptr) } {
+            tracing::error!(error = ?e, "Failed to set completion callback");
+            let _ = unsafe { Arc::from_raw(ctx_ptr as *const BatchCompletionContext) };
+            return (String::new(), 0, 0.0);
+        }
+
+        // Submit async forward (non-blocking)
+        if let Err(e) = request.forward_async(
             &mut input_tensors,
             &session,
             &gen_cfg,
             false, // stream_output
             true,  // enable_metrics
-            &mut output_tensors,
         ) {
-            Ok(_) => {
-                let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+            tracing::error!(error = ?e, "ForwardAsync failed");
+            let _ = unsafe { Arc::from_raw(ctx_ptr as *const BatchCompletionContext) };
+            return (String::new(), 0, 0.0);
+        }
 
-                // Get output tokens from the request
-                match request.get_output("output_ids") {
-                    Ok((data_ptr, size)) => {
-                        // data_ptr points to int32 array
-                        let num_tokens = size / 4;
-                        let output_ids: Vec<i32> = unsafe {
-                            std::slice::from_raw_parts(data_ptr as *const i32, num_tokens).to_vec()
-                        };
+        // Event-driven wait: no polling, no timeout
+        let (lock, cvar) = &*completion;
+        let mut done = lock.lock().unwrap();
+        while !*done {
+            done = cvar.wait(done).map_err(|poisoned| {
+                poisoned.into_inner()
+            }).unwrap_or_else(|guard| lock.lock().unwrap());
+        }
+        let _ctx = unsafe { Arc::from_raw(ctx_ptr as *const BatchCompletionContext) };
 
-                        // Decode output tokens
-                        let text = if let Some(tokenizer) = &self.tokenizer {
-                            match tokenizer.decode(
-                                &output_ids.iter().map(|&id| id as u32).collect::<Vec<_>>(),
-                                true,
-                            ) {
-                                Ok(t) => t,
-                                Err(e) => {
-                                    tracing::error!(error = %e, "Decoding failed");
-                                    format!("[decode error: {}]", e)
-                                }
-                            }
-                        } else {
-                            format!("{:?}", output_ids)
-                        };
+        // Measure elapsed time after completion
+        let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
-                        (text, num_tokens, elapsed_ms)
+        // Get output and decode
+        match request.get_output("output_ids") {
+            Ok((data_ptr, size)) => {
+                let num_tokens = size / 4;
+                let output_ids: Vec<i32> = unsafe {
+                    std::slice::from_raw_parts(data_ptr as *const i32, num_tokens).to_vec()
+                };
+
+                let text = if let Some(tokenizer) = &self.tokenizer {
+                    match tokenizer.decode(
+                        &output_ids.iter().map(|&id| id as u32).collect::<Vec<_>>(),
+                        true,
+                    ) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            tracing::error!(error = %e, "Decoding failed");
+                            format!("[decode error: {}]", e)
+                        }
                     }
-                    Err(e) => {
-                        tracing::error!(error = ?e, "Failed to get output_ids");
-                        (String::new(), 0, elapsed_ms)
-                    }
-                }
+                } else {
+                    format!("{:?}", output_ids)
+                };
+
+                (text, num_tokens, elapsed_ms)
             }
             Err(e) => {
-                tracing::error!(error = ?e, "C++ inference failed");
-                (String::new(), 0, 0.0)
+                tracing::error!(error = ?e, "Failed to get output_ids");
+                (String::new(), 0, elapsed_ms)
             }
         }
     }
@@ -2567,18 +2597,12 @@ impl TurboMindCEngine {
             let (lock, cvar) = &*completion;
             let mut done = lock.lock().unwrap();
             while !*done {
-                // Safety: Condvar::wait_timeout returns Err only if lock is poisoned
-                // Use 10ms timeout as safety net against missed notifications
-                let result = cvar.wait_timeout(done, std::time::Duration::from_millis(10));
-                done = match result {
-                    Ok((guard, _timeout)) => guard,
-                    Err(poisoned) => {
-                        // Poisoned lock: extract guard from tuple and drop it
-                        // to properly release the lock, then re-acquire
-                        drop(poisoned.into_inner().0);
-                        lock.lock().unwrap()
-                    }
-                };
+                // Event-driven wait: no timeout, callback guarantees notification
+                done = cvar.wait(done).map_err(|poisoned| {
+                    // Poisoned lock: re-acquire
+                    poisoned.into_inner()
+                })
+                .unwrap_or_else(|guard| lock.lock().unwrap());
             }
 
             // Reclaim the Arc to prevent memory leak
@@ -3222,20 +3246,15 @@ impl TurboMindCEngine {
                     };
                 }
 
-                // Wait for completion via Condvar (event-driven, zero CPU waste)
+                // Wait for completion via Condvar (event-driven, no timeout)
                 let (lock, cvar) = &*completion;
                 let mut done = lock.lock().unwrap();
                 while !*done {
-                    let result = cvar.wait_timeout(done, std::time::Duration::from_millis(10));
-                    done = match result {
-                        Ok((guard, _timeout)) => guard,
-                        Err(poisoned) => {
-                            // Poisoned lock: extract guard from tuple and drop it
-                            // to properly release the lock, then re-acquire
-                            drop(poisoned.into_inner().0);
-                            lock.lock().unwrap()
-                        }
-                    };
+                    done = cvar.wait(done).map_err(|poisoned| {
+                        // Poisoned lock: re-acquire
+                        poisoned.into_inner()
+                    })
+                    .unwrap_or_else(|guard| lock.lock().unwrap());
                 }
                 // Cleanup
                 let _ctx = unsafe { Box::from_raw(ctx_ptr as *mut BatchCompletionContext) };

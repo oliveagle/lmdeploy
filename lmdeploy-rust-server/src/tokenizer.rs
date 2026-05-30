@@ -587,7 +587,7 @@ impl LMTokenizerWithGpu {
         let sync_event = CudaEvent::new().ok();
 
         if let Some(ref event) = sync_event {
-            let _ = event.record(stream);
+            let _ = unsafe { event.record(stream) };
         }
 
         Ok(GpuTensor {

@@ -194,6 +194,9 @@ int TM_TurboMind_GetScheduleMetrics(
 TM_TensorMap* TM_TensorMap_Create(void);
 void TM_TensorMap_Destroy(TM_TensorMap* map);
 
+// Clear a TensorMap for reuse (removes all tensors, keeps allocated memory)
+void TM_TensorMap_Clear(TM_TensorMap* map);
+
 // Tensor creation and insertion into map
 // For CPU tensors with data pointer (no copy)
 void TM_TensorMap_SetInt32(TM_TensorMap* map, const char* name, const int32_t* data, int ndim, const int64_t* shape);
@@ -205,6 +208,7 @@ void TM_TensorMap_SetBytes(TM_TensorMap* map, const char* name, const void* data
 void TM_TensorMap_SetInt32GPU(TM_TensorMap* map, const char* name, const int32_t* data, int ndim, const int64_t* shape);
 void TM_TensorMap_SetInt64GPU(TM_TensorMap* map, const char* name, const int64_t* data, int ndim, const int64_t* shape);
 void TM_TensorMap_SetFloat32GPU(TM_TensorMap* map, const char* name, const float* data, int ndim, const int64_t* shape);
+void TM_TensorMap_SetUInt32GPU(TM_TensorMap* map, const char* name, const uint32_t* data, int ndim, const int64_t* shape);
 
 // Get tensor from map (caller does not own)
 bool TM_TensorMap_Get(
@@ -239,41 +243,6 @@ void TM_GenerationConfig_SetRandomSeed(TM_GenerationConfig* config, uint64_t val
 void TM_GenerationConfig_SetOutputLogprobs(TM_GenerationConfig* config, int value);
 void TM_GenerationConfig_SetOutputLastHiddenState(TM_GenerationConfig* config, int value);
 void TM_GenerationConfig_SetOutputLogits(TM_GenerationConfig* config, int value);
-
-// ============================================================
-// Guided Decoding / Structured Output (xgrammar)
-// ============================================================
-
-// Opaque handle for compiled grammar
-typedef struct TM_CompiledGrammar TM_CompiledGrammar;
-
-// Create a compiled grammar from JSON schema string
-// json_schema: JSON schema string (e.g., '{"type":"object","properties":{...}}')
-// Returns NULL on error
-TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema);
-
-// Create a compiled grammar from EBNF string
-// ebnf_string: EBNF grammar string
-// Returns NULL on error
-TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string);
-
-// Create a compiled grammar from regex pattern
-// regex: Regular expression string
-// Returns NULL on error
-TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex);
-
-// Get built-in JSON grammar (pre-compiled for general JSON output)
-// Returns a grammar that must NOT be destroyed (singleton)
-TM_CompiledGrammar* TM_Grammar_GetBuiltinJSON(void);
-
-// Destroy a compiled grammar (except builtin from TM_Grammar_GetBuiltinJSON)
-void TM_Grammar_Destroy(TM_CompiledGrammar* grammar);
-
-// Attach grammar to ModelRequest for guided decoding
-// Must be called before TM_ModelRequest_Forward / TM_ModelRequest_ForwardAsync
-// The grammar is NOT owned by the request and must remain valid until forward completes
-// Returns 0 on success, negative on error
-int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, TM_CompiledGrammar* grammar);
 
 // ============================================================
 // Session parameters
@@ -325,6 +294,29 @@ int TM_ModelRequest_ForwardAsync(
     bool stream_output,
     bool enable_metrics);
 
+// Token callback type for event-driven streaming
+// token_id: the generated token ID
+// seq_len: the current sequence length (1-indexed position of the token)
+typedef void (*TM_TokenCallback)(int token_id, int seq_len, void* user_data);
+
+// Completion callback type for event-driven request completion
+// status: the final request status (TM_RequestStatus)
+// seq_len: the final sequence length
+// user_data: opaque pointer passed to the callback
+typedef void (*TM_CompletionCallback)(int status, int seq_len, void* user_data);
+
+// Register a token callback for event-driven streaming.
+// The callback will be invoked from the C++ engine thread whenever a new token is generated.
+// user_data: opaque pointer passed to the callback
+// Returns 0 on success, negative on error
+int TM_ModelRequest_SetTokenCallback(TM_ModelRequest* req, TM_TokenCallback cb, void* user_data);
+
+// Register a completion callback for event-driven request completion.
+// The callback will be invoked from the C++ engine thread when the request completes.
+// user_data: opaque pointer passed to the callback
+// Returns 0 on success, negative on error
+int TM_ModelRequest_SetCompletionCallback(TM_ModelRequest* req, TM_CompletionCallback cb, void* user_data);
+
 // Get the output_ids tensor from the in-flight request.
 // Returns a pointer to int32 array of generated tokens and the count.
 // Only valid during stream_output mode (between ForwardAsync and completion).
@@ -371,16 +363,71 @@ int TM_ModelRequest_GetOutput(
     void** out_data,
     size_t* out_size);
 
-// Token callback type for event-driven streaming
-// token_id: the generated token ID
-// seq_len: the current sequence length (1-indexed position of the token)
-typedef void (*TM_TokenCallback)(int token_id, int seq_len, void* user_data);
+// ============================================================
+// Grammar support for guided decoding
+// ============================================================
 
-// Register a token callback for event-driven streaming.
-// The callback will be invoked from the C++ engine thread whenever a new token is generated.
-// user_data: opaque pointer passed to the callback
+typedef struct TM_CompiledGrammar TM_CompiledGrammar;
+
+// Create grammar from JSON schema string
+TM_CompiledGrammar* TM_Grammar_CreateFromJSONSchema(const char* json_schema);
+
+// Create grammar from EBNF string
+TM_CompiledGrammar* TM_Grammar_CreateFromEBNF(const char* ebnf_string);
+
+// Create grammar from regex pattern
+TM_CompiledGrammar* TM_Grammar_CreateFromRegex(const char* regex);
+
+// Get built-in JSON grammar (singleton, do not destroy)
+const TM_CompiledGrammar* TM_Grammar_GetBuiltinJSON(void);
+
+// Destroy grammar object (except for builtin)
+void TM_Grammar_Destroy(TM_CompiledGrammar* grammar);
+
+// Attach grammar to request (must be called before Forward)
 // Returns 0 on success, negative on error
-int TM_ModelRequest_SetTokenCallback(TM_ModelRequest* req, TM_TokenCallback cb, void* user_data);
+int TM_ModelRequest_SetGrammar(TM_ModelRequest* req, const TM_CompiledGrammar* grammar);
+
+// ============================================================
+// DLPack support for zero-copy tensor transfer
+// ============================================================
+
+/// DLPack-compatible tensor representation (C-compatible struct).
+///
+/// Used for zero-copy tensor sharing via DLPack protocol.
+typedef struct {
+    TM_DataType dtype;  // data type
+    int         ndim;   // number of dimensions
+    int64_t     shape[8];  // max 8 dimensions
+    void*       data;   // data pointer
+    int         device_id;  // -1 for CPU, >= 0 for CUDA device
+} TM_Tensor;
+
+// Set tensor from DLPack capsule (zero-copy)
+// data: raw pointer from DLPack capsule (GPU or CPU memory)
+// dl_type_code: DLPack type code (0=kBool, 2=kInt, 3=kFloat, 4=kUInt, 5=kBFloat)
+// dl_type_bits: number of bits per element (8, 16, 32, 64)
+// device_type: DLPack device type (1=CPU, 2=CUDA GPU)
+void TM_TensorMap_SetDLPack(
+    TM_TensorMap* map,
+    const char* name,
+    const void* data,
+    int ndim,
+    const int64_t* shape,
+    int dl_type_code,
+    int dl_type_bits,
+    int device_type);
+
+// Create TM_Tensor from DLPack capsule (zero-copy)
+// dlpack_capsule: pointer to DLManagedTensorVersioned or DLManagedTensor
+// out_tensor: output TM_Tensor struct to populate
+// Returns 0 on success, negative error code on failure
+int TM_TensorFromDLPack(void* dlpack_capsule, TM_Tensor* out_tensor);
+
+// Create DLPack capsule from TM_Tensor (zero-copy)
+// tensor: TM_Tensor struct to convert
+// Returns pointer to DLManagedTensorVersioned capsule, NULL on failure
+void* TM_TensorToDLPack(const TM_Tensor* tensor);
 
 // ============================================================
 // Weight Export / Import
@@ -401,6 +448,40 @@ int TM_ExportWeightsToBin(
     int num_kv_heads,
     int vocab_size);
 
+// ============================================================
+// CUDA Graph Support (Experimental)
+// ============================================================
+
+// Opaque handle to a captured CUDA Graph
+typedef struct TM_CudaGraph* TM_CudaGraphHandle;
+
+// Capture a CUDA Graph for a given input configuration
+// This captures the GPU kernel launch sequence for later replay
+// req: Model request (must be initialized)
+// input_tensors: Input tensor configuration to capture graph for
+// out_graph: Output handle for the captured graph
+// Returns 0 on success, negative error code on failure
+int TM_CudaGraph_Capture(
+    TM_ModelRequest* req,
+    TM_TensorMap* input_tensors,
+    TM_CudaGraphHandle* out_graph);
+
+// Launch a previously captured CUDA Graph
+// graph: Graph handle from TM_CudaGraph_Capture
+// input_tensors: Input tensors matching the captured configuration
+// output_tensors: Output tensor map to store results
+// stream: CUDA stream to launch on (0 = default stream)
+// Returns 0 on success, negative error code on failure
+int TM_CudaGraph_Launch(
+    TM_CudaGraphHandle graph,
+    TM_TensorMap* input_tensors,
+    TM_TensorMap* output_tensors,
+    void* stream);
+
+// Destroy a CUDA Graph and release associated resources
+void TM_CudaGraph_Destroy(TM_CudaGraphHandle graph);
+
+// ============================================================
 #ifdef __cplusplus
 }
 #endif

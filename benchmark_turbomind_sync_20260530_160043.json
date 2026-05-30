@@ -1,0 +1,9 @@
+{
+  "engine": "LMDeploy TurboMind (sync)",
+  "model": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "backend": "turbomind",
+  "method": "sync_infer",
+  "date": "2026-05-30 16:00:43",
+  "lmdeploy_version": "0.13.0",
+  "results": {}
+}

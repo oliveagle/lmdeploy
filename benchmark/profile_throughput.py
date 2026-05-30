@@ -258,7 +258,7 @@ class Engine:
         tasks = []
         for i in range(concurrency):
             task = self._inference(req_queue, i, temperature, top_p, top_k, stream_output, skip_tokenize,
-                                   skip_detokenize, concurrency)
+                                   skip_detokenize, concurrency, profiler)
             tasks.append(task)
 
         async def _gather_tasks(tasks):

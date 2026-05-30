@@ -85,7 +85,7 @@ struct ContextStorage {
                 mask = host_alloc_bit;
                 host_alloc_.push(alloc);
             }
-            else if (type == kDEVICE) {
+            else if (type == kDEVICE || type == kMANAGED) {
                 mask = device_alloc_bit;
                 device_alloc_.push(alloc);
             }
@@ -230,6 +230,7 @@ Allocator& Context::alloc(Device device)
 {
     switch (device.type) {
         case kDEVICE:
+        case kMANAGED:
             return device_alloc();
         case kCPU:
             return host_alloc();

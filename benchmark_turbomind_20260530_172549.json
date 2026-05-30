@@ -1,0 +1,56 @@
+{
+  "engine": "LMDeploy TurboMind (direct)",
+  "model": "/mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ",
+  "backend": "turbomind",
+  "date": "2026-05-30 17:25:49",
+  "results": [
+    {
+      "scenario": "short_context",
+      "input_len": 512,
+      "output_len": 512,
+      "completed": 5,
+      "ttft_ms_avg": 119.35532959978445,
+      "total_time_ms_avg": 12478.87169740061,
+      "decode_time_ms_avg": 12359.516367800825,
+      "prefill_throughput_tps": 4289.712086731355,
+      "decode_throughput_tps": 41.425569153649825,
+      "avg_output_tokens": 512.0
+    },
+    {
+      "scenario": "medium_context",
+      "input_len": 1024,
+      "output_len": 512,
+      "completed": 5,
+      "ttft_ms_avg": 190.33713480021106,
+      "total_time_ms_avg": 12690.169968999544,
+      "decode_time_ms_avg": 12499.832834199333,
+      "prefill_throughput_tps": 5379.927574694502,
+      "decode_throughput_tps": 40.96054777622118,
+      "avg_output_tokens": 512.0
+    },
+    {
+      "scenario": "long_context",
+      "input_len": 4096,
+      "output_len": 512,
+      "completed": 5,
+      "ttft_ms_avg": 677.0759621991601,
+      "total_time_ms_avg": 13976.749853399815,
+      "decode_time_ms_avg": 13299.673891200655,
+      "prefill_throughput_tps": 6049.542782018264,
+      "decode_throughput_tps": 38.497184531626,
+      "avg_output_tokens": 512.0
+    },
+    {
+      "scenario": "long_context",
+      "input_len": 8192,
+      "output_len": 512,
+      "completed": 5,
+      "ttft_ms_avg": 1564.5877128001302,
+      "total_time_ms_avg": 15985.483590402146,
+      "decode_time_ms_avg": 14420.895877602015,
+      "prefill_throughput_tps": 5235.884145695381,
+      "decode_throughput_tps": 35.50403555684906,
+      "avg_output_tokens": 512.0
+    }
+  ]
+}
