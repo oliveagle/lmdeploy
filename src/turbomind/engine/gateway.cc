@@ -92,7 +92,7 @@ void Gateway::pop(std::vector<std::shared_ptr<Request>>& infer_reqs,
     // Assign a monotonic increasing id for each infer request
     q.assign_unique_ids(infer_reqs);
 
-    // Bind for stateful inference
+    // Bind for stateful inference (skip one-shot requests where end_flag is true)
     std::vector<uint64_t> bind_ids;
     for (const auto& r : infer_reqs) {
         if (r->session.start_flag && !r->session.end_flag) {  // started but not ended
@@ -134,9 +134,10 @@ void Gateway::kill(std::shared_ptr<Request> r)
         queues_[rank]->kill(std::move(r));
     }
     else {
-        TM_LOG_ERROR("Failed to find a binded queue for {}", r->session.id);
+        // Session not bound: either one-shot request (start+end) or already ended.
+        // This is safe to treat as a no-op since there's no active session to kill.
         notify({[r = std::move(r)] {  //
-            UpdateState(*r, Request::kInvalid, 0);
+            UpdateState(*r, Request::kFinish, 0);
         }});
     }
 }
