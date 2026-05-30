@@ -47,7 +47,13 @@ public:
         base_{}, size_{size}, device_{alloc->device()}, dtype_{dtype}
     {
         auto bytes = turbomind::byte_size(dtype, size);
-        data_      = {alloc->allocate(bytes), [=](auto p) { alloc->deallocate(p, bytes); }};
+        void* ptr = alloc->allocate(bytes);
+        if (!ptr) {
+            // Allocation failed (e.g., out of memory), leave data_ as empty shared_ptr
+            // This allows caller to detect failure via operator bool()
+            return;
+        }
+        data_ = {ptr, [=](auto p) { alloc->deallocate(p, bytes); }};
     }
 
     Buffer(ssize_t size, DataType dtype, Device device): Buffer{size, dtype, Context::alloc(device)} {}
