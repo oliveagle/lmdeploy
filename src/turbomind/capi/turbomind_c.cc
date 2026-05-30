@@ -1094,8 +1094,21 @@ static void LoadWeightsFromSafetensors(
             // Check if target param slot exists (not if tensor is allocated)
             // get() returns empty Tensor if slot_ is nullptr
             if (!target_param.get()) {
+                // DEBUG: Log which tensor was skipped
+                if (tensor_name.find("lm_head") != std::string::npos ||
+                    tensor_name.find("output") != std::string::npos ||
+                    tensor_name.find("language_model") != std::string::npos) {
+                    SAFETENSORS_LOG("[C-API] DEBUG SKIP: tensor=%s -> tm_path=%s -> param=%s (slot not found)\n",
+                                   tensor_name.c_str(), tm_path.c_str(), param_name.c_str());
+                }
                 ++skip_count;
                 continue;
+            }
+
+            // Log successful param lookup for output-related tensors
+            if (tensor_name.find("lm_head") != std::string::npos) {
+                SAFETENSORS_LOG("[C-API] DEBUG LOAD: tensor=%s -> tm_path=%s -> param=%s (FOUND)\n",
+                               tensor_name.c_str(), tm_path.c_str(), param_name.c_str());
             }
 
             // Get direct zero-copy pointer to mmap'd data (no CPU copy!)
@@ -1131,7 +1144,7 @@ static void LoadWeightsFromSafetensors(
                 continue;
             }
 
-            if (tensor.raw_data()) {
+            if (tensor) {
                 size_t copy_size = std::min(meta.size, static_cast<size_t>(tensor.byte_size()));
                 transfers.push_back({src_data, tensor.raw_data(), copy_size});
                 ++loaded_count;
@@ -1199,7 +1212,7 @@ static void LoadWeightsFromSafetensors(
                     fprintf(stderr, "[C-API]   w_qkv_module->type() = %s\n", w_qkv_module->type());
                 }
                 if (!w_qkv_module) {
-                    fprintf(stderr, "[C-API] ERROR: Cannot find w_qkv child module for %s\n", key.c_str());
+                    fprintf(stderr, "[C-API] INFO: w_qkv child module not found for %s (MoE or separate proj format), skipping QKV fusion\n", key.c_str());
                     continue;
                 }
 
@@ -1209,7 +1222,7 @@ static void LoadWeightsFromSafetensors(
                 // Check that param slot is valid
                 if (!w_qkv_param) {
                     // w_qkv_param is falsy only if slot is nullptr (param not found in module)
-                    fprintf(stderr, "[C-API] ERROR: w_qkv.weight param slot not found for %s\n", key.c_str());
+                    fprintf(stderr, "[C-API] INFO: w_qkv.weight param slot not found for %s (MoE or separate proj format), skipping QKV fusion\n", key.c_str());
                     continue;
                 }
 
@@ -1232,7 +1245,7 @@ static void LoadWeightsFromSafetensors(
                 std::vector<size_t> fused_shape = {fused_out, hidden};
                 auto fused_tensor = w_qkv_param.alloc(fused_shape, acc.dtype);
 
-                if (!fused_tensor || !fused_tensor.raw_data()) {
+                if (!fused_tensor) {
                     fprintf(stderr, "[C-API] ERROR: Failed to allocate w_qkv for %s\n", key.c_str());
                     continue;
                 }
@@ -1482,6 +1495,18 @@ static std::string MapHuggingFaceWeightToTurboMind(const std::string& hf_name, c
     // embed_tokens.weight -> tok_embeddings (direct param on model_weight)
     if (result.compare(0, 12, "embed_tokens.") == 0) {
         result = "tok_embeddings";  // Return just the param name, not "tok_embeddings.weight"
+    }
+
+    // ========================================================
+    // language_model.* -> model_root params (top-level under model_weight)
+    // ========================================================
+    // language_model.norm.weight -> norm.weight
+    // language_model.embed_tokens.weight -> tok_embeddings.weight
+    if (result.compare(0, 15, "language_model.") == 0) {
+        result = result.substr(15);  // Remove "language_model." prefix
+        // For language_model.norm.weight -> norm.weight
+        // For language_model.embed_tokens.weight -> tok_embeddings.weight
+        SAFETENSORS_LOG("[C-API] Mapped language_model.%s -> %s\n", result.c_str(), result.c_str());
     }
 
     // ========================================================
@@ -1922,9 +1947,11 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
 
                     // Create each expert FfnWeight
                     for (int expert_idx = 0; expert_idx < hf_config.num_local_experts; ++expert_idx) {
-                        turbomind::core::FfnConfig expert_ffn_cfg;
+                        // Use moe_intermediate_size for expert FFN
                         expert_ffn_cfg.hidden_dim = hf_config.hidden_size;
-                        expert_ffn_cfg.inter_size = hf_config.intermediate_size;
+                        expert_ffn_cfg.inter_size = hf_config.moe_intermediate_size > 0
+                                                    ? hf_config.moe_intermediate_size
+                                                    : hf_config.intermediate_size;
                         expert_ffn_cfg.act_type = 0;  // SiLU
                         expert_ffn_cfg.fuse_silu = true;
                         expert_ffn_cfg.is_expert = true;
@@ -2246,10 +2273,43 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             fflush(stderr);
         }
 
+        // DEBUG: Verify model_weight state before ProcessWeights
+        auto* model_weight = model_root->text_model_ptr();
+        if (model_weight) {
+            fprintf(stderr, "[C-API] DEBUG: model_weight valid, checking modules...\n");
+            fflush(stderr);
+
+            auto* output = model_weight->output;
+            if (output) {
+                fprintf(stderr, "[C-API] DEBUG: output module exists, output_dim=%d\n", output->output_dim);
+                fflush(stderr);
+            } else {
+                fprintf(stderr, "[C-API] WARNING: output module is NULL!\n");
+                fflush(stderr);
+            }
+
+            if (model_weight->tok_embeddings) {
+                fprintf(stderr, "[C-API] DEBUG: tok_embeddings valid\n");
+                fflush(stderr);
+            } else {
+                fprintf(stderr, "[C-API] ERROR: tok_embeddings is NULL!\n");
+                fflush(stderr);
+            }
+        } else {
+            fprintf(stderr, "[C-API] ERROR: model_weight is NULL!\n");
+            fflush(stderr);
+        }
+
         // Step 5: Process weights (moves weights to GPU and calls prepare)
+        fprintf(stderr, "[C-API] Calling ProcessWeights...\n");
+        fflush(stderr);
         tm->instance->ProcessWeights(index);
+        fprintf(stderr, "[C-API] ProcessWeights completed\n");
+        fflush(stderr);
 
         // Step 6: Create inference engine
+        fprintf(stderr, "[C-API] Calling CreateEngine...\n");
+        fflush(stderr);
         tm->instance->CreateEngine(index);
 
         return TM_OK;
