@@ -1161,6 +1161,7 @@ static void LoadWeightsFromSafetensors(
                 auto qkv_start = std::chrono::high_resolution_clock::now();
 
                 // Navigate to the attention module
+                // key is "layers.X.attention", navigate through each part
                 turbomind::core::Module* attn_module = model_weight;
                 parts.clear();
                 size_t start = 0;
@@ -1171,8 +1172,16 @@ static void LoadWeightsFromSafetensors(
                 }
                 parts.push_back(key.substr(start));
 
+                fprintf(stderr, "[C-API] QKV fusion navigating %s (key: %s)\n",
+                        [&]() { std::string s; for (auto& p : parts) { s += "'" + p + "' -> "; } s += "[target]"; return s.c_str(); }(),
+                        key.c_str());
+
                 for (size_t j = 0; j < parts.size() && attn_module; ++j) {
-                    attn_module = attn_module->child(parts[j]);
+                    auto* next = attn_module->child(parts[j]);
+                    fprintf(stderr, "[C-API]   step %zu: part='%s', from=%p -> %p\n",
+                            j, parts[j].c_str(), static_cast<void*>(attn_module),
+                            static_cast<void*>(next));
+                    attn_module = next;
                 }
 
                 if (!attn_module) {
@@ -1180,20 +1189,26 @@ static void LoadWeightsFromSafetensors(
                     continue;
                 }
 
+                fprintf(stderr, "[C-API]   attn_module found, type=%s\n", attn_module->type());
+
                 // Navigate to the w_qkv child module first, then get the weight param
                 // This matches the nested param access pattern used in Phase 1
                 auto* w_qkv_module = attn_module->child("w_qkv");
+                fprintf(stderr, "[C-API]   child('w_qkv') -> %p\n", static_cast<void*>(w_qkv_module));
+                if (w_qkv_module) {
+                    fprintf(stderr, "[C-API]   w_qkv_module->type() = %s\n", w_qkv_module->type());
+                }
                 if (!w_qkv_module) {
                     fprintf(stderr, "[C-API] ERROR: Cannot find w_qkv child module for %s\n", key.c_str());
                     continue;
                 }
 
-                // Get the weight param slot (the tensor is intentionally unallocated,
-                // awaiting fusion - do NOT check bool(), which would fail for empty tensors)
+                // Get the weight param slot (operator bool() checks if the slot exists,
+                // regardless of whether the tensor is allocated - it isn't yet, awaiting fusion)
                 turbomind::core::Param w_qkv_param = w_qkv_module->param("weight");
-                turbomind::Tensor w_qkv_tensor = w_qkv_param.get();
-                if (!w_qkv_tensor) {
-                    // get() returns empty tensor if slot_ is nullptr (param not found)
+                // Check that param slot is valid
+                if (!w_qkv_param) {
+                    // w_qkv_param is falsy only if slot is nullptr (param not found in module)
                     fprintf(stderr, "[C-API] ERROR: w_qkv.weight param slot not found for %s\n", key.c_str());
                     continue;
                 }
@@ -1227,22 +1242,29 @@ static void LoadWeightsFromSafetensors(
 
                 // Copy in order: Q, K, V
                 // Each weight is transposed: HF uses [hidden, out] but TM uses [out, hidden]
-                // So we need to transpose each weight during fusion
+                // So we need to transpose each weight during fusion element-by-element
+                // HF [h, j] -> TM [j, h]: fused_data[(j * hidden + h) * elem_size] = src_data[(h * out + j) * elem_size]
                 for (size_t h = 0; h < hidden; ++h) {
-                    // Copy Q row (transposed)
-                    size_t q_offset = h * q_out * elem_size;
-                    size_t fused_q_offset = h * elem_size;
-                    std::memcpy(&fused_data[fused_q_offset], &acc.q_data[q_offset], q_out * elem_size);
+                    // Copy Q (transposed)
+                    for (size_t j = 0; j < q_out; ++j) {
+                        const uint8_t* src = &acc.q_data[(h * q_out + j) * elem_size];
+                        uint8_t* dst = &fused_data[(j * hidden + h) * elem_size];
+                        std::memcpy(dst, src, elem_size);
+                    }
 
-                    // Copy K row (transposed)
-                    size_t k_offset = h * k_out * elem_size;
-                    size_t fused_k_offset = (q_out + h) * elem_size;
-                    std::memcpy(&fused_data[fused_k_offset], &acc.k_data[k_offset], k_out * elem_size);
+                    // Copy K (transposed)
+                    for (size_t j = 0; j < k_out; ++j) {
+                        const uint8_t* src = &acc.k_data[(h * k_out + j) * elem_size];
+                        uint8_t* dst = &fused_data[((q_out + j) * hidden + h) * elem_size];
+                        std::memcpy(dst, src, elem_size);
+                    }
 
-                    // Copy V row (transposed)
-                    size_t v_offset = h * v_out * elem_size;
-                    size_t fused_v_offset = (q_out + k_out + h) * elem_size;
-                    std::memcpy(&fused_data[fused_v_offset], &acc.v_data[v_offset], v_out * elem_size);
+                    // Copy V (transposed)
+                    for (size_t j = 0; j < v_out; ++j) {
+                        const uint8_t* src = &acc.v_data[(h * v_out + j) * elem_size];
+                        uint8_t* dst = &fused_data[((q_out + k_out + j) * hidden + h) * elem_size];
+                        std::memcpy(dst, src, elem_size);
+                    }
                 }
 
                 // Copy fused data to GPU

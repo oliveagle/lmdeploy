@@ -1161,6 +1161,7 @@ static void LoadWeightsFromSafetensors(
                 auto qkv_start = std::chrono::high_resolution_clock::now();
 
                 // Navigate to the attention module
+                // key is "layers.X.attention", navigate through each part
                 turbomind::core::Module* attn_module = model_weight;
                 parts.clear();
                 size_t start = 0;
@@ -1171,8 +1172,16 @@ static void LoadWeightsFromSafetensors(
                 }
                 parts.push_back(key.substr(start));
 
+                fprintf(stderr, "[C-API] QKV fusion navigating %s (key: %s)\n",
+                        [&]() { std::string s; for (auto& p : parts) { s += "'" + p + "' -> "; } s += "[target]"; return s.c_str(); }(),
+                        key.c_str());
+
                 for (size_t j = 0; j < parts.size() && attn_module; ++j) {
-                    attn_module = attn_module->child(parts[j]);
+                    auto* next = attn_module->child(parts[j]);
+                    fprintf(stderr, "[C-API]   step %zu: part='%s', from=%p -> %p\n",
+                            j, parts[j].c_str(), static_cast<void*>(attn_module),
+                            static_cast<void*>(next));
+                    attn_module = next;
                 }
 
                 if (!attn_module) {
@@ -1180,42 +1189,29 @@ static void LoadWeightsFromSafetensors(
                     continue;
                 }
 
+                fprintf(stderr, "[C-API]   attn_module found, type=%s\n", attn_module->type());
+
                 // Navigate to the w_qkv child module first, then get the weight param
                 // This matches the nested param access pattern used in Phase 1
                 auto* w_qkv_module = attn_module->child("w_qkv");
+                fprintf(stderr, "[C-API]   child('w_qkv') -> %p\n", static_cast<void*>(w_qkv_module));
+                if (w_qkv_module) {
+                    fprintf(stderr, "[C-API]   w_qkv_module->type() = %s\n", w_qkv_module->type());
+                }
                 if (!w_qkv_module) {
                     fprintf(stderr, "[C-API] ERROR: Cannot find w_qkv child module for %s\n", key.c_str());
                     continue;
                 }
 
-                // Debug: check module type and try to get param
-                fprintf(stderr, "[C-API] DEBUG: w_qkv_module type=%s for %s\n", w_qkv_module->type(), key.c_str());
-                fflush(stderr);
-
-                // Debug: call for_each_param to verify params exist
-                fprintf(stderr, "[C-API] DEBUG: for_each_param check for %s\n", key.c_str());
-                fflush(stderr);
-                int param_count = 0;
-                w_qkv_module->for_each_param([&param_count](const char* name, turbomind::core::Tensor& tensor) {
-                    fprintf(stderr, "[C-API] DEBUG: found param '%s'\n", name);
-                    param_count++;
-                });
-                fprintf(stderr, "[C-API] DEBUG: found %d params for %s\n", param_count, key.c_str());
-                fflush(stderr);
-
-                // Debug: check param result
-                fprintf(stderr, "[C-API] DEBUG: calling param('weight') for %s\n", key.c_str());
-                fflush(stderr);
+                // Get the weight param slot (operator bool() checks if the slot exists,
+                // regardless of whether the tensor is allocated - it isn't yet, awaiting fusion)
                 turbomind::core::Param w_qkv_param = w_qkv_module->param("weight");
-                fprintf(stderr, "[C-API] DEBUG: param('weight') returned\n");
-                fflush(stderr);
-
-                // Check if param slot is valid
-                fprintf(stderr, "[C-API] DEBUG: checking w_qkv_param.get()...\n");
-                fflush(stderr);
-                auto test_tensor = w_qkv_param.get();
-                fprintf(stderr, "[C-API] DEBUG: w_qkv_param.get() completed, valid=%d\n", static_cast<bool>(test_tensor));
-                fflush(stderr);
+                // Check that param slot is valid
+                if (!w_qkv_param) {
+                    // w_qkv_param is falsy only if slot is nullptr (param not found in module)
+                    fprintf(stderr, "[C-API] ERROR: w_qkv.weight param slot not found for %s\n", key.c_str());
+                    continue;
+                }
 
                 // Calculate fused shape
                 // HF: q=[hidden, q_out], k=[hidden, k_out], v=[hidden, v_out]
@@ -1226,25 +1222,15 @@ static void LoadWeightsFromSafetensors(
                 const size_t v_out = acc.v_shape[1];
                 const size_t fused_out = q_out + k_out + v_out;
 
-                fprintf(stderr, "[C-API] DEBUG: fused shape [%zu,%zu], calling alloc()...\n", fused_out, hidden);
-                fflush(stderr);
-
-                // Allocate fused tensor
-                std::vector<size_t> fused_shape = {fused_out, hidden};
-                auto fused_tensor = w_qkv_param.alloc(fused_shape, acc.dtype);
-                fprintf(stderr, "[C-API] DEBUG: alloc() completed, fused_tensor valid=%d, raw_data=%p\n",
-                        static_cast<bool>(fused_tensor), fused_tensor.raw_data());
-                fflush(stderr);
-
-                // Check if data was actually allocated
-                if (!fused_tensor || !fused_tensor.raw_data()) {
-                    fprintf(stderr, "[C-API] ERROR: Failed to allocate w_qkv for %s (valid=%d, ptr=%p)\n",
-                            key.c_str(), static_cast<bool>(fused_tensor), fused_tensor.raw_data());
-                    continue;
-                }
-
                 // Data size calculation
                 const size_t elem_size = turbomind::byte_size(acc.dtype);
+                const size_t q_bytes = acc.q_data.size();
+                const size_t k_bytes = acc.k_data.size();
+                const size_t v_bytes = acc.v_data.size();
+
+                // Allocate fused tensor on GPU
+                std::vector<size_t> fused_shape = {fused_out, hidden};
+                auto fused_tensor = w_qkv_param.alloc(fused_shape, acc.dtype);
 
                 if (!fused_tensor || !fused_tensor.raw_data()) {
                     fprintf(stderr, "[C-API] ERROR: Failed to allocate w_qkv for %s\n", key.c_str());
@@ -1252,59 +1238,37 @@ static void LoadWeightsFromSafetensors(
                 }
 
                 // Fuse on CPU first, then transfer to GPU
-                fprintf(stderr, "[C-API] DEBUG: allocating %zu bytes for fused_data...\n", fused_tensor.byte_size());
-                fflush(stderr);
                 std::vector<uint8_t> fused_data(fused_tensor.byte_size());
-                fprintf(stderr, "[C-API] DEBUG: fused_data allocated, size=%zu\n", fused_data.size());
-                fflush(stderr);
 
                 // Copy in order: Q, K, V
                 // Each weight is transposed: HF uses [hidden, out] but TM uses [out, hidden]
-                // So we need to transpose each weight during fusion
-                fprintf(stderr, "[C-API] DEBUG: starting fusion loop, hidden=%zu, q_out=%zu, k_out=%zu, v_out=%zu...\n", hidden, q_out, k_out, v_out);
-                fprintf(stderr, "[C-API] DEBUG: q_data size=%zu, expected=%zu, k_data=%zu, v_data=%zu\n",
-                        acc.q_data.size(), hidden * q_out * elem_size, acc.k_data.size(), acc.v_data.size());
-                fflush(stderr);
-
-                // Iterate over all rows (h from 0 to hidden-1) for transposition
+                // So we need to transpose each weight during fusion element-by-element
+                // HF [h, j] -> TM [j, h]: fused_data[(j * hidden + h) * elem_size] = src_data[(h * out + j) * elem_size]
                 for (size_t h = 0; h < hidden; ++h) {
-                    // Copy Q row (transposed)
-                    size_t q_offset = h * q_out * elem_size;
-                    size_t q_size = q_out * elem_size;
-                    if (q_offset + q_size > acc.q_data.size()) {
-                        fprintf(stderr, "[C-API] ERROR: q_data OOB: offset=%zu + size=%zu > total=%zu\n",
-                                q_offset, q_size, acc.q_data.size());
-                        continue;
+                    // Copy Q (transposed)
+                    for (size_t j = 0; j < q_out; ++j) {
+                        const uint8_t* src = &acc.q_data[(h * q_out + j) * elem_size];
+                        uint8_t* dst = &fused_data[(j * hidden + h) * elem_size];
+                        std::memcpy(dst, src, elem_size);
                     }
-                    size_t fused_q_offset = h * elem_size;
-                    std::memcpy(&fused_data[fused_q_offset], &acc.q_data[q_offset], q_out * elem_size);
 
-                    // Copy K row (transposed)
-                    size_t k_offset = h * k_out * elem_size;
-                    size_t fused_k_offset = (q_out + h) * elem_size;
-                    std::memcpy(&fused_data[fused_k_offset], &acc.k_data[k_offset], k_out * elem_size);
+                    // Copy K (transposed)
+                    for (size_t j = 0; j < k_out; ++j) {
+                        const uint8_t* src = &acc.k_data[(h * k_out + j) * elem_size];
+                        uint8_t* dst = &fused_data[((q_out + j) * hidden + h) * elem_size];
+                        std::memcpy(dst, src, elem_size);
+                    }
 
-                    // Copy V row (transposed)
-                    size_t v_offset = h * v_out * elem_size;
-                    size_t fused_v_offset = (q_out + k_out + h) * elem_size;
-                    std::memcpy(&fused_data[fused_v_offset], &acc.v_data[v_offset], v_out * elem_size);
+                    // Copy V (transposed)
+                    for (size_t j = 0; j < v_out; ++j) {
+                        const uint8_t* src = &acc.v_data[(h * v_out + j) * elem_size];
+                        uint8_t* dst = &fused_data[((q_out + k_out + j) * hidden + h) * elem_size];
+                        std::memcpy(dst, src, elem_size);
+                    }
                 }
-                fprintf(stderr, "[C-API] DEBUG: fusion loop completed\n");
-                fflush(stderr);
 
                 // Copy fused data to GPU
-                // IMPORTANT: Use BatchCopy instead of std::memcpy for GPU memory
-                fprintf(stderr, "[C-API] DEBUG: adding fused QKV to batch_copy, size=%zu, dst=%p\n",
-                        fused_data.size(), fused_tensor.raw_data());
-                fflush(stderr);
-
-                // Add to transfers for batched GPU copy
-                transfers.push_back({fused_data.data(), fused_tensor.raw_data(), fused_data.size()});
-                ++loaded_count;
-
-                fprintf(stderr, "[C-API] DEBUG: fused QKV added to transfers\n");
-                fflush(stderr);
-
+                std::memcpy(fused_tensor.raw_data(), fused_data.data(), fused_data.size());
                 auto qkv_elapsed = std::chrono::high_resolution_clock::now() - qkv_start;
                 SAFETENSORS_LOG("[C-API] Fused QKV for %s: [%zu,%zu], %.0fms\n", key.c_str(), fused_out, hidden,
                                std::chrono::duration_cast<std::chrono::milliseconds>(qkv_elapsed).count());

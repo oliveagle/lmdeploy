@@ -180,7 +180,14 @@ public:
         return slot_ ? *slot_ : Tensor{};
     }
 
+    /// Whether the param slot was found (true even if tensor is not yet allocated).
     explicit operator bool() const
+    {
+        return slot_ != nullptr;
+    }
+
+    /// Whether the underlying tensor is allocated (slot exists AND has data).
+    bool is_allocated() const
     {
         return slot_ && static_cast<bool>(*slot_);
     }
