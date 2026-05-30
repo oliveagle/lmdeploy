@@ -1,0 +1,43 @@
+name: Rust Server Benchmark
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'lmdeploy-rust-server/**'
+      - 'src/turbomind/**'
+
+jobs:
+  rust-benchmark:
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Build Rust Server
+        working-directory: lmdeploy-rust-server
+        run: |
+          cargo build --release --bin prefill_benchmark
+
+      - name: Run Prefill Benchmark
+        working-directory: lmdeploy-rust-server
+        env:
+          MODEL_PATH: /mnt/data/models/modelscope_models/Qwen3___6-35B-A3B-AWQ
+        run: |
+          cargo run --release --bin prefill_benchmark -- \
+            --model "$MODEL_PATH" \
+            --warmup 2 \
+            --measure 5 \
+            --output tests/prefill_benchmark_rust.json
+
+      - name: Upload Benchmark Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-benchmark-results
+          path: lmdeploy-rust-server/tests/prefill_benchmark_rust.json
+          retention-days: 30

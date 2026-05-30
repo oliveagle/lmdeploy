@@ -2,6 +2,9 @@
 //!
 //! Direct bindings to turbomind_c.so without Python overhead
 
+#![allow(non_camel_case_types)]
+#![allow(nonstandard_style)]
+
 use std::fmt;
 use std::ffi::CString;
 use std::sync::OnceLock;
@@ -129,8 +132,12 @@ impl CudaEvent {
         }
     }
 
-    pub fn record(&self, stream: cudaStream_t) -> std::result::Result<(), i32> {
-        let ret = unsafe { cudaEventRecord(self.handle, stream) };
+    /// Record a CUDA event on the given stream.
+    ///
+    /// # Safety
+    /// The stream must be a valid CUDA stream.
+    pub unsafe fn record(&self, stream: cudaStream_t) -> std::result::Result<(), i32> {
+        let ret = cudaEventRecord(self.handle, stream);
         if ret == 0 {
             Ok(())
         } else {
