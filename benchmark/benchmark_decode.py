@@ -1,22 +1,23 @@
 import json
-import pickle
+import os
 import time
 from pathlib import Path
 
 import fire
 import numpy as np
-from lmdeploy.pytorch.decode import Engine
-from transformers import AutoTokenizer
+from lmdeploy import pipeline
+from lmdeploy.messages import PytorchEngineConfig, TurbomindEngineConfig
 
 
-def benchmark(model_path, share_gpt_path, downsample=100, accel=None, save_to='decode_result'):
+def benchmark(model_path, share_gpt_path, downsample=100, backend='turbomind', tp=1, save_to='decode_result'):
     """Benchmark using ShareGPT data.
 
     Please download `ShareGPT_V3_unfiltered_cleaned_split.json` as data for this benchmark.
     """
 
     start = time.monotonic()
-    content = json.load(open(share_gpt_path))
+    with open(share_gpt_path) as f:
+        content = json.load(f)
 
     texts = []
     for c in content:
@@ -25,37 +26,57 @@ def benchmark(model_path, share_gpt_path, downsample=100, accel=None, save_to='d
 
     print(f'Parse json in {time.monotonic() - start} seconds.')
 
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    tokenizer.pad_token_id = tokenizer.eos_token_id
-    tokenizer.padding_side = 'right'
-
+    # Downsample texts
     texts = texts[::downsample]
-    input_ids = tokenizer(texts, padding=False).input_ids
+    num_prompts = len(texts)
 
-    print(F'Number of prompts: {len(input_ids)}')
-    print(F'Maximum length: {max(map(len, input_ids))}')
-    print(F'Total length: {sum(map(len, input_ids))}')
+    print(f'Number of prompts: {num_prompts}')
+    print(f'Average length (chars): {np.mean([len(t) for t in texts]):.0f}')
+
+    # Create backend config
+    if backend == 'turbomind':
+        engine_config = TurbomindEngineConfig(tp=tp, max_batch_size=num_prompts)
+    else:
+        engine_config = PytorchEngineConfig(tp=tp, max_batch_size=num_prompts)
 
     start = time.monotonic()
-    # Init an engine
-    engine = Engine(model_path, tokenizer=tokenizer, accel=accel)
-    # decode prompts
-    probs = engine.decode(input_ids)
-    total_tokens = sum(map(len, input_ids))
+    # Init pipeline
+    pipe = pipeline(model_path, backend_config=engine_config)
+
+    pipe_start = time.monotonic()
+    print(f'Pipeline initialized in {pipe_start - start:.1f} seconds.')
+
+    # Process all prompts
+    responses = pipe(texts)
 
     elapsed = time.monotonic() - start
-    print(f'Decoded {total_tokens} tokens in {elapsed:.1f} seconds, '
-          f'{total_tokens / elapsed:.1f} tokens/s.')
-    print(f'Decoded {len(probs)} prompts in {elapsed:.1f} seconds, '
-          f'{len(probs) / elapsed:.1f} requests/s.')
+    total_chars = sum(len(r.text) if hasattr(r, 'text') and r.text else 0 for r in responses)
+    print(f'Decoded {total_chars} chars in {elapsed:.1f} seconds, '
+          f'{total_chars / elapsed:.1f} chars/s.')
+    print(f'Decoded {num_prompts} prompts in {elapsed:.1f} seconds, '
+          f'{num_prompts / elapsed:.1f} requests/s.')
 
-    pkl_path = Path(save_to).with_suffix('.pkl')
+    # Save results
+    os.makedirs(os.path.dirname(save_to) if os.path.dirname(save_to) else '.', exist_ok=True)
+    json_path = Path(save_to).with_suffix('.json')
 
-    with pkl_path.open('wb') as f:
-        pickle.dump(probs, f)
+    results = []
+    for text, resp in zip(texts[:5], responses[:5]):
+        results.append({
+            'prompt': text[:100] + '...',
+            'response': resp.text[:200] if hasattr(resp, 'text') else str(resp),
+        })
 
-    txt_path = Path(save_to).with_suffix('.txt')
-    np.savetxt(txt_path.as_posix(), probs, fmt='%.4e')
+    # Save results to JSON
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
+    print(f'Results saved to {json_path}')
+
+    print('Sample results (first 5):')
+    for r in results:
+        print(f'  Prompt: {r["prompt"]}')
+        print(f'  Response: {r["response"]}')
+        print()
 
 
 if __name__ == '__main__':
