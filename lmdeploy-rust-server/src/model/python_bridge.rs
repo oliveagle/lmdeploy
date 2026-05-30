@@ -9,7 +9,6 @@ use std::io::{BufRead, BufReader, Write};
 use std::pin::Pin;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
