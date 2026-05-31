@@ -1059,6 +1059,12 @@ struct StreamContext {
 struct ContextPtr(*mut c_void);
 unsafe impl Send for ContextPtr {}
 
+/// Send-safe wrapper for GPU pointer.
+/// Safe to Send because the GPU memory is managed by CUDA and the pointer
+/// is only read during the async block's execution.
+struct GpuPtr(*const c_void);
+unsafe impl Send for GpuPtr {}
+
 /// Batch completion context for non-streaming batch inference
 struct BatchCompletionContext {
     /// Completion signal via condition variable
@@ -2418,8 +2424,8 @@ impl TurboMindCEngine {
 
     /// Generate text with streaming output (token-by-token)
     ///
-    /// Uses event-driven callbacks from the C++ engine instead of polling.
-    /// Each generated token fires a callback that decodes and sends it through the channel.
+    /// Uses `gpu_tokenizer.encode_to_gpu()` to tokenize directly to GPU memory
+    /// with zero-copy path when available. Falls back to CPU tokenizer path.
     ///
     /// Returns a stream of (token_id, token_text) tuples.
     pub async fn generate_stream(
@@ -2427,7 +2433,24 @@ impl TurboMindCEngine {
         prompt: &str,
         params: GenerationParams,
     ) -> std::pin::Pin<Box<dyn futures::Stream<Item = (u32, String)> + Send>> {
-        // Tokenize input
+        // Try GPU tokenizer path first
+        if let Some(gpu_tok) = &self.gpu_tokenizer {
+            match gpu_tok.encode_to_gpu(prompt, false) {
+                Ok(gpu_tensor) => {
+                    let seq_len = gpu_tensor.len;
+                    tracing::debug!(
+                        input_len = seq_len,
+                        "GPU tokenizer path for generate_stream"
+                    );
+                    return self.generate_stream_impl_gpu(gpu_tensor, seq_len, params).await;
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "GPU tokenization failed, falling back to CPU");
+                }
+            }
+        }
+
+        // Fallback to CPU tokenizer path
         let (input_ids, tokenizer) = match &self.tokenizer {
             Some(t) => {
                 let ids = match t.encode(prompt, false, false) {
@@ -2604,6 +2627,144 @@ impl TurboMindCEngine {
             }
 
             // Reclaim the Arc to prevent memory leak
+            let _ctx = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
+        });
+
+        Box::pin(tokio_stream::wrappers::ReceiverStream::new(rx))
+    }
+
+    /// Internal streaming implementation with GPU tensor (zero-copy path).
+    ///
+    /// Uses DLPack to transfer input_ids directly from GPU memory to the C++ engine
+    /// without any CPU copy. This eliminates the Vec<u32> allocation and reduces
+    /// memory copies from 2 to 1.
+    ///
+    /// Returns a stream of (token_id, token_text) tuples.
+    async fn generate_stream_impl_gpu<'a>(
+        &self,
+        gpu_tensor: crate::tokenizer::GpuTensor<'a>,
+        seq_len: usize,
+        params: GenerationParams,
+    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = (u32, String)> + Send>> {
+        let pool = self
+            .request_pool
+            .as_ref()
+            .expect("Request pool not initialized")
+            .clone();
+        let params_clone = params.clone();
+
+        let (tx, rx) = tokio::sync::mpsc::channel::<(u32, String)>(128);
+
+        // Get CPU tokenizer for decoding (GPU tokenizer is input-only)
+        let tokenizer = match &self.tokenizer {
+            Some(t) => t.clone(),
+            None => {
+                tracing::error!("CPU tokenizer not available for decoding");
+                return Box::pin(futures::stream::empty());
+            }
+        };
+
+        // Sync before spawning to avoid lifetime issues
+        if let Some(ref event) = gpu_tensor.sync_event {
+            let _ = event.sync();
+        }
+
+        // Capture GPU pointer as usize (Send-safe) before dropping gpu_tensor
+        let gpu_ptr_addr = gpu_tensor.gpu_ptr as usize;
+
+        tokio::task::spawn(async move {
+            let gpu_ptr = gpu_ptr_addr as *const c_void;
+            let (_permit, mut request, mut input_tensors, mut _output_tensors) =
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(pool.acquire())
+                });
+
+            input_tensors.clear();
+
+            let completion = Arc::new((StdMutex::new(false), Condvar::new()));
+
+            let ctx = Arc::new(StreamContext {
+                tokenizer,
+                tx,
+                completion: Arc::clone(&completion),
+            });
+            let ctx_ptr = ContextPtr(Arc::into_raw(ctx) as *mut c_void);
+
+            if let Err(e) = unsafe { request.set_token_callback(token_callback, ctx_ptr.0) } {
+                tracing::error!(error = ?e, "Failed to set token callback");
+                let _ = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
+                return;
+            }
+
+            if let Err(e) =
+                unsafe { request.set_completion_callback(completion_callback, ctx_ptr.0) }
+            {
+                tracing::error!(error = ?e, "Failed to set completion callback");
+                let _ = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
+                return;
+            }
+
+            // Zero-copy DLPack transfer: GPU pointer directly to C++
+            let dlpack_input = DlpackInputTensor {
+                name: "input_ids",
+                data: gpu_ptr,
+                shape: vec![seq_len as i64],
+                dtype: crate::model::cpp_engine::DlpackDtype::UInt(32),
+                device: crate::model::cpp_engine::DlpackDevice::Cuda(0),
+            };
+            set_tensor_from_dlpack(&mut input_tensors, &dlpack_input);
+            input_tensors.set_sequence_length(seq_len as i32);
+
+            let mut gen_cfg = match crate::turbomind_c::GenConfig::new() {
+                Ok(g) => g,
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to create gen config");
+                    let _ = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
+                    return;
+                }
+            };
+            gen_cfg.set_max_new_tokens(params_clone.max_tokens.unwrap_or(1024) as i32);
+            gen_cfg.set_temperature(params_clone.temperature.unwrap_or(0.7));
+            gen_cfg.set_top_p(params_clone.top_p.unwrap_or(0.95));
+            gen_cfg.set_top_k(params_clone.top_k.unwrap_or(50) as i32);
+            params_clone.apply_to_gen_config(&mut gen_cfg);
+
+            let session = crate::turbomind_c::TM_SessionParam {
+                id: generate_session_id(),
+                step: 0,
+                start_flag: true,
+                end_flag: true,
+            };
+
+            if let Some(grammar) = &params_clone.grammar {
+                if let Err(e) = request.set_grammar(grammar) {
+                    tracing::warn!(error = ?e, "Failed to attach grammar for stream");
+                    let _ = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
+                    return;
+                }
+            }
+
+            if let Err(e) = request.forward_async(
+                &mut input_tensors,
+                &session,
+                &gen_cfg,
+                true,
+                false,
+            ) {
+                tracing::error!(error = ?e, "ForwardAsync failed");
+                let _ = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
+                return;
+            }
+
+            let (lock, cvar) = &*completion;
+            let mut done = lock.lock().unwrap();
+            while !*done {
+                done = cvar.wait(done).map_err(|poisoned| {
+                    poisoned.into_inner()
+                })
+                .unwrap_or_else(|guard| lock.lock().unwrap());
+            }
+
             let _ctx = unsafe { Arc::from_raw(ctx_ptr.0 as *const StreamContext) };
         });
 
