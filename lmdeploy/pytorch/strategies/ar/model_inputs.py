@@ -111,15 +111,37 @@ class ARModelInputsStrategy(ModelInputsStrategy):
                    device: str = 'cpu',
                    dummy_block_id: int = 0,
                    vocab_size: int = 1,
-                   meta: MakeDummyMeta | None = None) -> ModelInputs:
+                   meta: MakeDummyMeta | None = None,
+                   **kwargs) -> ModelInputs:
         """Create dummy model inputs."""
-        return make_dummy_inputs(batch_size,
-                                 max_q_seqlen=1,
-                                 is_decoding=is_decoding,
-                                 device=device,
-                                 dummy_block_id=dummy_block_id,
-                                 vocab_size=vocab_size,
-                                 meta=meta)
+        target_hidden_size = kwargs.pop('target_hidden_size', None)
+        target_dtype = kwargs.pop('target_dtype', torch.bfloat16)
+        max_q_seqlen = kwargs.pop('max_q_seqlen', None)
+
+        # For spec decoding prefill warmup, max_q_seqlen is not provided
+        # We use 1 as default, but target_hidden_states needs the correct length
+        if max_q_seqlen is None:
+            max_q_seqlen = 1
+
+        inputs = make_dummy_inputs(batch_size,
+                                   max_q_seqlen=max_q_seqlen,
+                                   is_decoding=is_decoding,
+                                   device=device,
+                                   dummy_block_id=dummy_block_id,
+                                   vocab_size=vocab_size,
+                                   meta=meta)
+
+        # For speculative decoding - create target_hidden_states for draft model warmup
+        if target_hidden_size is not None:
+            # target_hidden_states shape: [bsz, ctx_len, target_hidden_size]
+            # For DFlash, ctx_len should be 0 for prefill warmup of draft model
+            # We create a small dummy tensor
+            inputs.target_hidden_states = torch.zeros((1, batch_size * max_q_seqlen, target_hidden_size),
+                                                      dtype=target_dtype,
+                                                      device=device)
+            inputs.target_position_ids = torch.zeros_like(inputs.input_ids, dtype=torch.long, device=device)
+
+        return inputs
 
 
 def index_select_model_inputs(inputs: ModelInputs,

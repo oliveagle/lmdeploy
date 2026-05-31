@@ -1,8 +1,12 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import os
 import torch
 import triton
 from triton import language as tl
 
+# 设置 Triton benchmark 缓存大小以避免 OOM
+# 默认值是总显存大小，在 16GB V100 上会分配 4GB 作为 cache
+os.environ['TRITON_BENCHMARK_CACHE_SIZE_KB'] = '262144'  # 256MB instead of 4GB
 
 def get_cuda_autotune_config():
     return [
@@ -82,11 +86,6 @@ def _unpack_weight(weight):
     return weight.reshape(BLOCK_SIZE_K, BLOCK_SIZE_N)
 
 
-@triton.autotune(
-    configs=get_cuda_autotune_config(),
-    key=['N', 'K'],
-    reset_to_zero=['c_ptr'],
-)
 @triton.jit
 def awq_linear_kernel(
         a_ptr,
@@ -239,32 +238,134 @@ def awq_linear(x, qweight, scales, qzeros):
 
     BLOCK_SIZE_M = triton.next_power_of_2(M)
     BLOCK_SIZE_M = max(16, min(128, BLOCK_SIZE_M))
+
+    # 直接调用 kernel，不使用 autotuner
+    # 使用 BLOCK_SIZE_N = 64，这在 V100 上应该能工作
+    # 不使用 triton.autotune 来避免 OOM
+    BLOCK_SIZE_N = 64
+    GROUP_SIZE_M = 8
+
+    # 构造 grid 和调用
+    grid = (
+        triton.cdiv(M, BLOCK_SIZE_M) * triton.cdiv(N, BLOCK_SIZE_N),
+        SPLIT_K,
+    )
+
+    # 调用 kernel 而不是 autotuner
     awq_linear_kernel[grid](
-        # Pointers to matrices
         x,
         qweight,
         scales,
         qzeros,
         out,
-        # Matrix dimensions
         M,
         N,
         K,
         stride_am=x.stride(0),
-        stride_ak=x.stride(1),  #
+        stride_ak=x.stride(1),
         stride_wk=qweight.stride(0),
-        stride_wn=qweight.stride(1),  #
+        stride_wn=qweight.stride(1),
         stride_sk=scales.stride(0),
-        stride_sn=scales.stride(1),  #
+        stride_sn=scales.stride(1),
         stride_zk=qzeros.stride(0),
-        stride_zn=qzeros.stride(1),  #
+        stride_zn=qzeros.stride(1),
         stride_cm=out.stride(0),
         stride_cn=out.stride(1),
-        # Meta-parameters
-        BLOCK_SIZE_M=BLOCK_SIZE_M,
-        BLOCK_SIZE_K=group_size,
         SPLIT_K=SPLIT_K,
         NUM_STAGES=num_stages,
+        BLOCK_SIZE_M=BLOCK_SIZE_M,
+        BLOCK_SIZE_N=BLOCK_SIZE_N,
+        BLOCK_SIZE_K=group_size,
+        GROUP_SIZE_M=GROUP_SIZE_M,
     )
 
     return out
+
+
+def awq_dequant_weights(qweight, scales, qzeros, w_bit=4, group_size=128):
+    """Dequantize AWQ weights from int4 to float16.
+
+    This is a fallback implementation using PyTorch operations.
+    Not optimal for performance, but works for correctness.
+
+    Args:
+        qweight: Packed quantized weights, shape (in_features, quant_out_features)
+                 or (num_experts, in_features, quant_out_features)
+        scales: Scaling factors, shape (grouped_in_feats, out_features)
+                or (num_experts, grouped_in_feats, out_features)
+        qzeros: Packed zeros, shape (grouped_in_feats, quant_out_features)
+                or (num_experts, grouped_in_feats, quant_out_features)
+        w_bit: Bit width (default 4)
+        group_size: Group size for quantization
+
+    Returns:
+        Dequantized weights in float16, shape (in_features, out_features)
+                or (num_experts, out_features, in_features)
+    """
+    import torch
+
+    assert w_bit == 4, f"Only w_bit=4 is supported, got {w_bit}"
+    elem_per_int = 32 // w_bit
+
+    # Check if we have multiple experts
+    has_experts = qweight.dim() == 3
+    if has_experts:
+        num_experts = qweight.size(0)
+        results = []
+        for e in range(num_experts):
+            expert_qw = qweight[e]
+            expert_s = scales[e]
+            expert_qz = qzeros[e]
+            result = awq_dequant_weights_single_expert(
+                expert_qw, expert_s, expert_qz, w_bit, group_size
+            )
+            results.append(result.t())  # Transpose to (out_features, in_features)
+        return torch.stack(results, dim=0)
+    else:
+        return awq_dequant_weights_single_expert(qweight, scales, qzeros, w_bit, group_size)
+
+
+def awq_dequant_weights_single_expert(qweight, scales, qzeros, w_bit=4, group_size=128):
+    """Dequantize AWQ weights from int4 to float16 for a single expert.
+
+    Args:
+        qweight: Packed quantized weights, shape (in_features, quant_out_features)
+        scales: Scaling factors, shape (grouped_in_feats, out_features)
+        qzeros: Packed zeros, shape (grouped_in_feats, quant_out_features)
+        w_bit: Bit width (default 4)
+        group_size: Group size for quantization
+
+    Returns:
+        Dequantized weights in float16, shape (in_features, out_features)
+    """
+    import torch
+
+    assert w_bit == 4, f"Only w_bit=4 is supported, got {w_bit}"
+    elem_per_int = 32 // w_bit
+
+    in_features, quant_out_features = qweight.shape
+    grouped_in_feats, _ = qzeros.shape
+    out_features = scales.size(1)
+
+    # Unpack qweight: (in_features, quant_out_features) -> (in_features, out_features)
+    qw_unpacked = torch.zeros(in_features, out_features, dtype=torch.int32, device=qweight.device)
+    for i in range(elem_per_int):
+        shift = i * w_bit
+        qw_unpacked[:, i::elem_per_int] = (qweight >> shift) & 0xF
+
+    # Unpack qzeros: (grouped_in_feats, quant_out_features) -> (grouped_in_feats, out_features)
+    qz_unpacked = torch.zeros(grouped_in_feats, out_features, dtype=torch.int32, device=qzeros.device)
+    for i in range(elem_per_int):
+        shift = i * w_bit
+        qz_unpacked[:, i::elem_per_int] = (qzeros >> shift) & 0xF
+
+    # Dequantize: (weight - zeros) * scales
+    # We need to reshape for broadcasting
+    scales_broadcast = scales.reshape(grouped_in_feats, 1, out_features)
+    qz_broadcast = qz_unpacked.reshape(grouped_in_feats, 1, out_features)
+    qw_reshaped = qw_unpacked.reshape(grouped_in_feats, group_size, out_features)
+
+    weights = (qw_reshaped.to(torch.float16) - qz_broadcast.to(torch.float16)) * scales_broadcast.to(torch.float16)
+    weights = weights.reshape(in_features, out_features)
+
+    return weights

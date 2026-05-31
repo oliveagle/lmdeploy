@@ -18,14 +18,9 @@
 
 #include "src/turbomind/core/copy.h"
 #include "src/turbomind/core/logger.h"
-#include "src/turbomind/core/scope.h"
-#include "src/turbomind/models/decoder_layer_weight.h"
-#include "src/turbomind/models/delta_net_weight.h"
 #include "src/turbomind/models/language_model.h"
 #include "src/turbomind/models/llama/SequenceManager.h"
 #include "src/turbomind/models/llama/llama_params.h"
-#include "src/turbomind/models/model_weight.h"
-#include "src/turbomind/utils/cuda_utils.h"
 #include "src/turbomind/utils/metrics.h"
 
 // #include "dbg.h"
@@ -58,14 +53,14 @@ struct Engine::Impl {
     using Requests = vector<shared_ptr<Request>>;
     using Signal   = std::function<void()>;
 
-    Impl(EngineParam        param,
-         LanguageModel      model,
-         const ModelWeight& weights,
-         Context&           ctx,
-         Gateway&           gateway,
-         int                device_id,
-         int                queue_id,
-         int                phases);
+    Impl(DataType      dtype,
+         EngineParam   param,
+         LanguageModel model,
+         Context&      ctx,
+         Gateway&      gateway,
+         int           device_id,
+         int           queue_id,
+         int           phases);
 
     void CreateSequenceManager();
 
@@ -107,6 +102,7 @@ struct Engine::Impl {
 
     ~Impl();
 
+    const DataType    dtype_;
     const EngineParam param_;
 
     Gateway& gateway_;
@@ -125,14 +121,15 @@ struct Engine::Impl {
 
     int& is_warm_up_;
 
+    Context* ctx_;  // Save context for DFlash
+
     unique_ptr<SequenceManager> seq_mgr_;
 
     Queue<unique_ptr<BatchData>> inbound_;
     Queue<unique_ptr<BatchData>> outbound_;
 
-    LanguageModel      model_;
-    const ModelWeight& weights_;
-    ModelExecutor      executor_;
+    LanguageModel model_;
+    ModelExecutor executor_;
 
     std::thread internal_thread_;
 
@@ -177,14 +174,15 @@ Engine::Impl::~Impl()
     executor_ = {};
 }
 
-Engine::Impl::Impl(EngineParam        param,
-                   LanguageModel      model,
-                   const ModelWeight& weights,
-                   Context&           ctx,
-                   Gateway&           gateway,
-                   int                device_id,
-                   int                queue_id,
-                   int                phases):
+Engine::Impl::Impl(DataType      dtype,
+                   EngineParam   param,
+                   LanguageModel model,
+                   Context&      ctx,
+                   Gateway&      gateway,
+                   int           device_id,
+                   int           queue_id,
+                   int           phases):
+    dtype_{dtype},
     param_{param},
     gateway_{gateway},
     tp_group_{ctx.comm.h_tp_group},
@@ -196,8 +194,8 @@ Engine::Impl::Impl(EngineParam        param,
     queue_id_{queue_id},
     async_{phases > 1},
     is_warm_up_{*ctx.is_warm_up},
-    model_{std::move(model)},
-    weights_{weights}
+    ctx_{&ctx},
+    model_{std::move(model)}
 {
     states_.emplace_back();
 
@@ -209,53 +207,26 @@ Engine::Impl::Impl(EngineParam        param,
 
     CreateSequenceManager();  // initializes `session_len_trunc_`
 
-    const ssize_t max_batch_block_num = param.max_batch_size * cdiv(session_len_trunc_, param_.cache_block_seq_len);
-    block_ptrs_buf_                   = {max_batch_block_num, kCPUpinned};
-    block_ptrs_offsets_buf_           = {param.max_batch_size + 1, kCPUpinned};
+    const ssize_t max_batch_block_num =
+        param.max_batch_size * cdiv(session_len_trunc_, model_.attn_param().cache_block_seq_len);
+    block_ptrs_buf_         = {max_batch_block_num, kCPUpinned};
+    block_ptrs_offsets_buf_ = {param.max_batch_size + 1, kCPUpinned};
 }
 
 void Engine::Impl::CreateSequenceManager()
 {
-    const auto cache_block_seq_len = param_.cache_block_seq_len;
+    const auto cache_block_seq_len = model_.attn_param().cache_block_seq_len;
 
-    // Derive DeltaNet fields if linear attention exists
-    bool has_linear_attention = false;
-    int  linear_key_head_dim = 0, linear_value_head_dim = 0;
-    int  linear_conv_kernel_dim = 0, linear_num_key_heads = 0, linear_num_value_heads = 0;
-    for (int i = 0; i < weights_.num_layer; ++i) {
-        if (auto* dn = weights_.layer(i)->linear_attn.get()) {
-            has_linear_attention   = true;
-            linear_key_head_dim    = dn->key_head_dim;
-            linear_value_head_dim  = dn->value_head_dim;
-            linear_conv_kernel_dim = dn->d_conv;
-            linear_num_key_heads   = dn->num_k_heads * param_.attn_tp_size;
-            linear_num_value_heads = dn->num_v_heads * param_.attn_tp_size;
-            break;
-        }
-    }
+    const auto& model_param = model_.model_param();
 
-    if (has_linear_attention && param_.enable_prefix_caching) {
-        TM_LOG_FATAL("Prefix caching is unsupported when linear attention is present");
-    }
-
-    const auto get_free_size = [&] {
+    const auto get_free_size = [&] {  //
         size_t free{}, total{};
-        TM_CUDA_CHECK(cudaMemGetInfo(&free, &total));
+        check_cuda_error(cudaMemGetInfo(&free, &total));
         return AllReduce(tp_group_, free, comm::RedOp::kMin);
     };
 
-    seq_mgr_ = std::make_unique<SequenceManager>(weights_.head_dim,
-                                                 weights_.kv_head_num / param_.attn_tp_size,
-                                                 weights_.num_layer,
-                                                 weights_.layer_types,
-                                                 param_.quant_policy,
-                                                 weights_.data_type,
-                                                 weights_.data_type,  // runtime_dtype = data_type
-                                                 linear_key_head_dim,
-                                                 linear_value_head_dim,
-                                                 linear_conv_kernel_dim,
-                                                 linear_num_key_heads,
-                                                 linear_num_value_heads,
+    seq_mgr_ = std::make_unique<SequenceManager>(model_param,
+                                                 dtype_,
                                                  cache_block_seq_len,
                                                  param_.attn_tp_size,
                                                  param_.max_batch_size,
@@ -280,13 +251,7 @@ void Engine::Impl::Validate(Requests& infer_reqs, Requests& kill_reqs)
     std::pmr::monotonic_buffer_resource    mbr;
     std::pmr::unordered_map<uint64_t, int> occur(&mbr);
 
-    bool has_linear_attention = false;
-    for (auto t : weights_.layer_types) {
-        if (t == 1) {
-            has_linear_attention = true;
-            break;
-        }
-    }
+    const bool has_linear_attention = HasLinearAttention(model_.model_param());
 
     auto count = [&occur](const auto& reqs) {
         for (const auto& r : reqs) {
@@ -545,7 +510,6 @@ void Engine::Impl::Accept(const Requests& rs, vector<Signal>& signals)
 
 void Engine::Impl::Schedule()
 {
-    TM_FUNCTION_SCOPE();
     auto& s = states_.at(0);
 
     vector<const Sequence*>  sequences;
@@ -675,7 +639,6 @@ void Engine::Impl::Schedule()
 
 void Engine::Impl::Setup(BatchData& d)
 {
-    TM_FUNCTION_SCOPE();
     auto& st = states_.at(0);
 
     d.rc.resize(st.active);
@@ -722,7 +685,6 @@ void Engine::Impl::Setup(BatchData& d)
 
 void Engine::Impl::Update(BatchData& b, std::vector<Signal>& signals)
 {
-    TM_FUNCTION_SCOPE();
     auto& s = states_.at(0);
 
     BatchCopy copy;
@@ -755,17 +717,8 @@ void Engine::Impl::Update(BatchData& b, std::vector<Signal>& signals)
                 c.token_ids[c.seq_len] = output_ids[i];
                 c.seq_len              = sequence_length[i];
                 s.cache_len            = sequence_length[i] - 1;
-                const int old_tokens_count = static_cast<int>(s.tokens.size());
-                if (const int new_tokens = c.seq_len - old_tokens_count) {
+                if (const int new_tokens = c.seq_len - s.tokens.size()) {
                     s.tokens.insert(s.tokens.end(), c.token_ids + c.seq_len - new_tokens, c.token_ids + c.seq_len);
-                    if (c.req->token_cb) {
-                        signals.push_back([r = c.req, seq_len = c.seq_len, new_tokens]() {
-                            int offset = seq_len - new_tokens;
-                            for (int j = 0; j < new_tokens; ++j) {
-                                r->token_cb(r->output_ids.data()[offset + j], offset + j + 1);
-                            }
-                        });
-                    }
                 }
                 if (TM_UNLIKELY(finished[i])) {
                     signals.push_back([r = c.req, l = c.seq_len] {  //
@@ -821,8 +774,7 @@ void Engine::Impl::Update(BatchData& b, std::vector<Signal>& signals)
 
 void Engine::Impl::InternalThreadEntry()
 {
-    TM_FUNCTION_SCOPE();
-    TM_CUDA_CHECK(cudaSetDevice(device_id_));
+    check_cuda_error(cudaSetDevice(device_id_));
 
     auto stream = Stream::create();
 
@@ -925,15 +877,15 @@ Engine::Engine()                  = default;
 Engine::Engine(Engine&&) noexcept = default;
 Engine& Engine::operator=(Engine&&) noexcept = default;
 
-Engine::Engine(EngineParam        param,
-               LanguageModel      model,
-               const ModelWeight& weights,
-               Context&           ctx,
-               Gateway&           gateway,
-               int                device_id,
-               int                dp_rank,
-               int                phases):
-    impl_{std::make_unique<Impl>(param, std::move(model), weights, ctx, gateway, device_id, dp_rank, phases)}
+Engine::Engine(DataType      dtype,
+               EngineParam   param,
+               LanguageModel model,
+               Context&      ctx,
+               Gateway&      gateway,
+               int           device_id,
+               int           dp_rank,
+               int           phases):
+    impl_{std::make_unique<Impl>(dtype, param, std::move(model), ctx, gateway, device_id, dp_rank, phases)}
 {
 }
 
@@ -968,6 +920,23 @@ shared_ptr<ScheduleMetrics> Engine::GetScheduleMetrics()
         return std::atomic_load_explicit(&impl_->metrics_, std::memory_order_acquire);
     }
     return {};
+}
+
+void Engine::EnableDFlash(bool enable)
+{
+    TM_LOG_INFO("[DFlash] Engine::EnableDFlash: this={:p}, enable={:d}", (void*)this, (int)enable);
+    impl_->model_.SetDFlashContext(impl_->ctx_);
+    impl_->model_.EnableDFlash(enable);
+    // Just log that we're done - the decoder's EnableDFlash will log the final state
+    TM_LOG_INFO("[DFlash] Engine::EnableDFlash: done, enable={:d}", (int)enable);
+}
+
+void Engine::GetDFlashStats(int& total_draft_steps,
+                            int& total_draft_tokens,
+                            int& total_accepted_tokens,
+                            int& total_rejected_tokens)
+{
+    impl_->model_.GetDFlashStats(total_draft_steps, total_draft_tokens, total_accepted_tokens, total_rejected_tokens);
 }
 
 }  // namespace turbomind

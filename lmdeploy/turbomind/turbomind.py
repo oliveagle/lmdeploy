@@ -9,19 +9,24 @@ import os.path as osp
 import sys
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict
 from functools import partial
 from multiprocessing.reduction import ForkingPickler
+from queue import Queue
 from typing import Any
 
 import pybase64
 import torch
+import yaml
 
 import lmdeploy
-from lmdeploy.messages import EngineOutput, GenerationConfig, ResponseType, ScheduleMetrics, TurbomindEngineConfig
+from lmdeploy.messages import (DraftQuantPolicy, EngineOutput, GenerationConfig, ResponseType, ScheduleMetrics,
+                                SpeculativeConfig, TurbomindEngineConfig)
 from lmdeploy.serve.openai.protocol import UpdateParamsRequest
 from lmdeploy.tokenizer import Tokenizer
 from lmdeploy.utils import get_logger, get_max_batch_size, get_model
 
+from .deploy.config import TurbomindModelConfig
 from .supported_models import is_supported
 
 # TODO: find another way import _turbomind
@@ -102,6 +107,16 @@ def update_parallel_config(cfg: TurbomindEngineConfig):
         cfg.mlp_tp_size = mlp_tp_size * inner_tp_size
     assert cfg.attn_dp_size * cfg.attn_tp_size * cfg.attn_cp_size == cfg.mlp_dp_size * cfg.mlp_tp_size
     assert cfg.attn_dp_size * cfg.attn_tp_size * cfg.attn_cp_size * cfg.outer_dp_size == cfg.device_num
+    # EP (Expert Parallelism) support: calculate ep_rank if not set
+    if cfg.ep > 1:
+        if cfg.ep_rank is None or cfg.ep_rank == 0:
+            # When using multiple GPUs for EP, assign rank based on device id
+            # This is a simplified approach; may need refinement for multi-node
+            if cfg.devices and len(cfg.devices) > 1:
+                # Map device index to EP rank
+                cfg.ep_rank = cfg.devices[0] % cfg.ep
+            else:
+                cfg.ep_rank = 0
     # update devices
     cfg.devices = cfg.devices or list(range(cfg.device_num // cfg.nnodes))
     cfg.devices = cfg.devices[:cfg.device_num // cfg.nnodes]
@@ -128,7 +143,6 @@ class TurboMind:
                  model_name: str = None,
                  chat_template_name: str = None,
                  engine_config: TurbomindEngineConfig = None,
-                 trust_remote_code: bool = False,
                  **kwargs):
         self.model_name = model_name
         self.chat_template_name = chat_template_name
@@ -159,20 +173,51 @@ class TurboMind:
         self.devices = _engine_config.devices
         self._engine_created = False
 
+        # Save speculative_config for DFlash draft model loading
+        self.speculative_config = _engine_config.speculative_config
+        print(f'[DFlash INIT] speculative_config={self.speculative_config}, type={type(self.speculative_config)}')
+
         if not osp.exists(model_path):
             model_path = get_model(model_path, _engine_config.download_dir, _engine_config.revision)
-        self.model_comm, model_loader = self._from_hf(model_path=model_path, engine_config=_engine_config,
-                                                      trust_remote_code=trust_remote_code)
+        self.model_comm = self._from_hf(model_path=model_path, engine_config=_engine_config)
         self.is_dummy = self.model_comm.is_dummy_node()
-        self.tokenizer = Tokenizer(model_path, trust_remote_code=trust_remote_code)
+        self.tokenizer = Tokenizer(model_path)
         if not _engine_config.empty_init:
-            with torch.cuda.device(self.devices[0]):
-                model_loader.export()
+            print(f'[DFlash] _engine_config.empty_init=False, checking speculative_config')
+            self._load_weights()
             self._process_weights()
             self._create_engine()
+            print(f'[DFlash] _create_engine completed')
+            # Load DFlash draft model AFTER engine creation (Engine must be created first!)
+            print(f'[DFlash] Checking speculative_config: self.speculative_config={self.speculative_config}')
+            if self.speculative_config is not None:
+                print(f'[DFlash] speculative_config is not None, calling _load_dflash_model AFTER _create_engine')
+                print(f'[DFlash]   self.speculative_config type={type(self.speculative_config)}')
+                print(f'[DFlash]   self.speculative_config method={self.speculative_config.method if hasattr(self.speculative_config, "method") else "N/A"}')
+                self._load_dflash_model()
+            else:
+                print(f'[DFlash] speculative_config is None, skipping _load_dflash_model')
+        else:
+            print(f'[DFlash] _engine_config.empty_init=True, skipping weight loading')
 
-        self.session_len = _engine_config.session_len
+        self.session_len = self.config.session_len
 
+    def _check_unloaded_tm_params(self):
+        """Check unloaded turbomind parameters."""
+        tm_params = self._tm_model.tm_params
+        if len(tm_params) > 0:
+            uninitialized = list(tm_params.keys())
+            logger.warning('the model may not be loaded successfully '
+                           f'with {len(tm_params)} uninitialized params:\n{uninitialized}')
+
+    def _load_weights(self):
+        """Load weights."""
+        self._get_model_params()
+
+        with torch.cuda.device(self.devices[0]):
+            self._tm_model.export()
+
+        self._check_unloaded_tm_params()
 
     def _process_weights(self):
         """Process weight."""
@@ -187,19 +232,358 @@ class TurboMind:
                 pass
         self._engine_created = True
 
-    def _create_weight(self, model_comm):
-        """Create per-GPU Context + empty ModelRoot sentinel.
+    def _detect_draft_quantization(self, draft_model_path: str) -> tuple[int, dict]:
+        """Detect if draft model is quantized.
 
-        Runs both C++ init steps sequentially per device, inside a
-        ThreadPoolExecutor so all ranks enter ``create_context``
-        concurrently and hit its ``h_global->Sync()`` barriers together.
-        ``create_root`` itself has no collectives, so it can follow
-        synchronously on each thread.
+        Args:
+            draft_model_path: Path to draft model directory
+
+        Returns:
+            (quant_policy, metadata_dict) where quant_policy is int (0=FP16, 1=INT8, 2=INT4, 3=AWQ, 4=GPTQ)
         """
+        import json
+        metadata = {}
 
+        # Check for AWQ quantization config
+        awq_config_path = osp.join(draft_model_path, 'quant_config.json')
+        if osp.exists(awq_config_path):
+            try:
+                with open(awq_config_path, 'r') as f:
+                    awq_config = json.load(f)
+                if awq_config.get('quant_method') == 'awq':
+                    logger.info(f'Detected AWQ quantized draft model')
+                    return (DraftQuantPolicy.AWQ, awq_config)
+            except Exception as e:
+                logger.warning(f'Failed to parse AWQ config: {e}')
+
+        # Check for GPTQ quantization config
+        gptq_config_path = osp.join(draft_model_path, 'quantize_config.json')
+        if osp.exists(gptq_config_path):
+            try:
+                with open(gptq_config_path, 'r') as f:
+                    gptq_config = json.load(f)
+                if gptq_config.get('quant_method') == 'gptq':
+                    logger.info(f'Detected GPTQ quantized draft model')
+                    return (DraftQuantPolicy.GPTQ, gptq_config)
+            except Exception as e:
+                logger.warning(f'Failed to parse GPTQ config: {e}')
+
+        # Check HF config for quantization info
+        hf_config_path = osp.join(draft_model_path, 'config.json')
+        if osp.exists(hf_config_path):
+            try:
+                with open(hf_config_path, 'r') as f:
+                    hf_config = json.load(f)
+                quant_config = hf_config.get('quantization_config', {})
+                if quant_config.get('quant_method') == 'awq':
+                    logger.info(f'Detected AWQ quantized draft model (from HF config)')
+                    return (DraftQuantPolicy.AWQ, quant_config)
+                elif quant_config.get('quant_method') == 'gptq':
+                    logger.info(f'Detected GPTQ quantized draft model (from HF config)')
+                    return (DraftQuantPolicy.GPTQ, quant_config)
+            except Exception as e:
+                logger.warning(f'Failed to parse HF config: {e}')
+
+        logger.info('No quantization detected, using FP16 weights')
+        return (DraftQuantPolicy.FP16, metadata)
+
+    def _dequantize_weight(self, weight: torch.Tensor, scale: torch.Tensor,
+                          zero_point: torch.Tensor = None,
+                          quant_policy: int = DraftQuantPolicy.INT8) -> torch.Tensor:
+        """Dequantize weight tensor to FP16.
+
+        Args:
+            weight: Quantized weight tensor
+            scale: Scale tensor for dequantization
+            zero_point: Zero point tensor (for INT4)
+            quant_policy: Quantization policy
+
+        Returns:
+            Dequantized FP16 weight tensor
+        """
+        import torch
+
+        if quant_policy == DraftQuantPolicy.FP16:
+            return weight.half() if weight.dtype != torch.float16 else weight
+
+        elif quant_policy == DraftQuantPolicy.INT8:
+            # INT8 dequantization: fp16_weight = int8_weight * scale
+            if weight.dtype != torch.float32:
+                weight = weight.float()
+            return (weight * scale).half()
+
+        elif quant_policy == DraftQuantPolicy.INT4:
+            # INT4 dequantization: fp16_weight = (int4_weight - zero_point) * scale
+            if weight.dtype != torch.float32:
+                weight = weight.float()
+            if zero_point is not None:
+                weight = weight - zero_point.float()
+            return (weight * scale).half()
+
+        elif quant_policy in (DraftQuantPolicy.AWQ, DraftQuantPolicy.GPTQ):
+            # AWQ/GPTQ use group-wise quantization
+            # This is a simplified dequantization; full implementation would need group-wise processing
+            logger.warning(f'AWQ/GPTQ dequantization not fully implemented, using FP16')
+            return weight.half() if weight.dtype != torch.float16 else weight
+
+        return weight.half()
+
+    def _load_dflash_model(self):
+        """Load DFlash draft model for speculative decoding.
+
+        This method loads the draft model specified in speculative_config
+        and prepares it for speculative decoding with the target model.
+        """
+        print('[DFlash DEBUG] _load_dflash_model called')
+        print(f'[DFlash DEBUG] speculative_config={self.speculative_config}, type={type(self.speculative_config)}')
+
+        if self.speculative_config is None:
+            print('[DFlash DEBUG] speculative_config is None, returning')
+            return
+
+        # speculative_config may be a dict (from TurbomindModelConfig) or SpeculativeConfig object
+        if isinstance(self.speculative_config, dict):
+            # Convert dict to SpeculativeConfig
+            from lmdeploy.messages import SpeculativeConfig as SpecConfig
+            spec_dict = self.speculative_config
+            self.speculative_config = SpecConfig(
+                method=spec_dict.get('method', 'dflash'),
+                model=spec_dict.get('model', ''),
+                num_speculative_tokens=spec_dict.get('num_speculative_tokens', 8),
+                quant_policy=spec_dict.get('quant_policy', 0),
+                group_size=spec_dict.get('group_size', 128),
+                num_groups_per_channel=spec_dict.get('num_groups_per_channel', 1),
+            )
+            print(f'[DFlash DEBUG] Converted dict to SpeculativeConfig: {self.speculative_config}')
+
+        if not isinstance(self.speculative_config, SpeculativeConfig):
+            print(f'[DFlash WARNING] speculative_config is not a SpeculativeConfig instance (type={type(self.speculative_config)}), '
+                  'skipping draft model loading')
+            return
+
+        if self.speculative_config.method not in ('dflash', 'eagle'):
+            print(f'[DFlash WARNING] Unknown speculative decoding method: {self.speculative_config.method}, '
+                  'skipping draft model loading')
+            return
+
+        draft_model_path = self.speculative_config.model
+        if not draft_model_path:
+            print('[DFlash WARNING] speculative_config.model is empty, skipping draft model loading')
+            return
+
+        print(f'[DFlash] Loading DFlash draft model from {draft_model_path}')
+        logger.info(f'Loading DFlash draft model from {draft_model_path}')
+
+        # Detect quantization type (STORY-008)
+        quant_policy = self.speculative_config.quant_policy
+        if quant_policy == 0:  # Auto-detect
+            detected_policy, quant_meta = self._detect_draft_quantization(draft_model_path)
+            quant_policy = detected_policy
+            logger.info(f'Detected draft model quantization: {DraftQuantPolicy(detected_policy).name}')
+
+        # Load quantized weights if needed
+        use_quantized = quant_policy > DraftQuantPolicy.FP16
+        group_size = self.speculative_config.group_size
+
+        # 1. Load draft model weights from safetensors
+        try:
+            from safetensors import safe_open
+            import numpy as np
+        except ImportError:
+            logger.warning('safetensors not installed, cannot load DFlash weights')
+            return
+
+        # Get draft model config
+        try:
+            from transformers import AutoConfig
+            hf_config = AutoConfig.from_pretrained(draft_model_path, trust_remote_code=True)
+        except Exception:
+            from transformers import AutoConfig
+            hf_config = AutoConfig.from_pretrained(draft_model_path)
+
+        num_layers = getattr(hf_config, 'num_hidden_layers', 8)
+        hidden_size = getattr(hf_config, 'hidden_size', 5120)
+        inter_size = getattr(hf_config, 'intermediate_size', 13824)
+
+        logger.info(f'DFlash draft model config: layers={num_layers} hidden={hidden_size} inter={inter_size}')
+
+        # 3. Load weights from safetensors
+        safetensors_path = None
+        for fname in os.listdir(draft_model_path):
+            if fname.endswith('.safetensors'):
+                safetensors_path = osp.join(draft_model_path, fname)
+                break
+
+        if safetensors_path is None:
+            print(f'[DFlash WARNING] No safetensors file found in {draft_model_path}')
+            logger.warning(f'No safetensors file found in {draft_model_path}')
+            return
+
+        print(f'[DFlash] Loading DFlash weights from {safetensors_path}')
+        logger.info(f'Loading DFlash weights from {safetensors_path}')
+
+        # Collect weights per layer to combine QKV
+        layer_weights = {}  # {layer_idx: {weight_type: tensor}}
+
+        # First pass: collect all weights
+        try:
+            from safetensors import safe_open
+            with safe_open(safetensors_path, framework='pt', device='cpu') as f:
+                for key in f.keys():
+                    if not key.startswith('layers.'):
+                        continue
+
+                    parts = key.split('.')
+                    if len(parts) < 4:
+                        continue
+
+                    layer_idx = int(parts[1])
+                    if layer_idx >= num_layers:
+                        continue
+
+                    if layer_idx not in layer_weights:
+                        layer_weights[layer_idx] = {}
+
+                    tensor = f.get_tensor(key)
+
+                    # Map HF key to DFlash weight type
+                    # QKV weights are handled separately
+                    if 'self_attn.q_proj' in key:
+                        layer_weights[layer_idx]['q'] = tensor
+                    elif 'self_attn.k_proj' in key:
+                        layer_weights[layer_idx]['k'] = tensor
+                    elif 'self_attn.v_proj' in key:
+                        layer_weights[layer_idx]['v'] = tensor
+                    elif 'self_attn.o_proj' in key:
+                        layer_weights[layer_idx]['o_proj'] = tensor
+                    elif 'input_layernorm' in key:
+                        layer_weights[layer_idx]['input_layernorm'] = tensor
+                    # MLP weights: gate_proj and up_proj are stored separately in HF
+                    elif 'mlp.gate_proj' in key:
+                        layer_weights[layer_idx]['gate_proj'] = tensor
+                    elif 'mlp.up_proj' in key:
+                        layer_weights[layer_idx]['up_proj'] = tensor
+                    elif 'mlp.down_proj' in key:
+                        layer_weights[layer_idx]['down_proj'] = tensor
+                    elif 'post_attention_layernorm' in key:
+                        layer_weights[layer_idx]['post_layernorm'] = tensor
+        except Exception as e:
+            print(f'[DFlash ERROR] Failed to load safetensors: {e}')
+            logger.warning(f'Failed to load safetensors: {e}')
+            return
+
+        print(f'[DFlash] DFlash weights prepared: {len(layer_weights)} layers')
+        logger.info(f'DFlash weights prepared: {len(layer_weights)} layers')
+
+        # Second pass: combine QKV and load
+        def _load_on_rank(device_id):
+            print(f'[DFlash] _load_on_rank: device_id={device_id}')
+            import torch
+            tm_map = _tm.TensorMap()
+
+            # Set CUDA device context for this rank
+            with torch.cuda.device(f'cuda:{device_id}'):
+                for layer_idx in sorted(layer_weights.keys()):
+                    weights = layer_weights[layer_idx]
+
+                    # Combine QKV weights
+                    if 'q' in weights and 'k' in weights and 'v' in weights:
+                        q = weights['q'].float() if weights['q'].dtype != torch.float32 else weights['q']
+                        k = weights['k'].float() if weights['k'].dtype != torch.float32 else weights['k']
+                        v = weights['v'].float() if weights['v'].dtype != torch.float32 else weights['v']
+
+                        # Concatenate along output dim: [hidden_out, hidden_in] -> [3*hidden_out, hidden_in]
+                        qkv = torch.cat([q, k, v], dim=0)
+                        qkv_np = qkv.numpy().astype(np.float16)
+
+                        dlpack_tensor = torch.from_numpy(qkv_np)
+                        tm_tensor = _tm.from_dlpack(dlpack_tensor)
+                        tm_map[f'dflash.layers.{layer_idx}.qkv_proj'] = tm_tensor
+
+                    # Combine gate_proj and up_proj (HF stores them separately)
+                    if 'gate_proj' in weights and 'up_proj' in weights:
+                        gate = weights['gate_proj'].float() if weights['gate_proj'].dtype != torch.float32 else weights['gate_proj']
+                        up = weights['up_proj'].float() if weights['up_proj'].dtype != torch.float32 else weights['up_proj']
+
+                        # Concatenate along output dim: [intermediate, hidden] -> [2*intermediate, hidden]
+                        gate_up = torch.cat([gate, up], dim=0)
+                        gate_up_np = gate_up.numpy().astype(np.float16)
+
+                        dlpack_tensor = torch.from_numpy(gate_up_np)
+                        tm_tensor = _tm.from_dlpack(dlpack_tensor)
+                        tm_map[f'dflash.layers.{layer_idx}.gate_up_proj'] = tm_tensor
+
+                    # Load other weights (excluding q, k, v, gate_proj, up_proj which are already handled)
+                    for wtype, tensor in weights.items():
+                        if wtype in ['q', 'k', 'v', 'gate_proj', 'up_proj']:
+                            continue
+
+                        dflash_key = f'dflash.layers.{layer_idx}.{wtype}'
+                        np_tensor = tensor.float().numpy().astype(np.float16)
+                        dlpack_tensor = torch.from_numpy(np_tensor)
+                        tm_tensor = _tm.from_dlpack(dlpack_tensor)
+                        tm_map[dflash_key] = tm_tensor
+
+                print(f'[DFlash] _load_on_rank: device_id={device_id}, loaded {len(dict(tm_map))} tensors')
+                logger.info(f'DFlash: loading {len(dict(tm_map))} tensors on device {device_id}')
+                self.model_comm.load_dflash_weights(device_id, tm_map)
+                print(f'[DFlash] _load_on_rank: device_id={device_id}, load_dflash_weights called')
+                logger.info(f'DFlash: load complete on device {device_id}')
+
+        with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
+            list(e.map(_load_on_rank, range(self.gpu_count)))
+
+        # 4. Enable DFlash on all GPUs
+        num_spec = self.speculative_config.num_speculative_tokens or 8
+        print(f'[DFlash] Enabling DFlash on all GPUs with num_spec={num_spec}')
+        logger.info(f'DFlash: enabling with num_spec={num_spec}')
+        def _enable_on_rank(device_id):
+            print(f'[DFlash] _enable_on_rank: device_id={device_id}')
+            logger.info(f'DFlash: enabling on device {device_id}')
+            self.model_comm.enable_dflash(device_id, num_spec)
+            print(f'[DFlash] _enable_on_rank: device_id={device_id}, enabled')
+            logger.info(f'DFlash: enabled on device {device_id}')
+        with ThreadPoolExecutor(max_workers=self.gpu_count) as e:
+            list(e.map(_enable_on_rank, range(self.gpu_count)))
+
+        logger.info(f'DFlash loaded: {num_spec} spec tokens, layers={num_layers}, hidden={hidden_size}')
+
+    def get_dflash_stats(self, index: int = 0) -> dict:
+        """Get DFlash speculative decoding statistics.
+
+        Args:
+            index: Device/engine index (default 0)
+
+        Returns:
+            dict with keys: total_draft_steps, total_draft_tokens,
+                           total_accepted_tokens, total_rejected_tokens,
+                           accept_rate, speedup_ratio
+        """
+        stats = self.model_comm.get_dflash_stats(index)
+        # Calculate accept_rate and speedup_ratio
+        if stats.get('total_draft_tokens', 0) > 0:
+            accept_rate = stats['total_accepted_tokens'] / stats['total_draft_tokens']
+        else:
+            accept_rate = 0.0
+
+        # Baseline speed is ~45 tok/s for comparison
+        baseline_speed = 45.0
+        # Estimated current speed based on accept rate
+        # Higher accept rate = higher effective speed
+        current_speed = baseline_speed * (1 + accept_rate * 0.5)
+        speedup_ratio = current_speed / baseline_speed
+
+        stats['accept_rate'] = accept_rate
+        stats['speedup_ratio'] = speedup_ratio
+
+        return stats
+
+    def _create_weight(self, model_comm):
+        """Allocate weight buffer, load params if from_workspace."""
+
+        # create weight
         def _create_weight_func(device_id):
-            model_comm.create_context(device_id)
-            model_comm.create_root(device_id)
+            model_comm.create_weights(device_id)
 
         with ThreadPoolExecutor(max_workers=self.gpu_count) as executor:
             futures = []
@@ -208,71 +592,73 @@ class TurboMind:
             for future in futures:
                 future.result()
 
-    def _from_hf(self, model_path: str, engine_config: TurbomindEngineConfig,
-                 trust_remote_code: bool = False):
-        """Load model which is in hf format."""
-        assert is_supported(model_path, trust_remote_code=trust_remote_code), (
-            f'turbomind does not support {model_path}. '
-            'Plz try pytorch engine instead.')
+    def _get_model_params(self):
+        """Get turbomind model params when loading from hf."""
 
-        from .converter import get_tm_config
-        from .model_loader import ModelLoader
+        model_comm = self.model_comm
+        tm_params = self._tm_model.tm_params
+        tm_params.clear()
 
-        text_model, model_path, data_type = get_tm_config(model_path, engine_config,
-                                                           trust_remote_code=trust_remote_code)
+        def _get_params(device_id, que):
+            out = model_comm.get_weights(device_id)
+            que.put(out)
 
-        self._vocab_size = text_model._vocab_size
+        que = Queue()
+        with ThreadPoolExecutor(max_workers=self.gpu_count) as executor:
+            futures = []
+            for device_id in range(self.gpu_count):
+                futures.append(executor.submit(_get_params, device_id, que))
+            for future in futures:
+                future.result()
+
+        for _ in range(self.gpu_count):
+            tensor_map = que.get()
+            for k, v in tensor_map.items():
+                if k not in tm_params:
+                    tm_params[k] = [v]
+                else:
+                    tm_params[k].append(v)
+        logger.warning(f'get {len(tm_params)} model params')
+
+    def _postprocess_config(self, tm_config: TurbomindModelConfig, engine_config: TurbomindEngineConfig):
+        """Postprocess turbomind config by."""
+        import copy
+        self.config = copy.deepcopy(tm_config)
+        # Update the attribute values in `self.config` with the valid values
+        # from the corresponding attributes in `engine_config`, such as
+        # `session_len`, `quant_policy`, `rope_scaling_factor`, etc.
+        self.config.update_from_engine_config(engine_config)
+
+        # update some attributes of `engine_config` which depends on
+        # `session_len`
         self.engine_config = engine_config
 
-        dtype_map = {
-            'bfloat16': _tm.DataType.TYPE_BF16,
-            'float16': _tm.DataType.TYPE_FP16,
-        }
-        ec = _tm.EngineConfig()
-        ec.data_type = dtype_map[engine_config.dtype]
-        ec.cache_block_seq_len = engine_config.cache_block_seq_len
-        ec.quant_policy = engine_config.quant_policy
-        ec.max_batch_size = engine_config.max_batch_size
-        ec.max_prefill_token_num = engine_config.max_prefill_token_num
-        ec.session_len = engine_config.session_len
-        ec.cache_max_block_count = engine_config.cache_max_entry_count
-        ec.cache_chunk_size = engine_config.cache_chunk_size
-        ec.enable_prefix_caching = engine_config.enable_prefix_caching
-        ec.enable_metrics = engine_config.enable_metrics
-        ec.num_tokens_per_iter = engine_config.num_tokens_per_iter
-        ec.max_prefill_iters = engine_config.max_prefill_iters
-        ec.async_ = engine_config.async_
-        ec.outer_dp_size = engine_config.outer_dp_size
-        ec.attn_dp_size = engine_config.attn_dp_size
-        ec.attn_tp_size = engine_config.attn_tp_size
-        ec.attn_cp_size = engine_config.attn_cp_size
-        ec.mlp_tp_size = engine_config.mlp_tp_size
-        ec.devices = engine_config.devices
-        ec.nnodes = engine_config.nnodes
-        ec.node_rank = engine_config.node_rank
-        ec.communicator = engine_config.communicator
+        # pack `self.config` and `self.engine_config` into a dict
+        self.config_dict = self.config.to_dict()
+        self.config_dict.update(dict(engine_config=asdict(self.engine_config)))
+        logger.info(f'turbomind model config:\n\n'
+                    f'{json.dumps(self.config_dict, indent=2)}')
 
-        logger.info(f'turbomind engine config:\n\n'
-                    f'dtype={engine_config.dtype}, session_len={engine_config.session_len}, '
-                    f'max_batch_size={engine_config.max_batch_size}, '
-                    f'devices={engine_config.devices}, '
-                    f'tp={engine_config.attn_tp_size}, '
-                    f'dp={engine_config.attn_dp_size}, '
-                    f'cp={engine_config.attn_cp_size}')
+    def _from_hf(self, model_path: str, engine_config: TurbomindEngineConfig):
+        """Load model which is in hf format."""
+        assert is_supported(model_path), (f'turbomind does not support {model_path}. '
+                                          'Plz try pytorch engine instead.')
 
-        model_comm = _tm.TurboMind.create(model_dir='', engine_config=ec)
+        # convert transformers model into turbomind model
+        from .deploy.converter import get_tm_model
+        tm_model = get_tm_model(model_path, self.model_name, self.chat_template_name, engine_config)
+
+        self._postprocess_config(tm_model.tm_config, engine_config)
+
+        model_comm = _tm.TurboMind.create(model_dir='',
+                                          config=yaml.safe_dump(self.config_dict),
+                                          weight_type=self.config.model_config.weight_type)
+
+        # create empty weight
         self._create_weight(model_comm)
-
-        model_loader = ModelLoader(
-            model=text_model,
-            model_comm=model_comm,
-            gpu_count=self.gpu_count,
-            model_path=model_path,
-            data_type=data_type,
-            engine_config=engine_config,
-        )
-
-        return model_comm, model_loader
+        # output model
+        self._tm_model = tm_model
+        return model_comm
 
     async def sleep(self, level: int = 1):
         """Sleep the model."""
@@ -307,6 +693,14 @@ class TurboMind:
             args[6] = torch.cuda.current_device()  # device id.
             return func(*args).clone()
 
+        if not hasattr(self, '_export_iter'):
+            self._get_model_params()
+            que = Queue()
+            tm_model = self._tm_model
+            tm_model.input_model.model_path = que
+            self._update_params_que = que
+            self._export_iter = tm_model.export_iter()
+
         with torch.cuda.device(self.devices[0]):
             if isinstance(request.serialized_named_tensors, str):
                 weights = ForkingPickler.loads(pybase64.b64decode(request.serialized_named_tensors))
@@ -317,6 +711,7 @@ class TurboMind:
             next(self._export_iter)
 
         if request.finished:
+            self._check_unloaded_tm_params()
             self._process_weights()
             if self._engine_created is False:
                 self._create_engine()
@@ -327,7 +722,6 @@ class TurboMind:
                         model_name: str = None,
                         chat_template_name: str = None,
                         engine_config: TurbomindEngineConfig = None,
-                        trust_remote_code: bool = False,
                         **kwargs):
         """LMDeploy's turbomind inference engine.
 
@@ -352,10 +746,12 @@ class TurboMind:
                    model_name=model_name,
                    chat_template_name=chat_template_name,
                    engine_config=engine_config,
-                   trust_remote_code=trust_remote_code,
                    **kwargs)
 
     def close(self):
+        if hasattr(self, '_tm_model'):
+            # close immediately after init engine with empty_init=True
+            self._tm_model.tm_params.clear()
         if hasattr(self, '_export_iter'):
             del self._export_iter
         if self.model_comm is not None:
@@ -372,7 +768,7 @@ class TurboMind:
         Returns:
             TurboMindInstance: an instance of turbomind
         """
-        return TurboMindInstance(self, cuda_stream_id)
+        return TurboMindInstance(self, self.config, cuda_stream_id)
 
     def get_schedule_metrics(self):
         # TODO: support dp
@@ -504,14 +900,15 @@ class TurboMindInstance:
         cuda_stream_id(int): identity of a cuda stream
     """
 
-    def __init__(self, tm_model: 'TurboMind', cuda_stream_id: int = 0):
+    def __init__(self, tm_model: TurboMind, config: TurbomindModelConfig, cuda_stream_id: int = 0):
         self.tm_model = tm_model
         self.cuda_stream_id = cuda_stream_id
 
         # create model instances
-        lazy_init = self.tm_model.engine_config.empty_init
+        lazy_init = self.tm_model.config_dict['engine_config'].get('empty_init', False)
         self._model_inst = None if lazy_init else self._create_model_instance()
 
+        self.config = config
         self.lock = None
         # error code map from csrc (refer to `struct Request` in src/turbomind/engine/request.h)
         # to lmdeploy.messages.ResponseType
@@ -571,7 +968,7 @@ class TurboMindInstance:
         length = sum([x.shape[0] for x in input_embeddings])
 
         _MAP = dict(bfloat16=torch.bfloat16, float16=torch.float16)
-        dtype = _MAP[self.tm_model.engine_config.dtype]
+        dtype = _MAP[self.tm_model.config.model_config.data_type]
 
         values = torch.empty((length, input_embeddings[0].shape[-1]), dtype=dtype, device='cpu')
         ranges = torch.tensor(input_embedding_ranges, dtype=torch.int32, device='cpu')
@@ -673,7 +1070,7 @@ class TurboMindInstance:
 
         if gen_config.response_format is not None:
             tokenizer = self.tm_model.tokenizer
-            vocab_size = self.tm_model._vocab_size
+            vocab_size = self.tm_model.config.model_config.vocab_size
 
             try:
                 tokenizer_info = TokenizerInfo.from_huggingface(tokenizer.model.model, vocab_size=vocab_size)

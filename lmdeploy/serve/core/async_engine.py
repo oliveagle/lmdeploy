@@ -110,7 +110,6 @@ class AsyncEngine:
                  backend_config: TurbomindEngineConfig | PytorchEngineConfig | None = None,
                  chat_template_config: ChatTemplateConfig | None = None,
                  max_log_len: int | None = None,
-                 trust_remote_code: bool = False,
                  speculative_config: SpeculativeConfig | None = None,
                  **kwargs) -> None:
         logger.info(f'input backend={backend}, backend_config={backend_config}')
@@ -118,26 +117,23 @@ class AsyncEngine:
         backend_config = backend_config or (TurbomindEngineConfig()
                                             if backend == 'turbomind' else PytorchEngineConfig())
         self.model_name = model_name if model_name else model_path
-        self.chat_template = get_chat_template(model_path, chat_template_config, trust_remote_code=trust_remote_code)
-        self.tokenizer = Tokenizer(model_path, trust_remote_code=trust_remote_code)
+        self.chat_template = get_chat_template(model_path, chat_template_config)
+        self.tokenizer = Tokenizer(model_path)
         self.prompt_processor = MultimodalProcessor(self.tokenizer, self.chat_template)
-        self.hf_gen_cfg = get_hf_gen_cfg(model_path, trust_remote_code=trust_remote_code)
-        self.arch, self.hf_cfg = get_model_arch(model_path, trust_remote_code=trust_remote_code)
+        self.hf_gen_cfg = get_hf_gen_cfg(model_path)
+        self.arch, self.hf_cfg = get_model_arch(model_path)
         self.session_len = (_get_and_verify_max_len(self.hf_cfg, None)
                             if backend_config.session_len is None else backend_config.session_len)
         backend_config.session_len = self.session_len
-        if speculative_config is not None and backend == 'turbomind':
-            logger.warning('speculative decoding is not supported by turbomind ')
+        # TurboMind now supports DFlash speculative decoding
+        # if speculative_config is not None and backend == 'turbomind':
+        #     logger.warning('speculative decoding is not supported by turbomind ')
         # build backend engine
         if backend == 'turbomind':
-            self.engine = self._build_turbomind(model_path=model_path,
-                                                backend_config=backend_config,
-                                                trust_remote_code=trust_remote_code,
-                                                **kwargs)
+            self.engine = self._build_turbomind(model_path=model_path, backend_config=backend_config, speculative_config=speculative_config, **kwargs)
         elif backend == 'pytorch':
             self.engine = self._build_pytorch(model_path=model_path,
                                               backend_config=backend_config,
-                                              trust_remote_code=trust_remote_code,
                                               speculative_config=speculative_config,
                                               **kwargs)
         else:
@@ -174,31 +170,24 @@ class AsyncEngine:
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
 
-    def _build_turbomind(self,
-                         model_path: str,
-                         backend_config: TurbomindEngineConfig | None = None,
-                         trust_remote_code: bool = False,
-                         **kwargs):
+    def _build_turbomind(self, model_path: str, backend_config: TurbomindEngineConfig | None = None, speculative_config: SpeculativeConfig | None = None, **kwargs):
         """Inner build method for turbomind backend."""
         from lmdeploy import turbomind as tm
-        return tm.TurboMind.from_pretrained(model_path,
-                                            engine_config=backend_config,
-                                            trust_remote_code=trust_remote_code,
-                                            **kwargs)
+        # Attach speculative_config to backend_config if provided
+        if speculative_config is not None and backend_config is not None:
+            backend_config.speculative_config = speculative_config
+        engine = tm.TurboMind.from_pretrained(model_path, engine_config=backend_config, **kwargs)
+        print(f'[DFlash DEBUG] _build_turbomind: engine id={id(engine)}, _tm_model id={id(engine._tm_model) if hasattr(engine, "_tm_model") else "N/A"}')
+        return engine
 
     def _build_pytorch(self,
                        model_path: str,
                        backend_config: PytorchEngineConfig | None = None,
                        speculative_config: SpeculativeConfig | None = None,
-                       trust_remote_code: bool = False,
                        **kwargs):
         """Inner build method for pytorch backend."""
         from lmdeploy.pytorch.engine import Engine
-        return Engine.from_pretrained(model_path,
-                                      engine_config=backend_config,
-                                      speculative_config=speculative_config,
-                                      trust_remote_code=trust_remote_code,
-                                      **kwargs)
+        return Engine.from_pretrained(model_path, engine_config=backend_config, speculative_config=speculative_config)
 
     def _build_stat_loggers(self):
         self.stat_loggers = []
@@ -252,7 +241,11 @@ class AsyncEngine:
         logger.info(f'stop all sessions, epoch {self.epoch} -> {self.epoch + 1}')
         self.epoch += 1
         await self.session_mgr.async_abort_all()
-        logger.info('stopped all sessions')
+
+    def prepare_sleep(self):
+        """Reject new inference requests before backend sleep starts."""
+        self.sleeping_tags = {'weights', 'kv_cache'}
+        self.is_sleeping = True
 
     async def sleep(self, level: int = 1):
         """Sleep the model.
@@ -262,10 +255,9 @@ class AsyncEngine:
                 weights and discard the kv cache. Level 2 sleep will
                 discard both the model weights and the kv cache.
         """
-        self.is_sleeping = True
-        self.sleeping_tags = {'weights', 'kv_cache'}
-        await self.stop_all_session()
         await self.engine.sleep(level)
+        self.sleeping_tags = {'weights', 'kv_cache'}
+        self.is_sleeping = True
 
     def wakeup(self, tags: list[str] | None = None):
         """Wake up the model.
@@ -398,36 +390,25 @@ class AsyncEngine:
                 logger.warning('chat_template_kwargs["enable_thinking"] is already set, '
                                'the value will not be overwritten by enable_thinking')
         if messages:
-            try:
-                prompt = messages
-                self.request_logger.log_prompt(session, prompt=prompt)
-                prompt_input = await self.prompt_processor.get_prompt_input(prompt=prompt,
-                                                                            do_preprocess=do_preprocess,
-                                                                            sequence_start=sequence_start,
-                                                                            adapter_name=adapter_name,
-                                                                            tools=tools,
-                                                                            reasoning_effort=reasoning_effort,
-                                                                            chat_template_kwargs=chat_template_kwargs,
-                                                                            media_io_kwargs=media_io_kwargs,
-                                                                            mm_processor_kwargs=mm_processor_kwargs,
-                                                                            **kwargs)
-                prompt = prompt_input.get('prompt')
-                input_ids = prompt_input.get('input_ids')
-                self.request_logger.log_inputs(session,
-                                            prompt=prompt,
-                                            prompt_token_ids=input_ids,
-                                            gen_config=gen_config,
-                                            adapter_name=adapter_name)
-            except Exception:
-                logger.exception('[generate] error in prompt processing')
-                metrics_processor.increase_failed_requests('error')
-                yield GenOut(response='in prompt processing error',
-                             history_token_len=session.step,
-                             input_token_len=len(input_ids) if input_ids is not None else 0,
-                             generate_token_len=0,
-                             finish_reason='error',
-                             token_ids=[])
-                return
+            prompt = messages
+            self.request_logger.log_prompt(session, prompt=prompt)
+            prompt_input = await self.prompt_processor.get_prompt_input(prompt=prompt,
+                                                                        do_preprocess=do_preprocess,
+                                                                        sequence_start=sequence_start,
+                                                                        adapter_name=adapter_name,
+                                                                        tools=tools,
+                                                                        reasoning_effort=reasoning_effort,
+                                                                        chat_template_kwargs=chat_template_kwargs,
+                                                                        media_io_kwargs=media_io_kwargs,
+                                                                        mm_processor_kwargs=mm_processor_kwargs,
+                                                                        **kwargs)
+            prompt = prompt_input.get('prompt')
+            input_ids = prompt_input.get('input_ids')
+            self.request_logger.log_inputs(session,
+                                           prompt=prompt,
+                                           prompt_token_ids=input_ids,
+                                           gen_config=gen_config,
+                                           adapter_name=adapter_name)
         else:
             # TODO(lvhan) VLM doesn't support input_ids as an argument.
             # Figure out a graceful way to handle the invalid input
@@ -724,8 +705,6 @@ class AsyncEngine:
                     async for outputs in gen:
                         pass
                     logits[i] = outputs.logits[:input_len, :]
-                if sequence_end and self.backend == 'pytorch':
-                    await handle.async_end(session.session_id)
 
         create_sessions = False
         if sessions is None:
@@ -733,6 +712,9 @@ class AsyncEngine:
             sessions = [self.session_mgr.get() for _ in range(len(input_ids))]
         tasks = [_proc(session, i) for i, session in enumerate(sessions)]
         await asyncio.gather(*tasks)
+        if sequence_end and self.backend == 'pytorch':
+            for session in sessions:
+                await session.async_close()
         if sequence_end and create_sessions:
             for session in sessions:
                 self.session_mgr.remove(session)

@@ -59,11 +59,8 @@ class Qwen3_5ModelConfigBuilder(AutoModelConfigBuilder):
         else:
             recurrent_state_shape = (num_delta_layers, num_v_heads, head_k_dim, head_v_dim)
 
-        device_type = kwargs.get('device_type', 'auto')
-        if is_bf16_supported(device_type):
-            dtype = torch.bfloat16
-        else:
-            dtype = torch.float16
+        # 强制使用 float16 以避免 TileLang kernel 类型不匹配问题
+        dtype = torch.float16
         ssm_dtype = dtype if not _envs.fp32_mamba_ssm_dtype else torch.float32
         cfg.states_shapes = [(conv_state_shape, dtype), (recurrent_state_shape, ssm_dtype)]
         cfg.is_gated_delta = True
@@ -71,20 +68,54 @@ class Qwen3_5ModelConfigBuilder(AutoModelConfigBuilder):
 
         cfg.use_mrope = True
 
-        # for spec
+        # 修复 Qwen3.5 EOS token 问题: 使用 tokenizer 的 eos_token_id 而非 config 中的
+        # config.text_config.eos_token_id = 248044 (PAD), tokenizer.eos_token_id = 248046 (<|im_end|>)
+        if model_path is not None:
+            from transformers import AutoTokenizer
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+                cfg.eos_token_id = tokenizer.eos_token_id
+            except:
+                pass  # 使用默认值
+
+        # for spec decoding
         if spec_method is not None:
-            assert spec_method == 'qwen3_5_mtp'
-            cfg.model_paradigm = 'ar_spec'
+            if spec_method == 'dflash':
+                # DFlash uses 5 layers from full_attention layers only
+                # Distribute layers evenly, avoiding linear_attention layers
+                layer_indices = []
+                full_count = 0
+                for idx, layer_type in enumerate(layer_types):
+                    if layer_type == 'full_attention':
+                        full_count += 1
+                        # Select 5 layers evenly distributed: 1st, 25%, 50%, 75%, last
+                        if full_count in [1, full_count // 4 or 1, full_count // 2,
+                                          full_count * 3 // 4, full_count]:
+                            layer_indices.append(idx)
+                # Ensure we have exactly 5 layers
+                while len(layer_indices) < 5 and layer_indices:
+                    # Duplicate some layers if we don't have enough full_attention layers
+                    layer_indices.append(layer_indices[-1])
+                hf_config.aux_hidden_state_layers = tuple(layer_indices[:5])
+            elif spec_method == 'qwen3_5_mtp':
+                assert spec_method == 'qwen3_5_mtp'
+                cfg.model_paradigm = 'ar_spec'
 
         # draft model cfg
         if is_draft_model:
-            hf_config.architectures[0] = 'Qwen3_5MTPModel'
-            # remove for correct mapping when building the patched model
-            if hasattr(hf_config, 'auto_map'):
-                del hf_config.auto_map
+            original_arch = hf_config.architectures[0]
+            if original_arch == 'DFlashDraftModel':
+                # Keep DFlash architecture, don't remap to MTP
+                cfg.model_paradigm = 'ar_spec'
+                cfg.states_shapes = []
+            else:
+                hf_config.architectures[0] = 'Qwen3_5MTPModel'
+                # remove for correct mapping when building the patched model
+                if hasattr(hf_config, 'auto_map'):
+                    del hf_config.auto_map
 
-            cfg.model_paradigm = 'ar_spec'
-            cfg.num_layers = text_config.mtp_num_hidden_layers
-            cfg.states_shapes = []
+                cfg.model_paradigm = 'ar_spec'
+                cfg.num_layers = text_config.mtp_num_hidden_layers
+                cfg.states_shapes = []
 
         return cfg

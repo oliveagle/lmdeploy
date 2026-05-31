@@ -123,6 +123,39 @@ Regarding the principle of Dynamic NTK, please refer to:
 
 You can also turn on [LogN attention scaling](https://kexue.fm/archives/8823) by setting `use_logn_attn = 1`.
 
+### Expert Parallelism (EP)
+
+For Mixture of Experts (MoE) models, you can use Expert Parallelism to distribute experts across multiple GPUs.
+
+Key configuration parameters:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `mlp_ep_size` | int | 1 | Number of GPUs for expert parallelism. Distributes experts across `mlp_ep_size` GPUs. |
+| `mlp_ep_rank` | int | 0 | Rank of current GPU in EP group (0 to `mlp_ep_size`-1). Auto-calculated. |
+| `tensor_para_size` | int | 1 | Number of GPUs for tensor parallelism. |
+| `expert_num` | int | model-dependent | Total number of experts in the MoE model. |
+
+**Example for Qwen3.6-35B-A3B-AWQ (256 experts, EP=4):**
+
+```toml
+[llama]
+model_name = "qwen3.6-35b-a3b-awq"
+tensor_para_size = 1
+mlp_ep_size = 4
+mlp_ep_rank = 0
+expert_num = 256
+# ... other parameters
+```
+
+**Expert distribution for EP=4:**
+- Rank 0: experts [0, 63] (64 experts)
+- Rank 1: experts [64, 127] (64 experts)
+- Rank 2: experts [128, 191] (64 experts)
+- Rank 3: experts [192, 255] (64 experts)
+
+For detailed usage, see [Expert Parallelism](../advance/expert_parallelism.md).
+
 ## TurboMind 1.0 config
 
 Taking the `llama-2-7b-chat` model as an example, in TurboMind 1.0, its `config.ini` content is as follows:

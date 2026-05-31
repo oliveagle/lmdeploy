@@ -27,8 +27,14 @@ def build_fused_moe(
     """Fused moe builder."""
     quant_method = None
     if quant_config is not None:
-        quant_config = get_build_model_context().quant_config
-        quant_method = quant_config.get_quant_method(prefix)
+        if isinstance(quant_config, dict):
+            ctx_quant_config = get_build_model_context().quant_config
+            if ctx_quant_config is not None:
+                quant_config = ctx_quant_config
+        if hasattr(quant_config, 'get_quant_method'):
+            quant_method = quant_config.get_quant_method(prefix)
+        elif isinstance(quant_config, dict):
+            quant_method = quant_config.get('quant_method', None)
 
     if quant_method is None:
         from .default import FusedMoE
@@ -72,6 +78,24 @@ def build_fused_moe(
             renormalize=renormalize,
             fp8_dtype=quant_config.quant_dtype,
             scale_fmt=quant_config.scale_fmt,
+            dtype=dtype,
+            device=device,
+            all_reduce=all_reduce,
+            layer_idx=layer_idx,
+            act_func=act_func,
+        )
+    elif quant_method == 'awq':
+        # AWQ quantized MoE
+        from .awq import FusedMoEAWQ
+        return FusedMoEAWQ(
+            hidden_dim=hidden_dim,
+            ffn_dim=ffn_dim,
+            num_experts=num_experts,
+            top_k=top_k,
+            w_bit=quant_config.bits,
+            group_size=quant_config.group_size,
+            bias=bias,
+            renormalize=renormalize,
             dtype=dtype,
             device=device,
             all_reduce=all_reduce,

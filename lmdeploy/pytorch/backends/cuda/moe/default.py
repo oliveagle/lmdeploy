@@ -21,10 +21,15 @@ logger = get_logger('lmdeploy')
 class TritonFusedMoEImpl(FusedMoEImpl):
     """Triton fused moe implementation."""
 
-    def __init__(self, top_k: int, num_experts: int, renormalize: bool = False):
+    def __init__(self, top_k: int, num_experts: int, renormalize: bool = False,
+                 ep_size: int = 1, ep_group=None, layer_idx: int = 0):
         self.num_experts = num_experts
         self.top_k = top_k
         self.renormalize = renormalize
+        # Store EP context for expert sharding
+        self.ep_size = ep_size
+        self.ep_group = ep_group
+        self.layer_idx = layer_idx
 
     def update_weights(self, gate_up_weights: torch.Tensor, down_weights: torch.Tensor):
         gate_up_weights = gate_up_weights.transpose(1, 2).contiguous().transpose(1, 2)
@@ -460,12 +465,28 @@ class TritonFusedMoEBuilder(FusedMoEBuilder):
     ):
         """Build from mlp."""
         if ep_size > 1:
-            return FusedMoEEPImpl(ep_size=ep_size,
-                                  ep_group=ep_group,
-                                  top_k=top_k,
-                                  num_experts=num_experts,
-                                  hidden_dim=hidden_dim,
-                                  renormalize=renormalize,
-                                  layer_idx=layer_idx,
-                                  out_dtype=out_dtype)
+            # Try to use deep_gemm implementation first, fall back to Triton with EP
+            try:
+                import deep_gemm  # noqa: F401
+                return FusedMoEEPImpl(ep_size=ep_size,
+                                      ep_group=ep_group,
+                                      top_k=top_k,
+                                      num_experts=num_experts,
+                                      hidden_dim=hidden_dim,
+                                      renormalize=renormalize,
+                                      layer_idx=layer_idx,
+                                      out_dtype=out_dtype)
+            except ImportError:
+                logger.warning('DeepGEMM not found, using TritonFusedMoEImpl with EP support')
+                # Use TritonFusedMoEImpl which has ep_expert_list method
+                # IMPORTANT: Even when deep_gemm is not available, we still need to pass EP context
+                # for proper expert sharding in FusedMoEAWQ
+                return TritonFusedMoEImpl(
+                    top_k=top_k,
+                    num_experts=num_experts,
+                    renormalize=renormalize,
+                    ep_size=ep_size,
+                    ep_group=ep_group,
+                    layer_idx=layer_idx
+                )
         return TritonFusedMoEImpl(top_k=top_k, num_experts=num_experts, renormalize=renormalize)

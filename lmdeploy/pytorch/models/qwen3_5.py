@@ -330,7 +330,8 @@ class Qwen3_5MLP(nn.Module):
                  device: torch.device | None = None,
                  is_tp: bool = True,
                  all_reduce: bool = True,
-                 prefix: str = ''):
+                 prefix: str = '',
+                 layer_type: str = 'attn'):
         super().__init__()
         quantization_config = getattr(config, 'quantization_config', None)
         if intermediate_size is None:
@@ -345,6 +346,7 @@ class Qwen3_5MLP(nn.Module):
             quant_config=quantization_config,
             is_tp=is_tp,
             prefix=add_prefix('gate_up_proj', prefix),
+            layer_type=layer_type,
         )
 
         # silu and mul
@@ -361,6 +363,7 @@ class Qwen3_5MLP(nn.Module):
             is_tp=is_tp,
             all_reduce=all_reduce,
             prefix=add_prefix('down_proj', prefix),
+            layer_type=layer_type,
         )
 
     def forward(self, x, all_routed_experts: torch.Tensor | None = None):
@@ -936,6 +939,9 @@ class Qwen3_5TextModel(nn.Module):
         # build rotary embedding
         self.rotary_emb = Qwen3_5TextRotaryEmbedding(config, device=device)
 
+        # for spec decoding - aux hidden states
+        self.aux_hidden_state_layers = getattr(config, 'aux_hidden_state_layers', tuple())
+
     def forward(
         self,
         input_ids: torch.LongTensor,
@@ -971,6 +977,7 @@ class Qwen3_5TextModel(nn.Module):
 
         # decoding
         residual = None
+        aux_hidden_states = []
         for idx, decoder_layer in enumerate(self.layers):
             hidden_states, residual = decoder_layer(
                 hidden_states,
@@ -981,11 +988,18 @@ class Qwen3_5TextModel(nn.Module):
                 gated_delta_meta=gated_delta_meta,
                 all_routed_experts=all_routed_experts,
             )
+            # Collect hidden states for spec decoding
+            if idx in self.aux_hidden_state_layers:
+                aux_hidden_states.append(hidden_states)
 
         # norm
         hidden_states, _ = self.norm(hidden_states, residual)
 
-        return hidden_states
+        # Return both hidden_states and aux_hidden_states for spec decoding
+        if len(aux_hidden_states) > 0:
+            aux_hidden_states = torch.cat(aux_hidden_states, dim=-1)
+            return hidden_states, aux_hidden_states
+        return hidden_states, None
 
     def get_input_embeddings(self):
         """Get input embeddings."""
@@ -1065,7 +1079,7 @@ class Qwen3_5Model(nn.Module):
 
         output_inputs_embeds = inputs_embeds if return_input_embeds else None
 
-        hidden_states = self.language_model(
+        hidden_states, aux_hidden_states = self.language_model(
             input_ids=input_ids,
             position_ids=position_ids,
             past_key_values=past_key_values,
@@ -1075,7 +1089,7 @@ class Qwen3_5Model(nn.Module):
             mrope_position_ids=mrope_position_ids,
             all_routed_experts=all_routed_experts,
         )
-        return hidden_states, output_inputs_embeds
+        return hidden_states, output_inputs_embeds, aux_hidden_states
 
     def get_input_embeddings(self):
         """Get input embeddings."""
@@ -1153,7 +1167,7 @@ class Qwen3_5ForConditionalGeneration(nn.Module, DeployModelMixinV1, CudaGraphMi
             all_routed_experts = position_ids.new_empty(
                 (num_tokens, config.num_hidden_layers, config.num_experts_per_tok), dtype=torch.uint16)
 
-        hidden_states, target_inputs_embeds = self.model(
+        hidden_states, target_inputs_embeds, aux_hidden_states = self.model(
             input_ids=input_ids,
             position_ids=position_ids,
             past_key_values=past_key_values,
@@ -1176,7 +1190,8 @@ class Qwen3_5ForConditionalGeneration(nn.Module, DeployModelMixinV1, CudaGraphMi
         )
         return dict(hidden_states=hidden_states,
                     all_routed_experts=all_routed_experts,
-                    target_inputs_embeds=target_inputs_embeds)
+                    target_inputs_embeds=target_inputs_embeds,
+                    aux_hidden_states=aux_hidden_states)
 
     def get_input_embeddings(self):
         """Get input embeddings."""
@@ -1289,6 +1304,20 @@ class Qwen3_5ForConditionalGeneration(nn.Module, DeployModelMixinV1, CudaGraphMi
             layer_id = int(matches[0])
             return layer_id >= self.config.text_config.num_hidden_layers
 
+        def __get_param(name, params_dict):
+            """Get parameter from params_dict, handling language_model prefix."""
+            if name in params_dict:
+                return params_dict[name]
+            if 'language_model' in name:
+                name_without = name.replace('language_model.', '')
+                if name_without in params_dict:
+                    return params_dict[name_without]
+            if name.startswith('model.'):
+                name_without = name.replace('model.', '')
+                if name_without in params_dict:
+                    return params_dict[name_without]
+            raise KeyError(name)
+
         # modify from vllm
         stacked_params_mapping = [
             # (param_name, shard_name, shard_id)
@@ -1300,6 +1329,9 @@ class Qwen3_5ForConditionalGeneration(nn.Module, DeployModelMixinV1, CudaGraphMi
             ('.in_proj_ba', '.in_proj_b', 'b'),
             ('.in_proj_ba', '.in_proj_a', 'a'),
         ]
+
+        # Special handling for linear_attn weights that should not be split
+        linear_attn_weights = ['.in_proj_qkv', '.in_proj_z', '.in_proj_ba', '.out_proj']
 
         rms_norm_keys = ['model.norm', '.input_layernorm', '.post_attention_layernorm', '.q_norm', '.k_norm']
 
@@ -1321,14 +1353,17 @@ class Qwen3_5ForConditionalGeneration(nn.Module, DeployModelMixinV1, CudaGraphMi
             for (param_name, weight_name, shard_id) in stacked_params_mapping:
                 if weight_name not in name:
                     continue
+                # Skip if this is a linear_attn weight
+                if any(w in name for w in linear_attn_weights):
+                    continue
                 name = name.replace(weight_name, param_name)
-                param = params_dict[name]
+                param = __get_param(name, params_dict)
                 load_weight(param, loaded_weight, shard_id=shard_id)
                 break
             else:
                 if '.qkv.' in name:
                     # vl attention
-                    param = params_dict[name]
+                    param = __get_param(name, params_dict)
                     q, k, v = param.weight_spliter(loaded_weight)
                     load_weight(param, q, shard_id='q')
                     load_weight(param, k, shard_id='k')
@@ -1338,7 +1373,7 @@ class Qwen3_5ForConditionalGeneration(nn.Module, DeployModelMixinV1, CudaGraphMi
                         if rms_norm_key in name and 'weight' in name:
                             loaded_weight = loaded_weight + 1
                             break
-                    param = params_dict[name]
+                    param = __get_param(name, params_dict)
                     load_weight(param, loaded_weight)
 
     def get_input_processor(self) -> BaseModelInputProcessor:

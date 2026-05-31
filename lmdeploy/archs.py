@@ -10,7 +10,7 @@ from .utils import get_logger
 logger = get_logger('lmdeploy')
 
 
-def autoget_backend(model_path: str, trust_remote_code: bool = False):
+def autoget_backend(model_path: str) -> Literal['turbomind', 'pytorch']:
     """Get backend type in auto backend mode.
 
     Args:
@@ -36,7 +36,7 @@ def autoget_backend(model_path: str, trust_remote_code: bool = False):
     is_turbomind_installed = True
     try:
         from lmdeploy.turbomind.supported_models import is_supported as is_supported_turbomind
-        turbomind_has = is_supported_turbomind(model_path, trust_remote_code=trust_remote_code)
+        turbomind_has = is_supported_turbomind(model_path)
     except ImportError:
         is_turbomind_installed = False
 
@@ -57,8 +57,7 @@ def autoget_backend(model_path: str, trust_remote_code: bool = False):
 
 def autoget_backend_config(
     model_path: str,
-    backend_config: PytorchEngineConfig | TurbomindEngineConfig | None = None,
-    trust_remote_code: bool = False
+    backend_config: PytorchEngineConfig | TurbomindEngineConfig | None = None
 ) -> tuple[Literal['turbomind', 'pytorch'], PytorchEngineConfig | TurbomindEngineConfig]:
     """Get backend config automatically.
 
@@ -76,7 +75,7 @@ def autoget_backend_config(
     if isinstance(backend_config, PytorchEngineConfig):
         return 'pytorch', backend_config
 
-    backend = autoget_backend(model_path, trust_remote_code=trust_remote_code)
+    backend = autoget_backend(model_path)
     config = PytorchEngineConfig() if backend == 'pytorch' else TurbomindEngineConfig()
     if backend_config is not None:
         if type(backend_config) is type(config):
@@ -110,38 +109,33 @@ def check_vl_llm(backend: str, config: dict) -> bool:
         'LlavaLlamaForCausalLM', 'LlavaMistralForCausalLM', 'CogVLMForCausalLM', 'InternLMXComposer2ForCausalLM',
         'InternVLChatModel', 'MiniCPMV', 'LlavaForConditionalGeneration', 'LlavaNextForConditionalGeneration',
         'Phi3VForCausalLM', 'Qwen2VLForConditionalGeneration', 'Qwen2_5_VLForConditionalGeneration',
-        'Qwen3VLForConditionalGeneration', 'Qwen3VLMoeForConditionalGeneration', 'Qwen3_5ForConditionalGeneration',
-        'Qwen3_5MoeForConditionalGeneration', 'MllamaForConditionalGeneration', 'MolmoForCausalLM',
+        'Qwen3VLForConditionalGeneration', 'Qwen3VLMoeForConditionalGeneration', 'MllamaForConditionalGeneration', 'MolmoForCausalLM',
         'Gemma3ForConditionalGeneration', 'Llama4ForConditionalGeneration', 'InternVLForConditionalGeneration',
         'InternS1ForConditionalGeneration', 'InternS1ProForConditionalGeneration',
-        'InternS1_1_ForConditionalGeneration', 'Glm4vForConditionalGeneration',
-        'InternS2PreviewForConditionalGeneration', 'InternS2PreviewForCausalLM',
+        'InternS1_1_ForConditionalGeneration', 'Glm4vForConditionalGeneration'
     ])
-    turbomind_unsupported_archs = ['Qwen3_5ForConditionalGeneration',
-                                   'Qwen3_5MoeForConditionalGeneration',
-                                   'InternS2PreviewForConditionalGeneration',
-                                   'InternS2PreviewForCausalLM']
     if arch == 'QWenLMHeadModel' and 'visual' in config:
         return True
     elif arch == 'MultiModalityCausalLM' and 'language_config' in config:
         return True
     elif arch in ['ChatGLMModel', 'ChatGLMForConditionalGeneration'] and 'vision_config' in config:
         return True
-    elif arch in turbomind_unsupported_archs and backend == 'turbomind':
+    elif arch in ['Qwen3_5ForConditionalGeneration', 'Qwen3_5MoeForConditionalGeneration']:
+        # Qwen3.5 models are supported for both turbomind and pytorch as LLM
         return False
     elif arch in supported_archs:
         return True
     return False
 
 
-def get_task(backend: str, model_path: str, trust_remote_code: bool = False):
+def get_task(backend: str, model_path: str):
     """Get pipeline type and pipeline class from model config."""
     from lmdeploy.serve.core import AsyncEngine
 
     if os.path.exists(os.path.join(model_path, 'triton_models', 'weights')):
         # workspace model
         return 'llm', AsyncEngine
-    _, config = get_model_arch(model_path, trust_remote_code=trust_remote_code)
+    _, config = get_model_arch(model_path)
     if check_vl_llm(backend, config.to_dict()):
         from lmdeploy.serve.core import VLAsyncEngine
         return 'vlm', VLAsyncEngine
@@ -150,27 +144,21 @@ def get_task(backend: str, model_path: str, trust_remote_code: bool = False):
     return 'llm', AsyncEngine
 
 
-def get_model_arch(model_path: str, trust_remote_code: bool = False):
+def get_model_arch(model_path: str):
     """Get a model's architecture and configuration.
 
     Args:
         model_path(str): the model path
     """
     try:
-        cfg = AutoConfig.from_pretrained(model_path, trust_remote_code=trust_remote_code)
+        cfg = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
     except Exception as e:  # noqa
         from transformers import PretrainedConfig
-        cfg = PretrainedConfig.from_pretrained(model_path, trust_remote_code=trust_remote_code)
+        cfg = PretrainedConfig.from_pretrained(model_path, trust_remote_code=True)
 
     _cfg = cfg.to_dict()
     if _cfg.get('architectures', None):
         arch = _cfg['architectures'][0]
-        if _cfg.get('auto_map'):
-            for _, v in _cfg['auto_map'].items():
-                if 'InternLMXComposer2ForCausalLM' in v:
-                    arch = 'InternLMXComposer2ForCausalLM'
-    elif _cfg.get('text_config', None) and _cfg['text_config'].get('architectures', None):
-        arch = _cfg['text_config']['architectures'][0]
         if _cfg.get('auto_map'):
             for _, v in _cfg['auto_map'].items():
                 if 'InternLMXComposer2ForCausalLM' in v:

@@ -169,7 +169,13 @@ class CUDAGraphRunner(GraphRunner):
         if self.backend_config.eager_mode:
             return _false
 
-        return getattr(self.model, 'support_cuda_graph', _false)
+        # Get support_cuda_graph method from model
+        # If it's a class attribute (bool), wrap it in a lambda
+        support_graph = getattr(self.model, 'support_cuda_graph', _false)
+        if isinstance(support_graph, bool):
+            # If it's a boolean, return a function that returns that boolean
+            return lambda **kwargs: support_graph
+        return support_graph
 
     def _try_compile_model_once(self):
         if self.has_try_compile_model:

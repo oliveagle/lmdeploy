@@ -109,7 +109,12 @@ class ARSpecStoppingCriteria(ARStoppingCriteria):
              inputs: ModelInputs | None = None,
              extra_inputs: ARSpecExtraInputs | None = None):
         """Check whether to stop generation."""
-        token_ids = extra_inputs.output_token_ids
+        # Handle case where output_token_ids is None (e.g., first prefill step)
+        # Fall back to next_token_ids for stopping check
+        if extra_inputs.output_token_ids is None:
+            token_ids = next_token_ids.unsqueeze(-1) if next_token_ids.ndim == 1 else next_token_ids
+        else:
+            token_ids = extra_inputs.output_token_ids
 
         if token_ids.ndim == 1:
             token_ids = token_ids.unsqueeze(-1)
@@ -156,8 +161,10 @@ class ARSpecModelAgentStrategy(ModelAgentStrategy):
                            model_outputs: dict[str, torch.Tensor], **kwargs) -> ARSpecExtraInputs:
         """Slice outputs."""
         target_logits = model_outputs['logits'][0]
+        # Use aux_hidden_states for DFlash, fallback to hidden_states
+        target_hidden = model_outputs.get('aux_hidden_states', model_outputs.get('hidden_states'))
         return extra_inputs.clone(
-            target_hidden_states=model_outputs.get('hidden_states'),
+            target_hidden_states=target_hidden,
             target_position_ids=model_outputs.get('position_ids', None),
             target_inputs_embeds=model_outputs.get('target_inputs_embeds', None),
             target_logits=target_logits,

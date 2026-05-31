@@ -9,7 +9,7 @@
 
 namespace turbomind {
 
-class ModelWeight;
+class LlamaWeight;
 
 class LanguageModel {
 public:
@@ -24,9 +24,27 @@ public:
         return static_cast<bool>(impl_);
     }
 
-    LanguageModel(const EngineParam& engine, const Context& ctx, const ModelWeight& weights, int phases);
+    LanguageModel(DataType              dtype,
+                  const ModelParam&     model,
+                  const EngineParam&    engine,
+                  const AttentionParam& attn,
+                  const MoeParam&       moe,
+                  const Context&        ctx,
+                  const LlamaWeight&    weights,
+                  int                   phases);
 
     void Run(BatchOp op, int phase, TensorMap& env);
+
+    const ModelParam&     model_param() const noexcept;
+    const AttentionParam& attn_param() const noexcept;
+
+    // DFlash support
+    void EnableDFlash(bool enable);
+    void SetDFlashContext(Context* ctx);
+    void GetDFlashStats(int& total_draft_steps,
+                        int& total_draft_tokens,
+                        int& total_accepted_tokens,
+                        int& total_rejected_tokens);
 
 private:
     struct Impl;

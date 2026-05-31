@@ -94,148 +94,118 @@ Layer/norm/head mappings per model family are defined directly in `calibrate.py`
 - `lmdeploy/tokenizer.py` — HuggingFace/SentencePiece tokenizer wrapper.
 - `lmdeploy/serve/openai/` — OpenAI-compatible API server.
 
-## 性能基准测试
-
-**所有性能基准测试的脚本、结果和报告已固化在以下目录：**
-
-`benchmarks-archive/python-turbomind_35b_awq_20260526/`
-
-### 目录结构
-
-```
-benchmarks-archive/python-turbomind_35b_awq_20260526/
-├── README.md                                    # 测试报告（Prefill/Decode 分开）
-├── scripts/
-│   ├── run_benchmark.sh                        # 主测试脚本
-│   └── benchmark_turbomind_quick.py            # 自定义测试脚本
-└── results/
-    ├── profile_throughput_35b_random_512_512.csv
-    ├── profile_throughput_35b_random_1024_512.csv
-    ├── profile_throughput_35b_random_4096_512.csv
-    ├── profile_throughput_35b_random_8192_512.csv
-    └── benchmark_turbomind_20260526_134258.json
-```
-
-### 测试结果（Qwen3.6-35B-A3B-AWQ, TurboMind）
-
-| 输入 | 输出 | TTFT | Prefill (tok/s) | Decode (tok/s) |
-|------|------|------|-----------------|----------------|
-| 512 | 512 | 80ms | 6,408 | 42.6 |
-| 1024 | 512 | 139ms | 7,356 | 42.2 |
-| 4096 | 512 | 402ms | 10,190 | 40.5 |
-| 8192 | 512 | 649ms | 12,614 | 39.8 |
-
-**重要说明**：
-- Prefill 和 Decode 必须分开统计
-- Prefill 吞吐量 = input_len / ttft
-- Decode 吞吐量 = 1000 / tpot
-- 测试必须使用 `--concurrency 1` 串行测试，避免并发干扰
-- 数据以 CSV 文件中的实测数据为准，不得推测或估算
-
-### 运行测试
-
-```bash
-cd /mnt/data/lmdeploy
-bash benchmarks-archive/python-turbomind_35b_awq_20260526/scripts/run_benchmark.sh
-```
-
 ## Adding a New PyTorch Model
 
 Use the `/support-new-model` skill for a complete step-by-step guide.
 
-<!-- bv-agent-instructions-v2 -->
-
 ---
 
-## Beads Workflow Integration
+## DFlash Speculative Decoding Integration
 
-This project uses [beads_rust](https://github.com/Dicklesworthstone/beads_rust) (`br`) for issue tracking and [beads_viewer](https://github.com/Dicklesworthstone/beads_viewer) (`bv`) for graph-aware triage. Issues are stored in `.beads/` and tracked in git.
+**当前状态**: 设计完成，C++ 原型 80%，核心集成进行中
 
-### Using bv as an AI sidecar
+**团队协作**: 使用多 Agent 团队 `dflash-turbomind-integration` 进行开发
 
-bv is a graph-aware triage engine for Beads projects (.beads/beads.jsonl). Instead of parsing JSONL or hallucinating graph traversal, use robot flags for deterministic, dependency-aware outputs with precomputed metrics (PageRank, betweenness, critical path, cycles, HITS, eigenvector, k-core).
+**关键文档**:
+- `DFLASH_PROJECT_SUMMARY.md` - 项目总结
+- `DFLASH_IMPLEMENTATION_ROADMAP.md` - 实施路线图
+- `DFLASH_TURBOMIND_DESIGN.md` - 架构设计
+- `~/.claude/teams/dflash-turbomind-integration/AGENTS.md` - 团队协作记录
 
-**Scope boundary:** bv handles *what to work on* (triage, priority, planning). `br` handles creating, modifying, and closing beads.
+**已创建的 C++ 文件**:
+- `src/turbomind/models/llama/DFlashDraftModel.{h,cc}` - Draft model 实现
+- `src/turbomind/models/llama/DFlashDraftWeight.{h,cc}` - 权重结构
+- `src/turbomind/models/llama/dflash_kernels.{h,cu}` - CUDA kernels
+- `src/turbomind/models/llama/unified_decoder_dflash.{h,cc}` - Decoder 扩展
 
-**CRITICAL: Use ONLY --robot-* flags. Bare bv launches an interactive TUI that blocks your session.**
+**待完成的任务**:
+1. 修改 `LlamaWeight.{h,cc}` 添加 DFlashDraftWeight 支持
+2. 修改 `LlamaDecoder.cc` 实现 speculative 解码
+3. 添加 `SpeculativeConfig` 到 `messages.py`
+4. 修改 `CMakeLists.txt` 添加 DFlash 源文件
+5. 修改 `turbomind.py` Python 接口
 
-#### The Workflow: Start With Triage
+**预期性能**: 1.7x+ decode speedup, 60-80% accept rate
 
-**`bv --robot-triage` is your single entry point.** It returns everything you need in one call:
-- `quick_ref`: at-a-glance counts + top 3 picks
-- `recommendations`: ranked actionable items with scores, reasons, unblock info
-- `quick_wins`: low-effort high-impact items
-- `blockers_to_clear`: items that unblock the most downstream work
-- `project_health`: status/type/priority distributions, graph metrics
-- `commands`: copy-paste shell commands for next steps
+## Qwen3.6-35B-A3B-AWQ MoE 模型支持
 
-```bash
-bv --robot-triage        # THE MEGA-COMMAND: start here
-bv --robot-next          # Minimal: just the single top pick + claim command
+**当前状态**: ✅ AWQ MoE 量化方法支持已修复
 
-# Token-optimized output (TOON) for lower LLM context usage:
-bv --robot-triage --format toon
+**修复的问题**:
+1. ✅ 添加 AWQ 量化方法到 `lmdeploy/pytorch/nn/moe/__init__.py`
+2. ✅ 修复 `modules_to_not_convert` 层的识别（`lmdeploy/pytorch/config.py`）
+3. ✅ 添加 EP fallback 到 Triton 实现（`lmdeploy/pytorch/backends/cuda/moe/default.py`）
+
+**内存需求分析**:
+- Qwen3.6-35B-A3B-AWQ 有 256 个专家 × 40 层
+- TP4 只分片 FFN 维度，不分片专家
+- MoE 权重每 GPU 需要 ~15 GB
+- 总需求约 18 GB/GPU（超过 16GB V100）
+
+**运行建议**:
+- 使用 A100 40GB 或更大显存的 GPU
+- 或使用 8 张 GPU（TP=8）
+- 或测试更小的 MoE 模型
+
+**已知限制**:
+- 当前 LMDeploy MoE 实现 EP+TP 不能有效减少内存
+- EP 只分片专家，TP 只分片 FFN，不同时分片两者
+- 需要 `deep_gemm` 或 `DeepEP` 库才能使用完整的 EP 功能
+
+## Test 文件存放规范
+
+**测试文件位置**: `tests/` 目录下按功能分类组织
+
+### 目录结构
+
+```
+tests/
+├── dflash/              # DFlash speculative decoding 测试
+│   ├── test_dflash.py
+│   ├── test_dflash_debug.py
+│   └── ...
+├── test_awq_moe_fix.py  # AWQ MoE 相关测试
+├── test_correct_cache.py
+├── test_ep_config.py
+└── ...
 ```
 
-Before claiming, verify current state with `br show <id> --json` or `br ready --json`. `recommendations` can include graph-important blocked or assigned work; only `quick_ref.top_picks` and non-empty `claim_command` fields represent claimable work.
+### 测试文件命名规范
 
-#### Other bv Commands
+- **文件名**: 必须以 `test_` 开头，使用下划线命名
+- **位置**: 必须放在 `tests/` 目录下，按功能分子目录（如 `dflash/`）
+- **禁止**: 根目录（`lmdeploy/`）下禁止放置 `test*.py` 文件
 
-| Command | Returns |
-|---------|---------|
-| `--robot-plan` | Parallel execution tracks with unblocks lists |
-| `--robot-priority` | Priority misalignment detection with confidence |
-| `--robot-insights` | Full metrics: PageRank, betweenness, HITS, eigenvector, critical path, cycles, k-core |
-| `--robot-alerts` | Stale issues, blocking cascades, priority mismatches |
-| `--robot-suggest` | Hygiene: duplicates, missing deps, label suggestions, cycle breaks |
-| `--robot-diff --diff-since <ref>` | Changes since ref: new/closed/modified issues |
-| `--robot-graph [--graph-format=json\|dot\|mermaid]` | Dependency graph export |
+### 测试文件编写规范
 
-#### Scoping & Filtering
+1. **禁止硬编码路径**
+   - ❌ 禁止: `sys.path.insert(0, '/home/oliveagle/opt/lmdeploy/lmdeploy')`
+   - ✅ 正确: 假设从 repo 根目录运行，lmdeploy 已在 PYTHONPATH 中
 
-```bash
-bv --robot-plan --label backend              # Scope to label's subgraph
-bv --robot-insights --as-of HEAD~30          # Historical point-in-time
-bv --recipe actionable --robot-plan          # Pre-filter: ready to work (no blockers)
-bv --recipe high-impact --robot-triage       # Pre-filter: top PageRank scores
-```
+2. **禁止硬编码 LD_LIBRARY_PATH**
+   - ❌ 禁止: `os.environ['LD_LIBRARY_PATH'] = '.../build/lib'`
+   - ✅ 正确: 使用 `pip install -e .` 安装后，库路径自动配置
 
-### br Commands for Issue Management
+3. **模型路径配置**
+   - 使用环境变量或配置文件
+   - 提供默认值示例，但允许用户覆盖
 
-```bash
-br ready              # Show issues ready to work (no blockers)
-br list --status=open # All open issues
-br show <id>          # Full issue details with dependencies
-br create --title="..." --type=task --priority=2
-br update <id> --status=in_progress
-br close <id> --reason="Completed"
-br close <id1> <id2>  # Close multiple issues at once
-br sync --flush-only  # Export DB to JSONL
-```
+4. **GPU 配置**
+   - 使用 `CUDA_VISIBLE_DEVICES` 环境变量
+   - 提供清晰的注释说明 GPU 需求
 
-### Workflow Pattern
+### 运行测试
 
-1. **Triage**: Run `bv --robot-triage` to find the highest-impact actionable work
-2. **Claim**: Use `br update <id> --status=in_progress`
-3. **Work**: Implement the task
-4. **Complete**: Use `br close <id>`
-5. **Sync**: Always run `br sync --flush-only` at session end
-
-### Key Concepts
-
-- **Dependencies**: Issues can block other issues. `br ready` shows only unblocked work.
-- **Priority**: P0=critical, P1=high, P2=medium, P3=low, P4=backlog (use numbers 0-4, not words)
-- **Types**: task, bug, feature, epic, chore, docs, question
-- **Blocking**: `br dep add <issue> <depends-on>` to add dependencies
-
-### Session Protocol
+从 repo 根目录运行：
 
 ```bash
-git status              # Check what changed
-git add <files>         # Stage code changes
-br sync --flush-only    # Export beads changes to JSONL
-git commit -m "..."     # Commit everything
-git push                # Push to remote
+# 运行单个测试
+python tests/dflash/test_dflash.py
+
+# 运行所有单元测试
+pytest tests/test_lmdeploy/
+
+# 运行特定模块测试
+pytest tests/test_lmdeploy/test_model.py
 ```
 
-<!-- end-bv-agent-instructions -->

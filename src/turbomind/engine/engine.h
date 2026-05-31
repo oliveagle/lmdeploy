@@ -39,6 +39,14 @@ public:
 
     std::shared_ptr<ScheduleMetrics> GetScheduleMetrics();
 
+    // DFlash support
+    void EnableDFlash(bool enable);
+
+    void GetDFlashStats(int& total_draft_steps,
+                        int& total_draft_tokens,
+                        int& total_accepted_tokens,
+                        int& total_rejected_tokens);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

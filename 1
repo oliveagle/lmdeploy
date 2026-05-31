@@ -1,0 +1,96 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+`torch_dtype` is deprecated! Use `dtype` instead!
+[rank1]:[W508 00:17:52.564883151 ProcessGroupGloo.cpp:511] Warning: Unable to resolve hostname to a (local) address. Using the loopback address as fallback. Manually set the network interface to bind to with GLOO_SOCKET_IFNAME. (function operator())
+[rank2]:[W508 00:17:52.564989450 ProcessGroupGloo.cpp:511] Warning: Unable to resolve hostname to a (local) address. Using the loopback address as fallback. Manually set the network interface to bind to with GLOO_SOCKET_IFNAME. (function operator())
+[rank3]:[W508 00:17:52.567377259 ProcessGroupGloo.cpp:511] Warning: Unable to resolve hostname to a (local) address. Using the loopback address as fallback. Manually set the network interface to bind to with GLOO_SOCKET_IFNAME. (function operator())
+[rank0]:[W508 00:17:52.587295808 ProcessGroupGloo.cpp:511] Warning: Unable to resolve hostname to a (local) address. Using the loopback address as fallback. Manually set the network interface to bind to with GLOO_SOCKET_IFNAME. (function operator())
+Exception ignored in atexit callback: <bound method finalize._exitfunc of <class 'weakref.finalize'>>
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/weakref.py", line 666, in _exitfunc
+    f()
+  File "/usr/lib/python3.12/weakref.py", line 590, in __call__
+    return info.func(*info.args, **(info.kwargs or {}))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/oliveagle/venvs/lmdeploy/lib/python3.12/site-packages/torch/library.py", line 471, in _del_library
+    m.reset()
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 519, in handle_sigterm
+    exit(0)
+  File "<frozen _sitebuiltins>", line 26, in __call__
+SystemExit: 0
+[rank0]:[W508 00:17:59.083596308 ProcessGroupNCCL.cpp:1553] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+Traceback (most recent call last):
+  File "/tmp/test_dflash_5turns.py", line 174, in <module>
+    success = main()
+              ^^^^^^
+  File "/tmp/test_dflash_5turns.py", line 106, in main
+    pipe = pipeline(
+           ^^^^^^^^^
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/api.py", line 71, in pipeline
+    return Pipeline(model_path,
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pipeline.py", line 78, in __init__
+    self.async_engine = pipeline_class(model_path,
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/serve/core/async_engine.py", line 135, in __init__
+    self.engine = self._build_pytorch(model_path=model_path,
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/serve/core/async_engine.py", line 185, in _build_pytorch
+    return Engine.from_pretrained(model_path, engine_config=backend_config, speculative_config=speculative_config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/engine.py", line 239, in from_pretrained
+    return cls(
+           ^^^^
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/engine.py", line 153, in __init__
+    self.executor.init()
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/base.py", line 245, in init
+    self.build_model()
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 349, in build_model
+    self.collective_rpc('build_model')
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 312, in collective_rpc
+    outputs[proc_id] = ret_buf.receive()
+                       ^^^^^^^^^^^^^^^^^
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 187, in receive
+    with self.notifier.wait():
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 72, in wait
+    self.events[self._event_id].wait()
+  File "/usr/lib/python3.12/multiprocessing/synchronize.py", line 356, in wait
+    self._cond.wait(timeout)
+  File "/usr/lib/python3.12/multiprocessing/synchronize.py", line 268, in wait
+    return self._wait_semaphore.acquire(True, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 281, in signal_handler
+    self.release()
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 425, in release
+    proc.join()
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 491, in join
+    self._proc.join()
+  File "/usr/lib/python3.12/multiprocessing/process.py", line 149, in join
+    res = self._popen.wait(timeout)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/popen_fork.py", line 43, in wait
+    return self.poll(os.WNOHANG if timeout == 0.0 else 0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/popen_fork.py", line 27, in poll
+    pid, sts = os.waitpid(self.pid, flag)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 281, in signal_handler
+    self.release()
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 429, in release
+    ret_buf.close()
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 203, in close
+    self.notifier.close()
+  File "/home/oliveagle/opt/lmdeploy/lmdeploy/lmdeploy/pytorch/engine/executor/mp_executor.py", line 91, in close
+    event.set()
+  File "/usr/lib/python3.12/multiprocessing/synchronize.py", line 345, in set
+    self._cond.notify_all()
+  File "/usr/lib/python3.12/multiprocessing/synchronize.py", line 304, in notify_all
+    self.notify(n=sys.maxsize)
+  File "/usr/lib/python3.12/multiprocessing/synchronize.py", line 297, in notify
+    self._woken_count.acquire()       # wait for a sleeper to wake
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 3 leaked shared_memory objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

@@ -3,7 +3,7 @@ import enum
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import torch
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -23,6 +23,16 @@ class QuantPolicy(enum.IntEnum):
     INT4 = 4  # 4-bit KV cache
     INT8 = 8  # 8-bit KV cache
     TURBO_QUANT = 42  # TurboQuant: K=4bit QJL4 + V=2bit MSE
+
+
+class DraftQuantPolicy(enum.IntEnum):
+    """Quantization policy constants for draft model weights."""
+    FP16 = 0  # No quantization, use FP16 weights
+    INT8 = 1  # 8-bit weight-only quantization
+    INT4 = 2  # 4-bit weight-only quantization
+    AWQ = 3  # AWQ (Activation-aware Weight Quantization)
+    GPTQ = 4  # GPTQ (Gradient-based Post-Training Quantization)
+
 
 LogitsProcessor = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 """LogitsProcessor is a function that takes a tensor of input_ids, the logits
@@ -200,6 +210,27 @@ class GenerationConfig:
             self.repetition_ngram_threshold = 0
 
 
+@dataclass
+class SpeculativeConfig:
+    """Speculative decoding config.
+
+    Args:
+        method: the speculative decoding method.
+        model: the path of speculative model.
+        num_speculative_tokens: number of generated token of draft model per step
+        quant_policy: quantization policy for draft model weights.
+            0 = FP16 (no quantization), 1 = INT8, 2 = INT4, 3 = AWQ
+        group_size: quantization group size for INT4/AWQ quantization (default 128)
+        num_groups_per_channel: number of quantization groups per channel (for AWQ)
+    """
+    method: str = 'dflash'
+    model: str = ''
+    num_speculative_tokens: int = 8
+    quant_policy: int = 0  # 0=FP16, 1=INT8, 2=INT4, 3=AWQ
+    group_size: int = 128
+    num_groups_per_channel: int = 1
+
+
 @pydantic_dataclass
 class TurbomindEngineConfig:
     """TurboMind Engine config.
@@ -273,6 +304,8 @@ class TurbomindEngineConfig:
     model_format: str | None = None
     tp: int = 1
     dp: int = 1
+    ep: int = 1  # Expert Parallelism size for MoE
+    ep_rank: int = 0  # Expert Parallelism rank (0 to ep-1)
     cp: int = 1
     device_num: int = None
     attn_tp_size: int = None
@@ -305,6 +338,7 @@ class TurbomindEngineConfig:
     communicator: str = 'nccl'
     hf_overrides: dict[str, Any] | None = None
     enable_metrics: bool = True
+    speculative_config: SpeculativeConfig | None = None
 
     def __post_init__(self):
         """Check input validation."""
@@ -430,6 +464,7 @@ class PytorchEngineConfig:
     hf_overrides: dict[str, Any] | None = None
     disable_vision_encoder: bool = False
     logprobs_mode: str = None
+    speculative_config: SpeculativeConfig | None = None
     # router replay
     enable_return_routed_experts: bool = False
     enable_transfer_obj_ref: bool = False
@@ -676,17 +711,3 @@ class VisionConfig:
     """
     max_batch_size: int = 1
     thread_safe: bool = False
-
-
-@dataclass
-class SpeculativeConfig:
-    """Speculative decoding config.
-
-    Args:
-        method: the speculative decoding method.
-        model: the path of speculative model.
-        num_speculative_tokens: number of generated token of draft model per step
-    """
-    method: str
-    model: str = ''
-    num_speculative_tokens: int = 1

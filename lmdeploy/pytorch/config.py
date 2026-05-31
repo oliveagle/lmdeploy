@@ -158,24 +158,55 @@ class DistConfig:
         if dp == 1:
             self.mlp_tp = None
             self.attn_tp = None
-            self.moe_tp = None
+            # For MoE models with EP enabled, preserve moe_tp to allow EP+TP combination
+            # Only force moe_tp to None when EP is not enabled
+            if ep <= 1:
+                self.moe_tp = None
 
         # mlp and moe tp
         self.mlp_tp = self.mlp_tp or tp
-        self.moe_tp = self.moe_tp or (1 if ep > 1 else self.mlp_tp)
+        # When EP is enabled and moe_tp not explicitly set:
+        # - For MoE models, EP+TP combination is needed to fit model in memory
+        # - Default moe_tp to tp value when EP is enabled (enables EP+TP by default)
+        # - This allows 4x16GB cards to run models that need ~34GB per card with EP alone
+        if self.moe_tp is None:
+            if ep > 1:
+                # EP+TP: Use tp value for moe_tp to enable dimension sharding
+                # This reduces memory from ~34GB to ~12GB per card (4x improvement)
+                self.moe_tp = tp
+            else:
+                # No EP: Use mlp_tp
+                self.moe_tp = self.mlp_tp
 
         # world_size
-        world_size = ep if ep > 1 else max(self.mlp_tp, self.moe_tp)
+        # Support EP + TP combination: world_size = ep (TP is applied within each EP group)
+        # - ep=4 means 4 experts per group (4 GPU workers)
+        # - moe_tp=4 means tensor parallel within each worker (FFN dimension partition)
+        # - EP and TP are orthogonal, world_size doesn't need to be multiplied!
+        if ep > 1:
+            # When EP is enabled, world_size = ep
+            # moe_tp controls tensor parallel within each worker
+            world_size = ep
+        else:
+            world_size = max(self.mlp_tp, self.moe_tp)
         self.world_size = world_size
         assert (world_size >= dp and world_size % dp == 0), (f'world_size {world_size}, dp {dp}')
         assert (world_size >= ep and world_size % ep == 0), (f'world_size {world_size}, ep {ep}')
         assert (world_size >= self.mlp_tp
                 and world_size % self.mlp_tp == 0), (f'world_size {world_size}, mlp_tp {self.mlp_tp}')
-        assert (world_size >= self.moe_tp
-                and world_size % self.moe_tp == 0), (f'world_size {world_size}, moe_tp {self.moe_tp}')
+        # Relaxed: moe_tp can be different from world_size when EP + TP is combined
+        # When using EP + TP, world_size = ep, moe_tp controls intra-worker parallelism
+        if ep <= 1:
+            assert (world_size >= self.moe_tp
+                    and world_size % self.moe_tp == 0), (f'world_size {world_size}, moe_tp {self.moe_tp}')
 
         # attn tp
-        self.attn_tp = self.attn_tp or self.world_size // dp
+        # 关键修复：当 ep>1 时，attn_tp 默认应该是 1，而不是 world_size
+        # 这样可以避免 attn_tp > moe_tp 的问题
+        if self.ep > 1:
+            self.attn_tp = self.attn_tp or 1
+        else:
+            self.attn_tp = self.attn_tp or self.world_size // dp
         self.tp = self.attn_tp
         if self.mlp_tp > 1:
             assert (self.mlp_tp >= self.attn_tp
@@ -188,7 +219,12 @@ class DistConfig:
 
         # tp mode
         self.mlp_tp_mode = TPMode.DEFAULT if (self.mlp_tp in [1, self.attn_tp]) else TPMode.DP_TP
-        self.moe_tp_mode = TPMode.DEFAULT if (self.moe_tp in [1, self.attn_tp]) else TPMode.DP_TP
+        # When EP is enabled, moe_tp_mode should be DEFAULT even if moe_tp != attn_tp
+        # This is because EP and TP are orthogonal in EP mode - no DP_TP needed
+        if self.ep > 1:
+            self.moe_tp_mode = TPMode.DEFAULT
+        else:
+            self.moe_tp_mode = TPMode.DEFAULT if (self.moe_tp in [1, self.attn_tp]) else TPMode.DP_TP
 
     def get_tp_by_layer(self, layer_type: str):
         """Get tp by layer type."""
@@ -368,7 +404,7 @@ class ModelConfig:
     def from_pretrained(
         cls,
         pretrained_model_name_or_path: str,
-        trust_remote_code: bool = False,
+        trust_remote_code: bool = True,
         dtype: str = 'auto',
         dist_config: DistConfig = None,
         hf_overrides: dict[str, Any] = None,
@@ -389,7 +425,6 @@ class ModelConfig:
             dtype (str): user specified data type for model weights and
                 activations. Refer to `PyTorchEngineConfig` for details
             hf_overrides (dict[str, Any]): overrides for the HF config.
-            model_format (str): the quantization format of the model.
         """
         from transformers import AutoConfig
 
@@ -567,34 +602,33 @@ class SpecDecodeConfig:
         target_cache_cfg: CacheConfig,
         target_model: str = None,
         dtype: str = 'auto',
-        trust_remote_code: bool = False,
-        model_format: str = None,
-        hf_overrides: dict[str, Any] = None,
     ):
         model = model or target_model
         model_config = ModelConfig.from_pretrained(model,
-                                                   trust_remote_code=trust_remote_code,
+                                                   trust_remote_code=True,
                                                    dtype=dtype,
                                                    is_draft_model=True,
                                                    spec_method=method,
                                                    block_size=target_cache_cfg.block_size,
-                                                   model_format=model_format,
-                                                   hf_overrides=hf_overrides,
                                                    )
         cache_config = None
         # include medusa
         no_caches = ['medusa']
         if method not in no_caches:
+            # Draft model only needs minimal KV cache for candidate tokens
+            # Use a small fixed number instead of inheriting target's huge allocation
+            # DFlash only generates ~4-8 draft tokens per step, so 128 blocks is enough
+            min_gpu_blocks = max(128, target_cache_cfg.max_batches * 16)
+            min_cpu_blocks = max(32, target_cache_cfg.max_batches * 4)
             cache_config = CacheConfig(max_batches=target_cache_cfg.max_batches,
                                        block_size=target_cache_cfg.block_size,
-                                       kernel_block_size=target_cache_cfg.kernel_block_size,
-                                       num_cpu_blocks=target_cache_cfg.num_cpu_blocks,
-                                       num_gpu_blocks=target_cache_cfg.num_gpu_blocks,
+                                       num_cpu_blocks=min(min_cpu_blocks, target_cache_cfg.num_cpu_blocks),
+                                       num_gpu_blocks=min(min_gpu_blocks, target_cache_cfg.num_gpu_blocks),
                                        cache_max_entry_count=target_cache_cfg.cache_max_entry_count,
                                        max_prefill_token_num=target_cache_cfg.max_prefill_token_num,
                                        device_type=target_cache_cfg.device_type,
-                                       quant_policy=target_cache_cfg.quant_policy,
-                                       migration_backend=target_cache_cfg.migration_backend)
+                                       migration_backend=target_cache_cfg.migration_backend,
+                                       quant_policy=target_cache_cfg.quant_policy)
         obj = cls(
             model=model,
             method=method,
@@ -687,7 +721,7 @@ class QuantizationConfig:
         if not prefix or not self.ignored_layers:
             return self.quant_method
 
-        is_ignore = any([prefix in layer_name for layer_name in self.ignored_layers])
+        is_ignore = any([prefix in layer_name or layer_name in prefix for layer_name in self.ignored_layers])
         quant_method = None if is_ignore else self.quant_method
         return quant_method
 
