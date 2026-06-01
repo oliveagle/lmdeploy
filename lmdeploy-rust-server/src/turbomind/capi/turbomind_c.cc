@@ -1131,7 +1131,7 @@ static void LoadWeightsFromSafetensors(
                 continue;
             }
 
-            if (tensor.raw_data()) {
+            if (tensor) {
                 size_t copy_size = std::min(meta.size, static_cast<size_t>(tensor.byte_size()));
                 transfers.push_back({src_data, tensor.raw_data(), copy_size});
                 ++loaded_count;
@@ -1232,7 +1232,7 @@ static void LoadWeightsFromSafetensors(
                 std::vector<size_t> fused_shape = {fused_out, hidden};
                 auto fused_tensor = w_qkv_param.alloc(fused_shape, acc.dtype);
 
-                if (!fused_tensor || !fused_tensor.raw_data()) {
+                if (!fused_tensor) {
                     fprintf(stderr, "[C-API] ERROR: Failed to allocate w_qkv for %s\n", key.c_str());
                     continue;
                 }
