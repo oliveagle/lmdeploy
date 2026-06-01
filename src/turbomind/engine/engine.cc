@@ -699,7 +699,9 @@ void Engine::Impl::Setup(BatchData& d)
 
     // dbg(d.bs0, d.bsz, d.perm);
 
-    BatchCopy copy{};
+    // Create H2D stream for async copies
+    Stream    h2d_stream = Stream::create();
+    BatchCopy copy{h2d_stream};
 
     TensorMap env{{"batch", d.buf()},
                   {"copy", copy.buf()},
@@ -710,6 +712,9 @@ void Engine::Impl::Setup(BatchData& d)
 
     // dbg(copy);
     copy.Run();
+
+    // Ensure Engine stream waits for H2D stream to complete before signaling ready
+    core::Context::stream().Wait(copy.h2d_complete_event());
 
     d.local_token_num.resize(dp_size_);
     d.local_token_num[dp_rank_] = *env.at("token_num").data<int>();
@@ -734,7 +739,10 @@ void Engine::Impl::Update(BatchData& b, std::vector<Signal>& signals)
 
     copy.Run();
 
-    core::Context::stream().Sync();
+    // No explicit Sync needed: Wait(d->done) at line 907 already established
+    // cross-stream dependency. All GPU work including H2D copies are guaranteed
+    // complete before this stream proceeds.
+    // core::Context::stream().Sync();  // REMOVED
 
     //
     Run(BatchOp::kUpdate, b.phase, env);

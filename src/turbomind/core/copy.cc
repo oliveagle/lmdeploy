@@ -83,11 +83,20 @@ BatchCopy::BatchCopy(): self_{this}
     Reset();
 }
 
+BatchCopy::BatchCopy(const Stream& h2d_stream): self_{this}, h2d_stream_{h2d_stream}
+{
+    Reset();
+    h2d_complete_ = Event::create();
+}
+
 void BatchCopy::Run()
 {
     if (src_.empty()) {
         return;
     }
+
+    // Use H2D stream if available, otherwise use context stream
+    auto& target_stream = static_cast<bool>(h2d_stream_) ? h2d_stream_ : core::Context::stream();
 
     std::visit(
         [&](auto&& copy) {
@@ -107,7 +116,7 @@ void BatchCopy::Run()
                                    ais.data(),
                                    1,
                                    &fail_idx,
-                                   core::Context::stream().handle());
+                                   target_stream.handle());
 
                 if (auto i = fail_idx; i != SIZE_MAX) {
                     TM_LOG_FATAL("copy failed: src={} size={} dst={} code={}",
@@ -119,11 +128,16 @@ void BatchCopy::Run()
             }
             else {
                 for (unsigned i = 0; i < src_.size(); ++i) {
-                    core::Copy(src_[i], size_[i], dst_[i]);
+                    core::Copy(src_[i], size_[i], dst_[i], target_stream);
                 }
             }
         },
         GetCopyAPI());
+
+    // Record event when H2D completes
+    if (static_cast<bool>(h2d_stream_)) {
+        h2d_complete_.Record(h2d_stream_);
+    }
 
     Reset();
 }

@@ -76,7 +76,7 @@ class HuggingFaceTokenizer:
         logger = get_logger('lmdeploy')
 
         current_transformers_version = version.parse(transformers.__version__)
-        cfg = get_model_arch(model_dir, trust_remote_code=trust_remote_code)[1]
+        cfg = get_model_arch(model_dir)[1]
         cfg_ver = getattr(cfg, 'transformers_version', None)
         if cfg_ver is None:
             llm_config = getattr(cfg, 'llm_config', None)

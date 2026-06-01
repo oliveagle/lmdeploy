@@ -82,6 +82,10 @@ name = "prefill_benchmark"
 path = "src/bin/prefill_benchmark.rs"
 
 [[bin]]
+name = "prefill_benchmark_4_8_16k"
+path = "src/bin/prefill_benchmark_4_8_16k.rs"
+
+[[bin]]
 name = "test_2048"
 path = "src/bin/test_2048.rs"
 

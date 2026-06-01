@@ -35,9 +35,10 @@ struct ModelExecutor::Impl {
         TM_FUNCTION_SCOPE();
         TM_CUDA_CHECK(cudaSetDevice(device_id_));
 
-        Stream    stream  = Stream::create();
-        Allocator h_alloc = Allocator(kCPU);
-        Allocator d_alloc = Allocator(stream, false);
+        Stream    stream      = Stream::create();
+        Stream    h2d_stream  = Stream::create();
+        Allocator h_alloc    = Allocator(kCPU);
+        Allocator d_alloc     = Allocator(stream, false);
 
         AnomalyHandler::instance().Init(0, 1000, 0, 1000, stream.handle());
 
@@ -48,23 +49,26 @@ struct ModelExecutor::Impl {
         while (inbound_.pop(d)) {
             TM_CHECK_NOTNULL(d);
             core::Context::stream().Wait(d->ready);
-            Run(*d);
+            Run(*d, h2d_stream);
             d->done.Record(core::Context::stream());
             outbound_.push(std::move(d));
         }
     }
 
-    void Run(BatchData& d)
+    void Run(BatchData& d, const Stream& h2d_stream)
     {
         TM_FUNCTION_SCOPE();
         auto batch = &d;
 
-        BatchCopy copy;
+        BatchCopy copy{h2d_stream};
         TensorMap env{{"batch", d.buf()}, {"copy", copy.buf()}};
 
         model_.Run(BatchOp::kPrepare, d.phase, env);
         // dbg(copy);
         copy.Run();
+
+        // Compute stream waits for H2D copies to complete before forward pass
+        core::Context::stream().Wait(copy.h2d_complete_event());
 
         model_.Run(BatchOp::kForward, d.phase, env);
 

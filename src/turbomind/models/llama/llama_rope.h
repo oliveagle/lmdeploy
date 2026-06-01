@@ -52,4 +52,34 @@ struct RopeKernelParam {
     MropeRopeKernelParam  mrope;
 };
 
+struct YarnRopeParam {
+    float attention_factor = 0.f;
+    float beta_fast        = 0.f;
+    float beta_slow        = 0.f;
+};
+
+struct Llama3RopeParam {
+    float low_freq_factor                  = 0.f;
+    float high_freq_factor                 = 0.f;
+    int   original_max_position_embeddings = 0;
+};
+
+struct MropeParam {
+    int3 section{};
+};
+
+struct RopeParam {
+    RopeType type = RopeType::kDefault;
+
+    float base = 0.f;
+    int   dim  = 0;
+
+    float factor                  = 0.f;
+    int   max_position_embeddings = 0;
+
+    YarnRopeParam   yarn{};
+    Llama3RopeParam llama3{};
+    MropeParam      mrope{};
+};
+
 }  // namespace turbomind

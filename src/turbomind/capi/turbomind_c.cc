@@ -53,6 +53,7 @@ static void replace_all(std::string& str, const std::string& from, const std::st
 #include "src/turbomind/core/module.h"
 #include "src/turbomind/core/allocator.h"
 #include "src/turbomind/core/copy.h"
+#include "src/turbomind/core/tensor_map_pool.h"
 #include "src/turbomind/models/model_root.h"
 #include "src/turbomind/models/model_weight.h"
 #include "src/turbomind/models/decoder_layer_weight.h"
@@ -1948,6 +1949,7 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
                     // Create each expert FfnWeight
                     for (int expert_idx = 0; expert_idx < hf_config.num_local_experts; ++expert_idx) {
                         // Use moe_intermediate_size for expert FFN
+                        turbomind::core::FfnConfig expert_ffn_cfg;
                         expert_ffn_cfg.hidden_dim = hf_config.hidden_size;
                         expert_ffn_cfg.inter_size = hf_config.moe_intermediate_size > 0
                                                     ? hf_config.moe_intermediate_size
@@ -2273,32 +2275,6 @@ int TM_TurboMind_InitFromPath(TM_TurboMind* tm, int device_id, const char* model
             fflush(stderr);
         }
 
-        // DEBUG: Verify model_weight state before ProcessWeights
-        auto* model_weight = model_root->text_model_ptr();
-        if (model_weight) {
-            fprintf(stderr, "[C-API] DEBUG: model_weight valid, checking modules...\n");
-            fflush(stderr);
-
-            auto* output = model_weight->output;
-            if (output) {
-                fprintf(stderr, "[C-API] DEBUG: output module exists, output_dim=%d\n", output->output_dim);
-                fflush(stderr);
-            } else {
-                fprintf(stderr, "[C-API] WARNING: output module is NULL!\n");
-                fflush(stderr);
-            }
-
-            if (model_weight->tok_embeddings) {
-                fprintf(stderr, "[C-API] DEBUG: tok_embeddings valid\n");
-                fflush(stderr);
-            } else {
-                fprintf(stderr, "[C-API] ERROR: tok_embeddings is NULL!\n");
-                fflush(stderr);
-            }
-        } else {
-            fprintf(stderr, "[C-API] ERROR: model_weight is NULL!\n");
-            fflush(stderr);
-        }
 
         // Step 5: Process weights (moves weights to GPU and calls prepare)
         fprintf(stderr, "[C-API] Calling ProcessWeights...\n");
@@ -2935,7 +2911,11 @@ int TM_ModelRequest_Forward(
 
     try {
         turbomind::ModelRequest::InputParam param{};
-        param.tensors = std::make_shared<turbomind::core::TensorMap>(std::move(input_tensors->map));
+
+        auto input_pool = turbomind::core::AcquireTensorMap();
+        input_pool->map = std::move(input_tensors->map);
+        param.tensors = std::shared_ptr<turbomind::core::TensorMap>(input_pool, &input_pool->map);
+
         param.session.id = session->id;
         param.session.step = session->step;
         param.session.start_flag = session->start_flag;
@@ -2988,7 +2968,11 @@ int TM_ModelRequest_ForwardAsync(
 
     try {
         turbomind::ModelRequest::InputParam param{};
-        param.tensors = std::make_shared<turbomind::core::TensorMap>(std::move(input_tensors->map));
+
+        auto input_pool = turbomind::core::AcquireTensorMap();
+        input_pool->map = std::move(input_tensors->map);
+        param.tensors = std::shared_ptr<turbomind::core::TensorMap>(input_pool, &input_pool->map);
+
         param.session.id = session->id;
         param.session.step = session->step;
         param.session.start_flag = session->start_flag;

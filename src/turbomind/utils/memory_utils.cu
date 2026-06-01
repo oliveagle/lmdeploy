@@ -100,13 +100,15 @@ void invokeDtypeCast(
     else if (src_dtype == turbomind::kBfloat16 && dst_dtype == turbomind::kFloat32) {
         dtype_cast_kernel<<<grid, block, 0, stream>>>((float*)dst, (const bf16_t*)src, count);
     }
-    // fp16 -> bf16
+// fp16 -> bf16 (via float intermediate)
     else if (src_dtype == turbomind::kFloat16 && dst_dtype == turbomind::kBfloat16) {
-        dtype_cast_kernel<<<grid, block, 0, stream>>>((bf16_t*)dst, (const half_t*)src, count);
+        dtype_cast_kernel<<<grid, block, 0, stream>>>((float*)dst, (const half_t*)src, count);
+        dtype_cast_kernel<<<grid, block, 0, stream>>>((bf16_t*)dst, (const float*)dst, count);
     }
-    // bf16 -> fp16
+    // bf16 -> fp16 (via float intermediate)
     else if (src_dtype == turbomind::kBfloat16 && dst_dtype == turbomind::kFloat16) {
-        dtype_cast_kernel<<<grid, block, 0, stream>>>((half_t*)dst, (const bf16_t*)src, count);
+        dtype_cast_kernel<<<grid, block, 0, stream>>>((float*)dst, (const bf16_t*)src, count);
+        dtype_cast_kernel<<<grid, block, 0, stream>>>((half_t*)dst, (const float*)dst, count);
     }
 }
 

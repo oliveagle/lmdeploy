@@ -232,7 +232,7 @@ struct Buffer_: public Buffer {
     T* raw_data(ssize_t offset = 0)
     {
         if (!this->data_) return nullptr;
-        return (char*)this->data_.get() + turbomind::byte_size<T>(base_ + offset);
+        return reinterpret_cast<T*>((char*)this->data_.get() + turbomind::byte_size<T>(base_ + offset));
     }
 
     const T* raw_data(ssize_t offset = 0) const

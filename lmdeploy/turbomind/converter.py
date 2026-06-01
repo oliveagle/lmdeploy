@@ -160,7 +160,7 @@ def get_tm_config(model_path,
         tuple: (text_model, model_path, data_type)
     """
     # 1. Load HF config once; reused for quant_config, dtype, and session_len.
-    arch, hf_model_cfg = get_model_arch(model_path, trust_remote_code=trust_remote_code)
+    arch, hf_model_cfg = get_model_arch(model_path)
 
     # 2. Reconcile quant_config (unchanged logic from the prior flow).
     quant_config = search_nested_config(

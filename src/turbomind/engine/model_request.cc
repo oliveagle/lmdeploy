@@ -9,6 +9,7 @@
 #include "xgrammar/compiler.h"
 #include "xgrammar/matcher.h"
 
+#include "src/turbomind/core/tensor_map_pool.h"
 #include "src/turbomind/engine/model_request.h"
 #include "src/turbomind/engine/request.h"
 #include "src/turbomind/utils/constant.h"
@@ -47,8 +48,11 @@ void ModelRequest::End(std::function<void(int)> cb, uint64_t session_id)
 
 auto ModelRequest::Forward(InputParam param, std::function<void()> cb) -> OutputParam
 {
-    inputs_  = std::make_shared<TensorMap>();
-    outputs_ = std::make_shared<TensorMap>();
+    auto inputs_pool = core::AcquireTensorMap();
+    auto outputs_pool = core::AcquireTensorMap();
+
+    inputs_ = std::shared_ptr<TensorMap>(inputs_pool, &inputs_pool->map);
+    outputs_ = std::shared_ptr<TensorMap>(outputs_pool, &outputs_pool->map);
 
     auto add = [](auto& dest, auto key, auto dtype, auto where, auto shape, auto&&... dims) {
         Layout shape_;

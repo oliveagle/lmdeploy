@@ -13,10 +13,24 @@ public:
 
     BatchCopy();
 
+    explicit BatchCopy(const Stream& h2d_stream);
+
     BatchCopy(const BatchCopy&) = delete;
     BatchCopy& operator=(const BatchCopy&) = delete;
     BatchCopy(BatchCopy&&) noexcept        = delete;
     BatchCopy& operator=(BatchCopy&&) noexcept = delete;
+
+    // Get the H2D stream
+    const Stream& get_h2d_stream() const
+    {
+        return h2d_stream_;
+    }
+
+    // Get the event that signals H2D completion
+    const Event& h2d_complete_event() const
+    {
+        return h2d_complete_;
+    }
 
     // clang-format off
     class Group {
@@ -135,6 +149,9 @@ private:
     size_t count_;
 
     BatchCopy* self_;
+
+    Stream  h2d_stream_;
+    Event   h2d_complete_;
 };
 
 }  // namespace turbomind::core

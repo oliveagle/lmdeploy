@@ -258,9 +258,10 @@ if(ARCH STREQUAL "x86_64")
     if (${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "11.8")
       list(APPEND CMAKE_CUDA_ARCHITECTURES 89-real) # 4090
     endif ()
-    if (${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "12.0")
-      list(APPEND CMAKE_CUDA_ARCHITECTURES 90a-real) # H100
-    endif ()
+    # 90a removed: requires PTX 8.1+ for multimem instructions, not available on CUDA < 12.6
+    # if (${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "12.0")
+    #   list(APPEND CMAKE_CUDA_ARCHITECTURES 90a-real) # H100
+    # endif ()
     if (${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "12.8")
       list(APPEND CMAKE_CUDA_ARCHITECTURES 120a-real) # 5090
     endif ()

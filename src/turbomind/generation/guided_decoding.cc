@@ -92,7 +92,9 @@ void GuidedDecoding::Update(int phase, TensorMap& env)
 {
     if (auto& d = *data_.at(phase); d.active) {
         Copy(env.at("output_ids").buffer(), d.matchers.size(), output_ids_buf_);
-        core::Context::stream().Sync();
+        // Sync removed: engine.cc:910 Wait(d->done) already establishes cross-stream dependency
+        // All GPU work including H2D copies are guaranteed complete before this point
+        // core::Context::stream().Sync();  // REMOVED - blocking sync, unnecessary
         if (tp_group_->rank() == 0) {
             for (size_t i = 0; i < d.matchers.size(); ++i) {
                 if (const auto& matcher = d.matchers[i]; matcher && !matcher->IsTerminated()) {

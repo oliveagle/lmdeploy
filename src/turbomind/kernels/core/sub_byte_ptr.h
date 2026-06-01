@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <cuda_runtime.h>
+
 #include "src/turbomind/kernels/core/data_type.h"
 
 namespace turbomind {

@@ -93,7 +93,7 @@ CudaIpcCommImpl::CudaIpcCommImpl(HostComm h_comm):
     auto minval = comm::AllReduce(h_comm_, max_ctas_.value(), RedOp::kMin);
     TM_CHECK_EQ(max_ctas_.value(), minval) << "MAX_CTAS set to different values";
 
-#if __CUDACC_VER_MAJOR__ >= 12
+#if __CUDACC_VER_MAJOR__ >= 99  /* temporarily disabled; requires CUDA 12.x+ with multicast SDK */
     if (global_n_ranks_ >= 4 && GetEnv<COMM_NVLS_ENABLE>()) {  // solve 2n-2>n+1 -> n>3
         TM_CUDRV_CHECK(
             cuDeviceGetAttribute(&multicast_capability_, CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED, ordinals_[rank]));
@@ -172,7 +172,7 @@ void* CudaIpcCommImpl::Allocate(size_t size)
     prop.location.id   = ordinals_[global_rank_];
 
     if (multicast_capability_) {
-#if __CUDACC_VER_MAJOR__ >= 12
+#if __CUDACC_VER_MAJOR__ >= 99
         CUmulticastObjectProp prop{};
         prop.numDevices = alloc_access_descs_.size();
         prop.size       = size;
@@ -261,7 +261,7 @@ void CudaIpcCommImpl::Register(const Allocation& alloc, int group)
     const int rank  = this->rank(group);
 
     if (multicast_capability_ && ranks > 1) {  // ! `cuMulticastCreate` fails for `ranks == 1`
-#if __CUDACC_VER_MAJOR__ >= 12
+#if __CUDACC_VER_MAJOR__ >= 99
         CUmulticastObjectProp mc_prop{};
         mc_prop.numDevices = ranks;
         mc_prop.size       = size;
@@ -293,7 +293,7 @@ void CudaIpcCommImpl::Register(const Allocation& alloc, int group)
 void CudaIpcCommImpl::Deregister(Symmetric& s)
 {
     if (s.mc_handle) {
-#if __CUDACC_VER_MAJOR__ >= 12
+#if __CUDACC_VER_MAJOR__ >= 99
         auto deviceptr = reinterpret_cast<CUdeviceptr>(s.mc_ptr);
         TM_CUDRV_CHECK(cuMemUnmap(deviceptr, s.size));
         TM_CUDRV_CHECK(cuMemAddressFree(deviceptr, s.size));

@@ -56,7 +56,7 @@ def is_supported(model_path: str, trust_remote_code: bool = False):
     if os.path.exists(triton_model_path):
         support_by_turbomind = True
     else:
-        arch, cfg = get_model_arch(model_path, trust_remote_code=trust_remote_code)
+        arch, cfg = get_model_arch(model_path)
         quant_method = search_nested_config(cfg.to_dict(), 'quant_method')
         if quant_method and quant_method in ['smooth_quant']:
             return False

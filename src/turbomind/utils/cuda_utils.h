@@ -99,6 +99,9 @@ void ReportCuDrvError(CUresult ec, const char* file, int line);
         }                                                                                                              \
     } while (0)
 
+// Backward-compat alias: legacy name retained by older call sites.
+#define sync_check_cuda_error() TM_CUDA_CHECK(cudaGetLastError())
+
 template<typename T>
 void printMatrix(T* ptr, int m, int k, int stride, bool is_device_ptr);
 
