@@ -36,23 +36,6 @@ public:
 
     void CreateEngine(int index);
 
-    // DFlash speculative decoding support
-    void LoadDFlashWeights(int index, const std::unordered_map<std::string, Tensor>& weight_map);
-
-    void LoadDFlashWeightsQuantized(int index,
-                                    const std::unordered_map<std::string, Tensor>& weight_map,
-                                    const std::unordered_map<std::string, Tensor>& scale_map,
-                                    int quant_policy,
-                                    int group_size);
-
-    void EnableDFlash(int index, int num_spec_tokens);
-
-    void GetDFlashStats(int index,
-                        int& total_draft_steps,
-                        int& total_draft_tokens,
-                        int& total_accepted_tokens,
-                        int& total_rejected_tokens);
-
     void Sleep(int index, int level);
 
     void WakeUp(int index, const std::vector<std::string>& tags);

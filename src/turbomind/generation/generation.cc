@@ -1,6 +1,5 @@
 
 #include <memory>
-#include <vector>
 
 #include "src/turbomind/generation/generation.h"
 
@@ -20,23 +19,11 @@
 #include "src/turbomind/kernels/sampling_topk_kernels.h"  // InitializeRandomStates
 
 #include "src/turbomind/models/llama/llama_kernels.h"  // invokePadLastTokenIds
-#include "src/turbomind/models/llama/DFlashDraftModel.h"
-#include "src/turbomind/models/llama/dflash_kernels.h"
-#include "src/turbomind/core/logger.h"
+#include "src/turbomind/utils/cuda_utils.h"
 
 // #include "dbg.h"
 
 namespace turbomind {
-
-// 简化版 DFlash 验证函数声明（在 DFlashDraftModel.cu 中定义）
-extern void DFlashVerifyDraftGPU(
-    const Tensor& draft_tokens,
-    const Tensor& target_logits,
-    Tensor& accepted_tokens,
-    Tensor& accept_mask,
-    Tensor& max_logits,
-    Tensor& accepted_count,  // Output: [1] device tensor for count
-    int num_spec_tokens);
 
 using std::unique_ptr;
 using std::shared_ptr;
@@ -88,17 +75,6 @@ struct Generation::Impl {
     const int max_batch_size_;
     const int session_len_;
 
-    // DFlash statistics
-    int dflash_total_draft_steps_{0};
-    int dflash_total_draft_tokens_{0};
-    int dflash_total_accepted_tokens_{0};
-    int dflash_total_rejected_tokens_{0};
-    int dflash_summary_interval_{10};  // Log summary every N draft steps
-
-    // DFlash draft token storage (跨调用持久化)
-    Buffer_<int> dflash_stored_draft_tokens_;  // 存储待验证的 draft tokens
-    Buffer_<int> dflash_stored_draft_logits_;  // 存储 draft logits
-
     Impl(DataType              dtype,
          int                   max_batch_size,
          int                   session_len,
@@ -148,6 +124,7 @@ struct Generation::Impl {
 
     void Setup(int phase, TensorMap& env)
     {
+        TM_FUNCTION_SCOPE();
         auto& d = *data_.at(phase);
 
         auto& b    = *env.at("batch").data<BatchData*>()[0];
@@ -218,7 +195,6 @@ struct Generation::Impl {
             d.generation_size += c.generating;
         }
         // dbg(d.generation_size);
-        TM_LOG_ERROR("[DFlash] Generation Setup: generation_size=%d, batch_size=%d", (int)d.generation_size, (int)rc.size());
 
         logits_processor_->Setup(phase, env);
         sampling_->Setup(phase, env);
@@ -228,6 +204,7 @@ struct Generation::Impl {
 
     void Prepare(int phase, TensorMap& env)
     {
+        TM_FUNCTION_SCOPE();
         auto& d = *data_.at(phase);
 
         auto& b    = *env.at("batch").data<BatchData*>()[0];
@@ -241,6 +218,7 @@ struct Generation::Impl {
 
     void Unprep(int phase, TensorMap& env)
     {
+        TM_FUNCTION_SCOPE();
         auto& d    = *data_.at(phase);
         auto& b    = *env.at("batch").data<BatchData*>()[0];
         auto& copy = *env.at("copy").data<BatchCopy*>()[0];
@@ -252,6 +230,7 @@ struct Generation::Impl {
 
     void Fetch(int phase, TensorMap& env)
     {
+        TM_FUNCTION_SCOPE();
         auto& d    = *data_.at(phase);
         auto& copy = *env.at("copy").data<BatchCopy*>()[0];
 
@@ -266,12 +245,13 @@ struct Generation::Impl {
 
     void Update(int phase, TensorMap& env)
     {
+        TM_FUNCTION_SCOPE();
         sampling_->Update(phase, env);
     }
 
     void Forward(int phase, TensorMap& env)
     {
-        TM_LOG_INFO("[DFlash] Generation::Forward ENTRY: phase={}", phase);
+        TM_FUNCTION_SCOPE();
         auto& d = *data_.at(phase);
         auto& b = *env.at("batch").data<BatchData*>()[0];
 
@@ -283,20 +263,20 @@ struct Generation::Impl {
                                    d.random_init.data(),
                                    b.bsz,
                                    stream);
-            sync_check_cuda_error();
         }
 
         env.emplace("output_ids", output_ids_);              // out
         env.emplace("curand_state", random_state_.front());  // inout
 
         if (const int gs = d.generation_size) {
+
             env.emplace("token_ids_ptrs", d.token_ids_ptrs.slice(0, gs));
 
             auto logits = env.consume("logits");
 
             if (logits.dtype() != kFloat32) {
                 auto tmp = empty_like(logits, kFloat32);
-                invokeCastFloat2D(logits, tmp, stream);
+                TM_SCOPE_CALL(invokeCastFloat2D(logits, tmp, stream));
                 logits = std::move(tmp);
             }
 
@@ -310,88 +290,7 @@ struct Generation::Impl {
             guided_decoding_->FillMask(phase, env);
             guided_decoding_->ApplyMask(phase, env);
 
-            /// DFlash speculative decoding: check for pending draft tokens to verify
-            fprintf(stderr, "[DFlash] Generation Forward: checking dflash_pending_draft_tokens, contains=%d, generation_size=%d\n",
-                       (int)env.contains("dflash_pending_draft_tokens"), gs);
-            if (env.contains("dflash_pending_draft_tokens") && env.contains("logits")) {
-                const auto& pending_draft = env.at("dflash_pending_draft_tokens");
-
-                // Safety check: only proceed if we have valid draft tokens
-                if (pending_draft.shape(0) <= 0) {
-                    TM_LOG_DEBUG("[DFlash] No pending draft tokens (shape={}), skipping verification", pending_draft.shape(0));
-                    sampling_->Forward(phase, env);
-                } else {
-                    const auto& target_logits = env.at("logits");
-
-                    TM_LOG_INFO("[DFlash] Generation: Verifying first draft token against target logits (draft_count=%d)",
-                               pending_draft.shape(0));
-
-                    // 获取 draft model（从 env 中）
-                    // 注意：我们需要通过 Engine 或 LanguageModel 传递 draft model
-                    // 临时方案：在 Generation 内部实现简单的验证逻辑
-                    // 这个逻辑基于 DFlashVerifyDraftGPU，但不需要 draft model
-
-                    // DFlash verification: only verify first draft token against target model
-                    // In decode mode, target_logits has shape [1, vocab_size] (prediction for next token)
-                    // pending_draft has shape [num_spec] (predictions for future tokens)
-                    // We can only verify the first draft token since target model predicts 1 token
-
-                    const int num_spec = pending_draft.shape(0);
-                    const int vocab_size = target_logits.shape(1);
-
-                    TM_LOG_DEBUG("[DFlash] Verify: num_spec=%d, vocab_size=%d", num_spec, vocab_size);
-
-                    // Allocate output tensors for verification
-                    Tensor accepted_tokens, accept_mask, max_logits;
-                    Buffer_<int> h_accepted_count{1, kCPUpinned};
-                    Tensor accepted_count = Tensor(h_accepted_count.data(), {1}, kCPU);
-
-                    DFlashVerifyDraftGPU(
-                        pending_draft,
-                        target_logits,
-                        accepted_tokens,
-                        accept_mask,
-                        max_logits,
-                        accepted_count,
-                        num_spec);
-
-                    // Sync stream and copy count to host
-                    const auto verify_stream = core::Context::stream().handle();
-                    cudaStreamSynchronize(verify_stream);
-
-                    int accepted_count_val = h_accepted_count[0];
-                    dflash_total_accepted_tokens_ += accepted_count_val;
-                    dflash_total_rejected_tokens_ += (num_spec - accepted_count_val);
-
-                    TM_LOG_INFO("[DFlash] Verification complete: %d/%d accepted (%.1f%%)",
-                               accepted_count_val, num_spec,
-                               100.0f * accepted_count_val / num_spec);
-
-                    // Sample from target logits (for rejected positions or if all rejected)
-                    sampling_->Forward(phase, env);
-
-                    dflash_total_draft_steps_++;
-                    dflash_total_draft_tokens_ += num_spec;
-                    // Count will be available after sync; update stats in a follow-up step
-
-                    TM_LOG_INFO("[DFlash] Verification complete: %d draft tokens checked", num_spec);
-
-                    // Periodic summary logging
-                    if (dflash_total_draft_steps_ % dflash_summary_interval_ == 0 && dflash_total_draft_steps_ > 0) {
-                        float overall_accept_rate = dflash_total_draft_tokens_ > 0
-                            ? (float)dflash_total_accepted_tokens_ / dflash_total_draft_tokens_ * 100.0f : 0.0f;
-                        TM_LOG_INFO("[DFlash] ================ STATS SUMMARY ================");
-                        TM_LOG_INFO("[DFlash] Draft Steps:   %d", dflash_total_draft_steps_);
-                        TM_LOG_INFO("[DFlash] Draft Tokens:  %d", dflash_total_draft_tokens_);
-                        TM_LOG_INFO("[DFlash] Accepted:      %d (%.1f%%)", dflash_total_accepted_tokens_, overall_accept_rate);
-                        TM_LOG_INFO("[DFlash] Rejected:      %d", dflash_total_rejected_tokens_);
-                        TM_LOG_INFO("[DFlash] =================================================");
-                    }
-                }
-            } else {
-                // Normal sampling (no DFlash or no pending draft tokens)
-                sampling_->Forward(phase, env);
-            }
+            sampling_->Forward(phase, env);
 
             guided_decoding_->Update(phase, env);
 
@@ -435,14 +334,6 @@ void Generation::Run(BatchOp op, int phase, TensorMap& env)
     else if (op == BatchOp::kUpdate) {
         return impl_->Update(phase, env);
     }
-}
-
-void Generation::GetDFlashStats(int& total_draft_steps, int& total_draft_tokens, int& total_accepted_tokens, int& total_rejected_tokens) const
-{
-    total_draft_steps = impl_->dflash_total_draft_steps_;
-    total_draft_tokens = impl_->dflash_total_draft_tokens_;
-    total_accepted_tokens = impl_->dflash_total_accepted_tokens_;
-    total_rejected_tokens = impl_->dflash_total_rejected_tokens_;
 }
 
 }  // namespace turbomind

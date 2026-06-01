@@ -29,9 +29,6 @@ public:
 
     void Run(BatchOp op, int phase, TensorMap& env);
 
-    // DFlash statistics
-    void GetDFlashStats(int& total_draft_steps, int& total_draft_tokens, int& total_accepted_tokens, int& total_rejected_tokens) const;
-
 private:
     struct Impl;
 

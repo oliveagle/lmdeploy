@@ -9,18 +9,18 @@
 #include "src/turbomind/core/context.h"
 #include "src/turbomind/core/copy.h"
 #include "src/turbomind/core/interval.h"
+#include "src/turbomind/core/scope.h"
 #include "src/turbomind/core/state.h"
 #include "src/turbomind/engine/batch.h"
 #include "src/turbomind/engine/request.h"
 #include "src/turbomind/generation/generation.h"
 #include "src/turbomind/kernels/gpt_kernels.h"
 #include "src/turbomind/models/input_processor.h"
-#include "src/turbomind/models/llama/LlamaWeight.h"
 #include "src/turbomind/models/llama/llama_kernels.h"
 #include "src/turbomind/models/llama/llama_params.h"
 #include "src/turbomind/models/llama/llama_utils.h"
 #include "src/turbomind/models/llama/unified_decoder.h"
-#include "src/turbomind/models/llama/DFlashDraftModel.h"
+#include "src/turbomind/models/model_weight.h"
 #include "src/turbomind/models/output_processor.h"
 #include "src/turbomind/utils/anomaly_handler.h"
 #include "src/turbomind/utils/cuda_utils.h"
@@ -34,12 +34,8 @@ using std::unique_ptr;
 using std::shared_ptr;
 
 struct LanguageModel::Impl {
-    const DataType       dtype_;
-    const ModelParam     param_;
-    const EngineParam    engine_param_;
-    const AttentionParam attn_param_;
     const Communicators& comm_;
-    const LlamaWeight&   weights_;
+    const ModelWeight&   weights_;
     LlamaLinear&         linear_;
 
     const int  tp_size_;
@@ -83,13 +79,6 @@ struct LanguageModel::Impl {
     std::optional<OutputProcessor>  output_processor_;
     std::unique_ptr<Generation>     generation_;  // token generator
 
-    // DFlash draft token storage (跨调用持久化)
-    Tensor dflash_stored_draft_tokens_;  // 存储待验证的 draft tokens
-    Tensor dflash_stored_draft_logits_;  // 存储 draft logits
-
-    // DFlash draft model pointer for verification
-    DFlashDraftModel* dflash_draft_model_{nullptr};
-
     void Run(BatchOp op, int phase, TensorMap& env)
     {
         switch (op) {
@@ -111,14 +100,7 @@ struct LanguageModel::Impl {
         }
     }
 
-    Impl(DataType              dtype,
-         const ModelParam&     model,
-         const EngineParam&    engine,
-         const AttentionParam& attn,
-         const MoeParam&       moe,
-         const Context&        ctx,
-         const LlamaWeight&    weights,
-         int                   phases);
+    Impl(const EngineParam& engine, const Context& ctx, const ModelWeight& weights, int phases);
 
     Tensor LookupEmbedding(const Buffer_<int>& input_ids, Buffer symm_buf);
     Tensor PostEmbedding(const Tensor& features, Buffer symm_buf);
@@ -130,18 +112,7 @@ struct LanguageModel::Impl {
     void Fetch(int phase, TensorMap& env);
 };
 
-LanguageModel::Impl::Impl(DataType              dtype,
-                          const ModelParam&     model,
-                          const EngineParam&    engine,
-                          const AttentionParam& attn,
-                          const MoeParam&       moe,
-                          const Context&        ctx,
-                          const LlamaWeight&    weights,
-                          int                   phases):
-    dtype_{dtype},
-    param_{model},
-    engine_param_{engine},
-    attn_param_{attn},
+LanguageModel::Impl::Impl(const EngineParam& engine, const Context& ctx, const ModelWeight& weights, int phases):
     comm_{ctx.comm},
     weights_{weights},
     linear_{*ctx.linear},
@@ -171,19 +142,15 @@ LanguageModel::Impl::Impl(DataType              dtype,
         d.generating      = {engine.max_batch_size, kCPU};
     }
 
-    input_processor_.emplace(engine, param_, phases);
+    input_processor_.emplace(engine, weights_.hidden_units, weights_.data_type, phases);
 
-    unified_decoder_ = std::make_unique<UnifiedDecoder>(model, engine, attn, moe, ctx, phases);
+    unified_decoder_ = std::make_unique<UnifiedDecoder>(engine, ctx, phases, weights_);
 
-    generation_ = std::make_unique<Generation>(kFloat32,
-                                               engine.max_batch_size,
-                                               engine.session_len,
-                                               model.vocab_size,
-                                               weights.post_decoder_embedding.output_dim * tp_size_,
-                                               comm_.h_tp_group,
-                                               phases);
+    const int vocab_size = weights_.output->output_dim * tp_size_;
 
-    const int     vocab_size     = weights_.post_decoder_embedding.output_dim * tp_size_;
+    generation_ = std::make_unique<Generation>(
+        kFloat32, engine.max_batch_size, engine.session_len, weights_.vocab_size, vocab_size, comm_.h_tp_group, phases);
+
     const ssize_t max_fwd_tokens = engine.max_forward_token_num;
 
     if (ctx.comm.d_comm) {
@@ -192,34 +159,36 @@ LanguageModel::Impl::Impl(DataType              dtype,
         TM_CHECK(engine.max_forward_token_num % tp_size_ == 0);
 
         ssize_t bytes{};
-        bytes = std::max(bytes, byte_size(dtype_, max_fwd_tokens * engine.attn_dp_size * model.hidden_units));
-        bytes = std::max(bytes, byte_size(dtype_, engine.max_batch_size * vocab_size));
+        bytes = std::max(bytes,
+                         byte_size(weights_.data_type, max_fwd_tokens * engine.attn_dp_size * weights_.hidden_units));
+        bytes = std::max(bytes, byte_size(weights_.data_type, engine.max_batch_size * vocab_size));
 
         symm_buf_ = {bytes, symm_alloc};
         // Compute max logits length based on symm buffer size
-        max_logits_len_ = symm_buf_.view(dtype_).size() / vocab_size;
+        max_logits_len_ = symm_buf_.view(weights_.data_type).size() / vocab_size;
     }
     else {
-        max_logits_len_ = std::max<int>(max_fwd_tokens * model.hidden_units / vocab_size, engine.max_batch_size);
+        max_logits_len_ = std::max<int>(max_fwd_tokens * weights_.hidden_units / vocab_size, engine.max_batch_size);
     }
 
-    output_processor_.emplace(param_, max_logits_len_, tp_rank_, phases, [this](const Tensor& hstate) {
+    output_processor_.emplace(weights_.vocab_size, max_logits_len_, tp_rank_, phases, [this](const Tensor& hstate) {
         return PostEmbedding(hstate, symm_buf_);
     });
 }
 
 Tensor LanguageModel::Impl::LookupEmbedding(const Buffer_<int>& input_ids, Buffer symm_buf)
 {
+    TM_FUNCTION_SCOPE();
     const auto st = core::Context::stream().handle();
 
-    const int hidden_units = param_.hidden_units;
+    const int hidden_units = weights_.hidden_units;
 
-    const auto& embedding_table = weights_.pre_decoder_embedding.weight;
+    const auto& embedding_table = weights_.tok_embeddings;
     TM_CHECK_EQ(embedding_table.shape(1) * tp_size_, hidden_units);
 
     const int token_num = input_ids.size();
 
-    Tensor input_embeds{{token_num, hidden_units}, dtype_, kDEVICE};
+    Tensor input_embeds{{token_num, hidden_units}, weights_.data_type, kDEVICE};
 
     if (token_num == 0) {
         return input_embeds;
@@ -227,16 +196,16 @@ Tensor LanguageModel::Impl::LookupEmbedding(const Buffer_<int>& input_ids, Buffe
 
     if (tp_size_ == 1) {
         invokeEmbeddingLookup(input_embeds, input_ids, embedding_table, st);
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
     }
     else if (use_ag2d_) {
         const auto local_hidden_units = embedding_table.shape(1);
 
-        Tensor temp{symm_buf.view(dtype_), {token_num, tp_size_, local_hidden_units}};
+        Tensor temp{symm_buf.view(weights_.data_type), {token_num, tp_size_, local_hidden_units}};
         Tensor local{temp.slice({0, tp_rank_, 0}, {-1, 1, -1}).squeeze(1)};
 
         invokeEmbeddingLookup(local, input_ids, embedding_table, st);
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
 
         comm_.d_comm->AllGather2D(local.raw_data(),
                                   temp.raw_data(),
@@ -248,21 +217,22 @@ Tensor LanguageModel::Impl::LookupEmbedding(const Buffer_<int>& input_ids, Buffe
                                   {true, true},
                                   comm_.d_tp_group,
                                   st);
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
 
         Copy(temp.buffer(), input_embeds.buffer());
     }
     else {
         const auto local_hidden_units = embedding_table.shape(1);
 
-        Tensor temp{symm_buf.view(dtype_), {tp_size_, token_num, local_hidden_units}};
+        Tensor temp{symm_buf.view(weights_.data_type), {tp_size_, token_num, local_hidden_units}};
         Tensor local{temp.slice(tp_rank_).squeeze(0)};
 
         invokeEmbeddingLookup(local, input_ids, embedding_table, st);
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
 
-        comm_.d_comm->AllGather(local.raw_data(), temp.raw_data(), local.size(), dtype_, comm_.d_tp_group, st);
-        sync_check_cuda_error();
+        comm_.d_comm->AllGather(
+            local.raw_data(), temp.raw_data(), local.size(), weights_.data_type, comm_.d_tp_group, st);
+        TM_CUDA_CHECK(cudaGetLastError());
 
         invokeInPlaceTranspose102((uint16_t*)input_embeds.raw_data(),
                                   (uint16_t*)temp.raw_data(),
@@ -271,7 +241,7 @@ Tensor LanguageModel::Impl::LookupEmbedding(const Buffer_<int>& input_ids, Buffe
                                   local_hidden_units,
                                   false,
                                   st);
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
     }
 
     return input_embeds;
@@ -279,30 +249,29 @@ Tensor LanguageModel::Impl::LookupEmbedding(const Buffer_<int>& input_ids, Buffe
 
 Tensor LanguageModel::Impl::PostEmbedding(const Tensor& features, Buffer symm_buf)
 {
+    TM_FUNCTION_SCOPE();
     NvtxScope scope("postDecodeEmbedding");
 
     const auto st = core::Context::stream().handle();
 
     const int bsz              = features.shape(0);
-    const int local_vocab_size = weights_.post_decoder_embedding.output_dim;
+    const int local_vocab_size = weights_.output->output_dim;
     const int vocab_size       = local_vocab_size * tp_size_;
 
     if (bsz == 0) {
-        return Tensor{{0, vocab_size}, dtype_, kDEVICE};
+        return Tensor{{0, vocab_size}, weights_.data_type, kDEVICE};
     }
 
     if (tp_size_ == 1) {
-        Tensor logits{{bsz, vocab_size}, dtype_, kDEVICE};
-        linear_.Forward(features, weights_.post_decoder_embedding, logits);
-        sync_check_cuda_error();
+        Tensor logits{{bsz, vocab_size}, weights_.data_type, kDEVICE};
+        TM_SCOPE_CALL(linear_.Forward(features, *weights_.output, logits));
         TM_DEBUG_TENSOR(logits, "logits", 1);
         return logits;
     }
     else if (use_ag2d_) {
-        Tensor logits{symm_buf.view(dtype_), {bsz, tp_size_, local_vocab_size}};
+        Tensor logits{symm_buf.view(weights_.data_type), {bsz, tp_size_, local_vocab_size}};
         Tensor local = logits.slice({0, tp_rank_, 0}, {-1, 1, -1});
-        linear_.Forward(features, weights_.post_decoder_embedding, local.squeeze(1));
-        sync_check_cuda_error();
+        TM_SCOPE_CALL(linear_.Forward(features, *weights_.output, local.squeeze(1)));
         comm_.d_comm->AllGather2D(local.raw_data(),
                                   logits.raw_data(),
                                   vocab_size,
@@ -313,20 +282,19 @@ Tensor LanguageModel::Impl::PostEmbedding(const Tensor& features, Buffer symm_bu
                                   {true, true},
                                   comm_.d_tp_group,
                                   st);
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
         return logits.view({bsz, -1});
     }
     else {
-        Tensor logits{symm_buf.view(dtype_), {tp_size_, bsz, local_vocab_size}};
+        Tensor logits{symm_buf.view(weights_.data_type), {tp_size_, bsz, local_vocab_size}};
         Tensor local = logits.slice({tp_rank_, 0, 0}, {1, -1, -1});
-        linear_.Forward(features, weights_.post_decoder_embedding, local.squeeze(0));
-        sync_check_cuda_error();
+        TM_SCOPE_CALL(linear_.Forward(features, *weights_.output, local.squeeze(0)));
         comm_.d_comm->AllGather(local.raw_data(), logits.raw_data(), local.size(), local.dtype(), comm_.d_tp_group, st);
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
         Tensor out{{bsz, vocab_size}, features.dtype(), features.device()};
         invokeTransposeAxis01(
             (uint16_t*)out.raw_data(), (uint16_t*)logits.raw_data(), tp_size_, bsz, local_vocab_size, st);
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
         return out;
     }
 }
@@ -422,8 +390,7 @@ void LanguageModel::Impl::Prepare(int phase, TensorMap& env)
 
 void LanguageModel::Impl::Forward(int phase, TensorMap& env)
 {
-    TM_LOG_INFO("[DFlash] LanguageModel::Impl::Forward: this={}, unified_decoder_={}, phase={}",
-                (void*)this, (void*)unified_decoder_.get(), phase);
+    TM_FUNCTION_SCOPE();
 
     auto& d = data_.at(phase);
     auto& b = *env.at("batch").data<BatchData*>()[0];
@@ -451,24 +418,9 @@ void LanguageModel::Impl::Forward(int phase, TensorMap& env)
         env.produce("symm_buf", symm_buf_);
     }
 
-    env.produce("output_norm_weight", weights_.output_norm_weight);
+    env.produce("output_norm_weight", weights_.norm->weight);
 
-    // DFlash: 传递已存储的 draft tokens 给 decoder（用于 DECODE 阶段验证）
-    if (dflash_stored_draft_tokens_) {
-        TM_LOG_INFO("[DFlash] LanguageModel::Forward: passing stored draft tokens, shape={}", dflash_stored_draft_tokens_.shape(0));
-        env.produce("dflash_stored_draft_tokens", dflash_stored_draft_tokens_);
-    }
-
-    unified_decoder_->Forward(phase, env, weights_.decoder_layer_weights);
-
-    // DFlash: 获取新生成的 draft tokens 并存储（用于下一次迭代）
-    if (auto* draft_tokens = env.try_("dflash_stored_draft_tokens")) {
-        TM_LOG_INFO("[DFlash] LanguageModel::Forward: storing new draft tokens, shape={}", draft_tokens->shape(0));
-        dflash_stored_draft_tokens_ = *draft_tokens;
-        if (auto* draft_logits = env.try_("dflash_stored_draft_logits")) {
-            dflash_stored_draft_logits_ = *draft_logits;
-        }
-    }
+    unified_decoder_->Forward(phase, env, weights_.layers_list());
 
     // env.at("batch").data<BatchData*>()[0]->Notify();
 
@@ -480,9 +432,7 @@ void LanguageModel::Impl::Forward(int phase, TensorMap& env)
 
     output_processor_->OutputHiddenStatesAndLogits(phase, env, 1);
 
-    TM_LOG_INFO("[DFlash] LanguageModel::Forward END: d.n_generating={}", d.n_generating);
     if (d.n_generating) {
-        TM_LOG_INFO("[DFlash] LanguageModel::Forward: Calling generation_->Run");
         generation_->Run(BatchOp::kForward, phase, env);
         Copy(env.at("output_ids").buffer(), autoreg_ids_);
     }
@@ -520,130 +470,14 @@ LanguageModel::~LanguageModel() = default;
 
 LanguageModel::LanguageModel(LanguageModel&&) noexcept = default;
 
-LanguageModel::LanguageModel(DataType              dtype,
-                             const ModelParam&     model,
-                             const EngineParam&    engine,
-                             const AttentionParam& attn,
-                             const MoeParam&       moe,
-                             const Context&        ctx,
-                             const LlamaWeight&    weights,
-                             int                   phases)
+LanguageModel::LanguageModel(const EngineParam& engine, const Context& ctx, const ModelWeight& weights, int phases)
 {
-    impl_ = std::make_unique<Impl>(dtype, model, engine, attn, moe, ctx, weights, phases);
+    impl_ = std::make_unique<Impl>(engine, ctx, weights, phases);
 }
 
 void LanguageModel::Run(BatchOp op, int phase, TensorMap& env)
 {
     return TM_CHECK_NOTNULL(impl_)->Run(op, phase, env);
-}
-
-const ModelParam& LanguageModel::model_param() const noexcept
-{
-    return TM_CHECK_NOTNULL(impl_)->param_;
-}
-
-const AttentionParam& LanguageModel::attn_param() const noexcept
-{
-    return TM_CHECK_NOTNULL(impl_)->attn_param_;
-}
-
-void LanguageModel::SetDFlashContext(Context* ctx)
-{
-    TM_CHECK_NOTNULL(impl_)->unified_decoder_->SetContext(ctx);
-}
-
-void LanguageModel::EnableDFlash(bool enable)
-{
-    auto& impl = TM_CHECK_NOTNULL(impl_);
-    if (!enable) {
-        impl->unified_decoder_->EnableDFlash(false);
-        impl->unified_decoder_->SetDFlashDraftModel(nullptr);
-        TM_LOG_INFO("[DFlash] Disabled DFlash on LanguageModel decoder");
-        return;
-    }
-
-    // Check if draft weights are loaded
-    TM_LOG_INFO("[DFlash] EnableDFlash: checking weights, dflash_draft_weight_={}",
-                (void*)impl->weights_.dflash_draft_weight_.get());
-    if (!impl->weights_.dflash_draft_weight_) {
-        TM_LOG_ERROR("[DFlash] Cannot enable DFlash: draft weights not loaded. Call LoadDFlashWeights first.");
-        impl->unified_decoder_->EnableDFlash(false);
-        return;
-    }
-
-    TM_LOG_INFO("[DFlash] Enabling DFlash: num_layers={}, hidden={}, num_heads={}",
-                impl->weights_.dflash_draft_weight_->num_layers,
-                impl->weights_.dflash_draft_weight_->hidden_size,
-                impl->weights_.dflash_draft_weight_->num_attention_heads);
-
-    // Check if we have context
-    auto* ctx = impl->unified_decoder_->GetContext();
-    TM_LOG_INFO("[DFlash] EnableDFlash: got ctx={}, decoder={}", (void*)ctx, (void*)impl->unified_decoder_.get());
-    if (!ctx) {
-        TM_LOG_ERROR("[DFlash] Cannot enable DFlash: context not set. Call SetDFlashContext first.");
-        impl->unified_decoder_->EnableDFlash(false);
-        return;
-    }
-
-    // Create DFlash draft model
-    try {
-        TM_LOG_INFO("[DFlash] Creating DFlashDraftModel instance...");
-
-        // Get the actual number of draft layers from the loaded weights
-        int actual_num_layers = impl->weights_.dflash_draft_weight_->num_layers;
-        TM_LOG_INFO("[DFlash] Draft model has {} layers", actual_num_layers);
-
-        auto dflash_model = std::make_unique<DFlashDraftModel>(
-            impl->param_,
-            impl->engine_param_,
-            *ctx,
-            8,  // num_spec_tokens
-            actual_num_layers  // num_draft_layers - use actual loaded layer count
-        );
-
-        // Set the weight pointer (not copy)
-        TM_LOG_INFO("[DFlash] Setting draft weight pointer...");
-        dflash_model->SetDraftWeightPointer(impl->weights_.dflash_draft_weight_.get());
-
-        // Verify weight pointer was set correctly
-        DFlashDraftWeight* weight = dflash_model->GetDraftWeight();
-        TM_LOG_INFO("[DFlash] Verifying weight pointer: GetDraftWeight()={}",
-                   (void*)weight);
-
-        // Verify weights are accessible
-        if (weight && weight->num_layers > 0) {
-            TM_LOG_INFO("[DFlash] Verifying layer 0 weights");
-        }
-
-        // Attach draft model to decoder
-        impl->unified_decoder_->SetDFlashDraftModel(dflash_model.release());
-        impl->unified_decoder_->EnableDFlash(true);
-
-        TM_LOG_INFO("[DFlash] DFlash enabled successfully!");
-        TM_LOG_INFO("[DFlash]   enable_dflash_={:d}, dflash_draft_model_={:p}",
-                   (int)impl->unified_decoder_->IsDFlashEnabled(),
-                   (void*)impl->unified_decoder_->GetDFlashDraftModel());
-
-        // Force synchronized check - verify decoder state right now
-        TM_LOG_INFO("[DFlash] POST-ENABLE CHECK: IsDFlashEnabled()={:d}, GetDFlashDraftModel()={:p}, decoder addr={:p}",
-                   (int)impl->unified_decoder_->IsDFlashEnabled(),
-                   (void*)impl->unified_decoder_->GetDFlashDraftModel(),
-                   (void*)impl->unified_decoder_.get());
-    }
-    catch (const std::exception& e) {
-        TM_LOG_ERROR("[DFlash] Failed to enable DFlash: {}", e.what());
-        impl->unified_decoder_->EnableDFlash(false);
-        impl->unified_decoder_->SetDFlashDraftModel(nullptr);
-    }
-}
-
-void LanguageModel::GetDFlashStats(int& total_draft_steps,
-                                   int& total_draft_tokens,
-                                   int& total_accepted_tokens,
-                                   int& total_rejected_tokens)
-{
-    auto& impl = TM_CHECK_NOTNULL(impl_);
-    impl->generation_->GetDFlashStats(total_draft_steps, total_draft_tokens, total_accepted_tokens, total_rejected_tokens);
 }
 
 }  // namespace turbomind

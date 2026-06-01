@@ -1,36 +1,29 @@
 
 
-#include <functional>
 #include <numeric>
 #include <optional>
 
 #include <cuda_runtime.h>
 
 #include "src/turbomind/core/allocator.h"
-#include "src/turbomind/core/tensor.h"
+#include "src/turbomind/core/scope.h"
 #include "src/turbomind/kernels/core/math.h"
 #include "src/turbomind/kernels/norm/rms_norm.h"
-#include "src/turbomind/models/llama/DFlashDraftModel.h"
+#include "src/turbomind/models/decoder_layer_weight.h"
 #include "src/turbomind/models/llama/llama_kernels.h"
 #include "src/turbomind/models/llama/llama_utils.h"
 #include "src/turbomind/models/llama/moe_ffn_layer.h"
 #include "src/turbomind/models/llama/unified_attention_layer.h"
 #include "src/turbomind/models/llama/unified_decoder.h"
+#include "src/turbomind/models/model_weight.h"
 #include "src/turbomind/utils/anomaly_handler.h"
 #include "src/turbomind/utils/cuda_utils.h"
-#include "src/turbomind/core/logger.h"
 
 #include "src/turbomind/engine/request.h"
 
 // #include "dbg.h"
 
 namespace turbomind {
-
-// Global counter to track if UnifiedDecoder::Forward is called
-static std::atomic<int> g_unified_decoder_forward_count{0};
-
-// Global counter for decoder instance IDs
-static std::atomic<int> g_decoder_id_counter{0};
 
 void UnifiedDecoder::Run(BatchOp op, int phase, TensorMap& env)
 {
@@ -40,40 +33,70 @@ void UnifiedDecoder::Run(BatchOp op, int phase, TensorMap& env)
     }
 }
 
-UnifiedDecoder::UnifiedDecoder(const ModelParam&     model,
-                               const EngineParam&    engine,
-                               const AttentionParam& attn,
-                               const MoeParam&       moe,
-                               const Context&        ctx,
-                               int                   phases):
-    layer_num_(model.layer_num),
-    hidden_units_(model.hidden_units),
+UnifiedDecoder::UnifiedDecoder(const EngineParam& engine,
+                               const Context&     ctx,
+                               int                phases,
+                               const ModelWeight& model_weight):
+    layer_num_(model_weight.num_layer),
+    hidden_units_(model_weight.hidden_units),
     attn_tp_size_(engine.attn_tp_size),
     attn_dp_size_(engine.attn_dp_size),
     attn_dp_rank_(engine.attn_dp_rank),
     mlp_tp_size_(engine.mlp_tp_size),
     attn_tp_group_(ctx.comm.d_tp_group),
-    rmsnorm_eps_(model.norm_eps),
-    dflash_aux_layers_{1, 8, 16, 24, 31},  // 32 layer model: step=(32-2)/(5-1)=7.5 → {1,8.5,16,23.5,31} → {1,8,16,24,31}
     d_comm_(ctx.comm.d_comm),
-    tune_layer_num_(model.tune_layer_num),
-    is_warm_up_{*ctx.is_warm_up},
-    ctx_(const_cast<Context*>(&ctx)),
-    decoder_id_(g_decoder_id_counter.fetch_add(1))
+    tune_layer_num_(engine.tune_layer_num),
+    is_warm_up_{*ctx.is_warm_up}
 {
-    if (std::accumulate(moe.expert_num.begin(), moe.expert_num.end(), 0LL)) {
-        moe_ffn_layer_ = std::make_unique<MoeFfnLayer>(model, moe, engine, ctx);
+    bool has_moe = false;
+    for (int i = 0; i < model_weight.num_layer; ++i) {
+        if (model_weight.layer(i)->moe_ffn) {
+            has_moe = true;
+            break;
+        }
+    }
+    if (has_moe) {
+        moe_ffn_layer_ = std::make_unique<MoeFfnLayer>(engine, ctx);
     }
 
-    attn_layer_ =
-        std::make_unique<UnifiedAttentionLayer>(model, attn, engine, attn_tp_size_, ctx, phases, (bool)moe_ffn_layer_);
-
-    if (std::find(model.layer_types.begin(), model.layer_types.end(), 1) != model.layer_types.end()) {
-        linear_attn_layer_ = std::make_unique<GatedDeltaNetLayer>(model, attn, engine, attn_tp_size_, ctx, phases);
+    std::vector<AttentionWeight*> attn_weights;
+    attn_weights.reserve(model_weight.num_layer);
+    for (int i = 0; i < model_weight.num_layer; ++i) {
+        if (auto* attn = model_weight.layer(i)->attention.get()) {
+            attn_weights.push_back(attn);
+        }
     }
 
-    if (std::accumulate(model.inter_size.begin(), model.inter_size.end(), 0LL)) {
-        ffn_layer_ = std::make_unique<LlamaFfnLayer>(model, ctx);
+    attn_layer_ = std::make_unique<UnifiedAttentionLayer>(engine.quant_policy,
+                                                          model_weight.layer_types,
+                                                          model_weight.num_layer,
+                                                          attn_weights,
+                                                          engine,
+                                                          ctx,
+                                                          phases,
+                                                          (bool)moe_ffn_layer_);
+
+    bool has_linear_attn = false;
+    for (auto t : model_weight.layer_types) {
+        if (t == 1) {
+            has_linear_attn = true;
+            break;
+        }
+    }
+    if (has_linear_attn) {
+        linear_attn_layer_ =
+            std::make_unique<GatedDeltaNetLayer>(model_weight.data_type, model_weight.layer_types, engine, ctx, phases);
+    }
+
+    bool has_ffn = false;
+    for (int i = 0; i < model_weight.num_layer; ++i) {
+        if (model_weight.layer(i)->feed_forward) {
+            has_ffn = true;
+            break;
+        }
+    }
+    if (has_ffn) {
+        ffn_layer_ = std::make_unique<LlamaFfnLayer>(ctx);
     }
 }
 
@@ -81,6 +104,7 @@ void UnifiedDecoder::AllreduceResidualRMSnorm(Tensor&       hidden_states,
                                               Tensor&       residual,
                                               const Tensor& bias,
                                               const Tensor& weight,
+                                              float         eps,
                                               int           token_num,
                                               int           group0,
                                               int           group1,
@@ -96,27 +120,27 @@ void UnifiedDecoder::AllreduceResidualRMSnorm(Tensor&       hidden_states,
                                                 residual.data_or((void*)nullptr),
                                                 bias.data_or((void*)nullptr),
                                                 weight.raw_data(),
-                                                rmsnorm_eps_,
+                                                eps,
                                                 hidden_units_,
                                                 dtype,
                                                 group0,
                                                 group1,
                                                 local_token_nums,
                                                 stream);
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
     }
     else if (d_comm_) {
         d_comm_->AllreduceResidualBiasRMSnorm(hidden_states.raw_data(),
                                               residual.data_or((void*)nullptr),
                                               bias.data_or((void*)nullptr),
                                               weight.raw_data(),
-                                              rmsnorm_eps_,
+                                              eps,
                                               hidden_units_,
                                               token_num,
                                               dtype,
                                               0,
                                               stream);
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
     }
     else {
         invokeResidualBiasRMSNorm(hidden_states.raw_data(),
@@ -126,14 +150,15 @@ void UnifiedDecoder::AllreduceResidualRMSnorm(Tensor&       hidden_states,
                                   dtype,
                                   hidden_units_,
                                   token_num,
-                                  rmsnorm_eps_,
+                                  eps,
                                   stream);
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
     }
 }
 
 void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<WeightType*>& weights)
 {
+    TM_FUNCTION_SCOPE();
     /**
      * input tensors:
      *   \param decoder_input [token_num, hidden_units], float
@@ -164,35 +189,6 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
 
     const DataType dtype = local_residual.dtype();
 
-    // DFlash: Clear aux_hidden_states_ at the start of each forward pass
-    if (enable_dflash_ && dflash_draft_model_) {
-        aux_hidden_states_.clear();
-    }
-
-    // DFlash 调试：打印 Forward 开始时的状态
-    TM_LOG_DEBUG("[DFlash] Forward called: decoder=%p, enable_dflash_=%d, dflash_draft_model_=%p",
-           (void*)this, (int)enable_dflash_, (void*)dflash_draft_model_);
-
-    // DFlash: 预先获取 selected_token_pos（如果存在）
-    const Buffer* selected_pos_ptr = nullptr;
-    if (enable_dflash_ && dflash_draft_model_) {
-        if (args.try_("selected_token_pos")) {
-            selected_pos_ptr = &args.at("selected_token_pos").buffer();
-            TM_LOG_INFO("[DFlash] Found selected_token_pos, decoder_id={}, size={}", decoder_id_, selected_pos_ptr->size());
-        } else {
-            TM_LOG_INFO("[DFlash] No selected_token_pos in args, decoder_id={}, phase={}", decoder_id_, phase);
-        }
-        TM_LOG_INFO("[DFlash] DFlash enabled: decoder_id={}, enable={}, model={}, phase={}, decoder={:p}",
-                    decoder_id_, enable_dflash_, (void*)dflash_draft_model_, phase, (void*)this);
-    } else {
-        if (!enable_dflash_) {
-            TM_LOG_INFO("[DFlash] NOT enabled: decoder_id={}, enable_dflash_={}, decoder={:p}", decoder_id_, (int)enable_dflash_, (void*)this);
-        }
-        if (!dflash_draft_model_) {
-            TM_LOG_INFO("[DFlash] NO draft model: decoder_id={}, dflash_draft_model_={}, decoder={:p}", decoder_id_, (void*)dflash_draft_model_, (void*)this);
-        }
-    }
-
     Tensor global_hidden_states;
     if (d_comm_) {
         Buffer symm_buf      = args.at("symm_buf").buffer();
@@ -216,22 +212,29 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
         local_hidden_states = global_hidden_states;
     }
 
+    TM_LOG_DEBUG("local_token_num=%d, global_token_num=%d", (int)local_token_num, (int)global_token_num);
+
     TM_DEBUG_TENSOR(local_residual, "res", 1);
-    TM_DEBUG_TENSOR(weights.at(0)->self_attn_norm, "norm_weight", 2);
 
     const auto stream = core::Context::stream().handle();
 
-    invokeRMSNorm(local_hidden_states, local_residual, weights.at(0)->self_attn_norm, rmsnorm_eps_, stream);
-    sync_check_cuda_error();
+    invokeRMSNorm(local_hidden_states,
+                  local_residual,
+                  weights.at(0)->attention_norm->weight,
+                  weights.at(0)->attention_norm->norm_eps_,
+                  stream);
+
+    TM_CUDA_CHECK(cudaGetLastError());
 
     TM_DEBUG_TENSOR(local_hidden_states, Concat("norm0", 0), 2);
 
     // auto stack_alloc{core::Context::device_alloc().adapt<core::StackAllocatorImpl>()};
     // core::ContextGuard ctx{Allocator{stack_alloc}};
 
-    TM_LOG_INFO("[DFlash] Starting layer loop: decoder_id={}, layer_num_={}", decoder_id_, (int)layer_num_);
-
     for (int layer = 0; layer < layer_num_; ++layer) {
+
+        std::string _tm_layer_name = Concat("layer", layer);
+        TM_SCOPE(_tm_layer_name.c_str());
 
         // stack_alloc->iter();
 
@@ -245,13 +248,13 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
 
         /////////////////////////////////////////////
         /// self-attention or linear-attention
-        if (weights.at(layer)->linear_attn_weights) {
+        if (weights.at(layer)->linear_attn) {
             linear_attn_layer_->Forward(
-                {phase, local_hidden_states, local_hidden_states, weights.at(layer)->linear_attn_weights.get(), layer});
+                {phase, local_hidden_states, local_hidden_states, weights.at(layer)->linear_attn.get(), layer});
         }
         else {
-            attn_layer_->Forward(
-                {phase, local_hidden_states, local_hidden_states, weights.at(layer)->self_attn_weights.get(), layer});
+            auto* attn = weights.at(layer)->attention.get();
+            attn_layer_->Forward({phase, local_hidden_states, local_hidden_states, attn, layer});
         }
 
         TM_DEBUG_TENSOR(local_hidden_states, Concat("attn_block", layer), 2);
@@ -259,17 +262,18 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
         // For gated delta networks, we may need a different output.bias name or it doesn't have it.
         // We will just use `output.bias` from either layer.
         Tensor out_bias;
-        if (weights.at(layer)->linear_attn_weights) {
-            out_bias = weights.at(layer)->linear_attn_weights->out_proj.bias;
+        if (weights.at(layer)->linear_attn) {
+            out_bias = weights.at(layer)->linear_attn->out_proj->bias;
         }
         else {
-            out_bias = weights.at(layer)->self_attn_weights->output.bias;
+            out_bias = weights.at(layer)->attention->wo->bias;
         }
 
         AllreduceResidualRMSnorm(global_hidden_states,
                                  local_residual,
                                  out_bias,
-                                 weights.at(layer)->ffn_norm,
+                                 weights.at(layer)->ffn_norm->weight,
+                                 weights.at(layer)->ffn_norm->norm_eps_,
                                  local_token_num,
                                  attn_tp_group_,
                                  0,
@@ -283,18 +287,18 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
 
         std::optional<MoeFfnLayer::ForwardParam> moe_fwd_param;
 
-        if (weights.at(layer)->moe_weights) {
+        if (weights.at(layer)->moe_ffn) {
             moe_fwd_param = MoeFfnLayer::ForwardParam{global_hidden_states,
                                                       global_hidden_states,
-                                                      weights.at(layer)->moe_weights.get(),
+                                                      weights.at(layer)->moe_ffn.get(),
                                                       ffn_layer_ ? 1.f : 0.f,
                                                       layer};
             moe_ffn_layer_->Forward(*moe_fwd_param);
         }
 
-        if (weights.at(layer)->ffn_weights) {
+        if (ffn_layer_ && weights.at(layer)->feed_forward) {
             ffn_layer_->forward(
-                {global_hidden_states, global_hidden_states, weights.at(layer)->ffn_weights.get(), (int)layer});
+                {global_hidden_states, global_hidden_states, weights.at(layer)->feed_forward.get(), (int)layer});
         }
 
         if (moe_fwd_param) {
@@ -303,42 +307,20 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
 
         TM_DEBUG_TENSOR(global_hidden_states, Concat("ffn_block", layer), 2);
 
-        // DFlash: 收集指定层的 hidden states
-        if (enable_dflash_ && dflash_draft_model_) {
-            for (int i = 0; i < 5; ++i) {
-                if (layer == dflash_aux_layers_[i]) {
-                    if (aux_hidden_states_.size() <= (size_t)i) {
-                        aux_hidden_states_.resize(5);
-                    }
-
-                    // 简化：无论是否有 selected_token_pos，都收集全部 token
-                    // 这样可以在 prefill 和 decode 阶段都能工作
-                    size_t collect_size = global_token_num;
-
-                    aux_hidden_states_[i] = Tensor{{(int)collect_size, (int)hidden_units_}, dtype, kDEVICE};
-
-                    Copy(global_hidden_states, aux_hidden_states_[i]);
-                    sync_check_cuda_error();  // Check for CUDA errors after copy
-                    TM_LOG_INFO("[DFlash] Collected aux hidden state at layer {}, token_num={}, shape=[{}, {}]",
-                                layer, (int)collect_size, (int)aux_hidden_states_[i].shape(0), (int)aux_hidden_states_[i].shape(1));
-                    break;
-                }
-            }
-        }
-
         const bool last = layer == layer_num_ - 1;
 
-        auto& scale_weight = !last ? weights.at(layer + 1)->self_attn_norm : args.at("output_norm_weight");
+        auto& scale_weight = !last ? weights.at(layer + 1)->attention_norm->weight : args.at("output_norm_weight");
 
         AllreduceResidualRMSnorm(global_hidden_states,
                                  local_residual,
                                  {},
                                  scale_weight,
+                                 weights.at(layer)->ffn_norm->norm_eps_,
                                  local_token_num,
                                  0,
                                  attn_tp_group_,
                                  local_token_nums.data());
-        sync_check_cuda_error();
+        TM_CUDA_CHECK(cudaGetLastError());
 
         TM_DEBUG_TENSOR(local_residual, Concat("residual1", layer), 2);
         TM_DEBUG_TENSOR(local_hidden_states, Concat("norm0", layer + 1), 2);
@@ -379,120 +361,6 @@ void UnifiedDecoder::Forward(int phase, TensorMap& args, const std::vector<Weigh
 
     if (output_hidden_states) {
         args.produce("full_hidden_states", hidden_states);
-    }
-
-    // DFlash: aux_hidden_states 已在层循环中收集
-    // 正确的 speculative decoding 流程：
-    // - prefill 阶段（global_token_num > 1）：生成并存储 draft tokens，但不验证
-    // - decode 阶段（global_token_num == 1）：验证已存储的 draft tokens，生成新的 drafts
-    //
-    // 注意：phase 是异步 pipeline 的阶段（0 或 1），不是 prefill/decode 的标志
-    // 我们使用 global_token_num 来判断当前是 prefill 还是 decode
-
-    const bool is_prefill = global_token_num > 1;
-    const bool is_decode = global_token_num == 1;
-
-    TM_LOG_INFO("[DFlash] Checking conditions: decoder_id={}, enable={}, model={}, phase={}, global_tokens={} (prefill={}, decode={})",
-                decoder_id_, (int)enable_dflash_, (void*)dflash_draft_model_, phase, (int)global_token_num, (int)is_prefill, (int)is_decode);
-
-    if (enable_dflash_ && dflash_draft_model_) {
-        TM_LOG_INFO("[DFlash] aux_hidden_states_.size()={}", aux_hidden_states_.size());
-
-        // Log aux hidden state shapes
-        for (size_t i = 0; i < aux_hidden_states_.size(); ++i) {
-            const auto& t = aux_hidden_states_[i];
-            TM_LOG_INFO("[DFlash] aux_hidden_states_[{}] shape=[{}, {}] dtype={}",
-                       i, (int)t.shape(0), (int)t.shape(1), (int)t.dtype());
-        }
-
-        // Check draft model weights
-        auto* draft_weight = dflash_draft_model_->GetDraftWeight();
-        if (!draft_weight || !draft_weight->lm_head || !draft_weight->embed_tokens) {
-            TM_LOG_WARNING("[DFlash] Draft weights not properly loaded, skipping DFlash");
-            TM_LOG_WARNING("[DFlash]   draft_weight={:p}, lm_head={:p}, embed_tokens={:p}",
-                        (void*)draft_weight,
-                        draft_weight ? (void*)draft_weight->lm_head.raw_data() : nullptr,
-                        draft_weight ? (void*)draft_weight->embed_tokens.raw_data() : nullptr);
-        } else if (!aux_hidden_states_.empty()) {
-            // ========== DECODE 阶段：验证 draft tokens 并生成新的 draft tokens ==========
-            if (is_decode) {
-                TM_LOG_INFO("[DFlash] === DECODE MODE: Verifying and generating draft tokens ===");
-
-                // 1. 检查是否有已存储的 draft tokens 需要验证
-                Tensor* stored_draft_ptr = args.try_("dflash_stored_draft_tokens");
-                if (stored_draft_ptr && stored_draft_ptr->shape(0) > 0) {
-                    Tensor stored_draft = *stored_draft_ptr;
-                    TM_LOG_INFO("[DFlash] Found stored draft tokens: count={}", stored_draft.shape(0));
-
-                    // 2. 获取目标 logits 进行验证（在调用这里之前，logits 还未被生成）
-                    // 注意：在 Decoder Forward 结束时，logits 会被 produce 到 env 中
-                    // 所以我们不能在这里直接访问 logits
-                    // 正确的做法是在 Generation 阶段验证，但我们需要 draft model
-                    // 所以这里我们只是将 stored draft 传递给下一阶段
-                    // 但这需要将 draft model 也传递下去...
-
-                    // 简化方案：将 stored draft 存储起来，在 Generation 中进行验证
-                    // 但 Generation 无法访问 draft model...
-
-                    // 最终方案：在 unified_decoder.cc 中，调用完 GenerateDraft 后，
-                    // 我们尝试从 logits 中验证 draft tokens
-                    // 但 logits 此时还不存在...
-
-                    // 实际上，我们需要在 Generation 阶段进行验证
-                    // 因为 logits 是在 Generation 阶段才被使用的
-                    // 所以我们先存储 draft tokens，让 Generation 使用
-                    args.produce("dflash_pending_draft_tokens", stored_draft);
-                    TM_LOG_INFO("[DFlash] Stored pending draft tokens for verification in Generation");
-                }
-
-                // 3. 生成新的 draft tokens 用于下次迭代
-                // 首先消费掉旧的 draft tokens（如果存在）
-                if (args.contains("dflash_stored_draft_tokens")) {
-                    args.try_consume("dflash_stored_draft_tokens");
-                    args.try_consume("dflash_stored_draft_logits");
-                }
-
-                Tensor draft_tokens, draft_logits;
-                TM_LOG_INFO("[DFlash] Generating new draft tokens for next iteration...");
-                dflash_draft_model_->GenerateDraft(aux_hidden_states_, draft_tokens, draft_logits);
-
-                if (draft_tokens && draft_tokens.shape(0) > 0) {
-                    TM_LOG_INFO("[DFlash] Generated {} new draft tokens", draft_tokens.shape(0));
-                    // 存储到 args 中供下次迭代使用
-                    args.produce("dflash_stored_draft_tokens", draft_tokens);
-                    args.produce("dflash_stored_draft_logits", draft_logits);
-                }
-            }
-            // ========== PREFILL 阶段：只生成 draft tokens，不验证 ==========
-            else if (is_prefill) {
-                TM_LOG_INFO("[DFlash] === PREFILL MODE: Generating draft tokens ===");
-
-                // 首先消费掉旧的 draft tokens（如果存在）
-                if (args.contains("dflash_stored_draft_tokens")) {
-                    args.try_consume("dflash_stored_draft_tokens");
-                    args.try_consume("dflash_stored_draft_logits");
-                }
-
-                // 生成 draft tokens 并存储，供后续 decode 阶段使用
-                Tensor draft_tokens, draft_logits;
-                dflash_draft_model_->GenerateDraft(aux_hidden_states_, draft_tokens, draft_logits);
-
-                if (draft_tokens && draft_tokens.shape(0) > 0) {
-                    TM_LOG_INFO("[DFlash] Generated {} draft tokens from prefill", draft_tokens.shape(0));
-                    // 存储到 args 中供后续使用
-                    args.produce("dflash_stored_draft_tokens", draft_tokens);
-                    args.produce("dflash_stored_draft_logits", draft_logits);
-                    TM_LOG_INFO("[DFlash] PREFILL: stored draft tokens in args, key exists={}", args.contains("dflash_stored_draft_tokens"));
-                }
-            }
-        } else {
-            TM_LOG_WARNING("[DFlash] aux_hidden_states_ is empty, cannot generate drafts!");
-        }
-    } else {
-        if (enable_dflash_) {
-            TM_LOG_INFO("[DFlash] Skipping: enable={}, model={}, phase={}",
-                        enable_dflash_, (void*)dflash_draft_model_, phase);
-        }
     }
 }
 
