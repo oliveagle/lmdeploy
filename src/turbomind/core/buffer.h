@@ -61,23 +61,30 @@ public:
     template<class T>
     T* data()
     {
+        // Check data_ first to avoid crash on NULL pointer
+        if (!data_) return nullptr;
         TM_CHECK_EQ(data_type_v<T>, dtype_);
-        return (T*)((char*)TM_CHECK_NOTNULL(data_).get() + turbomind::byte_size<T>(base_));
+        return (T*)((char*)data_.get() + turbomind::byte_size<T>(base_));
     }
 
     template<class T>
     const T* data() const
     {
+        // Check data_ first to avoid crash on NULL pointer
+        if (!data_) return nullptr;
         return const_cast<Buffer*>(this)->data<T>();
     }
 
     void* raw_data(ssize_t offset = 0)
     {
-        return (char*)TM_CHECK_NOTNULL(data_).get() + turbomind::byte_size(dtype_, base_ + offset);
+        if (!data_) return nullptr;
+        return (char*)data_.get() + turbomind::byte_size(dtype_, base_ + offset);
     }
 
     const void* raw_data(ssize_t offset = 0) const
     {
+        // Check data_ first to avoid crash on NULL pointer
+        if (!data_) return nullptr;
         return const_cast<Buffer*>(this)->raw_data(offset);
     }
 
@@ -222,24 +229,28 @@ struct Buffer_: public Buffer {
         return data_ ? data() : other;
     }
 
-    void* raw_data(ssize_t offset = 0)
+    T* raw_data(ssize_t offset = 0)
     {
-        return (char*)TM_CHECK_NOTNULL(data_).get() + turbomind::byte_size<T>(base_ + offset);
+        if (!this->data_) return nullptr;
+        return (char*)this->data_.get() + turbomind::byte_size<T>(base_ + offset);
     }
 
-    const void* raw_data(ssize_t offset = 0) const
+    const T* raw_data(ssize_t offset = 0) const
     {
+        if (!this->data_) return nullptr;
         return const_cast<Buffer_*>(this)->raw_data(offset);
     }
 
     T* data()
     {
-        return static_cast<T*>(raw_data());
+        auto ptr = raw_data();
+        return static_cast<T*>(ptr);
     }
 
     const T* data() const
     {
-        return static_cast<const T*>(raw_data());
+        auto ptr = raw_data();
+        return static_cast<const T*>(ptr);
     }
 
     T* begin()
